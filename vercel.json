@@ -1,8 +1,4 @@
 {
   "version": 2,
-  "buildCommand": "npm install",
-  "env": {
-    "GCR_SUPABASE_URL": "@gcr_supabase_url",
-    "GCR_SUPABASE_SERVICE_KEY": "@gcr_supabase_service_key"
-  }
+  "buildCommand": "npm install"
 }
