@@ -8,9 +8,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
-app.get('/', (req, res) => res.json({ status: 'GCR API running', endpoints: 'api/gcr/*, api/admin/gcr/*, api/menu-editor/*, api/tourist/*, api/tourist-auth/*' }));
+app.get('/', (req, res) => res.json({ status: 'GCR API running', endpoints: 'api/gcr/*, api/admin/*, api/menu-editor/*, api/tourist/*, api/tourist-auth/*' }));
 app.use('/api/gcr', require('./routes/gcr'));
-app.use('/api/admin/gcr', require('./routes/admin'));
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/menu-editor', require('./routes/menu-editor'));
 app.use('/api/tourist-auth', require('./routes/tourist-auth'));
 app.use('/api/tourist', require('./routes/tourist'));

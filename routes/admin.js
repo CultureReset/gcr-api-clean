@@ -37,14 +37,14 @@ function invalidateCache(res, entitySlug = null) {
 // ─── ENTITY CRUD ──────────────────────────────────────────────────────────────
 
 // GET /api/admin/gcr/entities
-router.get('/entities', async (req, res) => {
+router.get('/gcr/entities', async (req, res) => {
   const { data, error } = await db.from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating').order('name');
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
 
 // POST /api/admin/gcr/entities — create new entity
-router.post('/entities', authRequired, async (req, res) => {
+router.post('/gcr/entities', authRequired, async (req, res) => {
   const { entity, tags, hours } = req.body;
   if (!entity?.slug || !entity?.name) return res.status(400).json({ error: 'slug and name required' });
 
@@ -63,7 +63,7 @@ router.post('/entities', authRequired, async (req, res) => {
 });
 
 // GET /api/admin/gcr/entities/:slug
-router.get('/entities/:slug', async (req, res) => {
+router.get('/gcr/entities/:slug', async (req, res) => {
   const slug = req.params.slug;
   const [entRes, hoursRes, photosRes, tagsRes] = await Promise.all([
     db.from('entity').select('*').eq('slug', slug).single(),
@@ -76,7 +76,7 @@ router.get('/entities/:slug', async (req, res) => {
 });
 
 // PUT /api/admin/gcr/entities/:slug — update core entity fields
-router.put('/entities/:slug', authRequired, async (req, res) => {
+router.put('/gcr/entities/:slug', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { entity } = req.body;
   const { error } = await db.from('entity').update({ ...entity, updated_at: new Date().toISOString() }).eq('slug', slug);
@@ -86,7 +86,7 @@ router.put('/entities/:slug', authRequired, async (req, res) => {
 });
 
 // PATCH /api/admin/gcr/entities/:slug — bulk update everything at once
-router.patch('/entities/:slug', authRequired, async (req, res) => {
+router.patch('/gcr/entities/:slug', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { entity, hours, happyHour, menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, specials, tags, photos } = req.body;
   const errors = [];
@@ -197,7 +197,7 @@ router.patch('/entities/:slug', authRequired, async (req, res) => {
 });
 
 // DELETE /api/admin/gcr/entities/:slug
-router.delete('/entities/:slug', authRequired, async (req, res) => {
+router.delete('/gcr/entities/:slug', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { error } = await db.from('entity').delete().eq('slug', slug);
   if (error) return res.status(500).json({ error: error.message });
@@ -207,7 +207,7 @@ router.delete('/entities/:slug', authRequired, async (req, res) => {
 
 // ─── HOURS ────────────────────────────────────────────────────────────────────
 
-router.put('/entities/:slug/hours', authRequired, async (req, res) => {
+router.put('/gcr/entities/:slug/hours', authRequired, async (req, res) => {
   const { hours } = req.body;
   const slug = req.params.slug;
   await db.from('entity_hours').delete().eq('entity_slug', slug);
@@ -220,7 +220,7 @@ router.put('/entities/:slug/hours', authRequired, async (req, res) => {
 
 // ─── MENU SECTIONS + ITEMS ────────────────────────────────────────────────────
 
-router.post('/entities/:slug/menu-sections', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/menu-sections', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('menu_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
@@ -229,20 +229,20 @@ router.post('/entities/:slug/menu-sections', authRequired, async (req, res) => {
   res.status(201).json(data);
 });
 
-router.put('/menu-sections/:id', authRequired, async (req, res) => {
+router.put('/gcr/menu-sections/:id', authRequired, async (req, res) => {
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('menu_sections').update({ section_name, sort_order }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/menu-sections/:id', authRequired, async (req, res) => {
+router.delete('/gcr/menu-sections/:id', authRequired, async (req, res) => {
   const { error } = await db.from('menu_sections').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
 
-router.post('/entities/:slug/menu-items', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/menu-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { item_name, description, price, section_id, tags, image_url, image_path } = req.body;
   const { data, error } = await db.from('menu_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, tags: tags || null, image_url: image_url || null, image_path: image_path || null }).select().single();
@@ -251,14 +251,14 @@ router.post('/entities/:slug/menu-items', authRequired, async (req, res) => {
   res.status(201).json(data);
 });
 
-router.put('/menu-items/:id', authRequired, async (req, res) => {
+router.put('/gcr/menu-items/:id', authRequired, async (req, res) => {
   const { item_name, description, price, section_id, tags, image_url, image_path } = req.body;
   const { data, error } = await db.from('menu_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, section_id: section_id || null, tags: tags || null, image_url: image_url || null, image_path: image_path || null }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/menu-items/:id', authRequired, async (req, res) => {
+router.delete('/gcr/menu-items/:id', authRequired, async (req, res) => {
   const { error } = await db.from('menu_items').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -266,7 +266,7 @@ router.delete('/menu-items/:id', authRequired, async (req, res) => {
 
 // ─── DRINK SECTIONS + ITEMS ───────────────────────────────────────────────────
 
-router.post('/entities/:slug/drink-sections', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/drink-sections', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('drink_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
@@ -275,7 +275,7 @@ router.post('/entities/:slug/drink-sections', authRequired, async (req, res) => 
   res.status(201).json(data);
 });
 
-router.post('/entities/:slug/drink-items', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/drink-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { item_name, description, price, section_id, image_url, image_path } = req.body;
   const { data, error } = await db.from('drink_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
@@ -284,14 +284,14 @@ router.post('/entities/:slug/drink-items', authRequired, async (req, res) => {
   res.status(201).json(data);
 });
 
-router.put('/drink-items/:id', authRequired, async (req, res) => {
+router.put('/gcr/drink-items/:id', authRequired, async (req, res) => {
   const { item_name, description, price, section_id, image_url, image_path } = req.body;
   const { data, error } = await db.from('drink_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, section_id: section_id || null, image_url: image_url || null, image_path: image_path || null }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/drink-items/:id', authRequired, async (req, res) => {
+router.delete('/gcr/drink-items/:id', authRequired, async (req, res) => {
   const { error } = await db.from('drink_items').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -299,7 +299,7 @@ router.delete('/drink-items/:id', authRequired, async (req, res) => {
 
 // ─── HAPPY HOUR ───────────────────────────────────────────────────────────────
 
-router.put('/entities/:slug/happy-hour', authRequired, async (req, res) => {
+router.put('/gcr/entities/:slug/happy-hour', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { hh_days, hh_start, hh_end, hh_description } = req.body;
   const { error } = await db.from('entity').update({ hh_days, hh_start, hh_end, hh_description, updated_at: new Date().toISOString() }).eq('slug', slug);
@@ -308,7 +308,7 @@ router.put('/entities/:slug/happy-hour', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/entities/:slug/hh-sections', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/hh-sections', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('happy_hour_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
@@ -317,7 +317,7 @@ router.post('/entities/:slug/hh-sections', authRequired, async (req, res) => {
   res.status(201).json(data);
 });
 
-router.post('/entities/:slug/hh-items', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/hh-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { item_name, description, price, original_price, section_id, image_url, image_path } = req.body;
   const { data, error } = await db.from('happy_hour_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
@@ -326,14 +326,14 @@ router.post('/entities/:slug/hh-items', authRequired, async (req, res) => {
   res.status(201).json(data);
 });
 
-router.put('/hh-items/:id', authRequired, async (req, res) => {
+router.put('/gcr/hh-items/:id', authRequired, async (req, res) => {
   const { item_name, description, price, original_price, image_url, image_path } = req.body;
   const { data, error } = await db.from('happy_hour_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/hh-items/:id', authRequired, async (req, res) => {
+router.delete('/gcr/hh-items/:id', authRequired, async (req, res) => {
   const { error } = await db.from('happy_hour_items').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -341,19 +341,19 @@ router.delete('/hh-items/:id', authRequired, async (req, res) => {
 
 // ─── EVENTS ───────────────────────────────────────────────────────────────────
 
-router.post('/events', authRequired, async (req, res) => {
+router.post('/gcr/events', authRequired, async (req, res) => {
   const { data, error } = await db.from('entity_events').insert({ ...req.body, is_active: true }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
 });
 
-router.put('/events/:id', authRequired, async (req, res) => {
+router.put('/gcr/events/:id', authRequired, async (req, res) => {
   const { data, error } = await db.from('entity_events').update(req.body).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/events/:id', authRequired, async (req, res) => {
+router.delete('/gcr/events/:id', authRequired, async (req, res) => {
   const { error } = await db.from('entity_events').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -361,19 +361,19 @@ router.delete('/events/:id', authRequired, async (req, res) => {
 
 // ─── SPECIALS ─────────────────────────────────────────────────────────────────
 
-router.post('/specials', authRequired, async (req, res) => {
+router.post('/gcr/specials', authRequired, async (req, res) => {
   const { data, error } = await db.from('entity_specials').insert({ ...req.body, is_active: true }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
 });
 
-router.put('/specials/:id', authRequired, async (req, res) => {
+router.put('/gcr/specials/:id', authRequired, async (req, res) => {
   const { data, error } = await db.from('entity_specials').update(req.body).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-router.delete('/specials/:id', authRequired, async (req, res) => {
+router.delete('/gcr/specials/:id', authRequired, async (req, res) => {
   const { error } = await db.from('entity_specials').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -381,7 +381,7 @@ router.delete('/specials/:id', authRequired, async (req, res) => {
 
 // ─── PHOTOS ───────────────────────────────────────────────────────────────────
 
-router.post('/entities/:slug/photos', authRequired, async (req, res) => {
+router.post('/gcr/entities/:slug/photos', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { url, image_path, is_cover, sort_order, caption } = req.body;
   const { data, error } = await db.from('entity_photos').insert({ entity_slug: slug, url, image_path: image_path || null, is_cover: !!is_cover, sort_order: sort_order || 0, caption: caption || null }).select().single();
@@ -390,7 +390,7 @@ router.post('/entities/:slug/photos', authRequired, async (req, res) => {
   res.status(201).json(data);
 });
 
-router.delete('/photos/:id', authRequired, async (req, res) => {
+router.delete('/gcr/photos/:id', authRequired, async (req, res) => {
   const { error } = await db.from('entity_photos').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -398,7 +398,7 @@ router.delete('/photos/:id', authRequired, async (req, res) => {
 
 // ─── BULK IMPORT ──────────────────────────────────────────────────────────────
 
-router.post('/import-entity', authRequired, async (req, res) => {
+router.post('/gcr/import-entity', authRequired, async (req, res) => {
   const { entity, hours, tags, photos } = req.body;
   if (!entity?.slug || !entity?.name) return res.status(400).json({ error: 'slug and name required' });
 
@@ -420,7 +420,7 @@ router.post('/import-entity', authRequired, async (req, res) => {
   res.json({ success: true, slug });
 });
 
-router.post('/import-menu', authRequired, async (req, res) => {
+router.post('/gcr/import-menu', authRequired, async (req, res) => {
   const { entity_slug, sections } = req.body;
   if (!entity_slug || !sections?.length) return res.status(400).json({ error: 'entity_slug and sections required' });
 
@@ -437,7 +437,7 @@ router.post('/import-menu', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/import-drinks', authRequired, async (req, res) => {
+router.post('/gcr/import-drinks', authRequired, async (req, res) => {
   const { entity_slug, sections } = req.body;
   if (!entity_slug || !sections?.length) return res.status(400).json({ error: 'entity_slug and sections required' });
 
@@ -454,7 +454,7 @@ router.post('/import-drinks', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/import-happyhour', authRequired, async (req, res) => {
+router.post('/gcr/import-happyhour', authRequired, async (req, res) => {
   const { entity_slug, hh_days, hh_start, hh_end, hh_description, sections } = req.body;
   if (!entity_slug) return res.status(400).json({ error: 'entity_slug required' });
 
@@ -472,7 +472,7 @@ router.post('/import-happyhour', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
-router.post('/import-events', authRequired, async (req, res) => {
+router.post('/gcr/import-events', authRequired, async (req, res) => {
   const { entity_slug, events } = req.body;
   if (!entity_slug || !events?.length) return res.status(400).json({ error: 'entity_slug and events required' });
   const rows = events.map(e => ({ entity_slug, entity_name: e.entity_name || null, event_name: e.event_name || e.name, description: e.description || null, event_date: e.event_date || null, start_time: e.start_time || null, end_time: e.end_time || null, day_of_week: e.day_of_week || null, recurring: !!e.recurring, artist_name: e.artist_name || null, cover_charge: e.cover_charge || null, is_active: true, image_url: e.image_url || null }));
@@ -481,7 +481,7 @@ router.post('/import-events', authRequired, async (req, res) => {
   res.json({ success: true, count: rows.length });
 });
 
-router.post('/import-specials', authRequired, async (req, res) => {
+router.post('/gcr/import-specials', authRequired, async (req, res) => {
   const { entity_slug, specials } = req.body;
   if (!entity_slug || !specials?.length) return res.status(400).json({ error: 'entity_slug and specials required' });
   const rows = specials.map(s => ({ entity_slug, entity_name: s.entity_name || null, special_name: s.special_name || s.name, description: s.description || null, discount_type: s.discount_type || null, discount_value: s.discount_value || null, discount_text: s.discount_text || null, days: s.days || null, day_of_week: s.day_of_week || null, start_time: s.start_time || null, end_time: s.end_time || null, is_active: true, image_url: s.image_url || null }));
@@ -490,7 +490,7 @@ router.post('/import-specials', authRequired, async (req, res) => {
   res.json({ success: true, count: rows.length });
 });
 
-router.post('/import-photos', authRequired, async (req, res) => {
+router.post('/gcr/import-photos', authRequired, async (req, res) => {
   const { entity_slug, photos } = req.body;
   if (!entity_slug || !photos?.length) return res.status(400).json({ error: 'entity_slug and photos required' });
   const rows = photos.map((p, i) => ({ entity_slug, url: p.url, image_path: p.image_path || null, is_cover: !!p.is_cover, sort_order: p.sort_order ?? i, caption: p.caption || null }));
@@ -500,7 +500,7 @@ router.post('/import-photos', authRequired, async (req, res) => {
 });
 
 // import-master — import everything for one entity at once
-router.post('/import-master', authRequired, async (req, res) => {
+router.post('/gcr/import-master', authRequired, async (req, res) => {
   const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials } = req.body;
   if (!entity?.slug || !entity?.name) return res.status(400).json({ error: 'entity.slug and entity.name required' });
 
@@ -581,6 +581,381 @@ router.post('/import-master', authRequired, async (req, res) => {
   }
 
   res.json({ success: true, slug, results });
+});
+
+// ─── TRIP SWIPE: TOURISTS ─────────────────────────────────────────────────────
+
+// GET /api/admin/tourists — list all tourists with summary stats
+router.get('/tourists', authRequired, async (req, res) => {
+  try {
+    const { data: profiles, error } = await db.from('tourist_profiles')
+      .select('user_id, email, name, phone, created_at, updated_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Fetch summary stats for each tourist
+    const tourists = await Promise.all((profiles || []).map(async (p) => {
+      const [saves, swipes, itinerary] = await Promise.all([
+        db.from('tourist_saves').select('id', { count: 'exact', head: true }).eq('user_id', p.user_id),
+        db.from('tourist_swipe_events').select('id', { count: 'exact', head: true }).eq('user_id', p.user_id),
+        db.from('tourist_itineraries').select('*').eq('user_id', p.user_id).maybeSingle()
+      ]);
+
+      return {
+        user_id: p.user_id,
+        email: p.email,
+        name: p.name || p.email.split('@')[0],
+        phone: p.phone,
+        saves_count: saves.count || 0,
+        swipes_count: swipes.count || 0,
+        itineraries_count: itinerary ? 1 : 0,
+        created_at: p.created_at,
+        updated_at: p.updated_at
+      };
+    }));
+
+    res.json({ tourists });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/admin/tourists/:user_id — get tourist detail with all data
+router.get('/tourists/:user_id', authRequired, async (req, res) => {
+  try {
+    const uid = req.params.user_id;
+    const [profile, saves, itinerary, swipes] = await Promise.all([
+      db.from('tourist_profiles').select('*').eq('user_id', uid).maybeSingle(),
+      db.from('tourist_saves').select('*').eq('user_id', uid).order('saved_at', { ascending: false }),
+      db.from('tourist_itineraries').select('*').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
+      db.from('tourist_swipe_events').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(100)
+    ]);
+
+    res.json({
+      profile: profile.data || null,
+      saves: saves.data || [],
+      itinerary: itinerary.data || null,
+      recent_swipes: swipes.data || []
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/admin/tourists/:user_id/preferences — get tourist preference scores
+router.get('/tourists/:user_id/preferences', authRequired, async (req, res) => {
+  try {
+    const uid = req.params.user_id;
+    const { data: prefs, error } = await db.from('user_preference_scores')
+      .select('*')
+      .eq('tourist_id', uid)
+      .order('score', { ascending: false });
+
+    if (error) throw error;
+    res.json({ preferences: prefs || [] });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/tourists/:user_id — delete tourist and cascade all data
+router.delete('/tourists/:user_id', authRequired, async (req, res) => {
+  try {
+    const uid = req.params.user_id;
+
+    // Delete cascading records
+    await Promise.all([
+      db.from('tourist_saves').delete().eq('user_id', uid),
+      db.from('tourist_swipe_events').delete().eq('user_id', uid),
+      db.from('tourist_itineraries').delete().eq('user_id', uid),
+      db.from('user_preference_scores').delete().eq('tourist_id', uid),
+      db.from('tourist_profiles').delete().eq('user_id', uid)
+    ]);
+
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── TRIP SWIPE: ANALYTICS ───────────────────────────────────────────────────
+
+// GET /api/admin/tripswipe-analytics — swipe activity stats
+router.get('/tripswipe-analytics', authRequired, async (req, res) => {
+  try {
+    const period = req.query.period || 'week';
+    const now = new Date();
+    let since = new Date(now);
+
+    if (period === 'today') since.setHours(0, 0, 0, 0);
+    else if (period === 'week') since.setDate(now.getDate() - 7);
+    else if (period === 'month') since.setMonth(now.getMonth() - 1);
+
+    const { data: events, error } = await db.from('tourist_swipe_events')
+      .select('*')
+      .gte('created_at', since.toISOString());
+
+    if (error) throw error;
+
+    const events_arr = events || [];
+    const likes = events_arr.filter(e => e.direction === 'like').length;
+    const nopes = events_arr.filter(e => e.direction === 'nope').length;
+    const total = events_arr.length;
+
+    // Category breakdown
+    const cats = {};
+    events_arr.forEach(e => {
+      const cat = e.category || 'unknown';
+      cats[cat] = (cats[cat] || 0) + 1;
+    });
+
+    res.json({
+      total_seen: total,
+      total_likes: likes,
+      total_nopes: nopes,
+      like_rate: total > 0 ? Math.round((likes / total) * 100) : 0,
+      categories: Object.entries(cats).map(([cat, count]) => ({ cat, count }))
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── TRIP SWIPE: SPONSORED BUSINESSES ──────────────────────────────────────
+
+// GET /api/admin/tripswipe/sponsored — list sponsored businesses
+router.get('/tripswipe/sponsored', authRequired, async (req, res) => {
+  try {
+    const { data: sponsored, error } = await db.from('tripswipe_sponsored')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ sponsored: sponsored || [] });
+  } catch(e) {
+    res.status(500).json({ sponsored: [] });
+  }
+});
+
+// POST /api/admin/tripswipe/sponsored — add sponsored business
+router.post('/tripswipe/sponsored', authRequired, async (req, res) => {
+  try {
+    const { entity_slug, entity_id, business_name, images, description, cta_text, cta_url, start_date, end_date } = req.body;
+
+    const { data, error } = await db.from('tripswipe_sponsored').insert({
+      entity_slug,
+      entity_id,
+      business_name,
+      images: images || [],
+      description,
+      cta_text,
+      cta_url,
+      start_date,
+      end_date,
+      is_active: true,
+      created_at: new Date().toISOString()
+    }).select('*').single();
+
+    if (error) throw error;
+    invalidateCache(res);
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/admin/tripswipe/sponsored/:id — update sponsored
+router.put('/tripswipe/sponsored/:id', authRequired, async (req, res) => {
+  try {
+    const { data, error } = await db.from('tripswipe_sponsored')
+      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    invalidateCache(res);
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/tripswipe/sponsored/:id
+router.delete('/tripswipe/sponsored/:id', authRequired, async (req, res) => {
+  try {
+    const { error } = await db.from('tripswipe_sponsored').delete().eq('id', req.params.id);
+    if (error) throw error;
+    invalidateCache(res);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── TRIP SWIPE: PROMO CARDS (Tonight) ─────────────────────────────────────
+
+// GET /api/admin/tripswipe/promo-cards — list promo cards
+router.get('/tripswipe/promo-cards', authRequired, async (req, res) => {
+  try {
+    const { data: cards, error } = await db.from('tripswipe_promo_cards')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ cards: cards || [] });
+  } catch(e) {
+    res.status(500).json({ cards: [] });
+  }
+});
+
+// POST /api/admin/tripswipe/promo-cards — add promo card
+router.post('/tripswipe/promo-cards', authRequired, async (req, res) => {
+  try {
+    const { title, description, image_url, cta_text, cta_url, show_date, is_active } = req.body;
+
+    const { data, error } = await db.from('tripswipe_promo_cards').insert({
+      title,
+      description,
+      image_url,
+      cta_text,
+      cta_url,
+      show_date,
+      is_active: is_active !== false,
+      created_at: new Date().toISOString()
+    }).select('*').single();
+
+    if (error) throw error;
+    invalidateCache(res);
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/admin/tripswipe/promo-cards/:id — update promo card
+router.put('/tripswipe/promo-cards/:id', authRequired, async (req, res) => {
+  try {
+    const { data, error } = await db.from('tripswipe_promo_cards')
+      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    invalidateCache(res);
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/tripswipe/promo-cards/:id
+router.delete('/tripswipe/promo-cards/:id', authRequired, async (req, res) => {
+  try {
+    const { error } = await db.from('tripswipe_promo_cards').delete().eq('id', req.params.id);
+    if (error) throw error;
+    invalidateCache(res);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── TRIP SWIPE: BUSINESS SETTINGS ────────────────────────────────────────
+
+// GET /api/admin/tripswipe/settings — get Trip Swipe business settings
+router.get('/tripswipe/settings', authRequired, async (req, res) => {
+  try {
+    const { data: settings, error } = await db.from('tripswipe_business_settings')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ settings: settings || [] });
+  } catch(e) {
+    res.status(500).json({ settings: [] });
+  }
+});
+
+// GET /api/admin/tripswipe/settings/:slug — get Trip Swipe setting for one business
+router.get('/tripswipe/settings/:slug', authRequired, async (req, res) => {
+  try {
+    const { data: setting, error } = await db.from('tripswipe_business_settings')
+      .select('*')
+      .eq('entity_slug', req.params.slug)
+      .maybeSingle();
+
+    if (error) throw error;
+    res.json(setting || { entity_slug: req.params.slug, enabled: true, show_on_tripswipe: true });
+  } catch(e) {
+    res.status(500).json({});
+  }
+});
+
+// PUT /api/admin/tripswipe/settings/:slug — update Trip Swipe setting
+router.put('/tripswipe/settings/:slug', authRequired, async (req, res) => {
+  try {
+    const slug = req.params.slug;
+
+    // Try to update, if not found insert
+    const { data: existing } = await db.from('tripswipe_business_settings')
+      .select('id')
+      .eq('entity_slug', slug)
+      .maybeSingle();
+
+    let result;
+    if (existing) {
+      const { data, error } = await db.from('tripswipe_business_settings')
+        .update({ ...req.body, updated_at: new Date().toISOString() })
+        .eq('entity_slug', slug)
+        .select('*')
+        .single();
+      if (error) throw error;
+      result = data;
+    } else {
+      const { data, error } = await db.from('tripswipe_business_settings').insert({
+        entity_slug: slug,
+        ...req.body,
+        created_at: new Date().toISOString()
+      }).select('*').single();
+      if (error) throw error;
+      result = data;
+    }
+
+    invalidateCache(res, slug);
+    res.json(result);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── PLATFORM ANALYTICS ───────────────────────────────────────────────────
+
+// GET /api/admin/platform-analytics — overall platform stats
+router.get('/platform-analytics', authRequired, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days || '30');
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const [tourists, saves, swipes, itineraries] = await Promise.all([
+      db.from('tourist_profiles').select('id', { count: 'exact', head: true }).gte('created_at', since),
+      db.from('tourist_saves').select('id', { count: 'exact', head: true }).gte('created_at', since),
+      db.from('tourist_swipe_events').select('id', { count: 'exact', head: true }).gte('created_at', since),
+      db.from('tourist_itineraries').select('id', { count: 'exact', head: true }).gte('created_at', since)
+    ]);
+
+    res.json({
+      period_days: days,
+      total_tourists: tourists.count || 0,
+      total_saves: saves.count || 0,
+      total_swipes: swipes.count || 0,
+      total_itineraries: itineraries.count || 0
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
