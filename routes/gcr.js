@@ -485,4 +485,47 @@ router.get('/category-page-config/:category', async (req, res) => {
   }
 });
 
+// ─── GET /api/gcr/entities/:parentSlug/children ───────────────────────────────
+router.get('/entities/:parentSlug/children', async (req, res) => {
+  try {
+    const { data, error } = await db
+      .from('entity')
+      .select('*')
+      .eq('parent_slug', req.params.parentSlug)
+      .eq('is_active', true)
+      .order('name');
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ children: data || [], total: (data || []).length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gcr/live-now ────────────────────────────────────────────────────
+router.get('/live-now', async (req, res) => {
+  try {
+    const now = new Date();
+    const nowTime = now.toTimeString().slice(0, 5);
+    const nowDate = now.toISOString().split('T')[0];
+
+    const { data: entities, error } = await db
+      .from('entity')
+      .select('id, slug, name, subtitle, entity_subtype, icon, phone, rating, review_count, city, state, address_line_1, hero_image_url, website_url, hh_days, hh_start, hh_end, hh_description')
+      .eq('is_active', true)
+      .limit(20);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const liveNow = (entities || []).filter(e => {
+      const hasHH = e.hh_days && e.hh_start && e.hh_end && nowTime >= e.hh_start && nowTime <= e.hh_end;
+      return hasHH;
+    });
+
+    res.json({ liveNow, total: liveNow.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
