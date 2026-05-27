@@ -20,6 +20,20 @@ function authRequired(req, res, next) {
   next();
 }
 
+// ─── CACHE INVALIDATION ───────────────────────────────────────────────────────
+// Clears cache by setting headers that tell CDN/clients to revalidate
+// This is called after every PATCH/POST/DELETE to ensure fresh data
+function invalidateCache(res, entitySlug = null) {
+  // Set headers to bust cache immediately - tells Vercel CDN and browsers to not cache
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+    'X-Cache-Invalidated': new Date().toISOString(),
+    'X-Invalidated-Slug': entitySlug || 'all-entities'
+  });
+}
+
 // ─── ENTITY CRUD ──────────────────────────────────────────────────────────────
 
 // GET /api/admin/gcr/entities
@@ -44,6 +58,7 @@ router.post('/entities', authRequired, async (req, res) => {
   if (hours?.length) ops.push(db.from('entity_hours').insert(hours.map(h => ({ entity_slug: slug, day_of_week: h.day_of_week, opens_at: h.opens_at || null, closes_at: h.closes_at || null, is_closed: !!h.is_closed }))));
 
   if (ops.length) await Promise.all(ops);
+  invalidateCache(res, slug);
   res.status(201).json(created);
 });
 
@@ -62,9 +77,11 @@ router.get('/entities/:slug', async (req, res) => {
 
 // PUT /api/admin/gcr/entities/:slug — update core entity fields
 router.put('/entities/:slug', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { entity } = req.body;
-  const { error } = await db.from('entity').update({ ...entity, updated_at: new Date().toISOString() }).eq('slug', req.params.slug);
+  const { error } = await db.from('entity').update({ ...entity, updated_at: new Date().toISOString() }).eq('slug', slug);
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.json({ success: true });
 });
 
@@ -175,13 +192,16 @@ router.patch('/entities/:slug', authRequired, async (req, res) => {
   }
 
   if (errors.length) return res.status(207).json({ success: false, errors });
+  invalidateCache(res, slug);
   res.json({ success: true });
 });
 
 // DELETE /api/admin/gcr/entities/:slug
 router.delete('/entities/:slug', authRequired, async (req, res) => {
-  const { error } = await db.from('entity').delete().eq('slug', req.params.slug);
+  const slug = req.params.slug;
+  const { error } = await db.from('entity').delete().eq('slug', slug);
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.json({ success: true });
 });
 
@@ -194,15 +214,18 @@ router.put('/entities/:slug/hours', authRequired, async (req, res) => {
   const rows = hours.map(h => ({ entity_slug: slug, day_of_week: h.day_of_week, opens_at: h.opens_at || null, closes_at: h.closes_at || null, is_closed: !!h.is_closed }));
   const { error } = await db.from('entity_hours').insert(rows);
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.json({ success: true });
 });
 
 // ─── MENU SECTIONS + ITEMS ────────────────────────────────────────────────────
 
 router.post('/entities/:slug/menu-sections', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { section_name, sort_order } = req.body;
-  const { data, error } = await db.from('menu_sections').insert({ entity_slug: req.params.slug, section_name, sort_order: sort_order || 0 }).select().single();
+  const { data, error } = await db.from('menu_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
@@ -220,9 +243,11 @@ router.delete('/menu-sections/:id', authRequired, async (req, res) => {
 });
 
 router.post('/entities/:slug/menu-items', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { item_name, description, price, section_id, tags, image_url, image_path } = req.body;
-  const { data, error } = await db.from('menu_items').insert({ entity_slug: req.params.slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, tags: tags || null, image_url: image_url || null, image_path: image_path || null }).select().single();
+  const { data, error } = await db.from('menu_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, tags: tags || null, image_url: image_url || null, image_path: image_path || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
@@ -242,16 +267,20 @@ router.delete('/menu-items/:id', authRequired, async (req, res) => {
 // ─── DRINK SECTIONS + ITEMS ───────────────────────────────────────────────────
 
 router.post('/entities/:slug/drink-sections', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { section_name, sort_order } = req.body;
-  const { data, error } = await db.from('drink_sections').insert({ entity_slug: req.params.slug, section_name, sort_order: sort_order || 0 }).select().single();
+  const { data, error } = await db.from('drink_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
 router.post('/entities/:slug/drink-items', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { item_name, description, price, section_id, image_url, image_path } = req.body;
-  const { data, error } = await db.from('drink_items').insert({ entity_slug: req.params.slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
+  const { data, error } = await db.from('drink_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
@@ -271,23 +300,29 @@ router.delete('/drink-items/:id', authRequired, async (req, res) => {
 // ─── HAPPY HOUR ───────────────────────────────────────────────────────────────
 
 router.put('/entities/:slug/happy-hour', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { hh_days, hh_start, hh_end, hh_description } = req.body;
-  const { error } = await db.from('entity').update({ hh_days, hh_start, hh_end, hh_description, updated_at: new Date().toISOString() }).eq('slug', req.params.slug);
+  const { error } = await db.from('entity').update({ hh_days, hh_start, hh_end, hh_description, updated_at: new Date().toISOString() }).eq('slug', slug);
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.json({ success: true });
 });
 
 router.post('/entities/:slug/hh-sections', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { section_name, sort_order } = req.body;
-  const { data, error } = await db.from('happy_hour_sections').insert({ entity_slug: req.params.slug, section_name, sort_order: sort_order || 0 }).select().single();
+  const { data, error } = await db.from('happy_hour_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
 router.post('/entities/:slug/hh-items', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { item_name, description, price, original_price, section_id, image_url, image_path } = req.body;
-  const { data, error } = await db.from('happy_hour_items').insert({ entity_slug: req.params.slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
+  const { data, error } = await db.from('happy_hour_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
@@ -347,9 +382,11 @@ router.delete('/specials/:id', authRequired, async (req, res) => {
 // ─── PHOTOS ───────────────────────────────────────────────────────────────────
 
 router.post('/entities/:slug/photos', authRequired, async (req, res) => {
+  const slug = req.params.slug;
   const { url, image_path, is_cover, sort_order, caption } = req.body;
-  const { data, error } = await db.from('entity_photos').insert({ entity_slug: req.params.slug, url, image_path: image_path || null, is_cover: !!is_cover, sort_order: sort_order || 0, caption: caption || null }).select().single();
+  const { data, error } = await db.from('entity_photos').insert({ entity_slug: slug, url, image_path: image_path || null, is_cover: !!is_cover, sort_order: sort_order || 0, caption: caption || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
