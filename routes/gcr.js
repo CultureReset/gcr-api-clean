@@ -102,6 +102,17 @@ router.get('/entities', async (req, res) => {
       .order('name')
       .range(offset, offset + limit - 1);
 
+    if (req.query.type) {
+      if (req.query.type === 'coffee') {
+        // Coffee & Sweets: show both coffee and dessert places
+        query = query.in('entity_type', ['coffee', 'dessert', 'bakery']);
+      } else if (req.query.type === 'staying') {
+        // Hotels & Rentals: show hotels, condos, vacation homes
+        query = query.in('entity_type', ['hotel', 'condo', 'vacation-rental']);
+      } else {
+        query = query.eq('entity_type', req.query.type);
+      }
+    }
     if (req.query.subtype) query = query.eq('entity_subtype', req.query.subtype);
     if (req.query.city)    query = query.ilike('city', `%${req.query.city}%`);
     if (req.query.search)  query = query.ilike('name', `%${req.query.search}%`);

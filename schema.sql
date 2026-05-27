@@ -246,6 +246,76 @@ CREATE INDEX idx_events_artist ON entity_events(artist_id);
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
+-- 14. TOURIST_PROFILES (tourist/user accounts — keyed by phone)
+CREATE TABLE IF NOT EXISTS tourist_profiles (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  phone text UNIQUE NOT NULL,
+  name text,
+  email text,
+  avatar_url text,
+  otp_code text,
+  otp_expires timestamptz,
+  sms_opt_in boolean DEFAULT true,
+  sms_opted_in_at timestamptz,
+  setup_complete boolean DEFAULT false,
+  preferences jsonb DEFAULT '{}',
+  last_active timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- 15. TOURIST_SESSIONS (OTP sessions — fallback if tourist_profiles fails)
+CREATE TABLE IF NOT EXISTS tourist_sessions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  phone text UNIQUE NOT NULL,
+  otp_code text,
+  otp_expires timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- 16. TOURIST_SAVES (entities saved by users across both modes)
+CREATE TABLE IF NOT EXISTS tourist_saves (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tourist_id uuid NOT NULL REFERENCES tourist_profiles(id) ON DELETE CASCADE,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  saved_at timestamptz DEFAULT now(),
+  UNIQUE(tourist_id, entity_slug)
+);
+
+-- 17. TOURIST_SWIPES (swipe events in trip-swipe mode)
+CREATE TABLE IF NOT EXISTS tourist_swipes (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tourist_id uuid NOT NULL REFERENCES tourist_profiles(id) ON DELETE CASCADE,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  direction text CHECK (direction IN ('left', 'right')),
+  category text,
+  swiped_at timestamptz DEFAULT now()
+);
+
+-- 18. TOURIST_SEEN (card-seen tracking for swipe deck reset)
+CREATE TABLE IF NOT EXISTS tourist_seen (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tourist_id uuid NOT NULL REFERENCES tourist_profiles(id) ON DELETE CASCADE,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  seen_at timestamptz DEFAULT now(),
+  UNIQUE(tourist_id, entity_slug)
+);
+
+-- 19. TOURIST_ITINERARIES (saved trip plans)
+CREATE TABLE IF NOT EXISTS tourist_itineraries (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tourist_id uuid NOT NULL REFERENCES tourist_profiles(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  description text,
+  days jsonb DEFAULT '[]',
+  start_date date,
+  end_date date,
+  shared_with text[],
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
 ALTER TABLE entity ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_photos ENABLE ROW LEVEL SECURITY;
@@ -259,6 +329,12 @@ ALTER TABLE happy_hour_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_specials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tourist_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tourist_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tourist_saves ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tourist_swipes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tourist_seen ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tourist_itineraries ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Public read" ON entity FOR SELECT USING (true);
 CREATE POLICY "Public read" ON entity_hours FOR SELECT USING (true);
@@ -287,6 +363,13 @@ CREATE POLICY "Service write" ON happy_hour_items FOR ALL USING (auth.role() = '
 CREATE POLICY "Service write" ON entity_specials FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON entity_events FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON artists FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service full access" ON tourist_profiles FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service full access" ON tourist_sessions FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service full access" ON tourist_saves FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service full access" ON tourist_swipes FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service full access" ON tourist_seen FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service full access" ON tourist_itineraries FOR ALL USING (auth.role() = 'service_role');
 
 -- ============================================================
 -- STORAGE BUCKET: create 'media' as public in Supabase UI
