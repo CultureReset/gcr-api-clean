@@ -385,4 +385,104 @@ router.post('/search', async (req, res) => {
   }
 });
 
+// ─── GET /api/gcr/sections ────────────────────────────────────────────────────
+router.get('/sections', async (req, res) => {
+  try {
+    const sections = [
+      { type: 'restaurants', name: 'Restaurants', icon: '🍽️', count: 0 },
+      { type: 'coffee-sweets', name: 'Coffee & Sweets', icon: '☕', count: 0 },
+      { type: 'happy-hours', name: 'Happy Hours', icon: '🍻', count: 0 },
+      { type: 'events', name: 'Events', icon: '🎉', count: 0 },
+      { type: 'things-to-do', name: 'Things To Do', icon: '🎯', count: 0 },
+      { type: 'services', name: 'Services', icon: '🛠️', count: 0 },
+      { type: 'public-spots', name: 'Public Spots', icon: '✨', count: 0 },
+      { type: 'shopping', name: 'Shopping', icon: '🛍️', count: 0 },
+      { type: 'hotel', name: 'Staying', icon: '🏨', count: 0 },
+    ];
+
+    const typeMap = {
+      'restaurants': 'restaurant',
+      'coffee-sweets': 'coffee',
+      'happy-hours': null,
+      'events': 'event',
+      'things-to-do': 'activity',
+      'services': 'service',
+      'public-spots': 'park',
+      'shopping': 'shopping',
+      'hotel': 'hotel'
+    };
+
+    for (let section of sections) {
+      const entityType = typeMap[section.type];
+      if (entityType) {
+        const { count } = await db
+          .from('entity')
+          .select('id', { count: 'exact', head: true })
+          .eq('entity_type', entityType)
+          .eq('is_active', true);
+        section.count = count || 0;
+      }
+    }
+
+    res.json({ sections, total_entities: sections.reduce((s, t) => s + t.count, 0), total_types: sections.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gcr/category-page-config/:category ───────────────────────────────
+router.get('/category-page-config/:category', async (req, res) => {
+  try {
+    const pageConfig = {
+      restaurants: {
+        page_title: 'Restaurants',
+        page_description: 'Browse Gulf Coast spots, then use tags at the top to narrow the results by vibe, location, and what people care about most.'
+      },
+      'coffee-sweets': {
+        page_title: 'Coffee & Sweets',
+        page_description: 'Find your favorite coffee shop, bakery, or dessert spot on the Gulf Coast.'
+      },
+      'happy-hours': {
+        page_title: 'Happy Hours',
+        page_description: 'Discover happy hour specials and drink deals across the Gulf Coast.'
+      },
+      events: {
+        page_title: 'Events & Entertainment',
+        page_description: 'Find live music, concerts, festivals, and events happening now on the Gulf Coast.'
+      },
+      'things-to-do': {
+        page_title: 'Things To Do',
+        page_description: 'Explore activities, attractions, tours, and adventures on the Gulf Coast.'
+      },
+      services: {
+        page_title: 'Services',
+        page_description: 'Find local services and professionals on the Gulf Coast.'
+      },
+      'public-spots': {
+        page_title: 'Public Spots',
+        page_description: 'Discover parks, beaches, and public areas on the Gulf Coast.'
+      },
+      shopping: {
+        page_title: 'Shopping',
+        page_description: 'Browse retail stores and boutiques on the Gulf Coast.'
+      },
+      hotel: {
+        page_title: 'Staying',
+        page_description: 'Find hotels, resorts, and vacation rentals on the Gulf Coast.'
+      },
+      feed: {
+        page_title: 'Live Feed',
+        page_description: 'See what\'s happening now on the Gulf Coast.'
+      }
+    };
+
+    const config = pageConfig[req.params.category];
+    if (!config) return res.status(404).json({ error: 'Category not found' });
+
+    res.json({ config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
