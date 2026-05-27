@@ -1434,6 +1434,55 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     res.json({ sent: profiles.length, numbers });
 });
 
+// GET /api/tourist/analytics — swipe trends and engagement metrics
+router.get('/analytics', touristAuth, async (req, res) => {
+    const touristId = req.touristId;
+
+    try {
+        const { data: events } = await mainDb
+            .from('tourist_swipes')
+            .select('direction, category, swiped_at')
+            .eq('tourist_id', touristId)
+            .order('swiped_at', { ascending: false });
+
+        const { data: saves } = await mainDb
+            .from('tourist_saves')
+            .select('category:entity_slug, saved_at')
+            .eq('tourist_id', touristId);
+
+        const directionCounts = { left: 0, right: 0 };
+        const categoryCounts = {};
+        const dailySwipes = {};
+
+        for (const ev of (events || [])) {
+            directionCounts[ev.direction] = (directionCounts[ev.direction] || 0) + 1;
+            categoryCounts[ev.category] = (categoryCounts[ev.category] || 0) + 1;
+
+            const date = new Date(ev.swiped_at).toISOString().split('T')[0];
+            dailySwipes[date] = (dailySwipes[date] || 0) + 1;
+        }
+
+        const totalSwipes = events?.length || 0;
+        const likeRate = totalSwipes > 0 ? (directionCounts.right / totalSwipes * 100).toFixed(1) : 0;
+        const avgSwipesPerDay = totalSwipes > 0 ? (totalSwipes / (Object.keys(dailySwipes).length || 1)).toFixed(1) : 0;
+
+        res.json({
+            total_swipes: totalSwipes,
+            total_saves: saves?.length || 0,
+            swipe_breakdown: directionCounts,
+            like_rate: parseFloat(likeRate),
+            category_distribution: categoryCounts,
+            daily_swipes: dailySwipes,
+            avg_swipes_per_day: parseFloat(avgSwipesPerDay),
+            first_swipe: events?.[events.length - 1]?.swiped_at || null,
+            last_swipe: events?.[0]?.swiped_at || null,
+        });
+    } catch (e) {
+        console.error('[analytics] Error:', e?.message);
+        return res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+});
+
 module.exports = router;
 module.exports.touristAuth = touristAuth;
 module.exports._recomputeAllPreferences = recomputeAllPreferences;
