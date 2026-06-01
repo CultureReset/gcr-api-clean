@@ -67,7 +67,7 @@ router.post('/:slug/auth', async (req, res) => {
 router.get('/:slug/data', pinAuth, async (req, res) => {
   const slug = req.entitySlug;
 
-  const { data: entity } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description').eq('slug', slug).single();
+  const { data: entity } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
   const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures] = await Promise.all([
@@ -103,6 +103,7 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     events: events.data || [],
     sides: sides.data || [],
     daily_features: dailyFeatures.data || [],
+    gallery_sections: entity?.gallery_sections || [],
   });
 });
 
@@ -344,13 +345,13 @@ async function uploadBase64Image(slug, itemId, itemType, base64Str) {
 
 router.post('/:slug/save', pinAuth, async (req, res) => {
   const slug = req.entitySlug;
-  const { business, gallery = [], sides = [], dailyFeatures = [], areas = [], happyHour = [] } = req.body;
+  const { business, gallery = [], gallery_sections = [], sides = [], dailyFeatures = [], areas = [], happyHour = [] } = req.body;
 
   if (!business || !business.name) return res.status(400).json({ error: 'Business name required' });
 
   try {
     // 1. Update entity (business info)
-    const { error: entityErr } = await db.from('entity').update({
+    const updateData = {
       name: business.name,
       subtitle: business.tagline || null,
       description: business.about || null,
@@ -358,7 +359,14 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       website_url: business.website || null,
       address_line_1: business.address || null,
       updated_at: new Date().toISOString(),
-    }).eq('slug', slug);
+    };
+
+    // Add gallery_sections if table has the column
+    if (gallery_sections && gallery_sections.length > 0) {
+      updateData.gallery_sections = gallery_sections;
+    }
+
+    const { error: entityErr } = await db.from('entity').update(updateData).eq('slug', slug);
     if (entityErr) return res.status(500).json({ error: 'Entity update failed: ' + entityErr.message });
 
     // 2. Handle gallery images
