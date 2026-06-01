@@ -1,15 +1,4 @@
 {
   "version": 2,
-  "buildCommand": "npm install",
-  "env": {
-    "GCR_SUPABASE_URL": "@gcr_supabase_url",
-    "GCR_SUPABASE_SERVICE_KEY": "@gcr_supabase_service_key",
-    "JWT_SECRET": "@jwt_secret",
-    "ADMIN_SECRET": "@admin_secret",
-    "ANTHROPIC_API_KEY": "@anthropic_api_key",
-    "SENDBLUE_KEY_ID": "@sendblue_key_id",
-    "SENDBLUE_SECRET": "@sendblue_secret",
-    "TRIP_SWIPE_URL": "@trip_swipe_url",
-    "GCR_BROWSE_URL": "@gcr_browse_url"
-  }
+  "buildCommand": "npm install"
 }
