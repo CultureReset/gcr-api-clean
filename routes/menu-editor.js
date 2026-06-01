@@ -22,8 +22,17 @@ function makeToken(slug, pin) {
 
 async function pinAuth(req, res, next) {
   const slug = req.params.slug;
-  const token = req.headers['x-menu-token'] || req.query.token;
-  if (!token) return res.status(401).json({ error: 'Token required' });
+  const adminToken = req.headers['x-admin-token'];
+  const menuToken = req.headers['x-menu-token'] || req.query.token;
+
+  // Admin bypass — if admin token is present, allow access
+  if (adminToken) {
+    req.entitySlug = slug;
+    return next();
+  }
+
+  // Otherwise require PIN token
+  if (!menuToken) return res.status(401).json({ error: 'Token required' });
 
   // Fetch entity and verify token matches slug+pin combo
   const { data: entity } = await db.from('entity').select('slug, menu_pin').eq('slug', slug).single();
@@ -31,7 +40,7 @@ async function pinAuth(req, res, next) {
   if (!entity.menu_pin) return res.status(403).json({ error: 'Menu editing not enabled for this business' });
 
   const expected = makeToken(slug, entity.menu_pin);
-  if (token !== expected) return res.status(401).json({ error: 'Invalid token' });
+  if (menuToken !== expected) return res.status(401).json({ error: 'Invalid token' });
 
   req.entitySlug = slug;
   next();

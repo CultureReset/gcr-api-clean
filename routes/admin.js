@@ -1028,4 +1028,102 @@ router.get('/platform-analytics', authRequired, async (req, res) => {
   }
 });
 
+// ─── AI ORGANIZER ─────────────────────────────────────────────────────────────
+// POST /api/admin/ai-organize
+// Parses raw text input (menu, specials, events, etc) into structured data
+// Body: { raw_input, business_id?, business_name }
+// Returns: { success, message, organized_data }
+
+router.post('/ai-organize', authRequired, async (req, res) => {
+  try {
+    const { raw_input, business_id, business_name } = req.body;
+    if (!raw_input || !raw_input.trim()) {
+      return res.status(400).json({ error: 'raw_input required' });
+    }
+
+    // Call Claude to parse the raw input
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const prompt = `You are a restaurant menu data organizer. Parse the following raw text input and structure it into a JSON object with these sections:
+- menu_sections: Array of {section_name, items: [{item_name, description?, price?}]}
+- drink_sections: Array of {section_name, items: [{item_name, description?, price?}]}
+- happy_hour_sections: Array of {section_name, items: [{item_name, description?, price?, original_price?}]}
+- specials: Array of {name, description?, discount_text?}
+- events: Array of {event_name, description?, event_date?, event_time?}
+
+Extract ONLY what's in the text. Use null/empty arrays for missing sections.
+Return ONLY valid JSON, no markdown.
+
+RAW INPUT:
+${raw_input}`;
+
+    const message = await client.messages.create({
+      model: 'claude-opus-4-7',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0]?.type === 'text' ? message.content[0].text : '';
+    let parsed = {};
+
+    try {
+      parsed = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse Claude response:', responseText);
+      return res.status(400).json({ error: 'Failed to parse data: ' + e.message });
+    }
+
+    // If business_id provided, fetch existing data and merge
+    let mergedData = {
+      menu_sections: parsed.menu_sections || [],
+      drink_sections: parsed.drink_sections || [],
+      happy_hour_sections: parsed.happy_hour_sections || [],
+      specials: parsed.specials || [],
+      events: parsed.events || [],
+    };
+
+    if (business_id && business_id !== 'null' && business_id !== 'new') {
+      const { data: entity } = await db.from('entity').select('slug').eq('id', business_id).single();
+      if (entity) {
+        const slug = entity.slug;
+
+        // Fetch existing data
+        const [menuSecs, drinkSecs, hhSecs, specs, evts] = await Promise.all([
+          db.from('menu_sections').select('*, items:menu_items(*)').eq('entity_slug', slug).order('sort_order'),
+          db.from('drink_sections').select('*, items:drink_items(*)').eq('entity_slug', slug).order('sort_order'),
+          db.from('happy_hour_sections').select('*, items:happy_hour_items(*)').eq('entity_slug', slug).order('sort_order'),
+          db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
+          db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true),
+        ]);
+
+        // Merge: old data + new parsed data (new data takes precedence)
+        mergedData.menu_sections = [
+          ...(menuSecs.data || []).map(s => ({ section_name: s.section_name, items: s.items || [] })),
+          ...(parsed.menu_sections || []).filter(p => !menuSecs.data?.some(s => s.section_name === p.section_name))
+        ];
+        mergedData.drink_sections = [
+          ...(drinkSecs.data || []).map(s => ({ section_name: s.section_name, items: s.items || [] })),
+          ...(parsed.drink_sections || []).filter(p => !drinkSecs.data?.some(s => s.section_name === p.section_name))
+        ];
+        mergedData.happy_hour_sections = [
+          ...(hhSecs.data || []).map(s => ({ section_name: s.section_name, items: s.items || [] })),
+          ...(parsed.happy_hour_sections || []).filter(p => !hhSecs.data?.some(s => s.section_name === p.section_name))
+        ];
+        mergedData.specials = [...(specs.data || []).map(s => ({ name: s.special_name, description: s.description, discount_text: s.discount_text })), ...(parsed.specials || [])];
+        mergedData.events = [...(evts.data || []).map(e => ({ event_name: e.event_name, description: e.description, event_date: e.event_date })), ...(parsed.events || [])];
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `✅ Data organized! Found ${(mergedData.menu_sections || []).length} menu sections, ${(mergedData.drink_sections || []).length} drink sections, ${(mergedData.specials || []).length} specials, ${(mergedData.events || []).length} events.`,
+      organized_data: mergedData,
+    });
+  } catch (err) {
+    console.error('AI organize error:', err);
+    res.status(500).json({ error: 'Failed to organize data: ' + err.message });
+  }
+});
+
 module.exports = router;
