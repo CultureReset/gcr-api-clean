@@ -20,7 +20,10 @@ const router = express.Router();
 // Cached admin client — avoids creating a new instance per request
 let _adminClient = null;
 function admin() {
-    if (!_adminClient) _adminClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    if (!_adminClient) _adminClient = createClient(
+      process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL,
+      process.env.GCR_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY
+    );
     return _adminClient;
 }
 
