@@ -30,13 +30,14 @@ async function buildFullEntity(slug) {
   const entity = await getEntityBySlug(slug);
   if (!entity) return null;
 
-  const [hours, photos, tags, menuSections, drinkSections, hhSections, specials, events, sides, dailyFeatures] = await Promise.all([
+  const [hours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_tags').select('*').eq('entity_slug', slug),
     db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('drink_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
     db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
@@ -47,16 +48,20 @@ async function buildFullEntity(slug) {
   const menuSectionIds = (menuSections.data || []).map(s => s.id);
   const drinkSectionIds = (drinkSections.data || []).map(s => s.id);
   const hhSectionIds = (hhSections.data || []).map(s => s.id);
+  const entitySectionIds = (entitySections.data || []).map(s => s.id);
 
-  const [menuItems, drinkItems, hhItems] = await Promise.all([
+  const [menuItems, drinkItems, hhItems, entitySectionItems] = await Promise.all([
     menuSectionIds.length
-      ? db.from('menu_items').select('*').in('section_id', menuSectionIds).order('id')
+      ? db.from('menu_items').select('*').in('section_id', menuSectionIds).order('sort_order')
       : { data: [] },
     drinkSectionIds.length
-      ? db.from('drink_items').select('*').in('section_id', drinkSectionIds).order('id')
+      ? db.from('drink_items').select('*').in('section_id', drinkSectionIds).order('sort_order')
       : { data: [] },
     hhSectionIds.length
-      ? db.from('happy_hour_items').select('*').in('section_id', hhSectionIds).order('id')
+      ? db.from('happy_hour_items').select('*').in('section_id', hhSectionIds).order('sort_order')
+      : { data: [] },
+    entitySectionIds.length
+      ? db.from('entity_section_items').select('*').in('section_id', entitySectionIds).order('sort_order')
       : { data: [] },
   ]);
 
@@ -75,6 +80,7 @@ async function buildFullEntity(slug) {
     menu_sections: nest(menuSections.data, menuItems.data),
     drink_sections: nest(drinkSections.data, drinkItems.data),
     happy_hour_sections: nest(hhSections.data, hhItems.data),
+    sections: nest(entitySections.data, entitySectionItems.data),
     specials: specials.data || [],
     events: events.data || [],
     sides: sides.data || [],
@@ -98,7 +104,10 @@ router.get('/entities', async (req, res) => {
         hh_days, hh_start, hh_end, hh_description,
         live_music, outdoor_seating,
         featured, is_active, description,
-        social_instagram, social_facebook, social_tiktok
+        social_instagram, social_facebook, social_tiktok,
+        duration_text, price_from, price_unit,
+        known_for, highlights, good_for,
+        what_makes_it_different, secondary_subtypes, seo_keywords
       `)
       .eq('is_active', true)
       .order('name')

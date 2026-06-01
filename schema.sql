@@ -216,6 +216,35 @@ CREATE TABLE entity_events (
   image_path text
 );
 
+-- 14b. ENTITY_SECTIONS (flexible sections for non-restaurant entity types)
+-- section_type controls frontend rendering:
+--   Things To Do: tour_types | whats_included | highlights | policies
+--   Services:     service_packages | what_we_do | faqs
+--   Staying:      room_types | amenities | policies
+CREATE TABLE entity_sections (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  section_type text NOT NULL,
+  section_name text NOT NULL,
+  sort_order integer DEFAULT 0
+);
+
+-- 14c. ENTITY_SECTION_ITEMS
+CREATE TABLE entity_section_items (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  section_id uuid NOT NULL REFERENCES entity_sections(id) ON DELETE CASCADE,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  item_name text NOT NULL,
+  description text,
+  price_from numeric(10,2),
+  price_to numeric(10,2),
+  price_label text,
+  duration text,
+  icon text,
+  metadata jsonb DEFAULT '{}',
+  sort_order integer DEFAULT 0
+);
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -235,6 +264,9 @@ CREATE INDEX idx_drink_items_slug ON drink_items(entity_slug);
 CREATE INDEX idx_hh_sections_slug ON happy_hour_sections(entity_slug);
 CREATE INDEX idx_hh_items_slug ON happy_hour_items(entity_slug);
 CREATE INDEX idx_specials_slug ON entity_specials(entity_slug);
+CREATE INDEX idx_entity_sections_slug ON entity_sections(entity_slug);
+CREATE INDEX idx_entity_section_items_section ON entity_section_items(section_id);
+CREATE INDEX idx_entity_section_items_slug ON entity_section_items(entity_slug);
 CREATE INDEX idx_specials_active ON entity_specials(is_active);
 CREATE INDEX idx_artists_slug ON artists(slug);
 CREATE INDEX idx_artists_active ON artists(is_active);
@@ -326,6 +358,8 @@ ALTER TABLE drink_sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE drink_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE happy_hour_sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE happy_hour_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_sections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_section_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_specials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE artists ENABLE ROW LEVEL SECURITY;
@@ -346,6 +380,8 @@ CREATE POLICY "Public read" ON drink_sections FOR SELECT USING (true);
 CREATE POLICY "Public read" ON drink_items FOR SELECT USING (true);
 CREATE POLICY "Public read" ON happy_hour_sections FOR SELECT USING (true);
 CREATE POLICY "Public read" ON happy_hour_items FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_sections FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_section_items FOR SELECT USING (true);
 CREATE POLICY "Public read" ON entity_specials FOR SELECT USING (true);
 CREATE POLICY "Public read" ON entity_events FOR SELECT USING (true);
 CREATE POLICY "Public read" ON artists FOR SELECT USING (true);
@@ -360,6 +396,8 @@ CREATE POLICY "Service write" ON drink_sections FOR ALL USING (auth.role() = 'se
 CREATE POLICY "Service write" ON drink_items FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON happy_hour_sections FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON happy_hour_items FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_sections FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_section_items FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON entity_specials FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON entity_events FOR ALL USING (auth.role() = 'service_role');
 CREATE POLICY "Service write" ON artists FOR ALL USING (auth.role() = 'service_role');

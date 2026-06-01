@@ -571,7 +571,7 @@ router.post('/gcr/import-photos', authRequired, async (req, res) => {
 
 // import-master — import everything for one entity at once
 router.post('/gcr/import-master', authRequired, async (req, res) => {
-  const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials } = req.body;
+  const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials, sections } = req.body;
   if (!entity?.slug || !entity?.name) return res.status(400).json({ error: 'entity.slug and entity.name required' });
 
   const slug = entity.slug;
@@ -650,7 +650,97 @@ router.post('/gcr/import-master', authRequired, async (req, res) => {
     results.specials = specials.length;
   }
 
+  // Flexible sections (Things To Do, Services, Staying)
+  if (sections?.length) {
+    await getDb().from('entity_section_items').delete().eq('entity_slug', slug);
+    await getDb().from('entity_sections').delete().eq('entity_slug', slug);
+    for (const [i, sec] of sections.entries()) {
+      const { data: s, error: secErr } = await getDb()
+        .from('entity_sections')
+        .insert({ entity_slug: slug, section_type: sec.section_type, section_name: sec.section_name || sec.name, sort_order: sec.sort_order ?? i })
+        .select('id').single();
+      if (secErr || !s) continue;
+      if (sec.items?.length) {
+        await getDb().from('entity_section_items').insert(sec.items.map((item, j) => ({
+          entity_slug: slug,
+          section_id: s.id,
+          item_name: item.item_name || item.name,
+          description: item.description || null,
+          price_from: item.price_from != null ? parseFloat(item.price_from) : null,
+          price_to: item.price_to != null ? parseFloat(item.price_to) : null,
+          price_label: item.price_label || null,
+          duration: item.duration || null,
+          icon: item.icon || null,
+          metadata: item.metadata || {},
+          sort_order: item.sort_order ?? j,
+        })));
+      }
+    }
+    results.sections = sections.length;
+  }
+
   res.json({ success: true, slug, results });
+});
+
+// ─── ENTITY SECTIONS (Things To Do / Services / Staying) ─────────────────────
+
+// GET /api/admin/entities/:slug/sections
+router.get('/entities/:slug/sections', authRequired, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { data: secs } = await getDb().from('entity_sections').select('*').eq('entity_slug', slug).order('sort_order');
+    const ids = (secs || []).map(s => s.id);
+    const { data: items } = ids.length
+      ? await getDb().from('entity_section_items').select('*').in('section_id', ids).order('sort_order')
+      : { data: [] };
+    const sections = (secs || []).map(s => ({ ...s, items: (items || []).filter(i => i.section_id === s.id) }));
+    res.json({ sections });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/admin/entities/:slug/sections — replace all sections for entity
+router.post('/entities/:slug/sections', authRequired, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { sections } = req.body;
+    if (!Array.isArray(sections)) return res.status(400).json({ error: 'sections array required' });
+
+    await getDb().from('entity_section_items').delete().eq('entity_slug', slug);
+    await getDb().from('entity_sections').delete().eq('entity_slug', slug);
+
+    for (const [i, sec] of sections.entries()) {
+      const { data: s, error: secErr } = await getDb()
+        .from('entity_sections')
+        .insert({ entity_slug: slug, section_type: sec.section_type, section_name: sec.section_name || sec.name, sort_order: sec.sort_order ?? i })
+        .select('id').single();
+      if (secErr || !s) continue;
+      if (sec.items?.length) {
+        await getDb().from('entity_section_items').insert(sec.items.map((item, j) => ({
+          entity_slug: slug, section_id: s.id,
+          item_name: item.item_name || item.name,
+          description: item.description || null,
+          price_from: item.price_from != null ? parseFloat(item.price_from) : null,
+          price_to: item.price_to != null ? parseFloat(item.price_to) : null,
+          price_label: item.price_label || null,
+          duration: item.duration || null,
+          icon: item.icon || null,
+          metadata: item.metadata || {},
+          sort_order: item.sort_order ?? j,
+        })));
+      }
+    }
+    res.json({ success: true, slug, count: sections.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/admin/entities/:slug/sections — clear all sections
+router.delete('/entities/:slug/sections', authRequired, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    await getDb().from('entity_section_items').delete().eq('entity_slug', slug);
+    await getDb().from('entity_sections').delete().eq('entity_slug', slug);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── TRIP SWIPE: TOURISTS ─────────────────────────────────────────────────────
