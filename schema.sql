@@ -382,3 +382,20 @@ CREATE POLICY "Service full access" ON tourist_itineraries FOR ALL USING (auth.r
 --   events/{id}/photo.jpg
 --   specials/{id}/photo.jpg
 -- ============================================================
+
+-- 20. ADMIN_USERS (admin login for cybercheck-login dashboard)
+CREATE TABLE IF NOT EXISTS admin_users (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  email text UNIQUE NOT NULL,
+  password_hash text NOT NULL,
+  role text DEFAULT 'admin',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
+
+-- Insert default admin (password: Cybercheckinc!)
+INSERT INTO admin_users (email, password_hash, role)
+VALUES ('info@cybercheckinc.com', '$2b$10$7/kZVTKxJMQqzfVx8vfM/.7Hy.5l.xHMuR8qVm0VlKjZ7VzKRkVpm', 'admin')
+ON CONFLICT (email) DO NOTHING;
