@@ -30,7 +30,7 @@ async function buildFullEntity(slug) {
   const entity = await getEntityBySlug(slug);
   if (!entity) return null;
 
-  const [hours, photos, tags, menuSections, drinkSections, hhSections, specials, events] = await Promise.all([
+  const [hours, photos, tags, menuSections, drinkSections, hhSections, specials, events, sides, dailyFeatures] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_tags').select('*').eq('entity_slug', slug),
@@ -39,6 +39,8 @@ async function buildFullEntity(slug) {
     db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
+    db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
+    db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true),
   ]);
 
   // Fetch items for each section type
@@ -75,6 +77,8 @@ async function buildFullEntity(slug) {
     happy_hour_sections: nest(hhSections.data, hhItems.data),
     specials: specials.data || [],
     events: events.data || [],
+    sides: sides.data || [],
+    daily_features: dailyFeatures.data || [],
   };
 }
 

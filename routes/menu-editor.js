@@ -61,13 +61,15 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
   const { data: entity } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description').eq('slug', slug).single();
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
-  const [menuSections, drinkSections, hhSections, specials, events, hours] = await Promise.all([
+  const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures] = await Promise.all([
     db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('drink_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
+    db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
+    db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true),
   ]);
 
   const sectionIds = [
@@ -90,6 +92,8 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     happy_hour_sections: (hhSections.data || []).map(s => ({ ...s, items: (hhItems.data || []).filter(i => i.section_id === s.id) })),
     specials: specials.data || [],
     events: events.data || [],
+    sides: sides.data || [],
+    daily_features: dailyFeatures.data || [],
   });
 });
 
@@ -331,7 +335,7 @@ async function uploadBase64Image(slug, itemId, itemType, base64Str) {
 
 router.post('/:slug/save', pinAuth, async (req, res) => {
   const slug = req.entitySlug;
-  const { business, gallery = [], sides = [], dailyFeatures = [], areas = [] } = req.body;
+  const { business, gallery = [], sides = [], dailyFeatures = [], areas = [], happyHour = [] } = req.body;
 
   if (!business || !business.name) return res.status(400).json({ error: 'Business name required' });
 
@@ -548,19 +552,37 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       });
     }
 
-    // 6. Happy Hour
+    // 6. Happy Hour sections & items
     if (happyHour && happyHour.length > 0) {
-      await db.from('entity_happy_hour').delete().eq('entity_slug', slug);
-      for (const hh of happyHour) {
-        await db.from('entity_happy_hour').insert({
+      await db.from('happy_hour_sections').delete().eq('entity_slug', slug);
+
+      for (let i = 0; i < happyHour.length; i++) {
+        const sec = happyHour[i];
+        const { data: inserted } = await db.from('happy_hour_sections').insert({
           entity_slug: slug,
-          day_of_week: hh.day_of_week || null,
-          start_time: hh.start_time || null,
-          end_time: hh.end_time || null,
-          description: hh.description || null,
-          items: hh.items ? JSON.stringify(hh.items) : null,
-          is_active: hh.active ?? true,
-        });
+          section_name: sec.name,
+          sort_order: i,
+        }).select().single();
+
+        if (inserted && sec.items) {
+          for (const item of sec.items) {
+            let imageUrl = item.image_url || (item.images && item.images[0]?.url);
+
+            if (imageUrl && imageUrl.startsWith('data:')) {
+              const uploaded = await uploadBase64Image(slug, inserted.id, 'hh-item', imageUrl);
+              if (uploaded) imageUrl = uploaded.url;
+            }
+
+            await db.from('happy_hour_items').insert({
+              entity_slug: slug,
+              section_id: inserted.id,
+              item_name: item.name,
+              description: item.description || null,
+              price: item.price ? parseFloat(item.price) : null,
+              image_url: imageUrl || null,
+            });
+          }
+        }
       }
     }
 
@@ -581,13 +603,15 @@ router.get('/:slug/qr-menu', async (req, res) => {
   const { data: entity } = await db.from('entity').select('slug, name, description, hero_image_url, phone, website_url, address_line_1, city, state, hh_days, hh_start, hh_end, hh_description').eq('slug', slug).eq('is_active', true).single();
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
-  const [menuSections, drinkSections, hhSections, specials, events, hours] = await Promise.all([
+  const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures] = await Promise.all([
     db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('drink_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
+    db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
+    db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true),
   ]);
 
   const [menuItems, drinkItems, hhItems] = await Promise.all([
@@ -604,6 +628,8 @@ router.get('/:slug/qr-menu', async (req, res) => {
     happy_hour_sections: (hhSections.data || []).map(s => ({ ...s, items: (hhItems.data || []).filter(i => i.section_id === s.id) })),
     specials: specials.data || [],
     events: events.data || [],
+    sides: sides.data || [],
+    daily_features: dailyFeatures.data || [],
   });
 });
 
