@@ -12,8 +12,8 @@ app.get('/', (req, res) => res.json({ status: 'GCR API running', endpoints: 'api
 app.use('/api/gcr', require('./routes/gcr'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/menu-editor', require('./routes/menu-editor'));
-app.use('/api/tourist-auth', require('./routes/tourist-auth'));
-app.use('/api/tourist', require('./routes/tourist'));
+// app.use('/api/tourist-auth', require('./routes/tourist-auth'));
+// app.use('/api/tourist', require('./routes/tourist'));
 
 app.use((err, req, res, next) => {
   console.error(err);

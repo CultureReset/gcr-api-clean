@@ -91,10 +91,8 @@ router.get('/entities', async (req, res) => {
         phone, rating, review_count, city, state, address_line_1,
         hero_image_url, website_url, directions_url, call_url,
         booking_url, reservation_url, order_url, price_range,
-        price_from, price_to, price_unit, secondary_types,
         hh_days, hh_start, hh_end, hh_description,
-        live_music, outdoor_seating, good_for_kids, good_for_groups,
-        serves_beer, serves_wine, serves_cocktails,
+        live_music, outdoor_seating,
         featured, is_active, description,
         social_instagram, social_facebook, social_tiktok
       `)

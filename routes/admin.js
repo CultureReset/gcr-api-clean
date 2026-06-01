@@ -1,23 +1,43 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
   process.env.GCR_SUPABASE_SERVICE_KEY
 );
 
+const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-in-production';
+
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
-// Accepts either the GCR service key OR the ADMIN_SECRET env var — no OAuth needed
+// Accepts: API key (ADMIN_SECRET), JWT token, or service key
 function authRequired(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '').trim()
     || req.headers['x-admin-key'];
-  const valid = [
+
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  // Check if it's an API key
+  const validKeys = [
     process.env.GCR_SUPABASE_SERVICE_KEY,
     process.env.ADMIN_SECRET,
   ].filter(Boolean);
-  if (!token || !valid.includes(token)) return res.status(401).json({ error: 'Unauthorized' });
-  next();
+
+  if (validKeys.includes(token)) {
+    next();
+    return;
+  }
+
+  // Check if it's a JWT token
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.admin = decoded;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
 // ─── CACHE INVALIDATION ───────────────────────────────────────────────────────
@@ -33,6 +53,50 @@ function invalidateCache(res, entitySlug = null) {
     'X-Invalidated-Slug': entitySlug || 'all-entities'
   });
 }
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+// POST /api/admin/login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    // Look up admin by email
+    const { data: admin, error } = await db
+      .from('admin_users')
+      .select('id, email, password_hash, role')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (error || !admin) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Compare password
+    const valid = await bcrypt.compare(password, admin.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Generate JWT token (valid for 7 days)
+    const token = jwt.sign(
+      { id: admin.id, email: admin.email, role: admin.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      admin: { id: admin.id, email: admin.email, role: admin.role }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
 
 // ─── ENTITY CRUD ──────────────────────────────────────────────────────────────
 
