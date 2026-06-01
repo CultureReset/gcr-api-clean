@@ -1,4 +1,3 @@
 {
-  "version": 2,
-  "buildCommand": "npm install"
+  "version": 2
 }
