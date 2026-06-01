@@ -284,16 +284,25 @@ const TABLE_MAP = {
   'hh-item':    'happy_hour_items',
   'event':      'entity_events',
   'special':    'entity_specials',
-  'hero':       null, // saved on entity itself
+  'hero':       null,
+  'gallery':    null,
 };
 
 router.post('/:slug/upload', pinAuth, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image file' });
 
   const slug = req.entitySlug;
-  const type = req.body.type || 'menu-item'; // menu-item | drink-item | hh-item | event | special | hero
+  const type = req.body.type || 'menu-item';
   const itemId = req.body.item_id || null;
-  const folder = type === 'hero' ? `entities/${slug}` : `${type}s/${itemId || slug}`;
+  const label = req.body.label || '';
+
+  let folder;
+  if (type === 'hero' || type === 'gallery') {
+    folder = `entities/${slug}/gallery`;
+  } else {
+    folder = `${type}s/${itemId || slug}`;
+  }
+
   const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
   const storagePath = `${folder}/${Date.now()}.${ext}`;
 
@@ -302,12 +311,17 @@ router.post('/:slug/upload', pinAuth, upload.single('image'), async (req, res) =
 
   const { data: { publicUrl } } = db.storage.from('media').getPublicUrl(storagePath);
 
-  // Save url + path directly to the correct DB row
-  const table = TABLE_MAP[type];
-  if (table && itemId) {
-    await db.from(table).update({ image_url: publicUrl, image_path: storagePath }).eq('id', itemId).eq('entity_slug', slug);
+  if (type === 'gallery') {
+    const { data: existing } = await db.from('entity_photos').select('sort_order').eq('entity_slug', slug).order('sort_order', { ascending: false }).limit(1).single();
+    const nextOrder = existing ? (existing.sort_order + 1) : 0;
+    await db.from('entity_photos').insert({ entity_slug: slug, url: publicUrl, image_path: storagePath, is_cover: nextOrder === 0, sort_order: nextOrder, caption: label || null });
   } else if (type === 'hero') {
     await db.from('entity').update({ hero_image_url: publicUrl, hero_image_path: storagePath }).eq('slug', slug);
+  } else {
+    const table = TABLE_MAP[type];
+    if (table && itemId) {
+      await db.from(table).update({ image_url: publicUrl, image_path: storagePath }).eq('id', itemId).eq('entity_slug', slug);
+    }
   }
 
   res.json({ success: true, url: publicUrl, path: storagePath });
