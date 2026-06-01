@@ -297,6 +297,222 @@ router.post('/:slug/upload', pinAuth, upload.single('image'), async (req, res) =
   res.json({ success: true, url: publicUrl, path: storagePath });
 });
 
+// ─── BULK SAVE ────────────────────────────────────────────────────────────────
+// POST /api/menu-editor/:slug/save
+// Receives full dashboard payload and saves to DB
+// Handles base64 image uploads to Supabase Storage
+
+async function uploadBase64Image(slug, itemId, itemType, base64Str) {
+  if (!base64Str || !base64Str.startsWith('data:')) return null;
+
+  try {
+    const matches = base64Str.match(/^data:([^;]+);base64,(.+)$/);
+    if (!matches) return null;
+
+    const mimeType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const ext = mimeType.split('/')[1] || 'jpg';
+    const folder = itemType === 'hero' ? `entities/${slug}` : `${itemType}s/${itemId || slug}`;
+    const storagePath = `${folder}/${Date.now()}.${ext}`;
+
+    const { error: upErr } = await db.storage.from('media').upload(storagePath, buffer, { contentType: mimeType, upsert: true });
+    if (upErr) {
+      console.error('Image upload error:', upErr);
+      return null;
+    }
+
+    const { data: { publicUrl } } = db.storage.from('media').getPublicUrl(storagePath);
+    return { url: publicUrl, path: storagePath };
+  } catch (err) {
+    console.error('Base64 upload error:', err);
+    return null;
+  }
+}
+
+router.post('/:slug/save', pinAuth, async (req, res) => {
+  const slug = req.entitySlug;
+  const { business, gallery = [], sides = [], dailyFeatures = [], areas = [] } = req.body;
+
+  if (!business || !business.name) return res.status(400).json({ error: 'Business name required' });
+
+  try {
+    // 1. Update entity (business info)
+    const { error: entityErr } = await db.from('entity').update({
+      name: business.name,
+      subtitle: business.tagline || null,
+      description: business.about || null,
+      phone: business.phone || null,
+      website_url: business.website || null,
+      address_line_1: business.address || null,
+      updated_at: new Date().toISOString(),
+    }).eq('slug', slug);
+    if (entityErr) return res.status(500).json({ error: 'Entity update failed: ' + entityErr.message });
+
+    // 2. Handle gallery images
+    if (gallery.length > 0) {
+      await db.from('entity_photos').delete().eq('entity_slug', slug);
+      for (let i = 0; i < gallery.length; i++) {
+        const img = gallery[i];
+        let imageUrl = img.url;
+
+        // Upload base64 if present
+        if (img.url && img.url.startsWith('data:')) {
+          const uploaded = await uploadBase64Image(slug, null, 'hero', img.url);
+          if (uploaded) imageUrl = uploaded.url;
+        }
+
+        await db.from('entity_photos').insert({
+          entity_slug: slug,
+          url: imageUrl,
+          is_cover: i === 0,
+          sort_order: i,
+          caption: img.label || null,
+        });
+      }
+    }
+
+    // 3. Process areas (sections, items, hours, etc.)
+    const dayMap = { monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6, sunday: 0 };
+
+    for (const area of areas) {
+      // 3a. Hours
+      if (area.hours) {
+        await db.from('entity_hours').delete().eq('entity_slug', slug);
+        for (const [day, times] of Object.entries(area.hours)) {
+          await db.from('entity_hours').insert({
+            entity_slug: slug,
+            day_of_week: dayMap[day.toLowerCase()] ?? 0,
+            opens_at: times?.open || null,
+            closes_at: times?.close || null,
+            is_closed: times?.closed ?? false,
+          });
+        }
+      }
+
+      // 3b. Menu sections & items
+      if (area.menu_sections && area.menu_sections.length > 0) {
+        await db.from('menu_sections').delete().eq('entity_slug', slug);
+
+        for (let i = 0; i < area.menu_sections.length; i++) {
+          const sec = area.menu_sections[i];
+          const { data: inserted } = await db.from('menu_sections').insert({
+            entity_slug: slug,
+            section_name: sec.name,
+            sort_order: i,
+          }).select().single();
+
+          if (inserted && sec.items) {
+            for (let j = 0; j < sec.items.length; j++) {
+              const item = sec.items[j];
+              let imageUrl = item.image_url || (item.images && item.images[0]?.url);
+
+              if (imageUrl && imageUrl.startsWith('data:')) {
+                const uploaded = await uploadBase64Image(slug, inserted.id, 'menu-item', imageUrl);
+                if (uploaded) imageUrl = uploaded.url;
+              }
+
+              await db.from('menu_items').insert({
+                entity_slug: slug,
+                section_id: inserted.id,
+                item_name: item.name,
+                description: item.description || null,
+                price: item.price ? parseFloat(item.price) : null,
+                image_url: imageUrl || null,
+              });
+            }
+          }
+        }
+      }
+
+      // 3c. Drink sections & items
+      if (area.drink_sections && area.drink_sections.length > 0) {
+        await db.from('drink_sections').delete().eq('entity_slug', slug);
+
+        for (let i = 0; i < area.drink_sections.length; i++) {
+          const sec = area.drink_sections[i];
+          const { data: inserted } = await db.from('drink_sections').insert({
+            entity_slug: slug,
+            section_name: sec.name,
+            sort_order: i,
+          }).select().single();
+
+          if (inserted && sec.items) {
+            for (const item of sec.items) {
+              let imageUrl = item.image_url || (item.images && item.images[0]?.url);
+
+              if (imageUrl && imageUrl.startsWith('data:')) {
+                const uploaded = await uploadBase64Image(slug, inserted.id, 'drink-item', imageUrl);
+                if (uploaded) imageUrl = uploaded.url;
+              }
+
+              await db.from('drink_items').insert({
+                entity_slug: slug,
+                section_id: inserted.id,
+                item_name: item.name,
+                description: item.description || null,
+                price: item.price ? parseFloat(item.price) : null,
+                image_url: imageUrl || null,
+              });
+            }
+          }
+        }
+      }
+
+      // 3d. Specials
+      if (area.specials && area.specials.length > 0) {
+        await db.from('entity_specials').delete().eq('entity_slug', slug);
+
+        for (const spec of area.specials) {
+          let imageUrl = spec.image_url || (spec.images && spec.images[0]?.url);
+
+          if (imageUrl && imageUrl.startsWith('data:')) {
+            const uploaded = await uploadBase64Image(slug, spec.id, 'special', imageUrl);
+            if (uploaded) imageUrl = uploaded.url;
+          }
+
+          await db.from('entity_specials').insert({
+            entity_slug: slug,
+            special_name: spec.name,
+            description: spec.description || null,
+            discount_text: spec.discount_text || null,
+            is_active: spec.active ?? true,
+            image_url: imageUrl || null,
+          });
+        }
+      }
+
+      // 3e. Events
+      if (area.events && area.events.length > 0) {
+        await db.from('entity_events').delete().eq('entity_slug', slug);
+
+        for (const evt of area.events) {
+          let imageUrl = evt.image_url || (evt.images && evt.images[0]?.url);
+
+          if (imageUrl && imageUrl.startsWith('data:')) {
+            const uploaded = await uploadBase64Image(slug, evt.id, 'event', imageUrl);
+            if (uploaded) imageUrl = uploaded.url;
+          }
+
+          await db.from('entity_events').insert({
+            entity_slug: slug,
+            event_name: evt.name,
+            description: evt.description || null,
+            event_date: evt.date || null,
+            start_time: evt.time || null,
+            is_active: evt.active ?? true,
+            image_url: imageUrl || null,
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Menu saved successfully' });
+  } catch (err) {
+    console.error('Save error:', err);
+    res.status(500).json({ error: 'Save failed: ' + err.message });
+  }
+});
+
 // ─── QR MENU (public read — no PIN) ──────────────────────────────────────────
 // GET /api/menu-editor/:slug/qr-menu
 // Used by QR code scan → display the full menu publicly
