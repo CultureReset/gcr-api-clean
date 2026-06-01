@@ -14,7 +14,7 @@ const entity = {
   subtitle: 'by Dolphins Down Under',
   entity_type: 'activity',
   entity_subtype: 'dolphin_cruise',
-  description: 'One of the few glass-bottom dolphin cruise experiences in Orange Beach. 90-minute narrated cruises through back bay waterways and Gulf waters with underwater viewing panels, dolphin watching, wildlife spotting, and sunset cruise options. Family-friendly, educational, and scenic.',
+  description: 'One of the only glass-bottom dolphin cruise experiences in Orange Beach. Custom glass-bottom catamarans with large underwater viewing panels let you watch marine life beneath the boat while spotting dolphins above. 90-minute narrated cruises through back bays and Gulf waters — family-friendly, educational, and a uniquely immersive experience compared to standard sightseeing boats.',
   phone: '(251) 968-4386',
   address_line_1: '28101 Perdido Beach Blvd',
   city: 'Orange Beach',
@@ -44,8 +44,14 @@ const tags = [
   { tag_name: 'Boat Tours',              tag_category: 'activity' },
   { tag_name: 'Tourist Attractions',     tag_category: 'audience' },
   { tag_name: 'Vacation Activities',     tag_category: 'audience' },
-  { tag_name: 'Good For Kids',           tag_category: 'audience' },
+  { tag_name: 'Good For Kids',            tag_category: 'audience' },
   { tag_name: 'Photography Friendly',    tag_category: 'experience' },
+  { tag_name: 'First-Time Visitors',     tag_category: 'audience' },
+  { tag_name: 'Unique Experience',       tag_category: 'experience' },
+  { tag_name: 'Free Parking',            tag_category: 'feature' },
+  { tag_name: 'Wheelchair Accessible',   tag_category: 'feature' },
+  { tag_name: 'Relaxed Pace',            tag_category: 'atmosphere' },
+  { tag_name: 'Not For Thrill Seekers',  tag_category: 'atmosphere' },
 ];
 
 
@@ -82,6 +88,29 @@ const sections = [
       { item_name: 'Orange Beach Waterways & Back Bays', icon: '🌊' },
       { item_name: 'Sunset Views over the Gulf', icon: '🌅' },
       { item_name: 'Coastal Wetlands & Marina Areas', icon: '🌿' },
+    ],
+  },
+  {
+    section_type: 'pricing',
+    section_name: 'Estimated Pricing',
+    items: [
+      { item_name: 'Adult Ticket', price_from: 30, price_to: 40, price_label: 'per person', description: 'Estimated. Verify directly with operator — pricing fluctuates seasonally.' },
+      { item_name: 'Child Ticket', price_from: 20, price_to: 30, price_label: 'per child', description: 'Estimated. Verify directly with operator.' },
+      { item_name: 'Infant', price_label: 'Contact operator', description: 'Check directly with operator for infant pricing.' },
+      { item_name: 'Private Charter', price_label: 'Varies', description: 'Price varies by boat type, group size, and duration. Contact operator directly.' },
+    ],
+  },
+  {
+    section_type: 'best_for',
+    section_name: 'Best For',
+    items: [
+      { item_name: 'Families with Kids', icon: '👨‍👩‍👧' },
+      { item_name: 'First-Time Visitors', icon: '🌟' },
+      { item_name: 'Dolphin Photography', icon: '📸' },
+      { item_name: 'Wildlife Enthusiasts', icon: '🦅' },
+      { item_name: 'Sunset Cruise Seekers', icon: '🌅' },
+      { item_name: 'Educational Activities', icon: '🎓' },
+      { item_name: 'Scenic Sightseeing', icon: '🌊' },
     ],
   },
   {
