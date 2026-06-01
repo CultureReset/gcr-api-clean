@@ -161,6 +161,15 @@ router.get('/entity/:slug', async (req, res) => {
   }
 });
 
+// ─── POST /api/gcr/entity/:slug/set-pin ──────────────────────────────────────
+router.post('/entity/:slug/set-pin', async (req, res) => {
+  const { pin } = req.body;
+  if (!pin) return res.status(400).json({ error: 'PIN required' });
+  const { error } = await db.from('entity').update({ menu_pin: String(pin) }).eq('slug', req.params.slug);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // ─── GET /api/gcr/events ──────────────────────────────────────────────────────
 router.get('/events', async (req, res) => {
   try {

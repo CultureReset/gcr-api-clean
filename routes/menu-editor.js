@@ -70,7 +70,7 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
   const { data: entity } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
-  const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures] = await Promise.all([
+  const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures, photos] = await Promise.all([
     db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('drink_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -79,6 +79,7 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true),
+    db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
   ]);
 
   const sectionIds = [
@@ -103,6 +104,7 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     events: events.data || [],
     sides: sides.data || [],
     daily_features: dailyFeatures.data || [],
+    entity_photos: photos.data || [],
     gallery_sections: entity?.gallery_sections || [],
   });
 });
