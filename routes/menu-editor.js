@@ -305,11 +305,12 @@ router.post('/:slug/upload', pinAuth, upload.single('image'), async (req, res) =
 
   const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase();
   const storagePath = `${folder}/${Date.now()}.${ext}`;
+  const bucket = (type === 'hero' || type === 'gallery') ? 'entity-photos' : 'menu-items';
 
-  const { error: upErr } = await db.storage.from('media').upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+  const { error: upErr } = await db.storage.from(bucket).upload(storagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
   if (upErr) return res.status(500).json({ error: upErr.message });
 
-  const { data: { publicUrl } } = db.storage.from('media').getPublicUrl(storagePath);
+  const { data: { publicUrl } } = db.storage.from(bucket).getPublicUrl(storagePath);
 
   if (type === 'gallery') {
     const { data: existing } = await db.from('entity_photos').select('sort_order').eq('entity_slug', slug).order('sort_order', { ascending: false }).limit(1).single();
@@ -344,14 +345,15 @@ async function uploadBase64Image(slug, itemId, itemType, base64Str) {
     const ext = mimeType.split('/')[1] || 'jpg';
     const folder = itemType === 'hero' ? `entities/${slug}` : `${itemType}s/${itemId || slug}`;
     const storagePath = `${folder}/${Date.now()}.${ext}`;
+    const bucket = (itemType === 'hero' || itemType === 'gallery') ? 'entity-photos' : 'menu-items';
 
-    const { error: upErr } = await db.storage.from('media').upload(storagePath, buffer, { contentType: mimeType, upsert: true });
+    const { error: upErr } = await db.storage.from(bucket).upload(storagePath, buffer, { contentType: mimeType, upsert: true });
     if (upErr) {
       console.error('Image upload error:', upErr);
       return null;
     }
 
-    const { data: { publicUrl } } = db.storage.from('media').getPublicUrl(storagePath);
+    const { data: { publicUrl } } = db.storage.from(bucket).getPublicUrl(storagePath);
     return { url: publicUrl, path: storagePath };
   } catch (err) {
     console.error('Base64 upload error:', err);
