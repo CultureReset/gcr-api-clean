@@ -392,7 +392,57 @@ router.post('/search', async (req, res) => {
       };
     }).sort((a, b) => b._relevance - a._relevance);
 
-    res.json({ query: q, results, total: results.length });
+    // Build flattened items list (all items across all restaurants)
+    const flattenedItems = [];
+    results.forEach(restaurant => {
+      (restaurant.matched_menu_items || []).forEach(item => {
+        flattenedItems.push({
+          item_name: item.item_name,
+          description: item.description,
+          price: item.price,
+          restaurant_name: restaurant.name,
+          restaurant_slug: restaurant.slug,
+          restaurant_rating: restaurant.rating,
+          type: 'menu'
+        });
+      });
+      (restaurant.matched_specials || []).forEach(special => {
+        flattenedItems.push({
+          item_name: special.special_name,
+          description: special.description || special.discount_text,
+          restaurant_name: restaurant.name,
+          restaurant_slug: restaurant.slug,
+          restaurant_rating: restaurant.rating,
+          type: 'special'
+        });
+      });
+      (restaurant.matched_events || []).forEach(event => {
+        flattenedItems.push({
+          item_name: event.event_name,
+          description: event.description || event.artist_name,
+          event_date: event.event_date,
+          restaurant_name: restaurant.name,
+          restaurant_slug: restaurant.slug,
+          restaurant_rating: restaurant.rating,
+          type: 'event'
+        });
+      });
+    });
+
+    // Sort flattened items by relevance (items that match the query term first)
+    flattenedItems.sort((a, b) => {
+      const aScore = score(a.item_name, a.description);
+      const bScore = score(b.item_name, b.description);
+      return bScore - aScore;
+    });
+
+    res.json({
+      query: q,
+      results,
+      items: flattenedItems,
+      total: results.length,
+      total_items: flattenedItems.length
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
