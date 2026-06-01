@@ -50,7 +50,7 @@ router.post('/:slug/auth', async (req, res) => {
   if (String(entity.menu_pin) !== String(pin)) return res.status(401).json({ error: 'Incorrect PIN' });
 
   const token = makeToken(entity.slug, entity.menu_pin);
-  res.json({ token, slug: entity.slug, name: entity.name, hero_image_url: entity.hero_image_url });
+  res.json({ success: true, token, slug: entity.slug, name: entity.name, hero_image_url: entity.hero_image_url });
 });
 
 // ─── GET /api/menu-editor/:slug/data ──────────────────────────────────────────
@@ -395,20 +395,24 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
 
       // 3b. Menu sections & items
       if (area.menu_sections && area.menu_sections.length > 0) {
+        console.log(`Saving ${area.menu_sections.length} menu sections`);
         await db.from('menu_sections').delete().eq('entity_slug', slug);
 
         for (let i = 0; i < area.menu_sections.length; i++) {
           const sec = area.menu_sections[i];
+          const sectionName = sec.name || sec.section_name;
+          console.log(`Section ${i}: name="${sectionName}", hasItems=${sec.items?.length || 0}`);
           const { data: inserted } = await db.from('menu_sections').insert({
             entity_slug: slug,
-            section_name: sec.name,
+            section_name: sectionName,
             sort_order: i,
           }).select().single();
 
           if (inserted && sec.items) {
             for (let j = 0; j < sec.items.length; j++) {
               const item = sec.items[j];
-              let imageUrl = item.image_url || (item.images && item.images[0]?.url);
+              const itemName = item.name || item.item_name;
+              let imageUrl = item.image_url || item.image_path || (item.images && item.images[0]?.url);
 
               if (imageUrl && imageUrl.startsWith('data:')) {
                 const uploaded = await uploadBase64Image(slug, inserted.id, 'menu-item', imageUrl);
@@ -418,7 +422,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
               await db.from('menu_items').insert({
                 entity_slug: slug,
                 section_id: inserted.id,
-                item_name: item.name,
+                item_name: itemName,
                 description: item.description || null,
                 price: item.price ? parseFloat(item.price) : null,
                 image_url: imageUrl || null,
@@ -434,15 +438,17 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
 
         for (let i = 0; i < area.drink_sections.length; i++) {
           const sec = area.drink_sections[i];
+          const sectionName = sec.name || sec.section_name;
           const { data: inserted } = await db.from('drink_sections').insert({
             entity_slug: slug,
-            section_name: sec.name,
+            section_name: sectionName,
             sort_order: i,
           }).select().single();
 
           if (inserted && sec.items) {
             for (const item of sec.items) {
-              let imageUrl = item.image_url || (item.images && item.images[0]?.url);
+              const itemName = item.name || item.item_name;
+              let imageUrl = item.image_url || item.image_path || (item.images && item.images[0]?.url);
 
               if (imageUrl && imageUrl.startsWith('data:')) {
                 const uploaded = await uploadBase64Image(slug, inserted.id, 'drink-item', imageUrl);
@@ -452,7 +458,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
               await db.from('drink_items').insert({
                 entity_slug: slug,
                 section_id: inserted.id,
-                item_name: item.name,
+                item_name: itemName,
                 description: item.description || null,
                 price: item.price ? parseFloat(item.price) : null,
                 image_url: imageUrl || null,
@@ -558,15 +564,17 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
 
       for (let i = 0; i < happyHour.length; i++) {
         const sec = happyHour[i];
+        const sectionName = sec.name || sec.section_name;
         const { data: inserted } = await db.from('happy_hour_sections').insert({
           entity_slug: slug,
-          section_name: sec.name,
+          section_name: sectionName,
           sort_order: i,
         }).select().single();
 
         if (inserted && sec.items) {
           for (const item of sec.items) {
-            let imageUrl = item.image_url || (item.images && item.images[0]?.url);
+            const itemName = item.name || item.item_name;
+            let imageUrl = item.image_url || item.image_path || (item.images && item.images[0]?.url);
 
             if (imageUrl && imageUrl.startsWith('data:')) {
               const uploaded = await uploadBase64Image(slug, inserted.id, 'hh-item', imageUrl);
@@ -576,7 +584,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
             await db.from('happy_hour_items').insert({
               entity_slug: slug,
               section_id: inserted.id,
-              item_name: item.name,
+              item_name: itemName,
               description: item.description || null,
               price: item.price ? parseFloat(item.price) : null,
               image_url: imageUrl || null,
