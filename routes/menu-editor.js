@@ -506,6 +506,64 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
+    // 4. Sides
+    if (sides && sides.length > 0) {
+      await db.from('entity_sides').delete().eq('entity_slug', slug);
+      const side = sides[0]; // Store single side item
+      let imageUrl = side.image_url || (side.images && side.images[0]?.url);
+
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
+        if (uploaded) imageUrl = uploaded.url;
+      }
+
+      await db.from('entity_sides').insert({
+        entity_slug: slug,
+        side_name: side.name || null,
+        description: side.description || null,
+        price: side.price ? parseFloat(side.price) : null,
+        image_url: imageUrl || null,
+        is_active: side.active ?? true,
+      });
+    }
+
+    // 5. Daily Features
+    if (dailyFeatures && dailyFeatures.length > 0) {
+      await db.from('entity_daily_features').delete().eq('entity_slug', slug);
+      const feature = dailyFeatures[0]; // Store single daily feature
+      let imageUrl = feature.image_url || (feature.images && feature.images[0]?.url);
+
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        const uploaded = await uploadBase64Image(slug, null, 'daily-feature', imageUrl);
+        if (uploaded) imageUrl = uploaded.url;
+      }
+
+      await db.from('entity_daily_features').insert({
+        entity_slug: slug,
+        feature_name: feature.name || null,
+        description: feature.description || null,
+        price: feature.price ? parseFloat(feature.price) : null,
+        image_url: imageUrl || null,
+        is_active: feature.active ?? true,
+      });
+    }
+
+    // 6. Happy Hour
+    if (happyHour && happyHour.length > 0) {
+      await db.from('entity_happy_hour').delete().eq('entity_slug', slug);
+      for (const hh of happyHour) {
+        await db.from('entity_happy_hour').insert({
+          entity_slug: slug,
+          day_of_week: hh.day_of_week || null,
+          start_time: hh.start_time || null,
+          end_time: hh.end_time || null,
+          description: hh.description || null,
+          items: hh.items ? JSON.stringify(hh.items) : null,
+          is_active: hh.active ?? true,
+        });
+      }
+    }
+
     res.json({ success: true, message: 'Menu saved successfully' });
   } catch (err) {
     console.error('Save error:', err);
