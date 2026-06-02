@@ -67,7 +67,17 @@ router.post('/:slug/auth', async (req, res) => {
 router.get('/:slug/data', pinAuth, async (req, res) => {
   const slug = req.entitySlug;
 
-  const { data: entity } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
+  // Try extended select (includes rotating_sections + theme if columns exist)
+  let entity;
+  const { data: entityFull, error: entitySelErr } = await db.from('entity')
+    .select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections, rotating_sections, theme')
+    .eq('slug', slug).single();
+  if (entitySelErr && (entitySelErr.code === '42703' || (entitySelErr.message || '').includes('does not exist'))) {
+    const { data } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
+    entity = data;
+  } else {
+    entity = entityFull;
+  }
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
   const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures, photos] = await Promise.all([
@@ -363,7 +373,7 @@ async function uploadBase64Image(slug, itemId, itemType, base64Str) {
 
 router.post('/:slug/save', pinAuth, async (req, res) => {
   const slug = req.entitySlug;
-  const { business, gallery = [], gallery_sections = [], sides = [], dailyFeatures = [], areas = [], happyHour = [] } = req.body;
+  const { business, gallery = [], gallery_sections = [], sides = [], dailyFeatures = [], areas = [], happyHour = [], rotatingSections = [], theme = {} } = req.body;
 
   if (!business || !business.name) return res.status(400).json({ error: 'Business name required' });
 
@@ -379,13 +389,23 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    // Add gallery_sections if table has the column
     if (gallery_sections && gallery_sections.length > 0) {
       updateData.gallery_sections = gallery_sections;
     }
 
-    const { error: entityErr } = await db.from('entity').update(updateData).eq('slug', slug);
-    if (entityErr) return res.status(500).json({ error: 'Entity update failed: ' + entityErr.message });
+    // Try to save rotating_sections + theme (requires column to exist)
+    const extendedData = { ...updateData };
+    if (rotatingSections && rotatingSections.length > 0) extendedData.rotating_sections = rotatingSections;
+    if (theme && Object.keys(theme).length > 0) extendedData.theme = theme;
+
+    const { error: entityErr } = await db.from('entity').update(extendedData).eq('slug', slug);
+    if (entityErr && (entityErr.code === '42703' || (entityErr.message || '').includes('does not exist'))) {
+      // Columns not yet added — fall back to basic update
+      const { error: e2 } = await db.from('entity').update(updateData).eq('slug', slug);
+      if (e2) return res.status(500).json({ error: 'Entity update failed: ' + e2.message });
+    } else if (entityErr) {
+      return res.status(500).json({ error: 'Entity update failed: ' + entityErr.message });
+    }
 
     // 2. Handle gallery images
     if (gallery.length > 0) {
@@ -551,25 +571,33 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
-    // 4. Sides
+    // 4. Sides + Add-ons (save all, not just first)
     if (sides && sides.length > 0) {
       await db.from('entity_sides').delete().eq('entity_slug', slug);
-      const side = sides[0]; // Store single side item
-      let imageUrl = side.image_url || (side.images && side.images[0]?.url);
-
-      if (imageUrl && imageUrl.startsWith('data:')) {
-        const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
-        if (uploaded) imageUrl = uploaded.url;
+      for (let i = 0; i < sides.length; i++) {
+        const side = sides[i];
+        let imageUrl = side.image_url || (side.images && side.images[0]?.url);
+        if (imageUrl && imageUrl.startsWith('data:')) {
+          const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
+          if (uploaded) imageUrl = uploaded.url;
+        }
+        const sideData = {
+          entity_slug: slug,
+          side_name: side.name || null,
+          description: side.description || null,
+          price: side.price ? parseFloat(side.price) : null,
+          image_url: imageUrl || null,
+          is_active: side.active ?? true,
+          sort_order: i,
+        };
+        // Try with item_type (requires ALTER TABLE if column missing)
+        const { error: sideErr } = await db.from('entity_sides').insert({ ...sideData, item_type: side.type || 'side' });
+        if (sideErr && (sideErr.code === '42703' || (sideErr.message || '').includes('does not exist'))) {
+          await db.from('entity_sides').insert(sideData);
+        } else if (sideErr) {
+          console.error('Side insert error:', sideErr.message);
+        }
       }
-
-      await db.from('entity_sides').insert({
-        entity_slug: slug,
-        side_name: side.name || null,
-        description: side.description || null,
-        price: side.price ? parseFloat(side.price) : null,
-        image_url: imageUrl || null,
-        is_active: side.active ?? true,
-      });
     }
 
     // 5. Daily Features
@@ -643,7 +671,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
 router.get('/:slug/qr-menu', async (req, res) => {
   const slug = req.params.slug;
 
-  const { data: entity } = await db.from('entity').select('slug, name, description, hero_image_url, phone, website_url, address_line_1, city, state, hh_days, hh_start, hh_end, hh_description').eq('slug', slug).eq('is_active', true).single();
+  const { data: entity } = await db.from('entity').select('*').eq('slug', slug).eq('is_active', true).single();
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
   const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures] = await Promise.all([
