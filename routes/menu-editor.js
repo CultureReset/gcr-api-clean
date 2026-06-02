@@ -571,33 +571,27 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
-    // 4. Sides + Add-ons (save all)
+    // 4. Sides + Add-ons (save all) — insert row-by-row so errors are isolated
+    const sidesDebug = [];
     if (sides && sides.length > 0) {
       await db.from('entity_sides').delete().eq('entity_slug', slug);
-      const sideRows = await Promise.all(sides.map(async (side) => {
+      for (const side of sides) {
         let imageUrl = side.image_url || (side.images && side.images[0]?.url);
         if (imageUrl && imageUrl.startsWith('data:')) {
           const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
           if (uploaded) imageUrl = uploaded.url;
         }
-        return {
+        const row = {
           entity_slug: slug,
-          side_name: side.name || null,
+          side_name: side.name || 'Side',
           description: side.description || null,
-          price: side.price ? parseFloat(side.price) : null,
+          price: side.price !== '' && side.price != null ? parseFloat(side.price) || null : null,
           image_url: imageUrl || null,
-          is_active: side.active ?? true,
+          is_active: true,
           item_type: side.type || 'side',
         };
-      }));
-      const { error: sidesErr } = await db.from('entity_sides').insert(sideRows);
-      if (sidesErr) {
-        // item_type column may not exist — fall back inserting without it
-        if (sidesErr.code === '42703' || (sidesErr.message || '').includes('does not exist')) {
-          await db.from('entity_sides').insert(sideRows.map(({ item_type, ...r }) => r));
-        } else {
-          console.error('Sides insert error:', sidesErr.message);
-        }
+        const { error: sErr } = await db.from('entity_sides').insert(row);
+        sidesDebug.push({ name: row.side_name, ok: !sErr, err: sErr ? `${sErr.code}: ${sErr.message}` : null });
       }
     }
 
@@ -658,7 +652,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
-    res.json({ success: true, message: 'Menu saved successfully' });
+    res.json({ success: true, message: 'Menu saved successfully', sidesDebug });
   } catch (err) {
     console.error('Save error:', err);
     res.status(500).json({ error: 'Save failed: ' + err.message });
