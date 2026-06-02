@@ -571,8 +571,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
-    // 4. Sides + Add-ons (save all) — insert row-by-row so errors are isolated
-    const sidesDebug = [];
+    // 4. Sides + Add-ons (save all)
     if (sides && sides.length > 0) {
       await db.from('entity_sides').delete().eq('entity_slug', slug);
       for (const side of sides) {
@@ -581,7 +580,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
           const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
           if (uploaded) imageUrl = uploaded.url;
         }
-        const row = {
+        const { error: sErr } = await db.from('entity_sides').insert({
           entity_slug: slug,
           side_name: side.name || 'Side',
           description: side.description || null,
@@ -589,9 +588,8 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
           image_url: imageUrl || null,
           is_active: true,
           item_type: side.type || 'side',
-        };
-        const { error: sErr } = await db.from('entity_sides').insert(row);
-        sidesDebug.push({ name: row.side_name, ok: !sErr, err: sErr ? `${sErr.code}: ${sErr.message}` : null });
+        });
+        if (sErr) console.error('Side insert:', sErr.code, sErr.message);
       }
     }
 
@@ -652,7 +650,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
-    res.json({ success: true, message: 'Menu saved successfully', sidesDebug });
+    res.json({ success: true, message: 'Menu saved successfully' });
   } catch (err) {
     console.error('Save error:', err);
     res.status(500).json({ error: 'Save failed: ' + err.message });
