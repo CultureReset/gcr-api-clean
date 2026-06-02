@@ -571,33 +571,32 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
-    // 4. Sides + Add-ons (save all, not just first)
+    // 4. Sides + Add-ons (save all)
     if (sides && sides.length > 0) {
       await db.from('entity_sides').delete().eq('entity_slug', slug);
-      for (let i = 0; i < sides.length; i++) {
-        const side = sides[i];
+      const sideRows = await Promise.all(sides.map(async (side) => {
         let imageUrl = side.image_url || (side.images && side.images[0]?.url);
         if (imageUrl && imageUrl.startsWith('data:')) {
           const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
           if (uploaded) imageUrl = uploaded.url;
         }
-        // Minimal guaranteed columns (original schema)
-        const minimalData = {
+        return {
           entity_slug: slug,
           side_name: side.name || null,
           description: side.description || null,
           price: side.price ? parseFloat(side.price) : null,
           image_url: imageUrl || null,
           is_active: side.active ?? true,
+          item_type: side.type || 'side',
         };
-        // Try full insert (item_type + sort_order), fall back to minimal
-        const { error: e1 } = await db.from('entity_sides').insert({ ...minimalData, sort_order: i, item_type: side.type || 'side' });
-        if (e1) {
-          const { error: e2 } = await db.from('entity_sides').insert({ ...minimalData, sort_order: i });
-          if (e2) {
-            const { error: e3 } = await db.from('entity_sides').insert(minimalData);
-            if (e3) console.error('Side insert failed:', e3.message);
-          }
+      }));
+      const { error: sidesErr } = await db.from('entity_sides').insert(sideRows);
+      if (sidesErr) {
+        // item_type column may not exist — fall back inserting without it
+        if (sidesErr.code === '42703' || (sidesErr.message || '').includes('does not exist')) {
+          await db.from('entity_sides').insert(sideRows.map(({ item_type, ...r }) => r));
+        } else {
+          console.error('Sides insert error:', sidesErr.message);
         }
       }
     }
