@@ -52,16 +52,16 @@ async function buildFullEntity(slug) {
 
   const [menuItems, drinkItems, hhItems, entitySectionItems] = await Promise.all([
     menuSectionIds.length
-      ? db.from('menu_items').select('*').in('section_id', menuSectionIds).order('sort_order')
+      ? db.from('menu_items').select('*').in('section_id', menuSectionIds).order('id')
       : { data: [] },
     drinkSectionIds.length
-      ? db.from('drink_items').select('*').in('section_id', drinkSectionIds).order('sort_order')
+      ? db.from('drink_items').select('*').in('section_id', drinkSectionIds).order('id')
       : { data: [] },
     hhSectionIds.length
-      ? db.from('happy_hour_items').select('*').in('section_id', hhSectionIds).order('sort_order')
+      ? db.from('happy_hour_items').select('*').in('section_id', hhSectionIds).order('id')
       : { data: [] },
     entitySectionIds.length
-      ? db.from('entity_section_items').select('*').in('section_id', entitySectionIds).order('sort_order')
+      ? db.from('entity_section_items').select('*').in('section_id', entitySectionIds).order('id')
       : { data: [] },
   ]);
 
