@@ -581,21 +581,23 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
           const uploaded = await uploadBase64Image(slug, null, 'side', imageUrl);
           if (uploaded) imageUrl = uploaded.url;
         }
-        const sideData = {
+        // Minimal guaranteed columns (original schema)
+        const minimalData = {
           entity_slug: slug,
           side_name: side.name || null,
           description: side.description || null,
           price: side.price ? parseFloat(side.price) : null,
           image_url: imageUrl || null,
           is_active: side.active ?? true,
-          sort_order: i,
         };
-        // Try with item_type (requires ALTER TABLE if column missing)
-        const { error: sideErr } = await db.from('entity_sides').insert({ ...sideData, item_type: side.type || 'side' });
-        if (sideErr && (sideErr.code === '42703' || (sideErr.message || '').includes('does not exist'))) {
-          await db.from('entity_sides').insert(sideData);
-        } else if (sideErr) {
-          console.error('Side insert error:', sideErr.message);
+        // Try full insert (item_type + sort_order), fall back to minimal
+        const { error: e1 } = await db.from('entity_sides').insert({ ...minimalData, sort_order: i, item_type: side.type || 'side' });
+        if (e1) {
+          const { error: e2 } = await db.from('entity_sides').insert({ ...minimalData, sort_order: i });
+          if (e2) {
+            const { error: e3 } = await db.from('entity_sides').insert(minimalData);
+            if (e3) console.error('Side insert failed:', e3.message);
+          }
         }
       }
     }
