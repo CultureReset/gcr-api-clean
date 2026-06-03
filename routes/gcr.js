@@ -636,4 +636,23 @@ router.get('/live-now', async (req, res) => {
   }
 });
 
+// ─── Page view tracking ───────────────────────────────────────────────────────
+router.post('/track', async (req, res) => {
+  try {
+    const { page_path, referrer, session_id, device_type, source, utm_source, utm_medium, utm_campaign, utm_term, utm_content } = req.body;
+    if (!page_path) return res.status(200).json({ ok: true });
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
+    await db.from('gcr_page_views').insert({
+      page_path, referrer: referrer || null, session_id: session_id || null,
+      device_type: device_type || null, source: source || null,
+      utm_source: utm_source || null, utm_medium: utm_medium || null,
+      utm_campaign: utm_campaign || null, utm_term: utm_term || null,
+      utm_content: utm_content || null, ip_address: ip
+    });
+    res.status(200).json({ ok: true });
+  } catch {
+    res.status(200).json({ ok: true });
+  }
+});
+
 module.exports = router;
