@@ -3,8 +3,6 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { validateEntityType, validateAlsoAppearsOn, VALID_ENTITY_TYPES, VALID_PAGES, SUBTYPES } = require('../utils/entity-types');
-const { processBusiness, processBulkUpload } = require('../utils/upload-processor');
 
 let db;
 function getDb() {
