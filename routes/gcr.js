@@ -343,14 +343,14 @@ router.post('/search', async (req, res) => {
     const orFilter = (...fields) =>
       keywords.flatMap(k => fields.map(f => `${f}.ilike.%${k}%`)).join(',');
 
-    // Search all tables in parallel
+    // Search all tables in parallel — events only matched if query hits event/artist name directly
     const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents] = await Promise.all([
       db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
       db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('happy_hour_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('entity_specials').select('entity_slug').eq('is_active', true).or(orFilter('special_name', 'description', 'discount_text')),
-      db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'description', 'artist_name')),
+      db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'artist_name')),
     ]);
 
     (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
@@ -386,15 +386,23 @@ router.post('/search', async (req, res) => {
       db.from('drink_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('happy_hour_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('entity_specials').select('entity_slug, special_name, description, discount_text').in('entity_slug', slugList).eq('is_active', true),
-      db.from('entity_events').select('entity_slug, event_name, event_date, artist_name').in('entity_slug', slugList).eq('is_active', true),
+      db.from('entity_events').select('entity_slug, event_name, event_date, artist_name').in('entity_slug', slugList).eq('is_active', true).or(orFilter('event_name', 'artist_name')),
       db.from('entity_photos').select('entity_slug, url, sort_order').in('entity_slug', slugList).order('sort_order'),
     ]);
 
-    // Build match maps
+    // Build match maps — deduplicate menu items by name within each entity
     const menuMap = {}, drinkMap = {}, hhMap = {}, specialMap = {}, eventMap = {}, photoMap = {};
-    (menuMatches.data || []).forEach(r => { if (!menuMap[r.entity_slug]) menuMap[r.entity_slug] = []; menuMap[r.entity_slug].push(r); });
-    (drinkMatches.data || []).forEach(r => { if (!drinkMap[r.entity_slug]) drinkMap[r.entity_slug] = []; drinkMap[r.entity_slug].push(r); });
-    (hhMatches.data || []).forEach(r => { if (!hhMap[r.entity_slug]) hhMap[r.entity_slug] = []; hhMap[r.entity_slug].push(r); });
+    const dedupeItems = (map, rows) => {
+      (rows || []).forEach(r => {
+        if (!map[r.entity_slug]) map[r.entity_slug] = new Map();
+        const key = (r.item_name || '').toLowerCase();
+        if (!map[r.entity_slug].has(key)) map[r.entity_slug].set(key, r);
+      });
+      Object.keys(map).forEach(slug => { map[slug] = [...map[slug].values()]; });
+    };
+    dedupeItems(menuMap, menuMatches.data);
+    dedupeItems(drinkMap, drinkMatches.data);
+    dedupeItems(hhMap, hhMatches.data);
     (specialMatches.data || []).forEach(r => { if (!specialMap[r.entity_slug]) specialMap[r.entity_slug] = []; specialMap[r.entity_slug].push(r); });
     (eventMatches.data || []).forEach(r => { if (!eventMap[r.entity_slug]) eventMap[r.entity_slug] = []; eventMap[r.entity_slug].push(r); });
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
@@ -411,7 +419,10 @@ router.post('/search', async (req, res) => {
     const results = (entities || []).map(e => {
       const menuItems = [...(menuMap[e.slug] || []), ...(drinkMap[e.slug] || []), ...(hhMap[e.slug] || [])];
       const specials = specialMap[e.slug] || [];
-      const events = eventMap[e.slug] || [];
+      // Only show events that actually matched the query (not all events from a matched restaurant)
+      const events = (eventMap[e.slug] || []).filter(ev =>
+        keywords.some(k => (ev.event_name || '').toLowerCase().includes(k) || (ev.artist_name || '').toLowerCase().includes(k))
+      );
       const nameScore = score(e.name, e.subtitle);
       const itemScore = menuItems.length ? score(menuItems[0].item_name, menuItems[0].description) : 0;
       const relevance = Math.max(nameScore, itemScore) + (e.rating || 0);
