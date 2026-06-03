@@ -11,8 +11,20 @@ CREATE TABLE entity (
   is_active boolean DEFAULT true,
   featured boolean DEFAULT false,
   icon text,
-  entity_type text,
+  -- entity_type controls which PRIMARY page this business appears on
+  -- Valid values: restaurant | coffee | dessert | bakery | activity |
+  --               service | shopping | hotel | condo | vacation-rental | park
+  entity_type text CHECK (entity_type IN (
+    'restaurant','coffee','dessert','bakery','activity',
+    'service','shopping','hotel','condo','vacation-rental','park'
+  )),
   entity_subtype text,
+  -- also_appears_on lets a business show on additional pages beyond its primary type
+  -- Valid page values: restaurants | coffee-sweets | things-to-do | services |
+  --                    shopping | staying | public-spots
+  -- Example: a dinner-cruise activity that also shows on the restaurants page:
+  --   entity_type='activity', also_appears_on='{restaurants}'
+  also_appears_on text[] DEFAULT '{}',
   description text,
   subtitle text,
   phone text,
@@ -61,6 +73,45 @@ CREATE TABLE entity (
   serves_cocktails boolean DEFAULT false,
   good_for_groups boolean DEFAULT false,
   good_for_kids boolean DEFAULT false,
+
+  -- Things To Do / Activity
+  price_from            numeric(10,2),
+  price_to              numeric(10,2),
+  price_unit            text,             -- "per person" | "per boat" | "per night" | "per hour"
+  duration_text         text,
+  duration_label        text,             -- "2-3 hours" | "Half Day" | "Full Day"
+  capacity_min          integer,
+  capacity_max          integer,
+  minimum_age           integer,
+  booking_advance_days  integer,
+
+  -- Staying (hotel / condo / vacation-rental)
+  bedrooms_min          integer,
+  bedrooms_max          integer,
+  sleeps_min            integer,
+  sleeps_max            integer,
+  check_in_time         time,
+  check_out_time        time,
+  pet_friendly          boolean DEFAULT false,
+  pool                  boolean DEFAULT false,
+  parking               boolean DEFAULT false,
+
+  -- Universal cross-category
+  known_for             text,
+  highlights            text[],
+  good_for              text[],
+  what_makes_it_different text,
+  secondary_subtypes    text[],
+  seo_keywords          text[],
+
+  -- Multi-page support
+  also_appears_on       text[] DEFAULT '{}',
+
+  -- Flexible JSON sections (legacy / bonus)
+  gallery_sections      jsonb,
+  rotating_sections     jsonb,
+  theme                 jsonb,
+
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -253,6 +304,7 @@ CREATE INDEX idx_entity_active ON entity(is_active);
 CREATE INDEX idx_entity_subtype ON entity(entity_subtype);
 CREATE INDEX idx_entity_city ON entity(city);
 CREATE INDEX idx_entity_featured ON entity(featured);
+CREATE INDEX idx_entity_also_appears_on ON entity USING GIN(also_appears_on);
 CREATE INDEX idx_hours_slug ON entity_hours(entity_slug);
 CREATE INDEX idx_photos_slug ON entity_photos(entity_slug);
 CREATE INDEX idx_tags_slug ON entity_tags(entity_slug);

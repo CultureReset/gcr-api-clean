@@ -115,13 +115,21 @@ router.get('/entities', async (req, res) => {
 
     if (req.query.type) {
       if (req.query.type === 'coffee') {
-        // Coffee & Sweets: show both coffee and dessert places
-        query = query.in('entity_type', ['coffee', 'dessert', 'bakery']);
+        query = query.or(`entity_type.in.(coffee,dessert,bakery),also_appears_on.cs.{coffee-sweets}`);
       } else if (req.query.type === 'staying') {
-        // Hotels & Rentals: show hotels, condos, vacation homes
-        query = query.in('entity_type', ['hotel', 'condo', 'vacation-rental']);
+        query = query.or(`entity_type.in.(hotel,condo,vacation-rental),also_appears_on.cs.{staying}`);
       } else {
-        query = query.eq('entity_type', req.query.type);
+        // page name → entity_type mapping for also_appears_on cross-page lookups
+        const PAGE_TO_TYPE = {
+          'restaurants':  'restaurant',
+          'things-to-do': 'activity',
+          'services':     'service',
+          'shopping':     'shopping',
+          'public-spots': 'park',
+        };
+        const page = req.query.type;
+        const primaryType = PAGE_TO_TYPE[page] || page;
+        query = query.or(`entity_type.eq.${primaryType},also_appears_on.cs.{${page}}`);
       }
     }
     if (req.query.subtype) query = query.eq('entity_subtype', req.query.subtype);
@@ -136,9 +144,9 @@ router.get('/entities', async (req, res) => {
 
     // Batch fetch tags, photos, hours for all entities
     const [tagRows, photoRows, hourRows] = await Promise.all([
-      slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs) : { data: [] },
-      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption').in('entity_slug', slugs).order('sort_order') : { data: [] },
-      slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week') : { data: [] },
+      slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
+      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
+      slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
     ]);
 
     const tagMap = {}, photoMap = {}, hourMap = {};
