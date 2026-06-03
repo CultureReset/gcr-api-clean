@@ -1686,6 +1686,7 @@ router.patch('/gcr/photos/:id', authRequired, async (req, res) => {
 
 // ─── GOOGLE PLACES IMPORT ─────────────────────────────────────────────────────
 const { googlePlaceToEntity, googlePlacesToEntities } = require('../utils/google-places-import');
+const { processBulkUpload } = require('../utils/upload-processor');
 
 // POST /api/admin/gcr/import/google-places
 // Pass raw Google Places API response directly — converts + saves everything
