@@ -1516,6 +1516,11 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
   }
 });
 
+// ─── Trip Swipe hero button config (public) ───────────────────────────────────
+router.get('/trip-swipe-button', async (req, res) => {
+  res.json({ type: 'iframe', label: '🌊 Start Swiping', url: process.env.TRIP_SWIPE_URL || 'https://gcr-trip-swipe.vercel.app' });
+});
+
 // ─── Business claim leads ─────────────────────────────────────────────────────
 router.get('/gcr/claims', authRequired, async (req, res) => {
   try {
