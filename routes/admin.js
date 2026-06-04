@@ -1516,4 +1516,29 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
   }
 });
 
+// ─── Business claim leads ─────────────────────────────────────────────────────
+router.get('/gcr/claims', authRequired, async (req, res) => {
+  try {
+    const { data, error } = await db.from('business_claims').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
+  try {
+    const { status, notes } = req.body || {};
+    const updates = { updated_at: new Date().toISOString() };
+    if (status) updates.status = status;
+    if (notes !== undefined) updates.notes = notes;
+    const { error } = await db.from('business_claims').update(updates).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

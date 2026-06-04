@@ -655,4 +655,28 @@ router.post('/track', async (req, res) => {
   }
 });
 
+// ─── Business claim submissions ───────────────────────────────────────────────
+router.post('/claim', async (req, res) => {
+  try {
+    const { business_name, category, contact_name, phone, email, website, message } = req.body || {};
+    if (!business_name || !phone) return res.status(400).json({ error: 'business_name and phone required' });
+    const { error } = await db.from('business_claims').insert({
+      business_name: business_name.trim(),
+      category:      category || null,
+      contact_name:  contact_name?.trim() || null,
+      phone:         phone.trim(),
+      email:         email?.trim() || null,
+      website:       website?.trim() || null,
+      message:       message?.trim() || null,
+      status:        'new',
+      created_at:    new Date().toISOString(),
+    });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('claim error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
