@@ -194,19 +194,9 @@ router.post('/signin', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
     try {
-        const url = `${process.env.SUPABASE_URL}/auth/v1/token?grant_type=password`;
-        const r = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                apikey: process.env.SUPABASE_ANON_KEY || '',
-                Authorization: `Bearer ${process.env.SUPABASE_ANON_KEY || ''}`,
-            },
-            body: JSON.stringify({ email, password }),
-        });
-        const d = await r.json();
-        if (!r.ok) {
-            const text = (d.error_description || d.msg || d.error || '').toString();
+        const { data: d, error } = await admin().auth.signInWithPassword({ email, password });
+        if (error) {
+            const text = (error.message || '').toString();
             const msg = /confirm/i.test(text)
                 ? 'Please confirm your email before signing in — check your inbox.'
                 : 'Invalid email or password';
@@ -214,9 +204,9 @@ router.post('/signin', async (req, res) => {
         }
         res.json({
             session: {
-                access_token: d.access_token,
-                refresh_token: d.refresh_token,
-                expires_at: d.expires_at,
+                access_token: d.session?.access_token,
+                refresh_token: d.session?.refresh_token,
+                expires_at: d.session?.expires_at,
             },
             user: { id: d.user?.id, email: d.user?.email, role: 'tourist' },
         });

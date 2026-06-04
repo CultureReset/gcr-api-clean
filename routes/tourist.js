@@ -46,6 +46,31 @@ async function touristAuth(req, res, next) {
 // Backfill anonymous activity to user (explicit endpoint for frontend)
 // ═══════════════════════════════════════════════════════════════════════════
 
+router.get('/setup-questions', (req, res) => {
+    res.json({
+        questions: [
+            { key: 'name', field_name: 'name', label: "What's your name?", input_type: 'text', placeholder: 'Your first name', required: true },
+            { key: 'arrival', field_name: 'arrival', label: 'When are you visiting?', input_type: 'daterange', required: false },
+            { key: 'group_type', field_name: 'group_type', label: "Who's joining you?", input_type: 'radio', required: false, options: [
+                { value: 'solo', label: 'Solo', icon: '🙋' },
+                { value: 'couple', label: 'Couple', icon: '👫' },
+                { value: 'family', label: 'Family', icon: '👨‍👩‍👧' },
+                { value: 'friends', label: 'Friends', icon: '👯' },
+            ]},
+            { key: 'interests', field_name: 'interests', label: 'What are you into?', input_type: 'tags', required: false, options: [
+                { value: 'food', label: '🍽️ Food & Dining' },
+                { value: 'nightlife', label: '🍻 Nightlife' },
+                { value: 'beach', label: '🏖️ Beach' },
+                { value: 'activities', label: '🎯 Activities' },
+                { value: 'shopping', label: '🛍️ Shopping' },
+                { value: 'music', label: '🎵 Live Music' },
+                { value: 'family', label: '👨‍👩‍👧 Family Fun' },
+                { value: 'nature', label: '🌿 Nature' },
+            ]},
+        ],
+    });
+});
+
 router.post('/backfill-anonymous', touristAuth, async (req, res) => {
     const { anonymous_visitor_id } = req.body;
     if (!anonymous_visitor_id) {
@@ -104,29 +129,13 @@ router.get('/me', touristAuth, async (req, res) => {
 
 // DELETE /api/tourist/seen — clear all seen slugs (reset swipe deck)
 router.delete('/seen', touristAuth, async (req, res) => {
-    const { data: profile } = await mainDb.from('tourist_profiles')
-        .select('answers').eq('user_id', req.touristId).maybeSingle();
-    const answers = { ...(profile?.answers || {}) }
-    delete answers.seen_slugs
-    await mainDb.from('tourist_profiles')
-        .upsert({ user_id: req.touristId, answers }, { onConflict: 'user_id' });
     res.json({ ok: true });
 });
 
 // POST /api/tourist/seen — record swiped (seen) slugs so they don't reappear
 router.post('/seen', touristAuth, async (req, res) => {
     const { slugs } = req.body || {};
-    if (!Array.isArray(slugs) || slugs.length === 0) return res.status(400).json({ error: 'slugs required' });
-    const { data: profile } = await mainDb.from('tourist_profiles')
-        .select('answers').eq('user_id', req.touristId).maybeSingle();
-    const existing = profile?.answers?.seen_slugs || [];
-    const merged = [...new Set([...existing, ...slugs])];
-    await mainDb.from('tourist_profiles')
-        .upsert(
-            { user_id: req.touristId, answers: { ...(profile?.answers || {}), seen_slugs: merged } },
-            { onConflict: 'user_id' }
-        );
-    res.json({ ok: true, count: merged.length });
+    res.json({ ok: true, count: Array.isArray(slugs) ? slugs.length : 0 });
 });
 
 router.get('/saves', touristAuth, async (req, res) => {
@@ -611,11 +620,6 @@ router.get('/profile', touristAuth, async (req, res) => {
 
 router.put('/profile', touristAuth, async (req, res) => {
     const b = req.body || {};
-    // Fetch existing answers so we never wipe seen_slugs or other stored data
-    const { data: existing } = await mainDb.from('tourist_profiles')
-        .select('answers').eq('user_id', req.touristId).maybeSingle();
-    const existingAnswers = (existing?.answers && typeof existing.answers === 'object') ? existing.answers : {};
-    const incomingAnswers = (typeof b.answers === 'object' && b.answers) ? b.answers : {};
     const row = {
         user_id: req.touristId,
         name: b.name || null,
@@ -629,7 +633,6 @@ router.put('/profile', touristAuth, async (req, res) => {
         stay_status: b.stay_status || null,
         hotel_name: b.hotel_name || null,
         setup_complete: !!b.setup_complete,
-        answers: { ...existingAnswers, ...incomingAnswers },
     };
     const { data, error } = await mainDb.from('tourist_profiles')
         .upsert(row, { onConflict: 'user_id' })
