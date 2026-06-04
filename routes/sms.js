@@ -1,7 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const twilio  = require('twilio');
-const { mainDb, admin } = require('../db');
+const { mainDb } = require('../db');
 
 const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
@@ -70,31 +70,7 @@ async function getOrCreateTourist(phone) {
     .single();
 
   if (error) throw new Error('Could not create profile: ' + error.message);
-
-  // Create/find Supabase auth user for token generation
-  const sb = admin();
-  const fakeEmail = `${phone.replace(/\+/, '')}@gcr.tourist`;
-  let authUser = null;
-  try {
-    const { data: existing } = await sb.auth.admin.getUserByEmail(fakeEmail);
-    authUser = existing?.user || null;
-  } catch {}
-
-  if (!authUser) {
-    const { data: created } = await sb.auth.admin.createUser({
-      email: fakeEmail, password: profile.id, email_confirm: true,
-      user_metadata: { phone, tourist_profile_id: profile.id },
-    });
-    authUser = created?.user || null;
-  }
-
-  let accessToken = null;
-  if (authUser) {
-    const { data: signIn } = await sb.auth.signInWithPassword({ email: fakeEmail, password: profile.id });
-    accessToken = signIn?.session?.access_token || null;
-  }
-
-  return { profile, accessToken };
+  return { profile };
 }
 
 // ── Inbound SMS state machine ─────────────────────────────────────────────────
@@ -134,61 +110,43 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
       const dates = parseDateRange(body);
 
       if (dates) {
-        // Save dates, clear state
         await mainDb.from('tourist_profiles').update({
-          arrival:   dates.arrival,
-          departure: dates.departure,
-          sms_state: 'active',
+          arrival:    dates.arrival,
+          departure:  dates.departure,
+          sms_state:  'active',
           updated_at: new Date().toISOString(),
         }).eq('id', existing.id);
 
-        const { accessToken } = await getOrCreateTourist(phone);
-        const link = accessToken
-          ? `${TRIP_SWIPE_URL}/swipe/all?token=${encodeURIComponent(accessToken)}`
-          : `${TRIP_SWIPE_URL}/swipe/all`;
-
         twiml.message(
-          `Perfect! We'll send you the best deals, happy hours & specials during your stay 🌊\n\nHere's your Trip Swipe link:\n${link}\n\nSwipe to discover the Gulf Coast!`
+          `Perfect! We'll text you deals, happy hours & specials while you're in town 🌊\n\nOpen Trip Swipe anytime:\n${TRIP_SWIPE_URL}\n\nLog in with your phone number — we'll text you a code.`
         );
       } else {
-        // Couldn't parse — ask again
         twiml.message(
-          `We couldn't read that date. Try something like:\n"June 5-8" or "6/5 to 6/8"\n\nWhat dates are you visiting?`
+          `We couldn't read that. Try something like:\n"June 5-8" or "6/5 to 6/8"\n\nWhat dates are you visiting?`
         );
       }
 
       return res.type('text/xml').send(twiml.toString());
     }
 
-    // ── Already signed up — re-send their link ────────────────────────────────
+    // ── Already signed up — re-send the link ─────────────────────────────────
     if (existing?.sms_opt_in) {
-      const { accessToken } = await getOrCreateTourist(phone);
-      const link = accessToken
-        ? `${TRIP_SWIPE_URL}/swipe/all?token=${encodeURIComponent(accessToken)}`
-        : `${TRIP_SWIPE_URL}/swipe/all`;
-
       twiml.message(
-        `Welcome back to Gulf Coast Radar! 🌊\n\nHere's your Trip Swipe link:\n${link}\n\nReply DATES to update your visit dates anytime.`
+        `Welcome back to Gulf Coast Radar! 🌊\n\nOpen Trip Swipe here:\n${TRIP_SWIPE_URL}\n\nLog in with your phone number — we'll text you a code.\n\nReply DATES to update your visit dates anytime.`
       );
-
       return res.type('text/xml').send(twiml.toString());
     }
 
     // ── New signup ────────────────────────────────────────────────────────────
-    const { profile, accessToken } = await getOrCreateTourist(phone);
+    const { profile } = await getOrCreateTourist(phone);
 
-    // Set state to awaiting_dates
     await mainDb.from('tourist_profiles').update({
       sms_state:  'awaiting_dates',
       updated_at: new Date().toISOString(),
     }).eq('id', profile.id);
 
-    const link = accessToken
-      ? `${TRIP_SWIPE_URL}/swipe/all?token=${encodeURIComponent(accessToken)}`
-      : `${TRIP_SWIPE_URL}/swipe/all`;
-
     twiml.message(
-      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nHere's your Trip Swipe link:\n${link}\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\n\nWe'll text you deals, happy hours & specials the days you're in town!\n\nReply STOP to opt out anytime.`
+      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nOpen Trip Swipe here:\n${TRIP_SWIPE_URL}\n\nLog in with your phone number — we'll text you a code each time.\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
     );
 
   } catch (e) {
