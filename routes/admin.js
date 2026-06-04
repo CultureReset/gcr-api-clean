@@ -3,6 +3,8 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 let db;
 function getDb() {
@@ -1214,6 +1216,23 @@ ${raw_input}`;
     console.error('AI organize error:', err);
     res.status(500).json({ error: 'Failed to organize data: ' + err.message });
   }
+});
+
+// POST /api/admin/gcr/upload-image — upload image file to Supabase storage
+router.post('/gcr/upload-image', authRequired, upload.single('image'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file provided' });
+  const { entity_slug, is_cover } = req.body;
+  const ext = req.file.originalname.split('.').pop() || 'jpg';
+  const fileName = `${entity_slug || 'general'}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error: upErr } = await getDb().storage.from('entity-media').upload(fileName, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+  if (upErr) return res.status(500).json({ error: upErr.message });
+  const { data: { publicUrl } } = getDb().storage.from('entity-media').getPublicUrl(fileName);
+  if (entity_slug) {
+    const { data: existing } = await getDb().from('entity_photos').select('id').eq('entity_slug', entity_slug).order('sort_order', { ascending: false }).limit(1);
+    const nextOrder = existing?.length ? (existing[0].sort_order || 0) + 1 : 0;
+    await getDb().from('entity_photos').insert({ entity_slug, url: publicUrl, image_path: fileName, is_cover: is_cover === 'true', sort_order: nextOrder });
+  }
+  res.json({ url: publicUrl, path: fileName });
 });
 
 module.exports = router;
