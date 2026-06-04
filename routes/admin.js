@@ -791,18 +791,40 @@ router.get('/tourists', authRequired, async (req, res) => {
 router.get('/tourists/:user_id', authRequired, async (req, res) => {
   try {
     const uid = req.params.user_id;
-    const [profile, saves, itinerary, swipes] = await Promise.all([
+    const [profile, saves, itinerary, swipesRight, swipesLeft, swipesSuper, seen] = await Promise.all([
       getDb().from('tourist_profiles').select('*').eq('user_id', uid).maybeSingle(),
       getDb().from('tourist_saves').select('*').eq('user_id', uid).order('saved_at', { ascending: false }),
       getDb().from('tourist_itineraries').select('*').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-      getDb().from('tourist_swipe_events').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(100)
+      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'left').order('swiped_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'super').order('swiped_at', { ascending: false }),
+      getDb().from('tourist_seen').select('entity_slug, seen_at').eq('user_id', uid).order('seen_at', { ascending: false }),
     ]);
 
+    const rightData  = swipesRight.data  || [];
+    const leftData   = swipesLeft.data   || [];
+    const superData  = swipesSuper.data  || [];
+    const savesData  = saves.data        || [];
+    const seenData   = seen.data         || [];
+
     res.json({
-      profile: profile.data || null,
-      saves: saves.data || [],
-      itinerary: itinerary.data || null,
-      recent_swipes: swipes.data || []
+      profile:       profile.data   || null,
+      itinerary:     itinerary.data || null,
+      saves:         savesData,
+      swiped_right:  rightData,
+      swiped_left:   leftData,
+      super_liked:   superData,
+      seen:          seenData,
+      summary: {
+        saves_count:       savesData.length,
+        swiped_right_count: rightData.length,
+        swiped_left_count:  leftData.length,
+        super_liked_count:  superData.length,
+        seen_count:         seenData.length,
+        like_rate: rightData.length + leftData.length > 0
+          ? Math.round((rightData.length / (rightData.length + leftData.length)) * 100) + '%'
+          : '—',
+      }
     });
   } catch(e) {
     res.status(500).json({ error: e.message });
@@ -817,8 +839,8 @@ router.get('/tourists/:user_id/preferences', authRequired, async (req, res) => {
     const [{ data: prefs }, { data: swipeStats }, { data: saves }, { data: swipedRight }] = await Promise.all([
       getDb().from('user_preference_scores').select('tag, score').eq('tourist_id', uid).order('score', { ascending: false }),
       getDb().from('tourist_swipe_events').select('direction').eq('user_id', uid),
-      getDb().from('tourist_saves').select('entity_slug, business_name, category, hero_image_url, is_super_like, saved_at').eq('user_id', uid).order('saved_at', { ascending: false }).limit(50),
-      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }).limit(50),
+      getDb().from('tourist_saves').select('entity_slug, business_name, category, hero_image_url, is_super_like, saved_at').eq('user_id', uid).order('saved_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }),
     ]);
 
     const scores = prefs || [];
