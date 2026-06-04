@@ -886,8 +886,8 @@ router.get('/tripswipe-analytics', authRequired, async (req, res) => {
 
 // ─── TRIP SWIPE: SPONSORED BUSINESSES ──────────────────────────────────────
 
-// GET /api/admin/tripswipe/sponsored — list sponsored businesses
-router.get('/tripswipe/sponsored', authRequired, async (req, res) => {
+// GET /api/admin/tripswipe/sponsored — list sponsored businesses (public read so Trip Swipe can load without auth)
+router.get('/tripswipe/sponsored', async (req, res) => {
   try {
     const { data: sponsored, error } = await getDb().from('tripswipe_sponsored')
       .select('*')
@@ -958,8 +958,8 @@ router.delete('/tripswipe/sponsored/:id', authRequired, async (req, res) => {
 
 // ─── TRIP SWIPE: PROMO CARDS (Tonight) ─────────────────────────────────────
 
-// GET /api/admin/tripswipe/promo-cards — list promo cards
-router.get('/tripswipe/promo-cards', authRequired, async (req, res) => {
+// GET /api/admin/tripswipe/promo-cards — list promo cards (public read so Trip Swipe can load without auth)
+router.get('/tripswipe/promo-cards', async (req, res) => {
   try {
     const { data: cards, error } = await getDb().from('tripswipe_promo_cards')
       .select('*')
@@ -1027,8 +1027,8 @@ router.delete('/tripswipe/promo-cards/:id', authRequired, async (req, res) => {
 
 // ─── TRIP SWIPE: BUSINESS SETTINGS ────────────────────────────────────────
 
-// GET /api/admin/tripswipe/settings — get Trip Swipe business settings
-router.get('/tripswipe/settings', authRequired, async (req, res) => {
+// GET /api/admin/tripswipe/settings — get Trip Swipe business settings (public read so Trip Swipe can load without auth)
+router.get('/tripswipe/settings', async (req, res) => {
   try {
     const { data: settings, error } = await getDb().from('tripswipe_business_settings')
       .select('*')
@@ -1041,8 +1041,8 @@ router.get('/tripswipe/settings', authRequired, async (req, res) => {
   }
 });
 
-// GET /api/admin/tripswipe/settings/:slug — get Trip Swipe setting for one business
-router.get('/tripswipe/settings/:slug', authRequired, async (req, res) => {
+// GET /api/admin/tripswipe/settings/:slug — get Trip Swipe setting for one business (public read)
+router.get('/tripswipe/settings/:slug', async (req, res) => {
   try {
     const { data: setting, error } = await getDb().from('tripswipe_business_settings')
       .select('*')
