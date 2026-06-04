@@ -1235,4 +1235,238 @@ router.post('/gcr/upload-image', authRequired, upload.single('image'), async (re
   res.json({ url: publicUrl, path: fileName });
 });
 
+// ─── SMS BLAST (manual, admin-triggered) ─────────────────────────────────────
+
+// POST /api/admin/sms-blast — send custom SMS to tourists filtered by:
+//   in_town_only: true/false  — only tourists whose visit dates include today
+//   tags: []                  — preference tags they love/like
+//   min_score: number         — minimum preference score (default 0)
+//   match_type: 'any'|'all'   — OR vs AND for tag matching
+//   swiped_right: []          — entity slugs they swiped right on
+//   saved: []                 — entity slugs they saved / super-liked
+//   category: string          — category they've engaged with (restaurant, activity, etc.)
+router.post('/sms-blast', authRequired, async (req, res) => {
+  const {
+    message,
+    in_town_only = true,
+    tags = [],
+    min_score = 0,
+    match_type = 'any',
+    swiped_right = [],
+    saved = [],
+    category = null,
+  } = req.body || {};
+
+  if (!message) return res.status(400).json({ error: 'message required' });
+
+  const twilio = require('twilio');
+  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const from   = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
+  const today  = new Date().toISOString().slice(0, 10);
+  const db     = getDb();
+
+  try {
+    // Step 1 — start with all opted-in tourists who have a phone
+    let baseQuery = db
+      .from('tourist_profiles')
+      .select('id, phone, name, arrival, departure')
+      .eq('sms_opt_in', true)
+      .not('phone', 'is', null);
+
+    if (in_town_only) {
+      baseQuery = baseQuery.lte('arrival', today).gte('departure', today);
+    }
+
+    const { data: allTourists, error: baseErr } = await baseQuery;
+    if (baseErr) throw baseErr;
+    if (!allTourists?.length) return res.json({ sent: 0, total: 0, message: 'No tourists match base filters' });
+
+    let eligible = new Set(allTourists.map(t => t.id));
+
+    // Step 2 — filter by preference tags
+    if (tags.length > 0) {
+      const { data: scores } = await db
+        .from('user_preference_scores')
+        .select('tourist_id, tag, score')
+        .in('tag', tags.map(t => t.toLowerCase().trim()))
+        .gte('score', min_score);
+
+      if (scores?.length) {
+        const byTourist = {};
+        scores.forEach(s => {
+          if (!byTourist[s.tourist_id]) byTourist[s.tourist_id] = new Set();
+          byTourist[s.tourist_id].add(s.tag.toLowerCase().trim());
+        });
+
+        const tagSet = new Set(tags.map(t => t.toLowerCase().trim()));
+        eligible = new Set([...eligible].filter(id => {
+          const matched = byTourist[id] || new Set();
+          if (match_type === 'all') return [...tagSet].every(t => matched.has(t));
+          return [...tagSet].some(t => matched.has(t));
+        }));
+      } else {
+        eligible = new Set(); // no matches
+      }
+    }
+
+    // Step 3 — filter by swiped right on specific businesses
+    if (swiped_right.length > 0) {
+      const { data: swipes } = await db
+        .from('tourist_swipe_events')
+        .select('tourist_id, entity_slug')
+        .in('entity_slug', swiped_right)
+        .eq('direction', 'right');
+
+      const swipers = new Set((swipes || []).map(s => s.tourist_id));
+      eligible = new Set([...eligible].filter(id => swipers.has(id)));
+    }
+
+    // Step 4 — filter by saved businesses
+    if (saved.length > 0) {
+      const { data: saves } = await db
+        .from('tourist_saves')
+        .select('user_id, entity_slug')
+        .in('entity_slug', saved);
+
+      const savers = new Set((saves || []).map(s => s.user_id));
+      eligible = new Set([...eligible].filter(id => savers.has(id)));
+    }
+
+    // Step 5 — filter by category engagement (swiped right OR saved in this category)
+    if (category) {
+      const [{ data: catSwipes }, { data: catSaves }] = await Promise.all([
+        db.from('tourist_swipe_events').select('tourist_id').eq('category', category).eq('direction', 'right'),
+        db.from('tourist_saves').select('user_id').eq('category', category),
+      ]);
+      const catEngaged = new Set([
+        ...(catSwipes || []).map(s => s.tourist_id),
+        ...(catSaves || []).map(s => s.user_id),
+      ]);
+      eligible = new Set([...eligible].filter(id => catEngaged.has(id)));
+    }
+
+    if (!eligible.size) return res.json({ sent: 0, total: 0, message: 'No tourists match all filters' });
+
+    // Step 6 — get phones for eligible tourist IDs
+    const eligibleTourists = allTourists.filter(t => eligible.has(t.id));
+
+    // Step 7 — send via Twilio with small delay between messages
+    let sent = 0;
+    const errors = [];
+    for (const t of eligibleTourists) {
+      try {
+        await client.messages.create({ from, to: t.phone, body: message });
+        sent++;
+        await new Promise(r => setTimeout(r, 80));
+      } catch (e) {
+        errors.push({ phone: t.phone, error: e.message });
+      }
+    }
+
+    // Log the blast
+    await db.from('sms_blast_log').insert({
+      message,
+      filters: { in_town_only, tags, min_score, match_type, swiped_right, saved, category },
+      total_eligible: eligibleTourists.length,
+      sent,
+      sent_at: new Date().toISOString(),
+      sent_by: req.adminEmail || 'admin',
+    }).catch(() => {});
+
+    res.json({ sent, total: eligibleTourists.length, errors: errors.length ? errors : undefined });
+
+  } catch (e) {
+    console.error('sms-blast error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/admin/sms-blasts — blast history
+router.get('/sms-blasts', authRequired, async (req, res) => {
+  try {
+    const { data, error } = await getDb()
+      .from('sms_blast_log')
+      .select('*')
+      .order('sent_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    res.json({ blasts: data || [] });
+  } catch (e) {
+    res.status(500).json({ blasts: [] });
+  }
+});
+
+// POST /api/admin/sms-blast/preview — count recipients without sending
+router.post('/sms-blast/preview', authRequired, async (req, res) => {
+  const {
+    in_town_only = true,
+    tags = [],
+    min_score = 0,
+    match_type = 'any',
+    swiped_right = [],
+    saved = [],
+    category = null,
+  } = req.body || {};
+
+  const today = new Date().toISOString().slice(0, 10);
+  const db = getDb();
+
+  try {
+    let baseQuery = db
+      .from('tourist_profiles')
+      .select('id')
+      .eq('sms_opt_in', true)
+      .not('phone', 'is', null);
+
+    if (in_town_only) baseQuery = baseQuery.lte('arrival', today).gte('departure', today);
+
+    const { data: allTourists } = await baseQuery;
+    if (!allTourists?.length) return res.json({ count: 0 });
+
+    let eligible = new Set(allTourists.map(t => t.id));
+
+    if (tags.length > 0) {
+      const { data: scores } = await db
+        .from('user_preference_scores')
+        .select('tourist_id, tag, score')
+        .in('tag', tags.map(t => t.toLowerCase().trim()))
+        .gte('score', min_score);
+      if (scores?.length) {
+        const byTourist = {};
+        scores.forEach(s => { if (!byTourist[s.tourist_id]) byTourist[s.tourist_id] = new Set(); byTourist[s.tourist_id].add(s.tag); });
+        const tagSet = new Set(tags.map(t => t.toLowerCase().trim()));
+        eligible = new Set([...eligible].filter(id => {
+          const m = byTourist[id] || new Set();
+          return match_type === 'all' ? [...tagSet].every(t => m.has(t)) : [...tagSet].some(t => m.has(t));
+        }));
+      } else eligible = new Set();
+    }
+
+    if (swiped_right.length > 0) {
+      const { data: swipes } = await db.from('tourist_swipe_events').select('tourist_id').in('entity_slug', swiped_right).eq('direction', 'right');
+      const s = new Set((swipes || []).map(s => s.tourist_id));
+      eligible = new Set([...eligible].filter(id => s.has(id)));
+    }
+
+    if (saved.length > 0) {
+      const { data: saves } = await db.from('tourist_saves').select('user_id').in('entity_slug', saved);
+      const s = new Set((saves || []).map(s => s.user_id));
+      eligible = new Set([...eligible].filter(id => s.has(id)));
+    }
+
+    if (category) {
+      const [{ data: cs }, { data: cv }] = await Promise.all([
+        db.from('tourist_swipe_events').select('tourist_id').eq('category', category).eq('direction', 'right'),
+        db.from('tourist_saves').select('user_id').eq('category', category),
+      ]);
+      const ce = new Set([...(cs||[]).map(s=>s.tourist_id), ...(cv||[]).map(s=>s.user_id)]);
+      eligible = new Set([...eligible].filter(id => ce.has(id)));
+    }
+
+    res.json({ count: eligible.size });
+  } catch (e) {
+    res.status(500).json({ count: 0, error: e.message });
+  }
+});
+
 module.exports = router;
