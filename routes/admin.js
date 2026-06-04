@@ -108,7 +108,7 @@ router.post('/login', async (req, res) => {
 
 // GET /api/admin/gcr/entities
 router.get('/gcr/entities', async (req, res) => {
-  const { data, error } = await getDb().from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating').order('name');
+  const { data, error } = await getDb().from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating').order('name').limit(5000);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
