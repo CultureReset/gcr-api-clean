@@ -751,24 +751,28 @@ router.delete('/entities/:slug/sections', authRequired, async (req, res) => {
 router.get('/tourists', authRequired, async (req, res) => {
   try {
     const { data: profiles, error } = await getDb().from('tourist_profiles')
-      .select('user_id, email, name, phone, created_at, updated_at')
+      .select('user_id, email, name, phone, destination, arrival, departure, setup_complete, sms_opt_in, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    // Fetch summary stats for each tourist
     const tourists = await Promise.all((profiles || []).map(async (p) => {
       const [saves, swipes, itinerary] = await Promise.all([
         getDb().from('tourist_saves').select('id', { count: 'exact', head: true }).eq('user_id', p.user_id),
         getDb().from('tourist_swipe_events').select('id', { count: 'exact', head: true }).eq('user_id', p.user_id),
-        getDb().from('tourist_itineraries').select('*').eq('user_id', p.user_id).maybeSingle()
+        getDb().from('tourist_itineraries').select('id').eq('user_id', p.user_id).limit(1).maybeSingle()
       ]);
 
       return {
         user_id: p.user_id,
         email: p.email,
-        name: p.name || p.email.split('@')[0],
+        name: p.name,
         phone: p.phone,
+        destination: p.destination,
+        arrival: p.arrival,
+        departure: p.departure,
+        setup_complete: p.setup_complete,
+        sms_opt_in: p.sms_opt_in,
         saves_count: saves.count || 0,
         swipes_count: swipes.count || 0,
         itineraries_count: itinerary ? 1 : 0,
@@ -805,17 +809,38 @@ router.get('/tourists/:user_id', authRequired, async (req, res) => {
   }
 });
 
-// GET /api/admin/tourists/:user_id/preferences — get tourist preference scores
+// GET /api/admin/tourists/:user_id/preferences — get processed preference data
 router.get('/tourists/:user_id/preferences', authRequired, async (req, res) => {
   try {
     const uid = req.params.user_id;
-    const { data: prefs, error } = await getDb().from('user_preference_scores')
-      .select('*')
-      .eq('tourist_id', uid)
-      .order('score', { ascending: false });
 
-    if (error) throw error;
-    res.json({ preferences: prefs || [] });
+    const [{ data: prefs }, { data: swipeStats }, { data: saves }, { data: swipedRight }] = await Promise.all([
+      getDb().from('user_preference_scores').select('tag, score').eq('tourist_id', uid).order('score', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('direction').eq('user_id', uid),
+      getDb().from('tourist_saves').select('entity_slug, business_name, category, hero_image_url, is_super_like, saved_at').eq('user_id', uid).order('saved_at', { ascending: false }).limit(50),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }).limit(50),
+    ]);
+
+    const scores = prefs || [];
+    const loves = scores.filter(p => p.score >= 20);
+    const likes = scores.filter(p => p.score >= 1 && p.score < 20);
+    const dislikes = scores.filter(p => p.score < 0);
+
+    const swipeArr = swipeStats || [];
+    const swipe_counts = {
+      like:  swipeArr.filter(s => s.direction === 'right').length,
+      nope:  swipeArr.filter(s => s.direction === 'left').length,
+      super: swipeArr.filter(s => s.direction === 'super').length,
+    };
+
+    res.json({
+      loves, likes, dislikes,
+      top_tags: scores.slice(0, 10).map(p => p.tag),
+      total_tags: scores.length,
+      swipe_counts,
+      saves: saves || [],
+      swiped_right: swipedRight || [],
+    });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
