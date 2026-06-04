@@ -99,7 +99,7 @@ async function buildFullEntity(slug) {
 // ─── GET /api/gcr/entities ────────────────────────────────────────────────────
 router.get('/entities', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
+    const limit = Math.min(parseInt(req.query.limit) || 100, 5000);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     let query = db
