@@ -7,6 +7,14 @@ const db = createClient(
   process.env.GCR_SUPABASE_SERVICE_KEY
 );
 
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 3958.8;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
 // Cache-control for all GETs
 router.use((req, res, next) => {
   if (req.method === 'GET') res.set('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
@@ -115,7 +123,8 @@ router.get('/entities', async (req, res) => {
         social_instagram, social_facebook, social_tiktok,
         duration_text, price_from, price_unit,
         known_for, highlights, good_for,
-        what_makes_it_different, secondary_subtypes, seo_keywords
+        what_makes_it_different, secondary_subtypes, seo_keywords,
+        latitude, longitude
       `)
       .eq('is_active', true)
       .order('name')
@@ -162,12 +171,19 @@ router.get('/entities', async (req, res) => {
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
     (hourRows.data || []).forEach(r => { if (!hourMap[r.entity_slug]) hourMap[r.entity_slug] = []; hourMap[r.entity_slug].push(r); });
 
-    const results = (entities || []).map(e => ({
-      ...e,
-      tags: tagMap[e.slug] || [],
-      photos: photoMap[e.slug] || [],
-      hours: hourMap[e.slug] || [],
-    }));
+    const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
+    const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
+    const sortByDist = req.query.sort === 'distance' && userLat !== null && userLng !== null;
+
+    const results = (entities || []).map(e => {
+      const row = { ...e, tags: tagMap[e.slug] || [], photos: photoMap[e.slug] || [], hours: hourMap[e.slug] || [] };
+      if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
+        row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
+      }
+      return row;
+    });
+
+    if (sortByDist) results.sort((a, b) => (a.distance_miles ?? 9999) - (b.distance_miles ?? 9999));
 
     res.json({ entities: results, total: results.length, offset, limit });
   } catch (err) {
@@ -333,7 +349,7 @@ router.get('/happy-hours', async (req, res) => {
 // ─── POST /api/gcr/search ─────────────────────────────────────────────────────
 router.post('/search', async (req, res) => {
   try {
-    const { query: q, city, limit = 50 } = req.body;
+    const { query: q, city, limit = 50, lat, lng } = req.body;
     if (!q || !q.trim()) return res.status(400).json({ error: 'Query required' });
 
     const term = q.toLowerCase().trim();
@@ -367,7 +383,8 @@ router.post('/search', async (req, res) => {
         id, slug, name, subtitle, entity_subtype, icon, phone, rating,
         review_count, city, state, address_line_1, hero_image_url,
         directions_url, call_url, booking_url, reservation_url, order_url,
-        price_range, hh_days, hh_start, hh_end, featured, is_active
+        price_range, hh_days, hh_start, hh_end, featured, is_active,
+        latitude, longitude
       `)
       .eq('is_active', true)
       .in('slug', [...matchedSlugs])
@@ -416,16 +433,21 @@ router.post('/search', async (req, res) => {
       return 0;
     };
 
+    const userLat = lat ? parseFloat(lat) : null;
+    const userLng = lng ? parseFloat(lng) : null;
+
     const results = (entities || []).map(e => {
       const menuItems = [...(menuMap[e.slug] || []), ...(drinkMap[e.slug] || []), ...(hhMap[e.slug] || [])];
       const specials = specialMap[e.slug] || [];
-      // Only show events that actually matched the query (not all events from a matched restaurant)
       const events = (eventMap[e.slug] || []).filter(ev =>
         keywords.some(k => (ev.event_name || '').toLowerCase().includes(k) || (ev.artist_name || '').toLowerCase().includes(k))
       );
       const nameScore = score(e.name, e.subtitle);
       const itemScore = menuItems.length ? score(menuItems[0].item_name, menuItems[0].description) : 0;
       const relevance = Math.max(nameScore, itemScore) + (e.rating || 0);
+      const distance_miles = (userLat && userLng && e.latitude && e.longitude)
+        ? haversine(userLat, userLng, e.latitude, e.longitude)
+        : null;
 
       return {
         ...e,
@@ -434,6 +456,7 @@ router.post('/search', async (req, res) => {
         matched_specials: specials,
         matched_events: events,
         _relevance: relevance,
+        distance_miles,
       };
     }).sort((a, b) => b._relevance - a._relevance);
 
@@ -677,6 +700,22 @@ router.post('/claim', async (req, res) => {
     console.error('claim error:', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ─── GET /api/gcr/locations/autocomplete ─────────────────────────────────────
+router.get('/locations/autocomplete', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q || q.length < 2) return res.json({ results: [] });
+
+  const { data, error } = await db
+    .from('entity')
+    .select('slug, name, city, state, entity_type, entity_subtype, hero_image_url, latitude, longitude')
+    .eq('is_active', true)
+    .ilike('name', `%${q}%`)
+    .limit(10);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ results: data || [] });
 });
 
 module.exports = router;

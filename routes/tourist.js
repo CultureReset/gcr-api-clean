@@ -1239,6 +1239,27 @@ router.get('/photos', touristAuth, async (req, res) => {
 // POST /api/tourist/location — browser sends GPS, we store it + check geofences
 // Body: { lat, lng }
 // ─────────────────────────────────────────────────────────────────────────────
+// ─── GET/PUT /api/tourist/location-settings ──────────────────────────────────
+router.get('/location-settings', touristAuth, async (req, res) => {
+  const { data } = await mainDb.from('tourist_profiles')
+    .select('location_sharing_enabled, geofence_radius_miles, sms_frequency, sms_categories')
+    .eq('user_id', req.touristId).maybeSingle();
+  res.json(data || { location_sharing_enabled: false, geofence_radius_miles: 1.0, sms_frequency: 'once_per_day', sms_categories: [] });
+});
+
+router.put('/location-settings', touristAuth, async (req, res) => {
+  const { location_sharing_enabled, geofence_radius_miles, sms_frequency, sms_categories } = req.body;
+  const update = { updated_at: new Date().toISOString() };
+  if (location_sharing_enabled !== undefined) update.location_sharing_enabled = location_sharing_enabled;
+  if (geofence_radius_miles !== undefined) update.geofence_radius_miles = geofence_radius_miles;
+  if (sms_frequency !== undefined) update.sms_frequency = sms_frequency;
+  if (sms_categories !== undefined) update.sms_categories = sms_categories;
+  const { error } = await mainDb.from('tourist_profiles')
+    .upsert({ user_id: req.touristId, ...update }, { onConflict: 'user_id' });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
+
 router.post('/location', touristAuth, async (req, res) => {
     const { lat, lng } = req.body || {};
     if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
