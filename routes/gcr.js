@@ -38,8 +38,9 @@ async function buildFullEntity(slug) {
   const entity = await getEntityBySlug(slug);
   if (!entity) return null;
 
-  const [hours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements] = await Promise.all([
+  const [hours, secondaryHours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
+    db.from('entity_secondary_hours').select('*').eq('entity_slug', slug).order('hours_type, day_of_week'),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_tags').select('*').eq('entity_slug', slug),
     db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -87,6 +88,7 @@ async function buildFullEntity(slug) {
   return {
     ...entity,
     hours: hours.data || [],
+    secondary_hours: secondaryHours.data || [],
     photos: photos.data || [],
     tags: tags.data || [],
     menu_sections: nest(menuSections.data, menuItems.data),
