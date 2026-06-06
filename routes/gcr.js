@@ -126,7 +126,17 @@ router.get('/entities', async (req, res) => {
         duration_text, price_from, price_unit,
         known_for, highlights, good_for,
         what_makes_it_different, secondary_subtypes, seo_keywords,
-        latitude, longitude
+        latitude, longitude,
+        editorial_summary, ai_overview, ai_review_summary,
+        price_level, price_range_low, price_range_high,
+        delivery, dine_in, takeout, curbside_pickup, reservable,
+        serves_breakfast, serves_brunch, serves_lunch, serves_dinner,
+        serves_beer, serves_wine, serves_cocktails, serves_coffee, serves_dessert, serves_vegetarian,
+        good_for_groups, good_for_children, allows_dogs, good_for_watching_sports,
+        wheelchair_accessible_entrance, wheelchair_accessible_parking,
+        wheelchair_accessible_restroom, wheelchair_accessible_seating,
+        google_maps_uri, primary_type_display, also_appears_on,
+        national_phone, google_place_id, business_status
       `)
       .eq('is_active', true)
       .order('name')

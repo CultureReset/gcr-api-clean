@@ -926,20 +926,166 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     const saves     = savesRes.data || [];
     const memories  = memoriesRes.data || [];
 
-    // Pull live GCR data — top entities so the AI can recommend real places
+    // Pull live GCR data — entities + menus + specials + pricing + activity details
     const gcrDb = require('../gcr-db')();
     const { data: gcrEntities } = await gcrDb
         .from('entity')
-        .select('name, slug, type, subtypes, city, neighborhood, rating, price_range, tags, is_active')
+        .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active')
         .eq('is_active', true)
         .order('rating', { ascending: false, nullsFirst: false })
-        .limit(120);
+        .limit(200);
+
+    const slugs = (gcrEntities || []).map(e => e.slug);
+
+    // Fetch menus, specials, pricing, happy hour items in parallel
+    const [menuSectionsRes, menuItemsRes, drinkSectionsRes, drinkItemsRes, specialsRes, pricingRes, hhSectionsRes, hhItemsRes, whatsIncludedRes] = await Promise.all([
+        slugs.length ? gcrDb.from('menu_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('menu_items').select('section_id, name, description, price, is_available').eq('is_available', true) : { data: [] },
+        slugs.length ? gcrDb.from('drink_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('drink_items').select('section_id, name, description, price').limit(2000) : { data: [] },
+        slugs.length ? gcrDb.from('entity_specials').select('entity_slug, title, description, price, days_active, is_active').in('entity_slug', slugs).eq('is_active', true) : { data: [] },
+        slugs.length ? gcrDb.from('pricing_items').select('entity_id, item_name, price, description, capacity_min, capacity_max, duration_minutes').limit(2000) : { data: [] },
+        slugs.length ? gcrDb.from('happy_hour_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('happy_hour_items').select('section_id, name, description, price').limit(1000) : { data: [] },
+        slugs.length ? gcrDb.from('whats_included').select('entity_id, item').limit(2000) : { data: [] },
+    ]);
+
+    // Build lookup maps
+    const menuSecMap = {};
+    (menuSectionsRes.data || []).forEach(s => { menuSecMap[s.id] = { slug: s.entity_slug, name: s.name }; });
+    const menuItemsBySlug = {};
+    (menuItemsRes.data || []).forEach(item => {
+        const sec = menuSecMap[item.section_id];
+        if (!sec) return;
+        if (!menuItemsBySlug[sec.slug]) menuItemsBySlug[sec.slug] = [];
+        menuItemsBySlug[sec.slug].push({ section: sec.name, name: item.name, desc: item.description, price: item.price });
+    });
+
+    const drinkSecMap = {};
+    (drinkSectionsRes.data || []).forEach(s => { drinkSecMap[s.id] = { slug: s.entity_slug, name: s.name }; });
+    const drinkItemsBySlug = {};
+    (drinkItemsRes.data || []).forEach(item => {
+        const sec = drinkSecMap[item.section_id];
+        if (!sec) return;
+        if (!drinkItemsBySlug[sec.slug]) drinkItemsBySlug[sec.slug] = [];
+        drinkItemsBySlug[sec.slug].push({ section: sec.name, name: item.name, desc: item.description, price: item.price });
+    });
+
+    const specialsBySlug = {};
+    (specialsRes.data || []).forEach(s => {
+        if (!specialsBySlug[s.entity_slug]) specialsBySlug[s.entity_slug] = [];
+        specialsBySlug[s.entity_slug].push(s);
+    });
+
+    const entityIdMap = {};
+    (gcrEntities || []).forEach(e => { if (e.id) entityIdMap[e.id] = e.slug; });
+    const pricingBySlug = {};
+    (pricingRes.data || []).forEach(p => {
+        const slug = entityIdMap[p.entity_id];
+        if (!slug) return;
+        if (!pricingBySlug[slug]) pricingBySlug[slug] = [];
+        pricingBySlug[slug].push(p);
+    });
+    const whatsIncludedBySlug = {};
+    (whatsIncludedRes.data || []).forEach(w => {
+        const slug = entityIdMap[w.entity_id];
+        if (!slug) return;
+        if (!whatsIncludedBySlug[slug]) whatsIncludedBySlug[slug] = [];
+        whatsIncludedBySlug[slug].push(w.item);
+    });
+
+    const hhSecMap = {};
+    (hhSectionsRes.data || []).forEach(s => { hhSecMap[s.id] = { slug: s.entity_slug, name: s.name }; });
+    const hhItemsBySlug = {};
+    (hhItemsRes.data || []).forEach(item => {
+        const sec = hhSecMap[item.section_id];
+        if (!sec) return;
+        if (!hhItemsBySlug[sec.slug]) hhItemsBySlug[sec.slug] = [];
+        hhItemsBySlug[sec.slug].push({ section: sec.name, name: item.name, desc: item.description, price: item.price });
+    });
 
     const gcrContext = (gcrEntities || []).map(e => {
-        const where = [e.neighborhood, e.city].filter(Boolean).join(', ');
-        const tags  = (e.tags || []).slice(0, 4).join(', ');
-        return `• ${e.name} [${e.type}${e.subtypes?.length ? '/' + e.subtypes[0] : ''}] ${where} ${e.rating ? `· ⭐${e.rating}` : ''} ${e.price_range || ''}${tags ? ' · ' + tags : ''} (slug: ${e.slug})`;
-    }).join('\n');
+        const type = [e.entity_type, e.entity_subtype].filter(Boolean).join('/');
+        const priceLevel = e.price_level ? '💰'.repeat(Math.min(e.price_level, 4)) : '';
+        const priceRange = e.price_range_low && e.price_range_high ? ` ($${e.price_range_low}–$${e.price_range_high})` : '';
+        const features = [
+            e.outdoor_seating && 'outdoor seating',
+            e.live_music && 'live music',
+            e.delivery && 'delivery',
+            e.dine_in && 'dine-in',
+            e.takeout && 'takeout',
+            e.reservable && 'reservations',
+            e.good_for_groups && 'good for groups',
+            e.good_for_children && 'kid-friendly',
+            e.allows_dogs && 'dog-friendly',
+            e.serves_breakfast && 'breakfast',
+            e.serves_brunch && 'brunch',
+            e.serves_lunch && 'lunch',
+            e.serves_dinner && 'dinner',
+            e.serves_beer && 'beer',
+            e.serves_wine && 'wine',
+            e.serves_cocktails && 'cocktails',
+            e.serves_vegetarian && 'vegetarian options',
+        ].filter(Boolean).join(', ');
+
+        let lines = `• ${e.name} [${type}] ${e.city || ''} ${e.rating ? `⭐${e.rating} (${e.review_count || 0} reviews)` : ''} ${priceLevel}${priceRange}`;
+        if (e.address_line_1) lines += `\n  📍 ${e.address_line_1}, ${e.city || ''}`;
+        if (e.phone) lines += ` · 📞 ${e.phone}`;
+        const blurb = e.description || e.editorial_summary;
+        if (blurb) lines += `\n  ${blurb.slice(0, 120)}`;
+        if (features) lines += `\n  Features: ${features}`;
+
+        // Activity pricing
+        if (e.price_from != null) lines += `\n  Price: ${e.price_from === 0 ? 'Free' : `From $${e.price_from}${e.price_unit ? `/${e.price_unit}` : ''}`}`;
+        if (e.duration_text) lines += ` · Duration: ${e.duration_text}`;
+
+        // Happy hour
+        if (e.hh_days) lines += `\n  🍺 Happy Hour: ${e.hh_days} ${e.hh_start || ''}–${e.hh_end || ''} ${e.hh_description ? `— ${e.hh_description.slice(0, 100)}` : ''}`;
+
+        // Specials
+        const specials = specialsBySlug[e.slug] || [];
+        if (specials.length) {
+            lines += `\n  Specials: ${specials.map(s => `${s.title}${s.price ? ` ($${s.price})` : ''}${s.description ? ` — ${s.description.slice(0, 60)}` : ''}${s.days_active ? ` [${s.days_active}]` : ''}`).join(' | ')}`;
+        }
+
+        // Pricing items (activities/tours) with capacity and duration
+        const pricing = pricingBySlug[e.slug] || [];
+        if (pricing.length) {
+            lines += `\n  Pricing: ${pricing.slice(0, 8).map(p => {
+                let s = `${p.item_name} $${p.price}`;
+                if (p.capacity_min && p.capacity_max) s += ` (${p.capacity_min}–${p.capacity_max} people)`;
+                else if (p.capacity_max) s += ` (up to ${p.capacity_max} people)`;
+                if (p.duration_minutes) s += ` · ${p.duration_minutes}min`;
+                if (p.description) s += ` — ${p.description.slice(0, 50)}`;
+                return s;
+            }).join(' | ')}`;
+        }
+
+        // What's included
+        const included = whatsIncludedBySlug[e.slug] || [];
+        if (included.length) lines += `\n  Includes: ${included.join(', ')}`;
+
+        // Menu items (top 8 per place to keep prompt size reasonable)
+        const menuItems = menuItemsBySlug[e.slug] || [];
+        if (menuItems.length) {
+            lines += `\n  Menu: ${menuItems.slice(0, 8).map(i => `${i.name}${i.price ? ` $${i.price}` : ''}${i.desc ? ` (${i.desc.slice(0, 40)})` : ''}`).join(' | ')}`;
+        }
+
+        // Drink items
+        const drinkItems = drinkItemsBySlug[e.slug] || [];
+        if (drinkItems.length) {
+            lines += `\n  Drinks: ${drinkItems.slice(0, 6).map(i => `${i.name}${i.price ? ` $${i.price}` : ''}`).join(' | ')}`;
+        }
+
+        // Happy hour items
+        const hhItems = hhItemsBySlug[e.slug] || [];
+        if (hhItems.length) {
+            lines += `\n  HH deals: ${hhItems.slice(0, 6).map(i => `${i.name}${i.price ? ` $${i.price}` : ''}`).join(' | ')}`;
+        }
+
+        lines += `\n  (slug: ${e.slug})`;
+        return lines;
+    }).join('\n\n');
 
     // Group memories
     let memoryBlock = '';
