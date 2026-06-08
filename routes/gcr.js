@@ -15,6 +15,17 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
+function normalizeImageUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/photos/')) {
+    const slug = url.split('/')[2];
+    const filename = url.split('/').pop();
+    return `${process.env.GCR_SUPABASE_URL}/storage/v1/object/public/entity-photos/${slug}/${filename}`;
+  }
+  return url;
+}
+
 // Cache-control for all GETs
 router.use((req, res, next) => {
   if (req.method === 'GET') res.set('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
@@ -85,11 +96,13 @@ async function buildFullEntity(slug) {
       items: (items || []).filter(i => i.section_id === sec.id),
     }));
 
+  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.image_url) }));
   return {
     ...entity,
+    hero_image_url: normalizeImageUrl(entity.hero_image_url),
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
-    photos: photos.data || [],
+    photos: normalizedPhotos,
     tags: tags.data || [],
     menu_sections: nest(menuSections.data, menuItems.data),
     drink_sections: nest(drinkSections.data, drinkItems.data),
@@ -188,7 +201,8 @@ router.get('/entities', async (req, res) => {
     const sortByDist = req.query.sort === 'distance' && userLat !== null && userLng !== null;
 
     const results = (entities || []).map(e => {
-      const row = { ...e, tags: tagMap[e.slug] || [], photos: photoMap[e.slug] || [], hours: hourMap[e.slug] || [] };
+      const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
+      const row = { ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url) };
       if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
         row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
       }
@@ -249,11 +263,11 @@ router.get('/events', async (req, res) => {
       artist_name: ev.artist?.name || ev.artist_name || null,
       artist: ev.artist || null,
       cover_charge: ev.cover_charge,
-      image_url: ev.image_url || ev.artist?.image_url || null,
+      image_url: normalizeImageUrl(ev.image_url || ev.artist?.image_url),
       entity_slug: ev.entity_slug,
       entity_name: ev.entity?.name || '',
       icon: ev.entity?.icon || '🏪',
-      hero_image_url: ev.entity?.hero_image_url || null,
+      hero_image_url: normalizeImageUrl(ev.entity?.hero_image_url),
       city: ev.entity?.city || '',
       address_line_1: ev.entity?.address_line_1 || '',
       phone: ev.entity?.phone || '',
@@ -292,11 +306,11 @@ router.get('/specials', async (req, res) => {
       end_time: s.end_time,
       start_date: s.start_date,
       end_date: s.end_date,
-      image_url: s.image_url,
+      image_url: normalizeImageUrl(s.image_url),
       entity_slug: s.entity_slug,
       entity_name: s.entity?.name || s.entity_name || '',
       icon: s.entity?.icon || '🏪',
-      hero_image_url: s.entity?.hero_image_url || null,
+      hero_image_url: normalizeImageUrl(s.entity?.hero_image_url),
       city: s.entity?.city || '',
       address_line_1: s.entity?.address_line_1 || '',
       phone: s.entity?.phone || '',
@@ -345,12 +359,16 @@ router.get('/happy-hours', async (req, res) => {
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
     (hourRows.data || []).forEach(r => { if (!hourMap[r.entity_slug]) hourMap[r.entity_slug] = []; hourMap[r.entity_slug].push(r); });
 
-    const results = (entities || []).map(e => ({
-      ...e,
-      hh_sections: hhSectionMap[e.slug] || [],
-      photos: photoMap[e.slug] || [],
-      hours: hourMap[e.slug] || [],
-    }));
+    const results = (entities || []).map(e => {
+      const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
+      return {
+        ...e,
+        hero_image_url: normalizeImageUrl(e.hero_image_url),
+        hh_sections: hhSectionMap[e.slug] || [],
+        photos,
+        hours: hourMap[e.slug] || [],
+      };
+    });
 
     res.json({ happyHours: results, total: results.length });
   } catch (err) {
