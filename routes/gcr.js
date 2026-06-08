@@ -15,13 +15,15 @@ function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
+const SUPABASE_URL = (process.env.GCR_SUPABASE_URL || '').trim();
+
 function normalizeImageUrl(url) {
   if (!url) return null;
   if (url.startsWith('http')) return url;
   if (url.startsWith('/photos/')) {
     const slug = url.split('/')[2];
     const filename = url.split('/').pop();
-    return `${process.env.GCR_SUPABASE_URL}/storage/v1/object/public/entity-photos/${slug}/${filename}`;
+    return `${SUPABASE_URL}/storage/v1/object/public/entity-photos/${slug}/${filename}`;
   }
   return url;
 }
