@@ -298,36 +298,20 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SENDBLUE PHONE OTP — new tourist login via iMessage
-// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Sendblue
+// TWILIO PHONE OTP
+// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Twilio SMS
 // POST /api/tourist-auth/phone-verify { phone, code }  → verify OTP → upsert tourist_profile → return token
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function getSendblueConfig() {
-    try {
-        const { data } = await mainDb.from('platform_settings').select('value').eq('key', 'sms_config').maybeSingle();
-        if (data?.value?.sendblue_key_id) return data.value;
-    } catch {}
-    return {
-        sendblue_key_id: process.env.SENDBLUE_KEY_ID,
-        sendblue_secret:  process.env.SENDBLUE_SECRET,
-    };
-}
+const twilio = require('twilio');
 
-async function sendblueMessage(phone, content) {
-    const cfg = await getSendblueConfig();
-    if (!cfg.sendblue_key_id || !cfg.sendblue_secret) throw new Error('Sendblue not configured');
-    const res = await fetch('https://api.sendblue.co/api/send-message', {
-        method: 'POST',
-        headers: {
-            'sb-api-key-id':     cfg.sendblue_key_id,
-            'sb-api-secret-key': cfg.sendblue_secret,
-            'Content-Type':      'application/json',
-        },
-        body: JSON.stringify({ number: phone, content }),
+async function sendTwilioSMS(phone, body) {
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    return client.messages.create({
+        from: process.env.TWILIO_PHONE_NUMBER || '+12513135464',
+        to:   phone,
+        body,
     });
-    if (!res.ok) throw new Error(`Sendblue error: ${res.status}`);
-    return res.json();
 }
 
 function normalizePhone(raw) {
@@ -359,10 +343,10 @@ router.post('/phone', async (req, res) => {
     }
 
     try {
-        await sendblueMessage(phone, `Your Gulf Coast Radar code is ${code}\n\nExpires in 10 minutes.`);
+        await sendTwilioSMS(phone, `Your Gulf Coast Radar code is ${code}\n\nExpires in 10 minutes.`);
     } catch (e) {
-        console.error('Sendblue OTP send failed:', e.message);
-        return res.status(500).json({ error: 'Failed to send code. Check Sendblue config.' });
+        console.error('Twilio OTP send failed:', e.message);
+        return res.status(500).json({ error: 'Failed to send code. Check Twilio config.' });
     }
 
     res.json({ success: true, phone });
