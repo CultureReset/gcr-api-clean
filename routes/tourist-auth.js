@@ -329,17 +329,14 @@ router.post('/phone', async (req, res) => {
     const code    = String(Math.floor(100000 + Math.random() * 900000));
     const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
 
-    // Store OTP — upsert tourist_profiles row keyed by phone
+    // Store OTP in tourist_otps (no user_id required — user may not exist yet)
     const { error: dbErr } = await mainDb
-        .from('tourist_profiles')
+        .from('tourist_otps')
         .upsert({ phone, otp_code: code, otp_expires: expires, updated_at: new Date().toISOString() }, { onConflict: 'phone' });
 
     if (dbErr) {
-        // Table may not exist yet in old DB — store in tourist_sessions fallback
-        await mainDb.from('tourist_sessions').upsert(
-            { phone, otp_code: code, otp_expires: expires },
-            { onConflict: 'phone' }
-        ).catch(() => {});
+        console.error('OTP storage error:', dbErr.message);
+        return res.status(500).json({ error: 'Could not generate code. Try again.' });
     }
 
     try {
@@ -358,10 +355,10 @@ router.post('/phone-verify', async (req, res) => {
     const code  = (req.body?.code || '').trim();
     if (!phone || !code) return res.status(400).json({ error: 'Phone and code required' });
 
-    // Load OTP from tourist_profiles
+    // Load OTP from tourist_otps
     const { data: otpRow } = await mainDb
-        .from('tourist_profiles')
-        .select('user_id, otp_code, otp_expires, name, setup_complete')
+        .from('tourist_otps')
+        .select('otp_code, otp_expires')
         .eq('phone', phone)
         .maybeSingle();
 
@@ -413,6 +410,12 @@ router.post('/phone-verify', async (req, res) => {
         console.error('tourist_profiles upsert error:', upsertErr.message);
         return res.status(500).json({ error: 'Could not save profile' });
     }
+
+    // Clear OTP from tourist_otps now that it's been used
+    await mainDb.from('tourist_otps')
+        .update({ otp_code: null, otp_expires: null })
+        .eq('phone', phone)
+        .catch(() => {});
 
     // Sign in to get a real access token
     const { data: signIn, error: signInErr } = await sb.auth.signInWithPassword({

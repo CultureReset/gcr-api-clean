@@ -1,12 +1,23 @@
-const express = require('express');
-const router  = express.Router();
-const twilio  = require('twilio');
+const express  = require('express');
+const router   = express.Router();
+const twilio   = require('twilio');
+const crypto   = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 const { mainDb } = require('../db');
 
 const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
 const FROM_NUMBER    = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
-const TRIP_SWIPE_URL = process.env.TRIP_SWIPE_URL || 'https://gcr-trip-swipe.vercel.app';
+const GCR_URL        = process.env.GCR_UNIFIED_URL || 'https://gcr-unified.vercel.app';
+
+let _adminClient = null;
+function adminSb() {
+  if (!_adminClient) _adminClient = createClient(
+    process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL,
+    process.env.GCR_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY
+  );
+  return _adminClient;
+}
 
 function getClient() {
   return twilio(ACCOUNT_SID, AUTH_TOKEN);
@@ -57,19 +68,43 @@ function parseDateRange(text) {
 }
 
 async function getOrCreateTourist(phone) {
+  const sb         = adminSb();
+  const fakeEmail  = `${phone.replace(/\+/, '')}@gcr.tourist`;
+  const stablePass = crypto.createHash('sha256').update(phone + 'gcr-salt').digest('hex');
+
+  // Find or create Supabase auth user
+  let authUser = null;
+  try {
+    const { data } = await sb.auth.admin.getUserByEmail(fakeEmail);
+    authUser = data?.user || null;
+  } catch {}
+
+  if (!authUser) {
+    const { data: created, error: createErr } = await sb.auth.admin.createUser({
+      email: fakeEmail,
+      password: stablePass,
+      email_confirm: true,
+      user_metadata: { phone },
+    });
+    if (createErr) throw new Error('Could not create auth user: ' + createErr.message);
+    authUser = created?.user;
+  }
+
+  // Upsert tourist_profiles keyed by user_id — phone links them
   const { data: profile, error } = await mainDb
     .from('tourist_profiles')
     .upsert({
+      user_id:         authUser.id,
       phone,
       sms_opt_in:      true,
       sms_opted_in_at: new Date().toISOString(),
       last_active:     new Date().toISOString(),
       updated_at:      new Date().toISOString(),
-    }, { onConflict: 'phone' })
-    .select('id, phone, arrival, departure, name')
+    }, { onConflict: 'user_id' })
+    .select('user_id, phone, arrival, departure, name, sms_state')
     .single();
 
-  if (error) throw new Error('Could not create profile: ' + error.message);
+  if (error) throw new Error('Could not save profile: ' + error.message);
   return { profile };
 }
 
@@ -101,9 +136,11 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
   try {
     const { data: existing } = await mainDb
       .from('tourist_profiles')
-      .select('id, phone, sms_opt_in, sms_state, arrival, departure')
+      .select('user_id, phone, sms_opt_in, sms_state, arrival, departure')
       .eq('phone', phone)
       .maybeSingle();
+
+    const phoneEncoded = encodeURIComponent(phone);
 
     // ── State: waiting for trip dates reply ───────────────────────────────────
     if (existing?.sms_state === 'awaiting_dates') {
@@ -115,10 +152,10 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
           departure:  dates.departure,
           sms_state:  'active',
           updated_at: new Date().toISOString(),
-        }).eq('id', existing.id);
+        }).eq('user_id', existing.user_id);
 
         twiml.message(
-          `Perfect! We'll text you deals, happy hours & specials while you're in town 🌊\n\nOpen Trip Swipe anytime:\n${TRIP_SWIPE_URL}\n\nLog in with your phone number — we'll text you a code.`
+          `Perfect! We'll text you deals, happy hours & specials while you're in town 🌊\n\nOpen Gulf Coast Radar here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWe'll text you a code to sign in — no password needed.`
         );
       } else {
         twiml.message(
@@ -132,7 +169,7 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     // ── Already signed up — re-send the link ─────────────────────────────────
     if (existing?.sms_opt_in) {
       twiml.message(
-        `Welcome back to Gulf Coast Radar! 🌊\n\nOpen Trip Swipe here:\n${TRIP_SWIPE_URL}\n\nLog in with your phone number — we'll text you a code.\n\nReply DATES to update your visit dates anytime.`
+        `Welcome back to Gulf Coast Radar! 🌊\n\nOpen the app here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWe'll text you a code to sign in.\n\nReply DATES to update your visit dates anytime.`
       );
       return res.type('text/xml').send(twiml.toString());
     }
@@ -143,10 +180,10 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     await mainDb.from('tourist_profiles').update({
       sms_state:  'awaiting_dates',
       updated_at: new Date().toISOString(),
-    }).eq('id', profile.id);
+    }).eq('user_id', profile.user_id);
 
     twiml.message(
-      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nOpen Trip Swipe here:\n${TRIP_SWIPE_URL}\n\nLog in with your phone number — we'll text you a code each time.\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
+      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nOpen the app here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWe'll text you a code to sign in — no password needed.\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
     );
 
   } catch (e) {
