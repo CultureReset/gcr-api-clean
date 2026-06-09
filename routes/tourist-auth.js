@@ -352,100 +352,80 @@ router.post('/phone', async (req, res) => {
     res.json({ success: true, phone });
 });
 
-// POST /phone-verify — verify OTP → create session
+// POST /phone-verify — verify OTP → create/find auth user → return session
 router.post('/phone-verify', async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     const code  = (req.body?.code || '').trim();
     if (!phone || !code) return res.status(400).json({ error: 'Phone and code required' });
 
-    // Check tourist_profiles first, fallback to tourist_sessions
-    let storedCode = null, storedExpires = null, profileId = null;
-
-    const { data: profile } = await mainDb
+    // Load OTP from tourist_profiles
+    const { data: otpRow } = await mainDb
         .from('tourist_profiles')
-        .select('id, otp_code, otp_expires')
+        .select('user_id, otp_code, otp_expires, name, setup_complete')
         .eq('phone', phone)
         .maybeSingle();
 
-    if (profile) {
-        storedCode    = profile.otp_code;
-        storedExpires = profile.otp_expires;
-        profileId     = profile.id;
-    } else {
-        const { data: session } = await mainDb
-            .from('tourist_sessions')
-            .select('id, otp_code, otp_expires')
-            .eq('phone', phone)
-            .maybeSingle();
-        if (session) { storedCode = session.otp_code; storedExpires = session.otp_expires; }
+    if (!otpRow?.otp_code) return res.status(400).json({ error: 'No code found. Request a new one.' });
+    if (otpRow.otp_code !== code) return res.status(400).json({ error: 'Incorrect code' });
+    if (new Date(otpRow.otp_expires) < new Date()) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+
+    const sb = admin();
+    const fakeEmail = `${phone.replace(/\+/, '')}@gcr.tourist`;
+    // stable password derived from phone — same every time so sign-in always works
+    const stablePassword = require('crypto').createHash('sha256').update(phone + 'gcr-salt').digest('hex');
+
+    // Find or create Supabase auth user
+    let authUser = null;
+    try {
+        const { data: existing } = await sb.auth.admin.getUserByEmail(fakeEmail);
+        authUser = existing?.user || null;
+    } catch {}
+
+    if (!authUser) {
+        const { data: created, error: createErr } = await sb.auth.admin.createUser({
+            email: fakeEmail,
+            password: stablePassword,
+            email_confirm: true,
+            user_metadata: { phone },
+        });
+        if (createErr) return res.status(500).json({ error: 'Could not create account: ' + createErr.message });
+        authUser = created?.user || null;
     }
 
-    if (!storedCode) return res.status(400).json({ error: 'No code found. Request a new one.' });
-    if (storedCode !== code) return res.status(400).json({ error: 'Incorrect code' });
-    if (new Date(storedExpires) < new Date()) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+    if (!authUser) return res.status(500).json({ error: 'Could not create account' });
 
-    // Mark verified — upsert tourist_profiles with phone confirmed
-    const { data: upserted, error: upsertErr } = await mainDb
+    // Upsert tourist_profiles keyed by user_id, linking phone
+    const { data: profile, error: upsertErr } = await mainDb
         .from('tourist_profiles')
         .upsert({
+            user_id:     authUser.id,
             phone,
-            otp_code:       null,
-            otp_expires:    null,
-            sms_opt_in:     true,
-            sms_opted_in_at: profileId ? undefined : new Date().toISOString(),
-            last_active:    new Date().toISOString(),
-            updated_at:     new Date().toISOString(),
-        }, { onConflict: 'phone' })
-        .select('id, phone, name, setup_complete')
+            otp_code:    null,
+            otp_expires: null,
+            sms_opt_in:  true,
+            last_active: new Date().toISOString(),
+            updated_at:  new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        .select('user_id, phone, name, setup_complete')
         .single();
 
     if (upsertErr) {
         console.error('tourist_profiles upsert error:', upsertErr.message);
-        return res.status(500).json({ error: 'Could not create profile' });
+        return res.status(500).json({ error: 'Could not save profile' });
     }
 
-    // Sign a Supabase anon session for this user using service role
-    // so the tourist JWT works with existing touristAuth middleware
-    const sb = admin();
-    let accessToken = null;
-    try {
-        // Create/find Supabase auth user keyed by phone as email alias
-        const fakeEmail = `${phone.replace(/\+/, '')}@gcr.tourist`;
-        let authUser = null;
-        try {
-            const { data: existing } = await sb.auth.admin.getUserByEmail(fakeEmail);
-            authUser = existing?.user || null;
-        } catch {}
+    // Sign in to get a real access token
+    const { data: signIn, error: signInErr } = await sb.auth.signInWithPassword({
+        email: fakeEmail,
+        password: stablePassword,
+    });
+    if (signInErr) return res.status(500).json({ error: 'Sign in failed: ' + signInErr.message });
 
-        if (!authUser) {
-            const { data: created } = await sb.auth.admin.createUser({
-                email: fakeEmail,
-                password: upserted.id, // stable per-user secret
-                email_confirm: true,
-                user_metadata: { phone, tourist_profile_id: upserted.id },
-            });
-            authUser = created?.user || null;
-        }
-
-        if (authUser) {
-            const { data: session } = await sb.auth.admin.generateLink({
-                type: 'magiclink',
-                email: fakeEmail,
-            });
-            // Use service-role signIn to get a real access token
-            const { data: signIn } = await sb.auth.signInWithPassword({
-                email: fakeEmail,
-                password: upserted.id,
-            });
-            accessToken = signIn?.session?.access_token || null;
-        }
-    } catch (e) {
-        console.error('Auth token generation error:', e.message);
-    }
+    const accessToken = signIn?.session?.access_token || null;
 
     res.json({
         success:      true,
-        tourist:      upserted,
+        tourist:      profile,
         access_token: accessToken,
     });
 });
