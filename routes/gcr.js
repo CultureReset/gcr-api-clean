@@ -561,6 +561,8 @@ router.get('/sections', async (req, res) => {
       { type: 'public-spots', name: 'Public Spots', icon: '✨', count: 0 },
       { type: 'shopping', name: 'Shopping', icon: '🛍️', count: 0 },
       { type: 'hotel', name: 'Staying', icon: '🏨', count: 0 },
+      { type: 'nightlife', name: 'Bars & Nightlife', icon: '🍸', count: 0 },
+      { type: 'wellness', name: 'Health & Wellness', icon: '💆', count: 0 },
     ];
 
     const typeMap = {
@@ -632,6 +634,14 @@ router.get('/category-page-config/:category', async (req, res) => {
       hotel: {
         page_title: 'Staying',
         page_description: 'Find hotels, resorts, and vacation rentals on the Gulf Coast.'
+      },
+      nightlife: {
+        page_title: 'Bars & Nightlife',
+        page_description: 'Bars, breweries, clubs, and nightlife on the Gulf Coast.'
+      },
+      wellness: {
+        page_title: 'Health & Wellness',
+        page_description: 'Spas, salons, gyms, and wellness services on the Gulf Coast.'
       },
       feed: {
         page_title: 'Live Feed',
