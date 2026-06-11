@@ -247,7 +247,7 @@ router.get('/events', async (req, res) => {
       .from('entity_events')
       .select('*, entity:entity_slug(slug, name, icon, hero_image_url, city, address_line_1, phone), artist:artist_id(id, name, slug, bio, genre, hometown, image_url, website_url, social_instagram, social_facebook, social_tiktok, spotify_url)')
       .eq('is_active', true)
-      .order('event_date', { ascending: true });
+      .order('event_date', { ascending: true, nullsFirst: false });
 
     if (req.query.slug) query = query.eq('entity_slug', req.query.slug);
 
