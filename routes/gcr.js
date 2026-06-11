@@ -213,6 +213,7 @@ router.get('/entities', async (req, res) => {
 
     if (sortByDist) results.sort((a, b) => (a.distance_miles ?? 9999) - (b.distance_miles ?? 9999));
 
+    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     res.json({ entities: results, total: results.length, offset, limit });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -372,6 +373,7 @@ router.get('/happy-hours', async (req, res) => {
       };
     });
 
+    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     res.json({ happyHours: results, total: results.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
