@@ -461,6 +461,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
             entity_slug: slug,
             section_name: sectionName,
             sort_order: i,
+            available_days: sec.available_days || null,
           }).select().single();
 
           if (inserted && sec.items) {
@@ -498,6 +499,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
             entity_slug: slug,
             section_name: sectionName,
             sort_order: i,
+            available_days: sec.available_days || null,
           }).select().single();
 
           if (inserted && sec.items) {
