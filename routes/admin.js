@@ -425,6 +425,42 @@ router.put('/gcr/events/:id', authRequired, async (req, res) => {
   res.json(data);
 });
 
+// POST /api/admin/gcr/events/backfill-types — infer and set event_type on all null events
+router.post('/gcr/events/backfill-types', authRequired, async (req, res) => {
+  const { data: events, error } = await getDb().from('entity_events').select('id,event_name,description').is('event_type', null);
+  if (error) return res.status(500).json({ error: error.message });
+
+  function infer(name, desc) {
+    const s = ((name || '') + ' ' + (desc || '')).toLowerCase();
+    if (s.includes('karaoke')) return 'karaoke';
+    if (s.includes('trivia')) return 'trivia';
+    if (s.includes('bingo')) return 'bingo';
+    if (s.includes('open mic') || s.includes('open jam')) return 'open_mic';
+    if (s.includes('drag')) return 'drag_show';
+    if (s.includes('comedy')) return 'comedy';
+    if (s.includes('dj ') || s.includes(' dj') || s.startsWith('dj')) return 'dj';
+    if (s.includes('happy hour')) return 'happy_hour';
+    if (s.includes('brunch')) return 'brunch_event';
+    if (s.includes('wine') && s.includes('tast')) return 'wine_tasting';
+    if (s.includes('beer') && s.includes('tast')) return 'beer_tasting';
+    if (s.includes('kids') || s.includes('children') || s.includes('family')) return 'kids_event';
+    if (s.includes('festival')) return 'festival';
+    if (s.includes('tournament') || s.includes('competition')) return 'tournament';
+    if (s.includes('fundrais') || s.includes('charity')) return 'fundraiser';
+    if (s.includes('art show') || s.includes('art exhibit')) return 'art_show';
+    if (s.includes('market') || s.includes('pop-up') || s.includes('popup')) return 'market';
+    return 'live_music';
+  }
+
+  let updated = 0, errors = 0;
+  for (const ev of events) {
+    const type = infer(ev.event_name, ev.description);
+    const { error: upErr } = await getDb().from('entity_events').update({ event_type: type }).eq('id', ev.id);
+    if (upErr) errors++; else updated++;
+  }
+  res.json({ total: events.length, updated, errors });
+});
+
 router.delete('/gcr/events/:id', authRequired, async (req, res) => {
   const { error } = await getDb().from('entity_events').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
@@ -1280,6 +1316,48 @@ router.post('/gcr/upload-image', authRequired, upload.single('image'), async (re
     await getDb().from('entity_photos').insert({ entity_slug, url: publicUrl, image_path: fileName, is_cover: is_cover === 'true', sort_order: nextOrder });
   }
   res.json({ url: publicUrl, path: fileName });
+});
+
+// ─── ARTISTS ─────────────────────────────────────────────────────────────────
+
+// GET /api/admin/artists — list all artists
+router.get('/artists', authRequired, async (req, res) => {
+  const { search } = req.query;
+  let q = getDb().from('artists').select('*').order('name', { ascending: true });
+  if (search) q = q.ilike('name', `%${search}%`);
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ artists: data || [] });
+});
+
+// GET /api/admin/artists/:id — single artist
+router.get('/artists/:id', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('artists').select('*').eq('id', req.params.id).single();
+  if (error) return res.status(404).json({ error: 'Artist not found' });
+  res.json(data);
+});
+
+// PUT /api/admin/artists/:id — update artist fields
+router.put('/artists/:id', authRequired, async (req, res) => {
+  const allowed = ['name', 'bio', 'genre', 'hometown', 'image_url', 'website_url', 'spotify_url', 'social_instagram', 'social_facebook', 'social_tiktok'];
+  const updates = {};
+  allowed.forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+  updates.updated_at = new Date().toISOString();
+  const { data, error } = await getDb().from('artists').update(updates).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// POST /api/admin/artists/:id/photo — upload artist photo
+router.post('/artists/:id/photo', authRequired, upload.single('image'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file provided' });
+  const ext = req.file.originalname.split('.').pop() || 'jpg';
+  const fileName = `artists/${req.params.id}-${Date.now()}.${ext}`;
+  const { error: upErr } = await getDb().storage.from('entity-media').upload(fileName, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+  if (upErr) return res.status(500).json({ error: upErr.message });
+  const { data: { publicUrl } } = getDb().storage.from('entity-media').getPublicUrl(fileName);
+  await getDb().from('artists').update({ image_url: publicUrl, updated_at: new Date().toISOString() }).eq('id', req.params.id);
+  res.json({ url: publicUrl });
 });
 
 // ─── SMS BLAST (manual, admin-triggered) ─────────────────────────────────────
