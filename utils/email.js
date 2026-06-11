@@ -1,46 +1,41 @@
-const axios = require('axios');
-
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
-const FROM_EMAIL = process.env.FROM_EMAIL || 'info@cybercheckinc.com';
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_API_URL = 'https://api.resend.com/emails';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
 const FROM_NAME = process.env.FROM_NAME || 'Gulf Coast Radar';
 
 async function sendEmail(to, subject, htmlBody, textBody) {
-  if (!BREVO_API_KEY) {
-    console.warn('BREVO_API_KEY not set, skipping email send');
+  if (!RESEND_API_KEY) {
+    console.warn('RESEND_API_KEY not set, skipping email send');
     return { success: true, message: 'Email service not configured' };
   }
 
   try {
-    const response = await axios.post(
-      BREVO_API_URL,
-      {
-        sender: { name: FROM_NAME, email: FROM_EMAIL },
-        to: [{ email: to }],
-        subject,
-        htmlContent: htmlBody,
-        textContent: textBody || htmlBody,
+    const response = await fetch(RESEND_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
       },
-      {
-        headers: {
-          'api-key': BREVO_API_KEY,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+      body: JSON.stringify({
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
+        to: [to],
+        subject,
+        html: htmlBody,
+        text: textBody || undefined,
+      }),
+    });
 
-    return {
-      success: true,
-      messageId: response.data.messageId,
-      message: 'Email sent successfully',
-    };
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Resend error:', data);
+      return { success: false, error: data.message, message: 'Failed to send email' };
+    }
+
+    return { success: true, messageId: data.id, message: 'Email sent successfully' };
   } catch (error) {
     console.error('Error sending email:', error.message);
-    return {
-      success: false,
-      error: error.message,
-      message: 'Failed to send email',
-    };
+    return { success: false, error: error.message, message: 'Failed to send email' };
   }
 }
 

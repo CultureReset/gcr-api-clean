@@ -11,7 +11,6 @@ build
 # Import/utility scripts not part of the app
 google-data/
 migrations/
-utils/
 .claude/
 google-places-type-mapping.json
 FULL_IMPORT_GUIDE.md
