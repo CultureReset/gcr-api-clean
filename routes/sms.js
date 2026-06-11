@@ -8,7 +8,7 @@ const { mainDb } = require('../db');
 const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
 const FROM_NUMBER    = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
-const GCR_URL        = process.env.GCR_UNIFIED_URL || 'https://gcr-unified.vercel.app';
+const GCR_URL        = process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com';
 
 let _adminClient = null;
 function adminSb() {
@@ -183,7 +183,7 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     }).eq('user_id', profile.user_id);
 
     twiml.message(
-      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nOpen the app here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWe'll text you a code to sign in — no password needed.\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
+      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nSave our contact (1 tap):\n${GCR_URL}/gcr.vcf\n\nOpen the app here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
     );
 
   } catch (e) {
