@@ -1,16 +1,22 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_API_URL = 'https://api.resend.com/emails';
-const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev';
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || 'info@cybercheckinc.com';
 const FROM_NAME = process.env.FROM_NAME || 'Gulf Coast Radar';
 
 async function sendEmail(to, subject, htmlBody, textBody) {
-  if (!RESEND_API_KEY) {
-    console.warn('RESEND_API_KEY not set, skipping email send');
-    return { success: true, message: 'Email service not configured' };
+  if (RESEND_API_KEY) {
+    return sendViaResend(to, subject, htmlBody, textBody);
+  } else if (BREVO_API_KEY) {
+    return sendViaBrevo(to, subject, htmlBody, textBody);
+  } else {
+    console.warn('No email provider configured (RESEND_API_KEY or BREVO_API_KEY)');
+    return { success: false, message: 'Email service not configured' };
   }
+}
 
+async function sendViaResend(to, subject, htmlBody, textBody) {
   try {
-    const response = await fetch(RESEND_API_URL, {
+    const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
@@ -24,17 +30,42 @@ async function sendEmail(to, subject, htmlBody, textBody) {
         text: textBody || undefined,
       }),
     });
-
     const data = await response.json();
-
     if (!response.ok) {
       console.error('Resend error:', data);
       return { success: false, error: data.message, message: 'Failed to send email' };
     }
-
     return { success: true, messageId: data.id, message: 'Email sent successfully' };
   } catch (error) {
-    console.error('Error sending email:', error.message);
+    console.error('Resend send error:', error.message);
+    return { success: false, error: error.message, message: 'Failed to send email' };
+  }
+}
+
+async function sendViaBrevo(to, subject, htmlBody, textBody) {
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: FROM_NAME, email: FROM_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: htmlBody,
+        textContent: textBody || htmlBody,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('Brevo error:', data);
+      return { success: false, error: data.message, message: 'Failed to send email' };
+    }
+    return { success: true, messageId: data.messageId, message: 'Email sent successfully' };
+  } catch (error) {
+    console.error('Brevo send error:', error.message);
     return { success: false, error: error.message, message: 'Failed to send email' };
   }
 }
