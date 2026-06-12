@@ -74,7 +74,7 @@ router.post('/batch', authRequired, async (req, res) => {
             label: `${label_prefix} #${seq}`,
             destination_url: destination_url || null,
             location: location || null,
-            scan_url: `https://cybercheck-links.vercel.app/q.html?c=${code}`,
+            scan_url: `https://gcr-unified.vercel.app/q.html?c=${code}`,
             scan_count: 0,
             active: true,
         });
@@ -111,7 +111,7 @@ router.post('/', authRequired, async (req, res) => {
             site_id: assignedSiteId,
             label,
             destination_url: destination_url || null,
-            scan_url: `https://cybercheck-links.vercel.app/q.html?c=${code}`,
+            scan_url: `https://gcr-unified.vercel.app/q.html?c=${code}`,
             metadata: metadata || {},
             notes: notes || null,
             location: location || null,
@@ -366,7 +366,7 @@ router.post('/partners', async (req, res) => {
         code: qrCode, type: 'referral', label: name,
         location: type, active: true,
         metadata: { partner_id: data.id, partner_type: type, partner_name: name },
-        scan_url: `https://cybercheck-links.vercel.app/q.html?c=${qrCode}`,
+        scan_url: `https://gcr-unified.vercel.app/q.html?c=${qrCode}`,
     }).catch(() => {});
 
     res.status(201).json(data);
