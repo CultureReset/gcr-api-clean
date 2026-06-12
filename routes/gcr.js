@@ -762,4 +762,26 @@ router.get('/locations/autocomplete', async (req, res) => {
   res.json({ results: data || [] });
 });
 
+// ─── POST /api/gcr/nfc-card-lead ─────────────────────────────────────────────
+router.post('/nfc-card-lead', async (req, res) => {
+  const { name, phone, email, business_name, business_type, industry, website, met_at, source, entity_id } = req.body;
+
+  const { data, error } = await db.from('leads').insert([{
+    name,
+    phone,
+    email,
+    business_name,
+    business_type,
+    industry,
+    website,
+    met_at,
+    source: source || 'nfc-card-matt',
+    entity_id: entity_id || null,
+    status: 'new'
+  }]).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, lead: data });
+});
+
 module.exports = router;

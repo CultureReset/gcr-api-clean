@@ -1624,4 +1624,30 @@ router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
   }
 });
 
+// ─── Leads ────────────────────────────────────────────────────────────────────
+router.get('/sales-leads', authRequired, async (req, res) => {
+  try {
+    const { source, status } = req.query;
+    let query = db.from('leads').select('*').order('created_at', { ascending: false });
+    if (source) query = query.eq('source', source);
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.patch('/sales-leads/:id', authRequired, async (req, res) => {
+  try {
+    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    const { error } = await db.from('leads').update(updates).eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
