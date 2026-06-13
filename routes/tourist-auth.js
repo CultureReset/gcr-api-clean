@@ -13,6 +13,18 @@ const express = require('express');
 const crypto  = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { sendEmail } = require('../utils/email');
+
+// Firebase Admin — verifies Firebase phone auth tokens
+let _firebaseAdmin = null;
+function getFirebaseAdmin() {
+  if (_firebaseAdmin) return _firebaseAdmin;
+  const admin = require('firebase-admin');
+  if (!admin.apps.length) {
+    admin.initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || 'gcr-admin' });
+  }
+  _firebaseAdmin = admin;
+  return admin;
+}
 const mainDb = require('../db');
 
 const router = express.Router();
@@ -351,20 +363,38 @@ router.post('/phone', async (req, res) => {
 
 // POST /phone-verify — verify OTP → create/find auth user → return session
 router.post('/phone-verify', async (req, res) => {
-    const phone = normalizePhone(req.body?.phone);
-    const code  = (req.body?.code || '').trim();
-    if (!phone || !code) return res.status(400).json({ error: 'Phone and code required' });
+    const phone   = normalizePhone(req.body?.phone);
+    const idToken = (req.body?.idToken || '').trim();
+    const code    = (req.body?.code || '').trim(); // legacy fallback
 
-    // Load OTP from tourist_otps
-    const { data: otpRow } = await mainDb
-        .from('tourist_otps')
-        .select('otp_code, otp_expires')
-        .eq('phone', phone)
-        .maybeSingle();
+    if (!phone) return res.status(400).json({ error: 'Phone required' });
 
-    if (!otpRow?.otp_code) return res.status(400).json({ error: 'No code found. Request a new one.' });
-    if (otpRow.otp_code !== code) return res.status(400).json({ error: 'Incorrect code' });
-    if (new Date(otpRow.otp_expires) < new Date()) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+    if (idToken) {
+        // Firebase path — verify the ID token server-side
+        try {
+            const admin = getFirebaseAdmin();
+            const decoded = await admin.auth().verifyIdToken(idToken);
+            // Confirm the token's phone matches what was submitted
+            if (decoded.phone_number && normalizePhone(decoded.phone_number) !== phone) {
+                return res.status(400).json({ error: 'Phone number mismatch' });
+            }
+        } catch (err) {
+            return res.status(401).json({ error: 'Invalid Firebase token: ' + err.message });
+        }
+    } else if (code) {
+        // Legacy OTP path (Twilio/Supabase)
+        const { data: otpRow } = await mainDb
+            .from('tourist_otps')
+            .select('otp_code, otp_expires')
+            .eq('phone', phone)
+            .maybeSingle();
+
+        if (!otpRow?.otp_code) return res.status(400).json({ error: 'No code found. Request a new one.' });
+        if (otpRow.otp_code !== code) return res.status(400).json({ error: 'Incorrect code' });
+        if (new Date(otpRow.otp_expires) < new Date()) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+    } else {
+        return res.status(400).json({ error: 'idToken or code required' });
+    }
 
     const sb = admin();
     const fakeEmail = `${phone.replace(/\+/, '')}@gcr.tourist`;
