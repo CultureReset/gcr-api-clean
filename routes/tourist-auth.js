@@ -43,6 +43,23 @@ function makeCode() {
     return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+// Verify a tourist's Bearer token → attach req.touristId / req.touristEmail
+async function touristAuth(req, res, next) {
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'No token provided' });
+    const token = header.split(' ')[1];
+    try {
+        const { data, error } = await mainDb.auth.getUser(token);
+        if (error || !data?.user) return res.status(401).json({ error: 'Invalid token' });
+        req.touristId = data.user.id;
+        req.touristEmail = data.user.email;
+        return next();
+    } catch {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Backfill: Link all pre-signup activity to the new user (fire-and-forget)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -474,6 +491,98 @@ router.post('/phone-verify', async (req, res) => {
             role:  'tourist',
         } : null,
     });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD EMAIL TO EXISTING (PHONE-SIGNUP) ACCOUNT
+// Lets a user who signed up via SMS attach a real email + password so they can
+// also log in by email. Same auth.users row — single account, two methods.
+//
+// POST /add-email         { email, password } (auth)  → sends 6-digit code to email
+// POST /verify-add-email  { code, password }  (auth)  → updates auth user
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post('/add-email', touristAuth, async (req, res) => {
+    const email = (req.body?.email || '').trim().toLowerCase();
+    const password = req.body?.password || '';
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+    // Refuse if the account already has a real (non-placeholder) email
+    if (req.touristEmail && !req.touristEmail.endsWith('@gcr.tourist')) {
+        return res.status(409).json({ error: 'Account already has an email. Sign out and use Forgot Password to change it.' });
+    }
+
+    // Refuse if that email belongs to a different account
+    const existing = await getUserByEmail(email);
+    if (existing && existing.id !== req.touristId) {
+        return res.status(409).json({ error: 'That email is already in use.' });
+    }
+
+    const sb = admin();
+    const code = makeCode();
+    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+
+    const { data: userData, error: getErr } = await sb.auth.admin.getUserById(req.touristId);
+    if (getErr || !userData?.user) return res.status(500).json({ error: 'Could not load account' });
+    const md = userData.user.user_metadata || {};
+
+    const { error: updErr } = await sb.auth.admin.updateUserById(req.touristId, {
+        user_metadata: {
+            ...md,
+            pending_email: email,
+            email_verification_code: code,
+            email_verification_expires_at: expiresAt,
+        },
+    });
+    if (updErr) return res.status(500).json({ error: 'Could not save code: ' + updErr.message });
+
+    const send = await sendEmail(email, '🌊 Your Gulf Coast Radar verification code', codeEmailHtml({ code }));
+    if (!send.success) return res.status(500).json({ error: 'Failed to send verification email' });
+
+    res.json({ success: true, message: 'Verification code sent — check your inbox.' });
+});
+
+router.post('/verify-add-email', touristAuth, async (req, res) => {
+    const code = (req.body?.code || '').trim();
+    const password = req.body?.password || '';
+
+    if (!code) return res.status(400).json({ error: 'Code required' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+    const sb = admin();
+    const { data: userData, error: getErr } = await sb.auth.admin.getUserById(req.touristId);
+    if (getErr || !userData?.user) return res.status(500).json({ error: 'Could not load account' });
+    const md = userData.user.user_metadata || {};
+
+    if (!md.pending_email) return res.status(400).json({ error: 'No pending email — request one first.' });
+    if (md.email_verification_code !== code) return res.status(400).json({ error: 'Incorrect code' });
+    if (md.email_verification_expires_at && new Date(md.email_verification_expires_at) < new Date()) {
+        return res.status(400).json({ error: 'Code expired — request a new one.' });
+    }
+
+    // Final ownership check (could have been claimed since the code was sent)
+    const claimed = await getUserByEmail(md.pending_email);
+    if (claimed && claimed.id !== req.touristId) {
+        return res.status(409).json({ error: 'That email is already in use.' });
+    }
+
+    const { error } = await sb.auth.admin.updateUserById(req.touristId, {
+        email: md.pending_email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+            ...md,
+            pending_email: null,
+            email_verification_code: null,
+            email_verification_expires_at: null,
+            verified_at: md.verified_at || new Date().toISOString(),
+        },
+    });
+    if (error) return res.status(500).json({ error: 'Could not update email: ' + error.message });
+
+    res.json({ success: true, email: md.pending_email });
 });
 
 module.exports = router;
