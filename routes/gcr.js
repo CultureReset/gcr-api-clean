@@ -62,12 +62,12 @@ async function buildFullEntity(slug) {
     db.from('entity_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
-    db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
-    db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true),
-    db.from('pricing_items').select('*').eq('entity_id', entity.id).order('sort_order'),
-    db.from('whats_included').select('*').eq('entity_id', entity.id).order('sort_order'),
-    db.from('faqs').select('*').eq('entity_id', entity.id),
-    db.from('requirements').select('*').eq('entity_id', entity.id).order('sort_order'),
+    db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('pricing_items').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('whats_included').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('faqs').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('requirements').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
   ]);
 
   // Fetch items for each section type
