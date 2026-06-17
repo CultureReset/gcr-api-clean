@@ -112,7 +112,7 @@ router.post('/login', async (req, res) => {
 router.get('/gcr/entities', async (req, res) => {
   const { data, error } = await getDb().from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating').order('name').limit(5000);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data || []);
+  res.json({ entities: data || [] });
 });
 
 // POST /api/admin/gcr/entities — create new entity
@@ -1648,6 +1648,40 @@ router.patch('/sales-leads/:id', authRequired, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── RAG STATUS & REINDEXING ────────────────────────────────────────────────────
+router.get('/rag-status', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { data: businesses } = await db.from('entity').select('id,slug,name,is_active').eq('is_active', true);
+    res.json({
+      indexed_businesses: 0,
+      total_gcr_businesses: businesses?.length || 0,
+      total_chunks: 0,
+      last_updated: null,
+      businesses: (businesses || []).map(b => ({ slug: b.slug, name: b.name, indexed: false }))
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/gcr/reindex/:slug', authRequired, async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const db = getDb();
+    const { data: entity } = await db.from('entity').select('*').eq('slug', slug).single();
+    if (!entity) return res.status(404).json({ error: 'Business not found' });
+    res.json({ slug: slug, name: entity.name, chunks_indexed: 0, embedding_status: 'pending' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── RAG Q&A (public endpoint) ──────────────────────────────────────────────────
+router.post('/gcr/ask', async (req, res) => {
+  try {
+    const { question } = req.body;
+    if (!question) return res.status(400).json({ error: 'question required' });
+    res.json({ answer: 'RAG search not yet implemented. Contact admin to enable.', sources: [] });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 module.exports = router;
