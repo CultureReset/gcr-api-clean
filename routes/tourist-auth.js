@@ -454,12 +454,25 @@ router.post('/phone-verify', async (req, res) => {
     });
     if (signInErr) return res.status(500).json({ error: 'Sign in failed: ' + signInErr.message });
 
-    const accessToken = signIn?.session?.access_token || null;
+    const sess = signIn?.session || null;
 
     res.json({
-        success:      true,
-        tourist:      profile,
-        access_token: accessToken,
+        success:       true,
+        tourist:       profile,
+        // Legacy fields (existing clients)
+        access_token:  sess?.access_token || null,
+        // Full session + user (matches /signin response shape so clients can share hydration code)
+        session: sess ? {
+            access_token:  sess.access_token,
+            refresh_token: sess.refresh_token,
+            expires_at:    sess.expires_at,
+        } : null,
+        user: authUser ? {
+            id:    authUser.id,
+            email: authUser.email,
+            phone,
+            role:  'tourist',
+        } : null,
     });
 });
 
