@@ -110,7 +110,9 @@ router.post('/login', async (req, res) => {
 
 // GET /api/admin/gcr/entities
 router.get('/gcr/entities', async (req, res) => {
-  const { data, error } = await getDb().from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating').order('name').limit(5000);
+  const limit = Math.min(parseInt(req.query.limit) || 1000, 5000);
+  const offset = parseInt(req.query.offset) || 0;
+  const { data, error } = await getDb().from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon, is_sponsored').order('name').range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ entities: data || [] });
 });
