@@ -19,6 +19,12 @@ function getDb() {
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-in-production';
 
+// Cache-control for GET requests (10 min for entity lists, helps with slow loads)
+router.use((req, res, next) => {
+  if (req.method === 'GET') res.set('Cache-Control', 's-maxage=600, stale-while-revalidate=120');
+  next();
+});
+
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 // Accepts: API key (ADMIN_SECRET), JWT token, or service key
 function authRequired(req, res, next) {
