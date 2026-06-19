@@ -10,99 +10,101 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
-// instead of crashing the entire API on boot.
-function mount(path, modPath) {
+// instead of crashing the entire API on boot. The loader thunk MUST contain a
+// literal require('./...') string so Vercel's bundler statically traces and
+// includes the route file (a dynamic require(variable) is NOT bundled → 404).
+function mount(path, loader) {
   try {
-    app.use(path, require(modPath));
+    app.use(path, loader());
   } catch (e) {
-    console.error(`[mount skipped] ${path} -> ${modPath}: ${e.message}`);
+    console.error(`[mount skipped] ${path}: ${e.message}`);
   }
 }
 
-app.get('/', (req, res) => res.json({ status: 'GCR API running', version: '2026-06-17', endpoints: 'api/gcr/*, api/admin/*, api/dashboard/*, api/public/*, api/auth/*, api/user/*, api/site/*, api/menu-editor/*, api/tourist/*, api/tourist-auth/*' }));
+app.get('/', (req, res) => res.json({ status: 'GCR API running', version: '2026-06-17b', endpoints: 'api/gcr/*, api/admin/*, api/dashboard/*, api/public/*, api/auth/*, api/user/*, api/site/*, api/menu-editor/*, api/tourist/*, api/tourist-auth/*' }));
 
 // Auth
-mount('/api/auth', './routes/auth');
+mount('/api/auth', () => require('./routes/auth'));
 
 // GCR & Admin
-mount('/api/gcr', './routes/gcr');
-mount('/api/admin', './routes/admin');
+mount('/api/gcr', () => require('./routes/gcr'));
+mount('/api/admin', () => require('./routes/admin'));
 
 // Dashboard (business owner)
-mount('/api/dashboard', './routes/dashboard');
+mount('/api/dashboard', () => require('./routes/dashboard'));
 
 // Public
-mount('/api/public', './routes/public');
+mount('/api/public', () => require('./routes/public'));
 
 // User
-mount('/api/user', './routes/user');
+mount('/api/user', () => require('./routes/user'));
 
 // Site
-mount('/api/site', './routes/site');
+mount('/api/site', () => require('./routes/site'));
 
 // Menu
-mount('/api/menu-editor', './routes/menu-editor');
-mount('/api/menu-edit', './routes/menu-edit');
-mount('/api/simple', './routes/simple-menu-edit');
+mount('/api/menu-editor', () => require('./routes/menu-editor'));
+mount('/api/menu-edit', () => require('./routes/menu-edit'));
+mount('/api/simple', () => require('./routes/simple-menu-edit'));
 
 // Tourist
-mount('/api/tourist-auth', './routes/tourist-auth');
-mount('/api/tourist', './routes/tourist');
-mount('/api/tourist/groups', './routes/tourist-groups');
+mount('/api/tourist-auth', () => require('./routes/tourist-auth'));
+mount('/api/tourist', () => require('./routes/tourist'));
+mount('/api/tourist/groups', () => require('./routes/tourist-groups'));
 
 // Admin tourists
-mount('/api/admin/tourists', './routes/admin-tourists');
+mount('/api/admin/tourists', () => require('./routes/admin-tourists'));
 
 // Setup questions
-mount('/api/admin/setup-questions', './routes/setup-questions');
+mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 
 // Apps & Modules
-mount('/api/apps', './routes/apps');
-mount('/api/modules', './routes/modules');
+mount('/api/apps', () => require('./routes/apps'));
+mount('/api/modules', () => require('./routes/modules'));
 
 // Google Business
-mount('/api/google-business', './routes/google-business');
-mount('/api/dashboard/google-business', './routes/google-business');
+mount('/api/google-business', () => require('./routes/google-business'));
+mount('/api/dashboard/google-business', () => require('./routes/google-business'));
 
 // SMS
-mount('/api/sms', './routes/sms');
+mount('/api/sms', () => require('./routes/sms'));
 
 // QR & Redirects
-mount('/api/qr', './routes/qr');
-mount('/api/links', './routes/links');
+mount('/api/qr', () => require('./routes/qr'));
+mount('/api/links', () => require('./routes/links'));
 
 // Update links
-mount('/api/update', './routes/update-link');
-mount('/update', './routes/update-link');
+mount('/api/update', () => require('./routes/update-link'));
+mount('/update', () => require('./routes/update-link'));
 
 // Payments — Stripe and Square
-mount('/api/stripe', './routes/stripe');
-mount('/api/square', './routes/square');
-mount('/api/webhooks', './routes/webhooks');
+mount('/api/stripe', () => require('./routes/stripe'));
+mount('/api/square', () => require('./routes/square'));
+mount('/api/webhooks', () => require('./routes/webhooks'));
 
 // Booking types
-mount('/api/availability', './routes/availability');
-mount('/api/boat-rental', './routes/boat-rental');
-mount('/api/charter', './routes/charter');
-mount('/api/rides', './routes/rides');
-mount('/api/photographer', './routes/photographer');
-mount('/api/integrations/fareharbor', './routes/fareharbor');
+mount('/api/availability', () => require('./routes/availability'));
+mount('/api/boat-rental', () => require('./routes/boat-rental'));
+mount('/api/charter', () => require('./routes/charter'));
+mount('/api/rides', () => require('./routes/rides'));
+mount('/api/photographer', () => require('./routes/photographer'));
+mount('/api/integrations/fareharbor', () => require('./routes/fareharbor'));
 
 // Live photo
-mount('/api/live-photo', './routes/live-photo');
+mount('/api/live-photo', () => require('./routes/live-photo'));
 
 // AI Provider
-mount('/api/ai-provider', './routes/ai-provider');
+mount('/api/ai-provider', () => require('./routes/ai-provider'));
 
 // Reviews & Analytics
-mount('/api/reviews', './routes/reviews');
-mount('/api/analytics', './routes/analytics');
+mount('/api/reviews', () => require('./routes/reviews'));
+mount('/api/analytics', () => require('./routes/analytics'));
 
 // WhatsApp, Voice Notes, OCR, DNS
-mount('/api/whatsapp', './routes/whatsapp');
-mount('/api/voice-notes', './routes/voice-notes');
-mount('/api/ocr', './routes/ocr');
-mount('/api/verify-dns', './routes/verify-dns');
+mount('/api/whatsapp', () => require('./routes/whatsapp'));
+mount('/api/voice-notes', () => require('./routes/voice-notes'));
+mount('/api/ocr', () => require('./routes/ocr'));
+mount('/api/verify-dns', () => require('./routes/verify-dns'));
 
 app.use((err, req, res, next) => {
   console.error(err);
