@@ -51,7 +51,10 @@ async function buildFullEntity(slug) {
   const entity = await getEntityBySlug(slug);
   if (!entity) return null;
 
-  const [hours, secondaryHours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements] = await Promise.all([
+  // NOTE: pricing_items / whats_included / faqs / requirements are keyed by
+  // entity_id (NOT entity_slug) and have no is_active column. activity_schedules
+  // has both keys. Query each by its real key or the rows come back empty.
+  const [hours, secondaryHours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements, schedules] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug).order('hours_type, day_of_week'),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -64,10 +67,11 @@ async function buildFullEntity(slug) {
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
     db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
     db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('pricing_items').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('whats_included').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('faqs').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('requirements').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('pricing_items').select('*').eq('entity_id', entity.id).order('sort_order'),
+    db.from('whats_included').select('*').eq('entity_id', entity.id).order('sort_order'),
+    db.from('faqs').select('*').eq('entity_id', entity.id).order('sort_order'),
+    db.from('requirements').select('*').eq('entity_id', entity.id).order('sort_order'),
+    db.from('activity_schedules').select('*').eq('entity_slug', slug).order('sort_order'),
   ]);
 
   // Fetch items for each section type
@@ -118,6 +122,7 @@ async function buildFullEntity(slug) {
     whats_included: whatsIncluded.data || [],
     faqs: faqs.data || [],
     requirements: requirements.data || [],
+    schedules: schedules.data || [],
   };
 }
 

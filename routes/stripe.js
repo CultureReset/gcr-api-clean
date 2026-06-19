@@ -715,6 +715,59 @@ router.post('/submit-key-via-link', async (req, res) => {
 });
 
 // ============================================
+// POST /api/stripe/payment/charge — Charge a card
+// ============================================
+router.post('/payment/charge', authRequired, async (req, res) => {
+    const { amount, currency, source, payment_method, description } = req.body;
+    if (!amount) return res.status(400).json({ error: 'amount required' });
+    if (!source && !payment_method) return res.status(400).json({ error: 'source or payment_method required' });
+
+    const stripe = await getStripeForSite(req.siteId);
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+
+    try {
+        const params = {
+            amount: Math.round(amount * 100),
+            currency: currency || 'usd',
+            description: description || 'Charge',
+        };
+        if (payment_method) {
+            params.payment_method = payment_method;
+            params.confirm = true;
+            params.automatic_payment_methods = { enabled: true, allow_redirects: 'never' };
+        } else {
+            params.source = source;
+        }
+        const charge = await stripe.paymentIntents.create(params);
+        res.json({ success: true, charge_id: charge.id, status: charge.status, amount: charge.amount / 100 });
+    } catch (err) {
+        console.error('payment/charge error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// POST /api/stripe/payment/refund — Refund a charge
+// ============================================
+router.post('/payment/refund', authRequired, async (req, res) => {
+    const { charge_id, amount } = req.body;
+    if (!charge_id) return res.status(400).json({ error: 'charge_id required' });
+
+    const stripe = await getStripeForSite(req.siteId);
+    if (!stripe) return res.status(503).json({ error: 'Stripe not configured' });
+
+    try {
+        const params = { payment_intent: charge_id };
+        if (amount) params.amount = Math.round(amount * 100);
+        const refund = await stripe.refunds.create(params);
+        res.json({ success: true, refund_id: refund.id, amount: refund.amount / 100, status: refund.status });
+    } catch (err) {
+        console.error('payment/refund error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
 // POST /api/stripe/refund — Process a refund
 // ============================================
 router.post("/refund", authRequired, async (req, res) => {

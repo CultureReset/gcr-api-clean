@@ -115,10 +115,26 @@ router.post('/login', async (req, res) => {
 // ─── ENTITY CRUD ──────────────────────────────────────────────────────────────
 
 // GET /api/admin/gcr/entities
+// Supabase/PostgREST hard-caps any single query at 1000 rows, so we must
+// page through with .range() to return the full set (~2,800 entities).
 router.get('/gcr/entities', async (req, res) => {
-  const { data, error } = await getDb().from('entity').select('id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon').order('name').limit(5000);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ entities: data || [] });
+  try {
+    const db = getDb();
+    const cols = 'id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon';
+    const PAGE = 1000;
+    let all = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await db.from('entity').select(cols).order('name').range(from, from + PAGE - 1);
+      if (error) return res.status(500).json({ error: error.message });
+      all = all.concat(data || []);
+      if (!data || data.length < PAGE) break;
+      from += PAGE;
+    }
+    res.json({ entities: all, total: all.length });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/admin/gcr/entities — create new entity
