@@ -100,6 +100,10 @@ mount('/api/ai-provider', () => require('./routes/ai-provider'));
 mount('/api/reviews', () => require('./routes/reviews'));
 mount('/api/analytics', () => require('./routes/analytics'));
 
+// Artists & Live Music
+mount('/api/artists', () => require('./routes/artists'));
+mount('/api/webhooks', () => require('./routes/email-webhook'));
+
 // WhatsApp, Voice Notes, OCR, DNS
 mount('/api/whatsapp', () => require('./routes/whatsapp'));
 mount('/api/voice-notes', () => require('./routes/voice-notes'));
