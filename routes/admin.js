@@ -188,7 +188,7 @@ router.put('/gcr/entities/:slug', authRequired, async (req, res) => {
 // PATCH /api/admin/gcr/entities/:slug — bulk update everything at once
 router.patch('/gcr/entities/:slug', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { entity, hours, happyHour, menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, specials, tags, photos } = req.body;
+  const { entity, hours, happyHour, menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, specials, tags, photos, schedules } = req.body;
   const errors = [];
 
   // 1. Core entity
@@ -289,6 +289,24 @@ router.patch('/gcr/entities/:slug', authRequired, async (req, res) => {
     const rows = photos.map((p, i) => ({ entity_slug: slug, url: p.url, image_path: p.image_path || null, is_cover: !!p.is_cover, sort_order: p.sort_order ?? i, caption: p.caption || null }));
     const { error } = await getDb().from('entity_photos').insert(rows);
     if (error) errors.push('photos: ' + error.message);
+  }
+
+  // 14. Activity schedules
+  if (schedules?.length) {
+    const rows = schedules.map((s, i) => ({
+      entity_slug: slug,
+      schedule_name: s.schedule_name || s.name || s.label,
+      label: s.label || s.schedule_name || s.name,
+      schedule_type: s.schedule_type || null,
+      time_start: s.time_start || s.time || null,
+      duration: s.duration || null,
+      days_of_week: s.days_of_week || s.days || null,
+      notes: s.notes || null,
+      is_active: s.is_active !== false,
+      sort_order: s.sort_order ?? i
+    }));
+    const { error } = await getDb().from('activity_schedules').insert(rows);
+    if (error) errors.push('schedules: ' + error.message);
   }
 
   if (errors.length) return res.status(207).json({ success: false, errors });
@@ -685,7 +703,7 @@ router.post('/gcr/import-photos', authRequired, async (req, res) => {
 
 // import-master — import everything for one entity at once
 router.post('/gcr/import-master', authRequired, async (req, res) => {
-  const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials, sections, pricing, whatsIncluded, requirements, faqs } = req.body;
+  const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials, sections, pricing, whatsIncluded, requirements, faqs, schedules } = req.body;
   if (!entity?.slug || !entity?.name) return res.status(400).json({ error: 'entity.slug and entity.name required' });
 
   const slug = entity.slug;
@@ -847,6 +865,24 @@ router.post('/gcr/import-master', authRequired, async (req, res) => {
       })));
       results.faqs = faqs.length;
     }
+  }
+
+  // Activity schedules
+  if (schedules?.length) {
+    const rows = schedules.map((s, i) => ({
+      entity_slug: slug,
+      schedule_name: s.schedule_name || s.name || s.label,
+      label: s.label || s.schedule_name || s.name,
+      schedule_type: s.schedule_type || null,
+      time_start: s.time_start || s.time || null,
+      duration: s.duration || null,
+      days_of_week: s.days_of_week || s.days || null,
+      notes: s.notes || null,
+      is_active: s.is_active !== false,
+      sort_order: s.sort_order ?? i
+    }));
+    const { error } = await getDb().from('activity_schedules').insert(rows);
+    if (!error) results.schedules = schedules.length;
   }
 
   res.json({ success: true, slug, results });
