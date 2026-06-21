@@ -57,6 +57,12 @@ function authRequired(req, res, next) {
 // ─── CACHE INVALIDATION ───────────────────────────────────────────────────────
 // Clears cache by setting headers that tell CDN/clients to revalidate
 // This is called after every PATCH/POST/DELETE to ensure fresh data
+// Look up entity UUID from slug — needed for tables that use entity_id FK
+async function getEntityId(slug) {
+  const { data } = await getDb().from('entity').select('id').eq('slug', slug).single();
+  return data?.id || null;
+}
+
 function invalidateCache(res, entitySlug = null) {
   // Set headers to bust cache immediately - tells Vercel CDN and browsers to not cache
   res.set({
@@ -1747,23 +1753,31 @@ router.post('/gcr/reindex/:slug', authRequired, async (req, res) => {
 
 // ─── PRICING ITEMS ────────────────────────────────────────────────────────────
 router.get('/gcr/entities/:slug/pricing-items', authRequired, async (req, res) => {
-  const { data, error } = await getDb().from('pricing_items').select('*').eq('entity_slug', req.params.slug).eq('is_active', true).order('sort_order');
+  const eid = await getEntityId(req.params.slug);
+  if (!eid) return res.json({ pricing_items: [] });
+  const { data, error } = await getDb().from('pricing_items').select('*').eq('entity_id', eid).order('sort_order');
   if (error) return res.status(500).json({ error: error.message });
   res.json({ pricing_items: data || [] });
 });
 router.get('/gcr/entities/:slug/whats-included', authRequired, async (req, res) => {
-  const { data, error } = await getDb().from('whats_included').select('*').eq('entity_slug', req.params.slug).eq('is_active', true).order('sort_order');
+  const eid = await getEntityId(req.params.slug);
+  if (!eid) return res.json({ whats_included: [] });
+  const { data, error } = await getDb().from('whats_included').select('*').eq('entity_id', eid).order('sort_order');
   if (error) return res.status(500).json({ error: error.message });
   res.json({ whats_included: data || [] });
 });
 router.get('/gcr/entities/:slug/requirements', authRequired, async (req, res) => {
-  const { data, error } = await getDb().from('requirements').select('*').eq('entity_slug', req.params.slug).eq('is_active', true).order('sort_order');
+  const eid = await getEntityId(req.params.slug);
+  if (!eid) return res.json({ requirements: [] });
+  const { data, error } = await getDb().from('requirements').select('*').eq('entity_id', eid).order('sort_order');
   if (error) return res.status(500).json({ error: error.message });
   res.json({ requirements: data || [] });
 });
 router.post('/gcr/entities/:slug/pricing-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { data, error } = await getDb().from('pricing_items').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
+  const eid = await getEntityId(slug);
+  if (!eid) return res.status(404).json({ error: 'Entity not found' });
+  const { data, error } = await getDb().from('pricing_items').insert({ ...req.body, entity_id: eid }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
@@ -1784,7 +1798,9 @@ router.delete('/gcr/pricing-items/:id', authRequired, async (req, res) => {
 // ─── WHAT'S INCLUDED ──────────────────────────────────────────────────────────
 router.post('/gcr/entities/:slug/whats-included', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { data, error } = await getDb().from('whats_included').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
+  const eid = await getEntityId(slug);
+  if (!eid) return res.status(404).json({ error: 'Entity not found' });
+  const { data, error } = await getDb().from('whats_included').insert({ ...req.body, entity_id: eid }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
@@ -1805,7 +1821,9 @@ router.delete('/gcr/whats-included/:id', authRequired, async (req, res) => {
 // ─── FAQs ─────────────────────────────────────────────────────────────────────
 router.post('/gcr/entities/:slug/faqs', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { data, error } = await getDb().from('faqs').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
+  const eid = await getEntityId(slug);
+  if (!eid) return res.status(404).json({ error: 'Entity not found' });
+  const { data, error } = await getDb().from('faqs').insert({ ...req.body, entity_id: eid }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
@@ -1826,7 +1844,9 @@ router.delete('/gcr/faqs/:id', authRequired, async (req, res) => {
 // ─── REQUIREMENTS ─────────────────────────────────────────────────────────────
 router.post('/gcr/entities/:slug/requirements', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { data, error } = await getDb().from('requirements').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
+  const eid = await getEntityId(slug);
+  if (!eid) return res.status(404).json({ error: 'Entity not found' });
+  const { data, error } = await getDb().from('requirements').insert({ ...req.body, entity_id: eid }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
@@ -1894,8 +1914,9 @@ router.get('/gcr/entities/:slug/secondary-hours', authRequired, async (req, res)
 });
 router.get('/gcr/entities/:slug/faqs', authRequired, async (req, res) => {
   const slug = req.params.slug;
+  const eid = await getEntityId(slug);
   const [f1, f2] = await Promise.all([
-    getDb().from('faqs').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    eid ? getDb().from('faqs').select('*').eq('entity_id', eid).order('sort_order') : { data: [] },
     getDb().from('entity_faqs').select('*').eq('entity_slug', slug).order('sort_order'),
   ]);
   res.json({ faqs: [...(f1.data || []), ...(f2.data || [])] });
