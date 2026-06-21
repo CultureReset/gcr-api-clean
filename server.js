@@ -30,8 +30,8 @@ mount('/api/auth', () => require('./routes/auth'));
 mount('/api/gcr', () => require('./routes/gcr'));
 mount('/api/admin', () => require('./routes/admin'));
 
-// Dashboard (business owner)
-mount('/api/dashboard', () => require('./routes/dashboard'));
+// Dashboard (business owner) — TODO: has missing module dependencies
+// mount('/api/dashboard', () => require('./routes/dashboard'));
 
 // Public
 mount('/api/public', () => require('./routes/public'));
@@ -64,7 +64,7 @@ mount('/api/modules', () => require('./routes/modules'));
 
 // Google Business
 mount('/api/google-business', () => require('./routes/google-business'));
-mount('/api/dashboard/google-business', () => require('./routes/google-business'));
+// mount('/api/dashboard/google-business', () => require('./routes/google-business')); // dashboard disabled
 
 // SMS
 mount('/api/sms', () => require('./routes/sms'));
@@ -96,13 +96,28 @@ mount('/api/live-photo', () => require('./routes/live-photo'));
 // AI Provider
 mount('/api/ai-provider', () => require('./routes/ai-provider'));
 
-// Reviews & Analytics
+// Reviews, Team, Gallery, FAQs, Blog, Bookings — Mini-site features
 mount('/api/reviews', () => require('./routes/reviews'));
+mount('/api/team', () => require('./routes/team'));
+mount('/api/gallery', () => require('./routes/gallery'));
+mount('/api/faqs', () => require('./routes/faqs'));
+mount('/api/blog', () => require('./routes/blog'));
+mount('/api/bookings', () => require('./routes/bookings'));
 mount('/api/analytics', () => require('./routes/analytics'));
 
 // Artists & Live Music
 mount('/api/artists', () => require('./routes/artists'));
+mount('/api/artist-bookings', () => require('./routes/artist-bookings'));
+mount('/api/cooperatives', () => require('./routes/cooperatives'));
+mount('/api/goals', () => require('./routes/goals'));
 mount('/api/webhooks', () => require('./routes/email-webhook'));
+
+// Messaging
+mount('/api/messaging', () => require('./routes/messaging'));
+
+// Rentals & Bookings
+mount('/api/rentals', () => require('./routes/rentals'));
+mount('/api/services', () => require('./routes/services'));
 
 // WhatsApp, Voice Notes, OCR, DNS
 mount('/api/whatsapp', () => require('./routes/whatsapp'));
