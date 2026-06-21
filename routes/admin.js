@@ -1488,6 +1488,28 @@ router.post('/gcr/upload-image', authRequired, upload.single('image'), async (re
 
 // ─── ARTISTS ─────────────────────────────────────────────────────────────────
 
+// POST /api/admin/artists — create new artist
+router.post('/artists', authRequired, async (req, res) => {
+  const { name, bio, genre, hometown, image_url, website_url, spotify_url, social_instagram, social_facebook, social_tiktok } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  const { data, error } = await getDb().from('artists').insert({
+    name,
+    bio: bio || null,
+    genre: genre || null,
+    hometown: hometown || null,
+    image_url: image_url || null,
+    website_url: website_url || null,
+    spotify_url: spotify_url || null,
+    social_instagram: social_instagram || null,
+    social_facebook: social_facebook || null,
+    social_tiktok: social_tiktok || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 // GET /api/admin/artists — list all artists
 router.get('/artists', authRequired, async (req, res) => {
   const { search } = req.query;
@@ -1526,6 +1548,13 @@ router.post('/artists/:id/photo', authRequired, upload.single('image'), async (r
   const { data: { publicUrl } } = getDb().storage.from('entity-media').getPublicUrl(fileName);
   await getDb().from('artists').update({ image_url: publicUrl, updated_at: new Date().toISOString() }).eq('id', req.params.id);
   res.json({ url: publicUrl });
+});
+
+// DELETE /api/admin/artists/:id — delete artist
+router.delete('/artists/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('artists').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 // ─── SMS BLAST (manual, admin-triggered) ─────────────────────────────────────
