@@ -1746,6 +1746,21 @@ router.post('/gcr/reindex/:slug', authRequired, async (req, res) => {
 });
 
 // ─── PRICING ITEMS ────────────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/pricing-items', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('pricing_items').select('*').eq('entity_slug', req.params.slug).eq('is_active', true).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ pricing_items: data || [] });
+});
+router.get('/gcr/entities/:slug/whats-included', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('whats_included').select('*').eq('entity_slug', req.params.slug).eq('is_active', true).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ whats_included: data || [] });
+});
+router.get('/gcr/entities/:slug/requirements', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('requirements').select('*').eq('entity_slug', req.params.slug).eq('is_active', true).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ requirements: data || [] });
+});
 router.post('/gcr/entities/:slug/pricing-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { data, error } = await getDb().from('pricing_items').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
@@ -1872,6 +1887,19 @@ router.delete('/gcr/daily-features/:id', authRequired, async (req, res) => {
 });
 
 // ─── SECONDARY HOURS ──────────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/secondary-hours', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_secondary_hours').select('*').eq('entity_slug', req.params.slug).order('hours_type, day_of_week');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ secondary_hours: data || [] });
+});
+router.get('/gcr/entities/:slug/faqs', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const [f1, f2] = await Promise.all([
+    getDb().from('faqs').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    getDb().from('entity_faqs').select('*').eq('entity_slug', slug).order('sort_order'),
+  ]);
+  res.json({ faqs: [...(f1.data || []), ...(f2.data || [])] });
+});
 router.post('/gcr/entities/:slug/secondary-hours', authRequired, async (req, res) => {
   const slug = req.params.slug;
   const { data, error } = await getDb().from('entity_secondary_hours').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
@@ -1888,6 +1916,141 @@ router.put('/gcr/secondary-hours/:id', authRequired, async (req, res) => {
 
 router.delete('/gcr/secondary-hours/:id', authRequired, async (req, res) => {
   const { error } = await getDb().from('entity_secondary_hours').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── ACTIVITY SCHEDULES ───────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/schedules', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('activity_schedules').select('*').eq('entity_slug', req.params.slug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/schedules', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const { data, error } = await getDb().from('activity_schedules').insert({ ...req.body, entity_slug: slug, is_active: true }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
+  res.status(201).json(data);
+});
+
+router.put('/gcr/schedules/:id', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('activity_schedules').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/schedules/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('activity_schedules').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── TEAM MEMBERS ─────────────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/team', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_team_members').select('*').eq('entity_slug', req.params.slug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/team', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const { data, error } = await getDb().from('entity_team_members').insert({ ...req.body, entity_slug: slug }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
+  res.status(201).json(data);
+});
+
+router.put('/gcr/team/:id', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_team_members').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/team/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('entity_team_members').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── REVIEWS ──────────────────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/reviews', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_reviews').select('*').eq('entity_slug', req.params.slug).order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/reviews', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const { data, error } = await getDb().from('entity_reviews').insert({ ...req.body, entity_slug: slug }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
+  res.status(201).json(data);
+});
+
+router.put('/gcr/reviews/:id', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_reviews').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/reviews/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('entity_reviews').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── POLICIES ─────────────────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/policies', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_policies').select('*').eq('entity_slug', req.params.slug);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/policies', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const { data, error } = await getDb().from('entity_policies').insert({ ...req.body, entity_slug: slug }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
+  res.status(201).json(data);
+});
+
+router.put('/gcr/policies/:id', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_policies').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/policies/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('entity_policies').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── BLOG POSTS ───────────────────────────────────────────────────────────────
+router.get('/gcr/entities/:slug/blog', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_blog_posts').select('*').eq('entity_slug', req.params.slug).order('published_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/blog', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const { data, error } = await getDb().from('entity_blog_posts').insert({ ...req.body, entity_slug: slug }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, slug);
+  res.status(201).json(data);
+});
+
+router.put('/gcr/blog/:id', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('entity_blog_posts').update(req.body).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/blog/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('entity_blog_posts').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
