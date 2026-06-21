@@ -685,7 +685,7 @@ router.post('/gcr/import-photos', authRequired, async (req, res) => {
 
 // import-master — import everything for one entity at once
 router.post('/gcr/import-master', authRequired, async (req, res) => {
-  const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials, sections } = req.body;
+  const { entity, hours, tags, photos, menu, drinks, happyHour, events, specials, sections, pricing, whatsIncluded, requirements, faqs } = req.body;
   if (!entity?.slug || !entity?.name) return res.status(400).json({ error: 'entity.slug and entity.name required' });
 
   const slug = entity.slug;
@@ -791,6 +791,62 @@ router.post('/gcr/import-master', authRequired, async (req, res) => {
       }
     }
     results.sections = sections.length;
+  }
+
+  // Pricing items
+  if (pricing?.length) {
+    const eid = await getEntityId(slug);
+    if (eid) {
+      await getDb().from('pricing_items').insert(pricing.map((p, i) => ({
+        entity_id: eid,
+        item_name: p.item_name || p.name,
+        price: p.price != null ? parseFloat(p.price) : null,
+        price_type: p.price_type || null,
+        description: p.description || null,
+        sort_order: p.sort_order ?? i,
+      })));
+      results.pricing = pricing.length;
+    }
+  }
+
+  // What's included
+  if (whatsIncluded?.length) {
+    const eid = await getEntityId(slug);
+    if (eid) {
+      await getDb().from('whats_included').insert(whatsIncluded.map((w, i) => ({
+        entity_id: eid,
+        included_item: typeof w === 'string' ? w : (w.included_item || w.item),
+        sort_order: i,
+      })));
+      results.whatsIncluded = whatsIncluded.length;
+    }
+  }
+
+  // Requirements
+  if (requirements?.length) {
+    const eid = await getEntityId(slug);
+    if (eid) {
+      await getDb().from('requirements').insert(requirements.map((r, i) => ({
+        entity_id: eid,
+        requirement_text: typeof r === 'string' ? r : (r.requirement_text || r.text),
+        sort_order: i,
+      })));
+      results.requirements = requirements.length;
+    }
+  }
+
+  // FAQs
+  if (faqs?.length) {
+    const eid = await getEntityId(slug);
+    if (eid) {
+      await getDb().from('faqs').insert(faqs.map((f, i) => ({
+        entity_id: eid,
+        question: f.question,
+        answer: f.answer,
+        sort_order: f.sort_order ?? i,
+      })));
+      results.faqs = faqs.length;
+    }
   }
 
   res.json({ success: true, slug, results });
