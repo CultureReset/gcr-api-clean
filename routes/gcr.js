@@ -51,7 +51,9 @@ async function buildFullEntity(slug) {
   const entity = await getEntityBySlug(slug);
   if (!entity) return null;
 
-  const [hours, secondaryHours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements, schedules] = await Promise.all([
+  const eid = entity.id; // UUID — some tables use entity_id, others entity_slug
+
+  const [hours, secondaryHours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements, schedules, teamMembers, reviews, policies, blogPosts, entityFaqs] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug).order('hours_type, day_of_week'),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -64,11 +66,16 @@ async function buildFullEntity(slug) {
     db.from('entity_events').select('*').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
     db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
     db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('pricing_items').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('whats_included').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('faqs').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('requirements').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('pricing_items').select('*').eq('entity_id', eid).order('sort_order'),
+    db.from('whats_included').select('*').eq('entity_id', eid).order('sort_order'),
+    db.from('faqs').select('*').eq('entity_id', eid).order('sort_order'),
+    db.from('requirements').select('*').eq('entity_id', eid).order('sort_order'),
     db.from('activity_schedules').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('entity_team_members').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_reviews').select('*').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }),
+    db.from('entity_policies').select('*').eq('entity_slug', slug),
+    db.from('entity_blog_posts').select('*').eq('entity_slug', slug).order('published_at', { ascending: false }),
+    db.from('entity_faqs').select('*').eq('entity_slug', slug).order('sort_order'),
   ]);
 
   // Fetch items for each section type
@@ -117,9 +124,13 @@ async function buildFullEntity(slug) {
     daily_features: dailyFeatures.data || [],
     pricing: pricing.data || [],
     whats_included: whatsIncluded.data || [],
-    faqs: faqs.data || [],
+    faqs: [...(faqs.data || []), ...(entityFaqs.data || [])],
     requirements: requirements.data || [],
     schedules: schedules.data || [],
+    team: teamMembers.data || [],
+    reviews: reviews.data || [],
+    policies: policies.data || [],
+    blog_posts: blogPosts.data || [],
   };
 }
 
