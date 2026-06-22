@@ -1,3 +1,7 @@
+const express = require('express');
+const router = express.Router();
+const { authRequired } = require('../middleware/auth');
+
 /**
  * Provider-agnostic AI wrapper.
  * Auto-detects provider from env: ANTHROPIC_API_KEY → Claude, OPENAI_API_KEY → GPT-4o, GROQ_API_KEY → Groq.
@@ -81,4 +85,18 @@ async function callGroq({ messages, systemPrompt, temperature, maxTokens }) {
   return { text, provider: 'groq', model: data.model };
 }
 
-module.exports = { callAIRound };
+// ─────────────────────────────────────────────────────────────────────────────
+// Route: POST /api/ai-provider/call
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/call', authRequired, async (req, res) => {
+  try {
+    const { messages, systemPrompt, temperature, maxTokens } = req.body;
+    const result = await callAIRound({ messages, systemPrompt, temperature, maxTokens });
+    res.json(result);
+  } catch (err) {
+    console.error('AI provider error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;

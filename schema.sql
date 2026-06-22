@@ -489,3 +489,176 @@ CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
 INSERT INTO admin_users (email, password_hash, role)
 VALUES ('info@cybercheckinc.com', '$2b$10$7/kZVTKxJMQqzfVx8vfM/.7Hy.5l.xHMuR8qVm0VlKjZ7VzKRkVpm', 'admin')
 ON CONFLICT (email) DO NOTHING;
+
+-- ============================================================
+-- MISSING TABLES FOR MINI-SITE COMPLETION
+-- ============================================================
+
+-- 21. ENTITY_REVIEWS (customer reviews and ratings)
+CREATE TABLE IF NOT EXISTS entity_reviews (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  reviewer_name text NOT NULL,
+  reviewer_email text,
+  rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  title text,
+  body text,
+  verified_purchase boolean DEFAULT false,
+  helpful_count integer DEFAULT 0,
+  approved boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_slug ON entity_reviews(entity_slug);
+CREATE INDEX IF NOT EXISTS idx_reviews_approved ON entity_reviews(approved);
+CREATE INDEX IF NOT EXISTS idx_reviews_rating ON entity_reviews(rating);
+
+-- 22. ENTITY_TEAM_MEMBERS (staff and team bios)
+CREATE TABLE IF NOT EXISTS entity_team_members (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  name text NOT NULL,
+  title text,
+  bio text,
+  photo_url text,
+  photo_path text,
+  specialty text,
+  certifications text[],
+  years_experience integer,
+  sort_order integer DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_team_slug ON entity_team_members(entity_slug);
+
+-- 23. ENTITY_GALLERY (organized photo gallery with categories)
+CREATE TABLE IF NOT EXISTS entity_gallery (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  photo_url text NOT NULL,
+  photo_path text,
+  caption text,
+  category text DEFAULT 'general',  -- interior, food, room, team, event, exterior, general
+  is_featured boolean DEFAULT false,
+  sort_order integer DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_gallery_slug ON entity_gallery(entity_slug);
+CREATE INDEX IF NOT EXISTS idx_gallery_category ON entity_gallery(category);
+CREATE INDEX IF NOT EXISTS idx_gallery_featured ON entity_gallery(is_featured);
+
+-- 24. ENTITY_AVAILABILITY (booking calendar slots)
+CREATE TABLE IF NOT EXISTS entity_availability (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  available_date date NOT NULL,
+  available_slots integer DEFAULT 1,
+  booked_slots integer DEFAULT 0,
+  blocked boolean DEFAULT false,
+  special_pricing numeric(10,2),
+  notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(entity_slug, available_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_availability_slug ON entity_availability(entity_slug);
+CREATE INDEX IF NOT EXISTS idx_availability_date ON entity_availability(available_date);
+
+-- 25. ENTITY_BOOKINGS (confirmed bookings/reservations)
+CREATE TABLE IF NOT EXISTS entity_bookings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  guest_name text NOT NULL,
+  guest_email text NOT NULL,
+  guest_phone text,
+  booking_date date NOT NULL,
+  booking_time time,
+  duration_hours numeric(5,2),
+  guest_count integer DEFAULT 1,
+  service_id text,
+  total_price numeric(10,2),
+  status text DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'completed', 'cancelled')),
+  special_requests text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bookings_slug ON entity_bookings(entity_slug);
+CREATE INDEX IF NOT EXISTS idx_bookings_date ON entity_bookings(booking_date);
+CREATE INDEX IF NOT EXISTS idx_bookings_status ON entity_bookings(status);
+
+-- 26. ENTITY_FAQS (frequently asked questions)
+CREATE TABLE IF NOT EXISTS entity_faqs (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  question text NOT NULL,
+  answer text NOT NULL,
+  category text DEFAULT 'general',  -- general, booking, cancellation, pet-policy, accessibility
+  sort_order integer DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_faqs_slug ON entity_faqs(entity_slug);
+CREATE INDEX IF NOT EXISTS idx_faqs_category ON entity_faqs(category);
+
+-- 27. ENTITY_POLICIES (business policies)
+CREATE TABLE IF NOT EXISTS entity_policies (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  policy_type text NOT NULL CHECK (policy_type IN ('cancellation', 'refund', 'house_rules', 'accessibility', 'pet_policy')),
+  content text NOT NULL,
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(entity_slug, policy_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_policies_slug ON entity_policies(entity_slug);
+
+-- 28. ENTITY_BLOG_POSTS (business blog/news posts)
+CREATE TABLE IF NOT EXISTS entity_blog_posts (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_slug text NOT NULL REFERENCES entity(slug) ON DELETE CASCADE,
+  title text NOT NULL,
+  slug text NOT NULL,
+  content text,
+  excerpt text,
+  featured_image_url text,
+  featured_image_path text,
+  published_at timestamptz,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(entity_slug, slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_slug ON entity_blog_posts(entity_slug);
+CREATE INDEX IF NOT EXISTS idx_blog_published ON entity_blog_posts(published_at);
+
+-- Enable RLS and create policies for new tables
+ALTER TABLE entity_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_team_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_gallery ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_availability ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_faqs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_policies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entity_blog_posts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read" ON entity_reviews FOR SELECT USING (approved = true);
+CREATE POLICY "Public read" ON entity_team_members FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_gallery FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_availability FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_faqs FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_policies FOR SELECT USING (true);
+CREATE POLICY "Public read" ON entity_blog_posts FOR SELECT USING (published_at IS NOT NULL AND published_at <= now());
+
+CREATE POLICY "Service write" ON entity_reviews FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_team_members FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_gallery FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_availability FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_bookings FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_faqs FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_policies FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Service write" ON entity_blog_posts FOR ALL USING (auth.role() = 'service_role');
