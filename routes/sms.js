@@ -3,7 +3,7 @@ const router   = express.Router();
 const twilio   = require('twilio');
 const crypto   = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
-const { mainDb } = require('../db');
+const mainDb = require('../db');
 
 const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
