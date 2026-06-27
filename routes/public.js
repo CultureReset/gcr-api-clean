@@ -2859,7 +2859,7 @@ router.get('/business', async (req, res) => {
 router.get('/menu', async (req, res) => {
     try {
         let siteId = req.siteId; // from domain resolution
-        const getGcrDb = require('../gcr-db');
+        const getGcrDb = require('../db');
         const gcrDb = getGcrDb();
         const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description';
 
@@ -3137,7 +3137,7 @@ router.get('/waivers/send-reminders', async (req, res) => {
 // GET /api/public/gcr-stats — Live GCR business count for home page display
 router.get('/gcr-stats', async (req, res) => {
     try {
-        const getGcrDb = require('../gcr-db');
+        const getGcrDb = require('../db');
         const gcrDb = getGcrDb();
         const { count, error } = await gcrDb
             .from('entity')

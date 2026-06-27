@@ -33,7 +33,7 @@
 const express  = require('express');
 const crypto   = require('crypto');
 const multer   = require('multer');
-const getGcrDb = require('../gcr-db');
+const getGcrDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 
 const router = express.Router();

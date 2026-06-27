@@ -18,7 +18,7 @@
 const express = require('express');
 const multer  = require('multer');
 const supabase = require('../db');
-const getGcrDb = require('../gcr-db');
+const getGcrDb = require('../db');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });

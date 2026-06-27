@@ -122,6 +122,8 @@ mount('/api/services', () => require('./routes/services'));
 // WhatsApp, Voice Notes, OCR, DNS
 mount('/api/whatsapp', () => require('./routes/whatsapp'));
 mount('/api/voice-notes', () => require('./routes/voice-notes'));
+mount('/api/email-parser', () => require('./routes/email-parser'));
+mount('/api/deals', () => require('./routes/deals'));
 mount('/api/ocr', () => require('./routes/ocr'));
 mount('/api/verify-dns', () => require('./routes/verify-dns'));
 

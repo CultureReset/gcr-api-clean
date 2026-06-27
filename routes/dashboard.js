@@ -1,7 +1,7 @@
 const express = require('express');
 const { authRequired } = require('../middleware/auth');
 const supabase = require('../db');
-const getGcrDb = require('../gcr-db');
+const getGcrDb = require('../db');
 // const { resolveEntityId } = require('../lib/entity-resolver'); // TODO: missing module
 const menuGcr = require('../lib/menu-gcr');
 const { extractJsonFromImage, getVisionProvidersStatus } = require('./ai-provider');

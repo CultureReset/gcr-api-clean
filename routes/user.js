@@ -1,6 +1,6 @@
 const express = require('express');
 const { authRequired } = require('../middleware/auth');
-const getGcrDb = require('../gcr-db');
+const getGcrDb = require('../db');
 
 const router = express.Router();
 router.use(authRequired);

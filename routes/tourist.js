@@ -246,7 +246,7 @@ const SWIPE_WEIGHTS = { like: 5, nope: -4, super: 15, save: 8, book: 20, view: 2
 // Fetch entity tags from the correct GCR tables (entity + entity_tags)
 async function fetchEntityTagMap(slugs) {
     if (!slugs?.length) return {};
-    const gcrDb = require('../gcr-db')();
+    const gcrDb = require('../db')();
     const tagMap = {}; // slug → string[]
 
     try {
@@ -927,7 +927,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     const memories  = memoriesRes.data || [];
 
     // Pull live GCR data — entities + menus + specials + pricing + activity details
-    const gcrDb = require('../gcr-db')();
+    const gcrDb = require('../db')();
     const { data: gcrEntities } = await gcrDb
         .from('entity')
         .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active')
@@ -1457,7 +1457,7 @@ async function checkGeofence(touristId, lat, lng) {
     const topTags = (scores || []).filter(s => s.score > 0).map(s => s.tag);
 
     // Find businesses within 0.5 miles that have active specials today
-    const gcrDb = require('../gcr-db')();
+    const gcrDb = require('../db')();
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
     const { data: nearby } = await gcrDb
