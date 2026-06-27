@@ -31,7 +31,7 @@ mount('/api/gcr', () => require('./routes/gcr'));
 mount('/api/admin', () => require('./routes/admin'));
 
 // Dashboard (business owner) — TODO: has missing module dependencies
-// mount('/api/dashboard', () => require('./routes/dashboard'));
+mount('/api/dashboard', () => require('./routes/dashboard'));
 
 // Public
 mount('/api/public', () => require('./routes/public'));
