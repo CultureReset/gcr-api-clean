@@ -53,7 +53,25 @@ async function buildFullEntity(slug) {
 
   const eid = entity.id; // UUID — some tables use entity_id, others entity_slug
 
-  const [hours, secondaryHours, photos, tags, menuSections, drinkSections, hhSections, entitySections, specials, events, sides, dailyFeatures, pricing, whatsIncluded, faqs, requirements, schedules, teamMembers, reviews, policies, blogPosts, entityFaqs] = await Promise.all([
+  const [
+    hours, secondaryHours, photos, tags,
+    menuSections, drinkSections, hhSections, entitySections,
+    specials, events, sides, dailyFeatures,
+    pricing, whatsIncluded, faqs, requirements,
+    schedules, teamMembers, reviews, policies, blogPosts, entityFaqs,
+    // ACTIVITY / CHARTER
+    meetingPoints, activityOptions, fishSpecies,
+    // HOTEL / CONDO / VACATION RENTAL
+    propertyDetails, roomTypes, amenities, propertyFees, stayLinks, availability,
+    // SERVICE
+    serviceCategories, serviceMenu, servicePackages, classSchedule,
+    // SHOP
+    productCategories, products,
+    // PARK
+    facilities, spotRules, accessInfo,
+    // LOYALTY + BOOKABLE
+    loyaltyProgram, bookableResources,
+  ] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug).order('hours_type, day_of_week'),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -76,6 +94,32 @@ async function buildFullEntity(slug) {
     db.from('entity_policies').select('*').eq('entity_slug', slug),
     db.from('entity_blog_posts').select('*').eq('entity_slug', slug).order('published_at', { ascending: false }),
     db.from('entity_faqs').select('*').eq('entity_slug', slug).order('sort_order'),
+    // ACTIVITY / CHARTER
+    db.from('meeting_points').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('activity_options').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('fish_species').select('*').eq('entity_slug', slug).order('sort_order'),
+    // HOTEL / CONDO / VACATION RENTAL
+    db.from('property_details').select('*').eq('entity_slug', slug).maybeSingle(),
+    db.from('room_types').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('amenities').select('*').eq('entity_slug', slug),
+    db.from('property_fees').select('*').eq('entity_slug', slug),
+    db.from('stay_links').select('*').eq('entity_slug', slug),
+    db.from('availability').select('*').eq('entity_slug', slug).gte('date', new Date().toISOString().split('T')[0]).order('date').limit(90),
+    // SERVICE
+    db.from('service_categories').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('service_menu').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('service_packages').select('*').eq('entity_slug', slug),
+    db.from('class_schedule').select('*').eq('entity_slug', slug).order('day_of_week'),
+    // SHOP
+    db.from('product_categories').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('products').select('*').eq('entity_slug', slug).eq('in_stock', true).order('sort_order'),
+    // PARK
+    db.from('facilities').select('*').eq('entity_slug', slug),
+    db.from('spot_rules').select('*').eq('entity_slug', slug),
+    db.from('access_info').select('*').eq('entity_slug', slug).maybeSingle(),
+    // LOYALTY + BOOKABLE
+    db.from('loyalty_programs').select('program_name, keyword, sms_number').eq('entity_slug', slug).eq('active', true).maybeSingle(),
+    db.from('bookable_resources').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
   ]);
 
   // Fetch items for each section type
@@ -138,6 +182,32 @@ async function buildFullEntity(slug) {
     reviews: reviews.data || [],
     policies: policies.data || [],
     blog_posts: blogPosts.data || [],
+    // ACTIVITY / CHARTER
+    meeting_points: meetingPoints.data || [],
+    activity_options: activityOptions.data || [],
+    fish_species: fishSpecies.data || [],
+    // HOTEL / CONDO / VACATION RENTAL
+    property_details: (propertyDetails && propertyDetails.data) || null,
+    room_types: roomTypes.data || [],
+    amenities: amenities.data || [],
+    property_fees: propertyFees.data || [],
+    stay_links: stayLinks.data || [],
+    availability: availability.data || [],
+    // SERVICE
+    service_categories: serviceCategories.data || [],
+    service_menu: serviceMenu.data || [],
+    service_packages: servicePackages.data || [],
+    class_schedule: classSchedule.data || [],
+    // SHOP
+    product_categories: productCategories.data || [],
+    products: products.data || [],
+    // PARK
+    facilities: facilities.data || [],
+    spot_rules: spotRules.data || [],
+    access_info: (accessInfo && accessInfo.data) || null,
+    // LOYALTY + BOOKABLE
+    loyalty_program: (loyaltyProgram && loyaltyProgram.data) || null,
+    bookable_resources: bookableResources.data || [],
   };
 }
 
