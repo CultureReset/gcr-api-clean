@@ -214,6 +214,7 @@ async function buildFullEntity(slug) {
     policies: policies.data || [],
     blog_posts: blogPosts.data || [],
     announcements: announcements.data || [],
+    social_posts: socialPostsRes?.data || [],
     modules: [...modules],
     // Food/Menu
     menu_sections: nest(cond.menuSections?.data, items.menuItems),
@@ -994,6 +995,15 @@ router.get('/home-feed', async (req, res) => {
       return nowTime >= e.hh_start && nowTime <= e.hh_end;
     });
 
+    // Social posts for home feed
+    const { data: socialPosts } = await db
+      .from('social_posts')
+      .select('id,image_url,caption,card_title,card_entity_name,card_city,card_type,post_url,entity_slug,post_date,source')
+      .eq('is_active', true)
+      .eq('show_on_home', true)
+      .order('post_date', { ascending: false })
+      .limit(30);
+
     res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
     res.json({
       events:      eventsRes.data   || [],
@@ -1001,6 +1011,7 @@ router.get('/home-feed', async (req, res) => {
       happyHours:  happyHoursNow,
       liveMusic:   liveMusicRes.data || [],
       thingsToDo:  thingsRes.data   || [],
+      socialPosts: socialPosts      || [],
     });
   } catch (err) {
     console.error('home-feed error:', err.message);

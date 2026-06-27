@@ -2291,3 +2291,208 @@ router.get('/users', authRequired, async (req, res) => {
 });
 
 module.exports = router;
+
+// ── SOCIAL POSTS — paste FB/IG URLs, each becomes a card ──────────────────────
+
+// POST /api/admin/social-posts/scrape
+// Body: { urls: ["https://fb.com/...", "https://instagram.com/p/..."] }
+// Scrapes each URL via oEmbed and saves to social_posts table
+router.post('/social-posts/scrape', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { urls, entity_slug, card_type = 'post', show_on_home = true } = req.body;
+    if (!Array.isArray(urls) || urls.length === 0) {
+      return res.status(400).json({ error: 'urls array required' });
+    }
+
+    const results = [];
+
+    for (const rawUrl of urls) {
+      const url = rawUrl.trim();
+      if (!url) continue;
+
+      try {
+        const isFacebook = url.includes('facebook.com') || url.includes('fb.com') || url.includes('fb.watch');
+        const isInstagram = url.includes('instagram.com');
+
+        let image_url = null;
+        let caption = null;
+        let author_name = null;
+        let author_url = null;
+        let source = 'manual';
+
+        if (isInstagram) {
+          source = 'instagram';
+          // Instagram oEmbed — gives thumbnail + caption
+          const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${process.env.FB_APP_ID}|${process.env.FB_APP_SECRET}`;
+          try {
+            const r = await fetch(oembedUrl);
+            if (r.ok) {
+              const data = await r.json();
+              image_url = data.thumbnail_url || null;
+              caption = data.title || null;
+              author_name = data.author_name || null;
+              author_url = data.author_url || null;
+            }
+          } catch {}
+
+          // Fallback: public oembed without token (works for public posts)
+          if (!image_url) {
+            try {
+              const r2 = await fetch(`https://www.instagram.com/api/v1/oembed/?url=${encodeURIComponent(url)}`);
+              if (r2.ok) {
+                const data = await r2.json();
+                image_url = data.thumbnail_url || null;
+                caption = data.title || null;
+                author_name = data.author_name || null;
+                author_url = data.author_url || null;
+              }
+            } catch {}
+          }
+
+        } else if (isFacebook) {
+          source = 'facebook';
+          // Facebook oEmbed — only gives author_name, no image
+          try {
+            const oembedUrl = `https://www.facebook.com/plugins/post/oembed.json/?url=${encodeURIComponent(url)}`;
+            const r = await fetch(oembedUrl);
+            if (r.ok) {
+              const data = await r.json();
+              author_name = data.author_name || null;
+              author_url = data.author_url || null;
+            }
+          } catch {}
+        }
+
+        // Extract entity name from URL if no author
+        // facebook.com/BusinessName/posts/123 → "BusinessName"
+        // instagram.com/p/CODE → use author_name
+        let card_entity_name = author_name;
+        if (!card_entity_name) {
+          const fbMatch = url.match(/facebook\.com\/([^\/\?]+)\//);
+          if (fbMatch && fbMatch[1] !== 'permalink.php' && fbMatch[1] !== 'groups') {
+            card_entity_name = fbMatch[1].replace(/\./g, ' ');
+          }
+        }
+
+        // Upsert to social_posts
+        const { data: post, error } = await db.from('social_posts').upsert({
+          post_url: url,
+          source,
+          entity_slug: entity_slug || null,
+          image_url,
+          caption,
+          author_name,
+          author_url,
+          card_type,
+          card_entity_name,
+          show_on_home,
+          show_on_profile: !!entity_slug,
+          is_active: true,
+          created_by: 'admin',
+          post_date: new Date().toISOString(),
+        }, { onConflict: 'post_url' }).select().single();
+
+        results.push({
+          url,
+          success: !error,
+          id: post?.id,
+          image_url,
+          caption: caption?.slice(0, 80),
+          author_name,
+          card_entity_name,
+          error: error?.message,
+        });
+
+      } catch (e) {
+        results.push({ url, success: false, error: e.message });
+      }
+    }
+
+    res.json({ processed: results.length, results });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/social-posts  — manually add/edit a post (with your own image + caption)
+router.post('/social-posts', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const {
+      post_url, image_url, caption, card_title, card_entity_name,
+      card_type = 'post', entity_slug, card_city, source = 'manual',
+      show_on_home = true, show_on_profile = false, post_date,
+    } = req.body;
+
+    if (!post_url && !image_url) {
+      return res.status(400).json({ error: 'post_url or image_url required' });
+    }
+
+    const { data, error } = await db.from('social_posts').upsert({
+      post_url: post_url || `manual:${Date.now()}`,
+      source,
+      entity_slug: entity_slug || null,
+      image_url: image_url || null,
+      caption: caption || null,
+      card_title: card_title || null,
+      card_entity_name: card_entity_name || null,
+      card_city: card_city || null,
+      card_type,
+      show_on_home,
+      show_on_profile,
+      is_active: true,
+      created_by: 'admin',
+      post_date: post_date || new Date().toISOString(),
+    }, { onConflict: 'post_url' }).select().single();
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/admin/social-posts — list all posts
+router.get('/social-posts', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { entity_slug, source, card_type, limit = 50 } = req.query;
+    let q = db.from('social_posts').select('*').order('created_at', { ascending: false }).limit(parseInt(limit));
+    if (entity_slug) q = q.eq('entity_slug', entity_slug);
+    if (source) q = q.eq('source', source);
+    if (card_type) q = q.eq('card_type', card_type);
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/admin/social-posts/:id — update a post (add image, change card_type, link entity)
+router.put('/social-posts/:id', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const allowed = ['image_url','caption','card_title','card_entity_name','card_city','card_type','entity_slug','show_on_home','show_on_profile','is_active','post_date'];
+    const updates = {};
+    for (const k of allowed) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
+    const { data, error } = await db.from('social_posts').update(updates).eq('id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/social-posts/:id
+router.delete('/social-posts/:id', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { error } = await db.from('social_posts').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
