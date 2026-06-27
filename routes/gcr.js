@@ -64,7 +64,7 @@ async function buildFullEntity(slug) {
     db.from('entity_hours').select('day_of_week,opens_at,closes_at,is_closed').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_photos').select('id,url,image_url,caption,alt_text,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
     db.from('entity_tags').select('tag_name,tag_category').eq('entity_slug', slug),
-    db.from('entity_events').select('id,event_name,description,event_date,start_time,end_time,cover_charge,image_url,artist_name,artist_id,day_of_week,recurring, artist:artist_id(id,slug,name,genre,image_url)').eq('entity_slug', slug).eq('is_active', true).order('event_date').limit(20),
+    db.from('entity_events').select('id,event_name,description,event_date,start_time,end_time,cover_charge,image_url,artist_name,artist_id,day_of_week,recurring, artist:artists!entity_events_artist_id_fkey(id,slug,name,genre,image_url,social_instagram,social_facebook,spotify_url)').eq('entity_slug', slug).eq('is_active', true).order('event_date').limit(20),
     db.from('entity_reviews').select('id,author_name,rating,title,body,source,review_date').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }).limit(20),
     db.from('faqs').select('id,question,answer,category,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_team_members').select('id,name,title,bio,photo_url,specialty,sort_order').eq('entity_slug', slug).order('sort_order'),
@@ -391,7 +391,7 @@ router.get('/events', async (req, res) => {
   try {
     let query = db
       .from('entity_events')
-      .select('*, entity:entity_slug(slug, name, icon, hero_image_url, city, address_line_1, phone), artist:artist_id(id, name, slug, bio, genre, hometown, image_url, website_url, social_instagram, social_facebook, social_tiktok, spotify_url)')
+      .select('*, entity:entity_slug(slug, name, icon, hero_image_url, city, address_line_1, phone), artist:artists!entity_events_artist_id_fkey(id, name, slug, bio, genre, hometown, image_url, website_url, social_instagram, social_facebook, social_tiktok, spotify_url)')
       .eq('is_active', true)
       .order('event_date', { ascending: true, nullsFirst: false });
 
@@ -971,7 +971,7 @@ router.get('/home-feed', async (req, res) => {
 
       // 🎸 Live music events today
       db.from('entity_events')
-        .select(`id, event_name, event_date, start_time, image_url, artist_name, artist_id, entity_slug, entity:entity_slug(${ENTITY_COLS})`)
+        .select(`id, event_name, event_date, start_time, image_url, artist_name, artist_id, entity_slug, entity:entity_slug(${ENTITY_COLS}), artist:artists!entity_events_artist_id_fkey(id,slug,name,image_url)`)
         .eq('is_active', true)
         .or(`event_date.eq.${today},and(recurring.eq.true,day_of_week.eq.${todayName})`)
         .not('artist_name', 'is', null)
