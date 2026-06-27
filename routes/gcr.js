@@ -71,6 +71,8 @@ async function buildFullEntity(slug) {
     facilities, spotRules, accessInfo,
     // LOYALTY + BOOKABLE
     loyaltyProgram, bookableResources,
+    // EXTRA
+    announcements, whatToBring, orderLinks, activityDetails, dailyFeaturesNew, entityModules,
   ] = await Promise.all([
     db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug).order('hours_type, day_of_week'),
@@ -120,6 +122,13 @@ async function buildFullEntity(slug) {
     // LOYALTY + BOOKABLE
     db.from('loyalty_programs').select('program_name, keyword, sms_number').eq('entity_slug', slug).eq('active', true).maybeSingle(),
     db.from('bookable_resources').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    // EXTRA
+    db.from('announcements').select('*').eq('entity_slug', slug).eq('active', true),
+    db.from('what_to_bring').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('order_links').select('*').eq('entity_slug', slug),
+    db.from('activity_details').select('*').eq('entity_slug', slug).maybeSingle(),
+    db.from('daily_features').select('*').eq('entity_slug', slug).gte('feature_date', new Date().toISOString().split('T')[0]).order('feature_date').limit(10),
+    db.from('entity_modules').select('module_key, enabled, settings, sort_order').eq('entity_slug', slug).eq('enabled', true).order('sort_order'),
   ]);
 
   // Fetch items for each section type
@@ -142,6 +151,30 @@ async function buildFullEntity(slug) {
       ? db.from('entity_section_items').select('*').in('section_id', entitySectionIds).order('id')
       : { data: [] },
   ]);
+
+  // Fetch price_tiers for pricing_items
+  const pricingItemIds = (pricing.data || []).map(p => p.id);
+  const { data: priceTiersData } = pricingItemIds.length
+    ? await db.from('price_tiers').select('*').in('price_item_id', pricingItemIds).order('sort_order')
+    : { data: [] };
+
+  // Fetch room_amenities for room_types
+  const roomTypeIds = (roomTypes.data || []).map(r => r.id);
+  const { data: roomAmenitiesData } = roomTypeIds.length
+    ? await db.from('room_amenities').select('*').in('room_type_id', roomTypeIds)
+    : { data: [] };
+
+  // Nest price_tiers into pricing_items
+  const pricingWithTiers = (pricing.data || []).map(item => ({
+    ...item,
+    tiers: (priceTiersData || []).filter(t => t.price_item_id === item.id),
+  }));
+
+  // Nest room_amenities into room_types
+  const roomTypesWithAmenities = (roomTypes.data || []).map(room => ({
+    ...room,
+    room_amenities: (roomAmenitiesData || []).filter(a => a.room_type_id === room.id),
+  }));
 
   // Nest items into sections
   const nest = (sections, items) =>
@@ -173,7 +206,7 @@ async function buildFullEntity(slug) {
     })),
     sides: sides.data || [],
     daily_features: dailyFeatures.data || [],
-    pricing: pricing.data || [],
+    pricing: pricingWithTiers,
     whats_included: whatsIncluded.data || [],
     faqs: [...(faqs.data || []), ...(entityFaqs.data || [])],
     requirements: requirements.data || [],
@@ -188,7 +221,7 @@ async function buildFullEntity(slug) {
     fish_species: fishSpecies.data || [],
     // HOTEL / CONDO / VACATION RENTAL
     property_details: (propertyDetails && propertyDetails.data) || null,
-    room_types: roomTypes.data || [],
+    room_types: roomTypesWithAmenities,
     amenities: amenities.data || [],
     property_fees: propertyFees.data || [],
     stay_links: stayLinks.data || [],
@@ -208,6 +241,13 @@ async function buildFullEntity(slug) {
     // LOYALTY + BOOKABLE
     loyalty_program: (loyaltyProgram && loyaltyProgram.data) || null,
     bookable_resources: bookableResources.data || [],
+    // EXTRA
+    announcements: announcements.data || [],
+    what_to_bring: whatToBring.data || [],
+    order_links: orderLinks.data || [],
+    activity_details: (activityDetails && activityDetails.data) || null,
+    todays_features: dailyFeaturesNew.data || [],
+    modules: (entityModules.data || []).map(m => m.module_key),
   };
 }
 
