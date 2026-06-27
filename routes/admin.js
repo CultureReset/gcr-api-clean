@@ -2206,4 +2206,88 @@ router.post('/gcr/ask', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── USER → ENTITY LINKING (admin manually links dashboard users to GCR entities) ─
+// POST /api/admin/link-user  { user_email, entity_slug }
+router.post('/link-user', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { user_email, entity_slug, role = 'owner' } = req.body;
+    if (!user_email || !entity_slug) return res.status(400).json({ error: 'user_email and entity_slug required' });
+
+    // Look up user
+    const { data: user, error: userErr } = await db.from('users').select('id, email, name').eq('email', user_email).maybeSingle();
+    if (userErr || !user) return res.status(404).json({ error: `User not found: ${user_email}` });
+
+    // Look up entity
+    const { data: entity, error: entErr } = await db.from('entity').select('id, slug, name, entity_type').eq('slug', entity_slug).maybeSingle();
+    if (entErr || !entity) return res.status(404).json({ error: `Entity not found: ${entity_slug}` });
+
+    // Upsert entity_owners
+    const { error: ownerErr } = await db.from('entity_owners').upsert({
+      user_id: user.id,
+      entity_id: entity.id,
+      entity_slug: entity.slug,
+      role,
+    }, { onConflict: 'user_id,entity_id' });
+    if (ownerErr) return res.status(500).json({ error: ownerErr.message });
+
+    // Also update users.entity_id + users.entity_slug for quick lookup
+    await db.from('users').update({ entity_id: entity.id, entity_slug: entity.slug }).eq('id', user.id);
+
+    res.json({
+      success: true,
+      linked: { user: { id: user.id, email: user.email, name: user.name }, entity: { id: entity.id, slug: entity.slug, name: entity.name, type: entity.entity_type }, role }
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/link-user?entity_slug=xxx  — see who is linked to an entity
+router.get('/link-user', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { entity_slug, user_email } = req.query;
+    if (!entity_slug && !user_email) return res.status(400).json({ error: 'entity_slug or user_email required' });
+
+    let q = db.from('entity_owners').select('*, entity:entity_slug(name, entity_type), user:user_id(email, name)');
+    if (entity_slug) q = q.eq('entity_slug', entity_slug);
+    if (user_email) q = q.eq('user_id', db.from('users').select('id').eq('email', user_email));
+
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// DELETE /api/admin/link-user  { user_email, entity_slug }  — unlink
+router.delete('/link-user', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { user_email, entity_slug } = req.body;
+    if (!user_email || !entity_slug) return res.status(400).json({ error: 'user_email and entity_slug required' });
+
+    const { data: user } = await db.from('users').select('id').eq('email', user_email).maybeSingle();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    await db.from('entity_owners').delete().eq('user_id', user.id).eq('entity_slug', entity_slug);
+
+    // Clear quick lookup if it was pointing at this entity
+    const { data: remaining } = await db.from('entity_owners').select('entity_slug').eq('user_id', user.id);
+    if (!remaining || remaining.length === 0) {
+      await db.from('users').update({ entity_id: null, entity_slug: null }).eq('id', user.id);
+    }
+
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/users — list all dashboard users with their linked entity
+router.get('/users', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { data, error } = await db.from('users').select('id, email, name, role, entity_slug, entity_id, created_at').order('created_at', { ascending: false }).limit(200);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
