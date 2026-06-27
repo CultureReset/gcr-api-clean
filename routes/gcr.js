@@ -930,3 +930,80 @@ router.post('/nfc-card-lead', async (req, res) => {
 });
 
 module.exports = router;
+
+// ─── GET /api/gcr/home-feed ───────────────────────────────────────────────────
+// Returns all sliding card rows for the home page in one request
+router.get('/home-feed', async (req, res) => {
+  try {
+    const now = new Date();
+    const nowTime = now.toTimeString().slice(0, 5); // "HH:MM"
+    const today = now.toISOString().split('T')[0];
+    const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const todayName = dayNames[now.getDay()];
+
+    const ENTITY_COLS = 'id,slug,name,entity_type,entity_subtype,hero_image_url,rating,city,price_range';
+
+    // Run all queries in parallel
+    const [eventsRes, specialsRes, hhRes, liveMusicRes, thingsRes] = await Promise.all([
+
+      // 🎉 Events tonight / this week
+      db.from('entity_events')
+        .select(`id, event_name, event_date, start_time, cover_charge, image_url, artist_name, day_of_week, recurring, entity_slug, entity:entity_slug(${ENTITY_COLS})`)
+        .eq('is_active', true)
+        .or(`event_date.eq.${today},and(recurring.eq.true,day_of_week.eq.${todayName})`)
+        .order('start_time')
+        .limit(20),
+
+      // ⭐ Specials active today
+      db.from('entity_specials')
+        .select(`id, title, special_name, description, discount_text, image_url, entity_slug, entity:entity_slug(${ENTITY_COLS})`)
+        .eq('is_active', true)
+        .limit(20),
+
+      // 🍺 Happy hours active RIGHT NOW
+      db.from('entity')
+        .select(`id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, rating, city`)
+        .eq('is_active', true)
+        .not('hh_start', 'is', null)
+        .not('hh_end', 'is', null)
+        .limit(50),
+
+      // 🎸 Live music events today
+      db.from('entity_events')
+        .select(`id, event_name, event_date, start_time, image_url, artist_name, artist_id, entity_slug, entity:entity_slug(${ENTITY_COLS})`)
+        .eq('is_active', true)
+        .or(`event_date.eq.${today},and(recurring.eq.true,day_of_week.eq.${todayName})`)
+        .not('artist_name', 'is', null)
+        .order('start_time')
+        .limit(20),
+
+      // 🌊 Things to do — activities, tours, charters
+      db.from('entity')
+        .select(ENTITY_COLS)
+        .eq('is_active', true)
+        .in('entity_type', ['activity','charter','tour','park'])
+        .order('rating', { ascending: false, nullsFirst: false })
+        .limit(20),
+    ]);
+
+    // Filter happy hours to only ones active right now
+    const happyHoursNow = (hhRes.data || []).filter(e => {
+      if (!e.hh_start || !e.hh_end) return false;
+      const days = (e.hh_days || '').toLowerCase();
+      if (days && !days.includes(todayName.slice(0,3)) && !days.includes(todayName)) return false;
+      return nowTime >= e.hh_start && nowTime <= e.hh_end;
+    });
+
+    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+    res.json({
+      events:      eventsRes.data   || [],
+      specials:    specialsRes.data || [],
+      happyHours:  happyHoursNow,
+      liveMusic:   liveMusicRes.data || [],
+      thingsToDo:  thingsRes.data   || [],
+    });
+  } catch (err) {
+    console.error('home-feed error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
