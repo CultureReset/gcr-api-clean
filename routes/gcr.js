@@ -51,151 +51,155 @@ async function buildFullEntity(slug) {
   const entity = await getEntityBySlug(slug);
   if (!entity) return null;
 
-  const eid = entity.id; // UUID — some tables use entity_id, others entity_slug
+  const entityType = (entity.entity_type || '').toLowerCase();
+  const isFood = ['restaurant','coffee','dessert','bakery','bar'].includes(entityType);
+  const isStay = ['hotel','condo','vacation-rental'].includes(entityType);
+  const isActivity = entityType === 'activity';
+  const isService = entityType === 'service';
+  const isShopping = entityType === 'shopping';
+  const isPark = entityType === 'park';
+
+  // ── CORE queries — every business ──────────────────────────────────────────
+  const corePromises = [
+    db.from('entity_hours').select('day_of_week,opens_at,closes_at,is_closed').eq('entity_slug', slug).order('day_of_week'),
+    db.from('entity_photos').select('id,url,image_url,caption,alt_text,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
+    db.from('entity_tags').select('tag_name,tag_category').eq('entity_slug', slug),
+    db.from('entity_events').select('id,event_name,description,event_date,start_time,end_time,cover_charge,image_url,artist_name,artist_id,day_of_week,recurring, artist:artist_id(id,slug,name,genre,image_url)').eq('entity_slug', slug).eq('is_active', true).order('event_date').limit(20),
+    db.from('entity_reviews').select('id,author_name,rating,title,body,source,review_date').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }).limit(20),
+    db.from('faqs').select('id,question,answer,category,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_team_members').select('id,name,title,bio,photo_url,specialty,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_policies').select('id,policy_type,title,type,body,content').eq('entity_slug', slug),
+    db.from('entity_blog_posts').select('id,title,slug,excerpt,body,cover_url,published_at').eq('entity_slug', slug).order('published_at', { ascending: false }).limit(10),
+    db.from('entity_secondary_hours').select('*').eq('entity_slug', slug),
+    db.from('announcements').select('id,message,type,starts_at,ends_at').eq('entity_slug', slug).eq('active', true),
+    db.from('entity_modules').select('module_key').eq('entity_slug', slug).eq('enabled', true),
+  ];
 
   const [
-    hours, secondaryHours, photos, tags,
-    menuSections, drinkSections, hhSections, entitySections,
-    specials, events, sides, dailyFeatures,
-    pricing, whatsIncluded, faqs, requirements,
-    schedules, teamMembers, reviews, policies, blogPosts, entityFaqs,
-    // ACTIVITY / CHARTER
-    meetingPoints, activityOptions, fishSpecies,
-    // HOTEL / CONDO / VACATION RENTAL
-    propertyDetails, roomTypes, amenities, propertyFees, stayLinks, availability,
-    // SERVICE
-    serviceCategories, serviceMenu, servicePackages, classSchedule,
-    // SHOP
-    productCategories, products,
-    // PARK
-    facilities, spotRules, accessInfo,
-    // LOYALTY + BOOKABLE
-    loyaltyProgram, bookableResources,
-    // EXTRA
-    announcements, whatToBring, orderLinks, activityDetails, dailyFeaturesNew, entityModules,
-  ] = await Promise.all([
-    db.from('entity_hours').select('*').eq('entity_slug', slug).order('day_of_week'),
-    db.from('entity_secondary_hours').select('*').eq('entity_slug', slug).order('hours_type, day_of_week'),
-    db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('entity_tags').select('*').eq('entity_slug', slug),
-    db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('drink_sections').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('entity_sections').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
-    db.from('entity_events').select('*, artist:artist_id(id, slug, name, genre, image_url, social_instagram)').eq('entity_slug', slug).eq('is_active', true).order('event_date'),
-    db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('pricing_items').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('whats_included').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('faqs').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('requirements').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('activity_schedules').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    db.from('entity_team_members').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('entity_reviews').select('*').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }),
-    db.from('entity_policies').select('*').eq('entity_slug', slug),
-    db.from('entity_blog_posts').select('*').eq('entity_slug', slug).order('published_at', { ascending: false }),
-    db.from('entity_faqs').select('*').eq('entity_slug', slug).order('sort_order'),
-    // ACTIVITY / CHARTER
-    db.from('meeting_points').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('activity_options').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('fish_species').select('*').eq('entity_slug', slug).order('sort_order'),
-    // HOTEL / CONDO / VACATION RENTAL
-    db.from('property_details').select('*').eq('entity_slug', slug).maybeSingle(),
-    db.from('room_types').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('amenities').select('*').eq('entity_slug', slug),
-    db.from('property_fees').select('*').eq('entity_slug', slug),
-    db.from('stay_links').select('*').eq('entity_slug', slug),
-    db.from('availability').select('*').eq('entity_slug', slug).gte('date', new Date().toISOString().split('T')[0]).order('date').limit(90),
-    // SERVICE
-    db.from('service_categories').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('service_menu').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('service_packages').select('*').eq('entity_slug', slug),
-    db.from('class_schedule').select('*').eq('entity_slug', slug).order('day_of_week'),
-    // SHOP
-    db.from('product_categories').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('products').select('*').eq('entity_slug', slug).eq('in_stock', true).order('sort_order'),
-    // PARK
-    db.from('facilities').select('*').eq('entity_slug', slug),
-    db.from('spot_rules').select('*').eq('entity_slug', slug),
-    db.from('access_info').select('*').eq('entity_slug', slug).maybeSingle(),
-    // LOYALTY + BOOKABLE
-    db.from('loyalty_programs').select('program_name, keyword, sms_number').eq('entity_slug', slug).eq('active', true).maybeSingle(),
-    db.from('bookable_resources').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-    // EXTRA
-    db.from('announcements').select('*').eq('entity_slug', slug).eq('active', true),
-    db.from('what_to_bring').select('*').eq('entity_slug', slug).order('sort_order'),
-    db.from('order_links').select('*').eq('entity_slug', slug),
-    db.from('activity_details').select('*').eq('entity_slug', slug).maybeSingle(),
-    db.from('daily_features').select('*').eq('entity_slug', slug).gte('feature_date', new Date().toISOString().split('T')[0]).order('feature_date').limit(10),
-    db.from('entity_modules').select('module_key, enabled, settings, sort_order').eq('entity_slug', slug).eq('enabled', true).order('sort_order'),
-  ]);
+    hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes
+  ] = await Promise.all(corePromises);
 
-  // Fetch items for each section type
-  const menuSectionIds = (menuSections.data || []).map(s => s.id);
-  const drinkSectionIds = (drinkSections.data || []).map(s => s.id);
-  const hhSectionIds = (hhSections.data || []).map(s => s.id);
-  const entitySectionIds = (entitySections.data || []).map(s => s.id);
+  const modules = new Set((modulesRes.data || []).map(m => m.module_key));
 
-  const [menuItems, drinkItems, hhItems, entitySectionItems] = await Promise.all([
-    menuSectionIds.length
-      ? db.from('menu_items').select('*').in('section_id', menuSectionIds).order('id')
-      : { data: [] },
-    drinkSectionIds.length
-      ? db.from('drink_items').select('*').in('section_id', drinkSectionIds).order('id')
-      : { data: [] },
-    hhSectionIds.length
-      ? db.from('happy_hour_items').select('*').in('section_id', hhSectionIds).order('id')
-      : { data: [] },
-    entitySectionIds.length
-      ? db.from('entity_section_items').select('*').in('section_id', entitySectionIds).order('id')
-      : { data: [] },
-  ]);
+  // ── CONDITIONAL queries — only run if module is enabled ───────────────────
+  const conditionalPromises = [];
+  const conditionalKeys = [];
 
-  // Fetch price_tiers for pricing_items
-  const pricingItemIds = (pricing.data || []).map(p => p.id);
-  const { data: priceTiersData } = pricingItemIds.length
-    ? await db.from('price_tiers').select('*').in('price_item_id', pricingItemIds).order('sort_order')
-    : { data: [] };
+  if (isFood || modules.has('menu')) {
+    conditionalPromises.push(
+      db.from('menu_sections').select('id,section_name,sort_order,time_range,available_days').eq('entity_slug', slug).order('sort_order'),
+      db.from('drink_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
+      db.from('happy_hour_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
+      db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
+      db.from('entity_sides').select('id,item_name,side_name,description,price,sort_order').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+      db.from('entity_daily_features').select('id,label,feature_name,value,description,price,sort_order').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+      db.from('order_links').select('id,label,url,type').eq('entity_slug', slug),
+    );
+    conditionalKeys.push('menuSections','drinkSections','hhSections','specials','sides','dailyFeatures','orderLinks');
+  }
 
-  // Fetch room_amenities for room_types
-  const roomTypeIds = (roomTypes.data || []).map(r => r.id);
-  const { data: roomAmenitiesData } = roomTypeIds.length
-    ? await db.from('room_amenities').select('*').in('room_type_id', roomTypeIds)
-    : { data: [] };
+  if (isActivity || modules.has('activity')) {
+    conditionalPromises.push(
+      db.from('pricing_items').select('*').eq('entity_slug', slug).order('sort_order'),
+      db.from('whats_included').select('id,item_name,included_item,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
+      db.from('requirements').select('id,requirement_name,requirement_text,applies_to,sort_order').eq('entity_slug', slug).order('sort_order'),
+      db.from('activity_schedules').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+      db.from('meeting_points').select('id,name,address,lat,lng,instructions,parking_note').eq('entity_slug', slug).order('sort_order'),
+      db.from('activity_options').select('*').eq('entity_slug', slug).order('sort_order'),
+      db.from('fish_species').select('id,species,season').eq('entity_slug', slug).order('sort_order'),
+      db.from('what_to_bring').select('id,item,sort_order').eq('entity_slug', slug).order('sort_order'),
+      db.from('activity_details').select('*').eq('entity_slug', slug).maybeSingle(),
+    );
+    conditionalKeys.push('pricing','whatsIncluded','requirements','schedules','meetingPoints','activityOptions','fishSpecies','whatToBring','activityDetails');
+  }
 
-  // Nest price_tiers into pricing_items
-  const pricingWithTiers = (pricing.data || []).map(item => ({
-    ...item,
-    tiers: (priceTiersData || []).filter(t => t.price_item_id === item.id),
-  }));
+  if (isStay || modules.has('stay')) {
+    conditionalPromises.push(
+      db.from('property_details').select('*').eq('entity_slug', slug).maybeSingle(),
+      db.from('room_types').select('*').eq('entity_slug', slug).order('sort_order'),
+      db.from('amenities').select('id,name,category,icon,is_shared').eq('entity_slug', slug),
+      db.from('property_fees').select('id,name,amount,type,mandatory').eq('entity_slug', slug),
+      db.from('stay_links').select('id,label,url,platform').eq('entity_slug', slug),
+      db.from('availability').select('id,date,status,spots_remaining').eq('entity_slug', slug).gte('date', new Date().toISOString().split('T')[0]).order('date').limit(60),
+      db.from('bookable_resources').select('id,name,type,capacity').eq('entity_slug', slug).eq('is_active', true),
+    );
+    conditionalKeys.push('propertyDetails','roomTypes','amenities','propertyFees','stayLinks','availability','bookableResources');
+  }
 
-  // Nest room_amenities into room_types
-  const roomTypesWithAmenities = (roomTypes.data || []).map(room => ({
-    ...room,
-    room_amenities: (roomAmenitiesData || []).filter(a => a.room_type_id === room.id),
-  }));
+  if (isService || modules.has('services')) {
+    conditionalPromises.push(
+      db.from('service_categories').select('id,name,sort_order').eq('entity_slug', slug).order('sort_order'),
+      db.from('service_menu').select('id,category_id,name,description,price,duration_minutes,sort_order').eq('entity_slug', slug).order('sort_order'),
+      db.from('service_packages').select('id,name,description,price,includes').eq('entity_slug', slug),
+      db.from('class_schedule').select('id,class_name,day_of_week,start_time,duration_minutes,capacity').eq('entity_slug', slug).order('day_of_week'),
+    );
+    conditionalKeys.push('serviceCategories','serviceMenu','servicePackages','classSchedule');
+  }
 
-  // Nest items into sections
-  const nest = (sections, items) =>
+  if (isShopping || modules.has('shop')) {
+    conditionalPromises.push(
+      db.from('product_categories').select('id,name,sort_order').eq('entity_slug', slug).order('sort_order'),
+      db.from('products').select('id,category_id,name,description,price,in_stock,sort_order').eq('entity_slug', slug).eq('in_stock', true).order('sort_order'),
+    );
+    conditionalKeys.push('productCategories','products');
+  }
+
+  if (isPark || modules.has('park')) {
+    conditionalPromises.push(
+      db.from('facilities').select('id,name,available').eq('entity_slug', slug),
+      db.from('spot_rules').select('id,rule').eq('entity_slug', slug),
+      db.from('access_info').select('id,entry_point,parking_note,fee').eq('entity_slug', slug).maybeSingle(),
+    );
+    conditionalKeys.push('facilities','spotRules','accessInfo');
+  }
+
+  if (modules.has('loyalty')) {
+    conditionalPromises.push(
+      db.from('loyalty_programs').select('program_name,keyword,sms_number').eq('entity_slug', slug).eq('active', true).maybeSingle(),
+    );
+    conditionalKeys.push('loyaltyProgram');
+  }
+
+  // Run all conditional queries in parallel
+  const conditionalResults = await Promise.all(conditionalPromises);
+  const cond = {};
+  conditionalKeys.forEach((key, i) => { cond[key] = conditionalResults[i]; });
+
+  // ── SECTION ITEMS — only if sections exist ─────────────────────────────────
+  const menuSectionIds = ((cond.menuSections?.data) || []).map(s => s.id);
+  const drinkSectionIds = ((cond.drinkSections?.data) || []).map(s => s.id);
+  const hhSectionIds = ((cond.hhSections?.data) || []).map(s => s.id);
+  const pricingItemIds = ((cond.pricing?.data) || []).map(p => p.id);
+  const roomTypeIds = ((cond.roomTypes?.data) || []).map(r => r.id);
+
+  const itemPromises = [];
+  const itemKeys = [];
+
+  if (menuSectionIds.length) { itemPromises.push(db.from('menu_items').select('id,section_id,item_name,name,description,price,image_url,sort_order,is_available').in('section_id', menuSectionIds).order('sort_order')); itemKeys.push('menuItems'); }
+  if (drinkSectionIds.length) { itemPromises.push(db.from('drink_items').select('id,section_id,item_name,description,price,is_on_tap,sort_order').in('section_id', drinkSectionIds).order('sort_order')); itemKeys.push('drinkItems'); }
+  if (hhSectionIds.length) { itemPromises.push(db.from('happy_hour_items').select('id,section_id,item_name,description,hh_price,price,sort_order').in('section_id', hhSectionIds).order('sort_order')); itemKeys.push('hhItems'); }
+  if (pricingItemIds.length) { itemPromises.push(db.from('price_tiers').select('*').in('price_item_id', pricingItemIds).order('sort_order')); itemKeys.push('priceTiers'); }
+  if (roomTypeIds.length) { itemPromises.push(db.from('room_amenities').select('id,room_type_id,name').in('room_type_id', roomTypeIds)); itemKeys.push('roomAmenities'); }
+
+  const itemResults = await Promise.all(itemPromises);
+  const items = {};
+  itemKeys.forEach((key, i) => { items[key] = itemResults[i]?.data || []; });
+
+  const nest = (sections, itemList) =>
     (sections || []).map(sec => ({
-      ...sec,
-      items: (items || []).filter(i => i.section_id === sec.id),
+      ...sec, items: (itemList || []).filter(i => i.section_id === sec.id),
     }));
 
   const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.image_url) }));
+
   return {
     ...entity,
     hero_image_url: normalizeImageUrl(entity.hero_image_url),
+    // Core
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
     photos: normalizedPhotos,
     tags: tags.data || [],
-    menu_sections: nest(menuSections.data, menuItems.data),
-    drink_sections: nest(drinkSections.data, drinkItems.data),
-    happy_hour_sections: nest(hhSections.data, hhItems.data),
-    sections: nest(entitySections.data, entitySectionItems.data),
-    specials: specials.data || [],
     events: (events.data || []).map(ev => ({
       ...ev,
       artist_slug: ev.artist?.slug || null,
@@ -204,50 +208,59 @@ async function buildFullEntity(slug) {
       artist_image: ev.artist?.image_url ? normalizeImageUrl(ev.artist.image_url) : null,
       image_url: normalizeImageUrl(ev.image_url || ev.artist?.image_url),
     })),
-    sides: sides.data || [],
-    daily_features: dailyFeatures.data || [],
-    pricing: pricingWithTiers,
-    whats_included: whatsIncluded.data || [],
-    faqs: [...(faqs.data || []), ...(entityFaqs.data || [])],
-    requirements: requirements.data || [],
-    schedules: schedules.data || [],
-    team: teamMembers.data || [],
     reviews: reviews.data || [],
+    faqs: faqs.data || [],
+    team: team.data || [],
     policies: policies.data || [],
     blog_posts: blogPosts.data || [],
-    // ACTIVITY / CHARTER
-    meeting_points: meetingPoints.data || [],
-    activity_options: activityOptions.data || [],
-    fish_species: fishSpecies.data || [],
-    // HOTEL / CONDO / VACATION RENTAL
-    property_details: (propertyDetails && propertyDetails.data) || null,
-    room_types: roomTypesWithAmenities,
-    amenities: amenities.data || [],
-    property_fees: propertyFees.data || [],
-    stay_links: stayLinks.data || [],
-    availability: availability.data || [],
-    // SERVICE
-    service_categories: serviceCategories.data || [],
-    service_menu: serviceMenu.data || [],
-    service_packages: servicePackages.data || [],
-    class_schedule: classSchedule.data || [],
-    // SHOP
-    product_categories: productCategories.data || [],
-    products: products.data || [],
-    // PARK
-    facilities: facilities.data || [],
-    spot_rules: spotRules.data || [],
-    access_info: (accessInfo && accessInfo.data) || null,
-    // LOYALTY + BOOKABLE
-    loyalty_program: (loyaltyProgram && loyaltyProgram.data) || null,
-    bookable_resources: bookableResources.data || [],
-    // EXTRA
     announcements: announcements.data || [],
-    what_to_bring: whatToBring.data || [],
-    order_links: orderLinks.data || [],
-    activity_details: (activityDetails && activityDetails.data) || null,
-    todays_features: dailyFeaturesNew.data || [],
-    modules: (entityModules.data || []).map(m => m.module_key),
+    modules: [...modules],
+    // Food/Menu
+    menu_sections: nest(cond.menuSections?.data, items.menuItems),
+    drink_sections: nest(cond.drinkSections?.data, items.drinkItems),
+    happy_hour_sections: nest(cond.hhSections?.data, items.hhItems),
+    specials: cond.specials?.data || [],
+    sides: cond.sides?.data || [],
+    daily_features: cond.dailyFeatures?.data || [],
+    order_links: cond.orderLinks?.data || [],
+    // Activity
+    pricing: (cond.pricing?.data || []).map(item => ({
+      ...item,
+      tiers: items.priceTiers?.filter(t => t.price_item_id === item.id) || [],
+    })),
+    whats_included: cond.whatsIncluded?.data || [],
+    requirements: cond.requirements?.data || [],
+    schedules: cond.schedules?.data || [],
+    meeting_points: cond.meetingPoints?.data || [],
+    activity_options: cond.activityOptions?.data || [],
+    fish_species: cond.fishSpecies?.data || [],
+    what_to_bring: cond.whatToBring?.data || [],
+    activity_details: cond.activityDetails?.data || null,
+    // Stay
+    property_details: cond.propertyDetails?.data || null,
+    room_types: (cond.roomTypes?.data || []).map(room => ({
+      ...room,
+      room_amenities: items.roomAmenities?.filter(a => a.room_type_id === room.id) || [],
+    })),
+    amenities: cond.amenities?.data || [],
+    property_fees: cond.propertyFees?.data || [],
+    stay_links: cond.stayLinks?.data || [],
+    availability: cond.availability?.data || [],
+    bookable_resources: cond.bookableResources?.data || [],
+    // Services
+    service_categories: cond.serviceCategories?.data || [],
+    service_menu: cond.serviceMenu?.data || [],
+    service_packages: cond.servicePackages?.data || [],
+    class_schedule: cond.classSchedule?.data || [],
+    // Shop
+    product_categories: cond.productCategories?.data || [],
+    products: cond.products?.data || [],
+    // Park
+    facilities: cond.facilities?.data || [],
+    spot_rules: cond.spotRules?.data || [],
+    access_info: cond.accessInfo?.data || null,
+    // Loyalty
+    loyalty_program: cond.loyaltyProgram?.data || null,
   };
 }
 
@@ -343,7 +356,7 @@ router.get('/entities', async (req, res) => {
 
     if (sortByDist) results.sort((a, b) => (a.distance_miles ?? 9999) - (b.distance_miles ?? 9999));
 
-    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.set('Cache-Control', 'public, s-maxage=180, stale-while-revalidate=900');
     res.json({ entities: results, total: results.length, offset, limit });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -355,6 +368,8 @@ router.get('/entity/:slug', async (req, res) => {
   try {
     const entity = await buildFullEntity(req.params.slug);
     if (!entity) return res.status(404).json({ error: 'Not found' });
+    // Cache at Vercel edge for 2 min, allow stale for 10 min while revalidating
+    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
     res.json(entity);
   } catch (err) {
     res.status(500).json({ error: err.message });
