@@ -2,7 +2,7 @@ const express = require('express');
 const { authRequired } = require('../middleware/auth');
 const supabase = require('../db');
 const getGcrDb = require('../db');
-const { resolveEntityId } = require('../lib/entity-resolver');
+const { resolveEntityId, resolveEntity } = require('../lib/entity-resolver');
 const menuGcr = require('../lib/menu-gcr');
 const { extractJsonFromImage, getVisionProvidersStatus } = require('./ai-provider');
 const gcr = () => getGcrDb();
@@ -84,10 +84,15 @@ router.use(authRequired);
 async function requireEntity(req, res) {
     const entityId = await resolveEntityId(req);
     if (!entityId) {
-        res.status(400).json({ error: 'No GCR entity linked to this user. Add a row in entity_owners (user_id → entity_id) or set entity.legacy_site_id = your site_id.' });
+        res.status(400).json({ error: 'No GCR entity linked to this user.' });
         return null;
     }
     return entityId;
+}
+
+// Get entity id+slug for current user — used by all GCR-direct endpoints
+async function getEntity(req) {
+    return await resolveEntity(req);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -275,66 +280,40 @@ function _adminProfileToGcrEntity(bizUpdates, contentUpdates) {
 }
 
 router.get('/profile', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const { data } = await gcr().from('entity').select('*').eq('id', e).maybeSingle();
-        return res.json(_gcrEntityToAdminProfile(data));
-    }
-    const { data: business } = await supabase.from('businesses').select('*').eq('site_id', req.siteId).single();
-    const { data: content } = await supabase.from('site_content').select('*').eq('site_id', req.siteId).single();
-    res.json({ business, content });
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked to this account.' });
+    const { data, error } = await gcr().from('entity').select('*').eq('id', entity.id).maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || {});
 });
 
 router.put('/profile', async (req, res) => {
-    const { business: bizUpdates, content: contentUpdates } = req.body;
-    if (!bizUpdates && !contentUpdates) {
-        return res.status(400).json({ error: 'Body must have "business" and/or "content" keys.' });
-    }
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked to this account.' });
 
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const entityUpdates = _adminProfileToGcrEntity(bizUpdates, contentUpdates);
-        if (Object.keys(entityUpdates).length) {
-            entityUpdates.updated_at = new Date().toISOString();
-            const { error } = await gcr().from('entity').update(entityUpdates).eq('id', e);
-            if (error) return res.status(500).json({ error: error.message });
-        }
-        const { data } = await gcr().from('entity').select('*').eq('id', e).maybeSingle();
-        return res.json(_gcrEntityToAdminProfile(data));
+    const allowed = [
+        'name','subtitle','description','phone','email','website_url',
+        'address_line_1','city','state','zip','latitude','longitude',
+        'hero_image_url','logo_url','price_range','price_from',
+        'hh_days','hh_start','hh_end','hh_description',
+        'social_instagram','social_facebook','social_tiktok',
+        'reservation_url','booking_url','order_url','directions_url',
+        'live_music','outdoor_seating','good_for_groups','good_for_children',
+        'allows_dogs','reservable','delivery','dine_in','takeout',
+        'duration_text','known_for','highlights','good_for',
+        'what_makes_it_different','ai_overview',
+    ];
+    const updates = {};
+    const body = { ...(req.body.business || {}), ...(req.body.content || {}), ...req.body };
+    for (const key of allowed) {
+        if (body[key] !== undefined) updates[key] = body[key];
     }
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'No valid fields to update.' });
+    updates.updated_at = new Date().toISOString();
 
-    // Try to also update GCR entity for non-admin users
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const entityUpdates = _adminProfileToGcrEntity(bizUpdates, contentUpdates);
-        if (Object.keys(entityUpdates).length) {
-            entityUpdates.updated_at = new Date().toISOString();
-            await gcr().from('entity').update(entityUpdates).eq('id', entityId);
-        }
-    }
-    if (bizUpdates) {
-        const allowedBizFields = ['name', 'type', 'logo_url', 'cover_url', 'custom_domain'];
-        const bizData = {};
-        for (const key of allowedBizFields) {
-            if (bizUpdates[key] !== undefined) bizData[key] = bizUpdates[key];
-        }
-        if (Object.keys(bizData).length > 0) {
-            bizData.updated_at = new Date().toISOString();
-            await supabase.from('businesses').update(bizData).eq('site_id', req.siteId);
-        }
-    }
-    if (contentUpdates) {
-        delete contentUpdates.site_id;
-        if (contentUpdates.tagline !== undefined && contentUpdates.hero_text === undefined) {
-            contentUpdates.hero_text = contentUpdates.tagline;
-        }
-        delete contentUpdates.tagline;
-        contentUpdates.updated_at = new Date().toISOString();
-        await supabase.from('site_content').upsert({ site_id: req.siteId, ...contentUpdates }).select();
-    }
-    const { data: business } = await supabase.from('businesses').select('*').eq('site_id', req.siteId).single();
-    const { data: content } = await supabase.from('site_content').select('*').eq('site_id', req.siteId).single();
-    res.json({ business, content });
+    const { data, error } = await gcr().from('entity').update(updates).eq('id', entity.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
 });
 
 // ============================================
@@ -343,46 +322,29 @@ router.put('/profile', async (req, res) => {
 
 // GET /api/dashboard/hours
 router.get('/hours', async (req, res) => {
-    const { data } = await supabase
-        .from('site_content')
-        .select('hours')
-        .eq('site_id', req.siteId)
-        .single();
-
-    res.json(data?.hours || {});
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const { data, error } = await gcr().from('entity_hours').select('*').eq('entity_slug', entity.slug).order('day_of_week');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
 });
 
-// PUT /api/dashboard/hours
 router.put('/hours', async (req, res) => {
-    const { hours } = req.body;
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { hours } = req.body; // array of { day_of_week, opens_at, closes_at, is_closed }
+    if (!Array.isArray(hours)) return res.status(400).json({ error: 'hours must be an array' });
 
-    const { data, error } = await supabase
-        .from('site_content')
-        .update({ hours, updated_at: new Date().toISOString() })
-        .eq('site_id', req.siteId)
-        .select('hours')
-        .single();
-
+    const rows = hours.map(h => ({
+        entity_slug: entity.slug,
+        day_of_week: h.day_of_week,
+        opens_at: h.opens_at || h.open_time || null,
+        closes_at: h.closes_at || h.close_time || null,
+        is_closed: h.is_closed || h.closed || false,
+    }));
+    const { data, error } = await gcr().from('entity_hours').upsert(rows, { onConflict: 'entity_slug,day_of_week' }).select();
     if (error) return res.status(500).json({ error: error.message });
-
-    // Sync to GCR entity_hours
-    const entityId = await resolveEntityId(req);
-    if (entityId && hours && typeof hours === 'object') {
-        const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-        const rows = DAYS.map(day => {
-            const h = hours[day] || {};
-            return {
-                entity_id: entityId,
-                day_of_week: day,
-                open_time: h.open || h.open_time || null,
-                close_time: h.close || h.close_time || null,
-                is_closed: h.closed || h.is_closed || false,
-            };
-        });
-        await gcr().from('entity_hours').upsert(rows, { onConflict: 'entity_id,day_of_week' }).catch(() => {});
-    }
-
-    res.json(data.hours);
+    res.json(data);
 });
 
 // ============================================
@@ -390,294 +352,169 @@ router.put('/hours', async (req, res) => {
 // ============================================
 
 router.get('/services', async (req, res) => {
-    const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('site_id', req.siteId)
-        .order('sort_order', { ascending: true });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data || []);
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const [cats, menu, pkgs] = await Promise.all([
+        gcr().from('service_categories').select('*').eq('entity_slug', entity.slug).order('sort_order'),
+        gcr().from('service_menu').select('*').eq('entity_slug', entity.slug).order('sort_order'),
+        gcr().from('service_packages').select('*').eq('entity_slug', entity.slug),
+    ]);
+    res.json({ categories: cats.data || [], menu: menu.data || [], packages: pkgs.data || [] });
 });
 
 router.post('/services', async (req, res) => {
-    const service = { ...req.body, site_id: req.siteId };
-    delete service.id;
-
-    const { data, error } = await supabase
-        .from('services')
-        .insert(service)
-        .select()
-        .single();
-
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { type = 'service_menu', ...body } = req.body;
+    const table = type === 'category' ? 'service_categories' : type === 'package' ? 'service_packages' : 'service_menu';
+    const row = { ...body, entity_slug: entity.slug }; delete row.id;
+    const { data, error } = await gcr().from(table).insert(row).select().single();
     if (error) return res.status(500).json({ error: error.message });
-    // TODO: Emit event: business.service.created
     res.status(201).json(data);
 });
 
 router.put('/services/:id', async (req, res) => {
-    const updates = { ...req.body, updated_at: new Date().toISOString() };
-    delete updates.site_id;
-    delete updates.id;
-
-    const { data, error } = await supabase
-        .from('services')
-        .update(updates)
-        .eq('id', req.params.id)
-        .eq('site_id', req.siteId)
-        .select()
-        .single();
-
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { type = 'service_menu', ...updates } = req.body;
+    const table = type === 'category' ? 'service_categories' : type === 'package' ? 'service_packages' : 'service_menu';
+    delete updates.id; delete updates.entity_slug;
+    const { data, error } = await gcr().from(table).update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
-    // TODO: Emit event: business.service.updated
     res.json(data);
 });
 
 router.delete('/services/:id', async (req, res) => {
-    const { error } = await supabase
-        .from('services')
-        .delete()
-        .eq('id', req.params.id)
-        .eq('site_id', req.siteId);
-
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const table = req.query.type === 'category' ? 'service_categories' : req.query.type === 'package' ? 'service_packages' : 'service_menu';
+    const { error } = await gcr().from(table).delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
     if (error) return res.status(500).json({ error: error.message });
-    // TODO: Emit event: business.service.deleted
     res.json({ success: true });
 });
 
-// ============================================
-// GALLERY
-// ============================================
-
-// Gallery: admin path stores in entity_photos; Circle Boats stays on `media` table.
-// GCR entity_photos columns: image_url, caption, alt_text, sort_order, is_cover
-// Admin frontend expects: { id, url, filename, alt_text, file_size, folder }
-function _gcrPhotoToAdmin(p) {
-    if (!p) return p;
-    return {
-        id: p.id,
-        url: p.image_url,
-        filename: p.caption || '',
-        alt_text: p.alt_text || p.caption || '',
-        file_size: null,
-        folder: 'gallery',
-        sort_order: p.sort_order || 0,
-    };
-}
-
 router.get('/gallery', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const { data, error } = await gcr().from('entity_photos').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true });
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json((data || []).map(_gcrPhotoToAdmin));
-    }
-    const { data } = await supabase.from('media').select('*').eq('site_id', req.siteId).eq('file_type', 'image').order('uploaded_at', { ascending: false });
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const { data, error } = await gcr().from('entity_photos').select('*').eq('entity_slug', entity.slug).order('sort_order');
+    if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
 });
 
 router.post('/gallery', async (req, res) => {
-    const { url, filename, alt_text, file_size } = req.body;
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const { data, error } = await gcr().from('entity_photos').insert({
-            entity_id: entityId, image_url: url, caption: filename || null, alt_text: alt_text || null, sort_order: 0
-        }).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(201).json(_gcrPhotoToAdmin(data));
-    }
-    const { data, error } = await supabase.from('media').insert({
-        site_id: req.siteId, url, filename, alt_text, file_size, file_type: 'image', folder: 'gallery'
-    }).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { url, image_url, caption, alt_text, sort_order } = req.body;
+    const photo = { entity_slug: entity.slug, image_url: url || image_url, caption: caption || null, alt_text: alt_text || null, sort_order: sort_order || 0 };
+    const { data, error } = await gcr().from('entity_photos').insert(photo).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
 });
 
 router.put('/gallery/:id', async (req, res) => {
-    const { alt_text, folder } = req.body;
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const patch = {};
-        if (alt_text !== undefined) patch.alt_text = alt_text;
-        const { data, error } = await gcr().from('entity_photos').update(patch).eq('id', req.params.id).eq('entity_id', entityId).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(_gcrPhotoToAdmin(data));
-    }
-    const { data, error } = await supabase.from('media').update({ alt_text, folder }).eq('id', req.params.id).eq('site_id', req.siteId).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const updates = {}; ['caption','alt_text','sort_order'].forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    const { data, error } = await gcr().from('entity_photos').update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
 });
 
 router.delete('/gallery/:id', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const { error } = await gcr().from('entity_photos').delete().eq('id', req.params.id).eq('entity_id', entityId);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true });
-    }
-    const { error } = await supabase.from('media').delete().eq('id', req.params.id).eq('site_id', req.siteId);
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { error } = await gcr().from('entity_photos').delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
 
-// ============================================
-// FAQS
-// ============================================
-
 router.get('/faqs', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const { data, error } = await gcr().from('faq_items').select('*').eq('entity_id', e).order('sort_order', { ascending: true });
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data || []);
-    }
-    const { data } = await supabase.from('faqs').select('*').eq('site_id', req.siteId).order('sort_order', { ascending: true });
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const { data, error } = await gcr().from('faqs').select('*').eq('entity_slug', entity.slug).order('sort_order');
+    if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
 });
 
 router.post('/faqs', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const body = { ...req.body, entity_id: e };
-        delete body.id; delete body.site_id;
-        const { data, error } = await gcr().from('faq_items').insert(body).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(201).json(data);
-    }
-    const faq = { ...req.body, site_id: req.siteId };
-    delete faq.id;
-    const { data, error } = await supabase.from('faqs').insert(faq).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { question, answer, category, sort_order } = req.body;
+    const { data, error } = await gcr().from('faqs').insert({ entity_slug: entity.slug, question, answer, category: category || null, sort_order: sort_order || 0 }).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
 });
 
 router.put('/faqs/:id', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const updates = { ...req.body };
-        delete updates.id; delete updates.site_id; delete updates.entity_id;
-        const { data, error } = await gcr().from('faq_items').update(updates).eq('id', req.params.id).eq('entity_id', e).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data);
-    }
-    const updates = { ...req.body };
-    delete updates.site_id;
-    delete updates.id;
-
-    const { data, error } = await supabase
-        .from('faqs')
-        .update(updates)
-        .eq('id', req.params.id)
-        .eq('site_id', req.siteId)
-        .select()
-        .single();
-
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const updates = {}; ['question','answer','category','sort_order'].forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    const { data, error } = await gcr().from('faqs').update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
 });
 
 router.delete('/faqs/:id', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const { error } = await gcr().from('faq_items').delete().eq('id', req.params.id).eq('entity_id', e);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true });
-    }
-    const { error } = await supabase.from('faqs').delete().eq('id', req.params.id).eq('site_id', req.siteId);
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { error } = await gcr().from('faqs').delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
 
-// ============================================
-// SOCIAL LINKS
-// ============================================
-
 router.get('/social', async (req, res) => {
-    const { data } = await supabase
-        .from('site_content')
-        .select('social_links')
-        .eq('site_id', req.siteId)
-        .single();
-
-    res.json(data?.social_links || {});
+    const entity = await getEntity(req);
+    if (!entity) return res.json({});
+    const { data } = await gcr().from('entity').select('social_instagram, social_facebook, social_tiktok, website_url').eq('id', entity.id).maybeSingle();
+    res.json(data || {});
 });
 
 router.put('/social', async (req, res) => {
-    const { data, error } = await supabase
-        .from('site_content')
-        .update({ social_links: req.body, updated_at: new Date().toISOString() })
-        .eq('site_id', req.siteId)
-        .select('social_links')
-        .single();
-
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const allowed = ['social_instagram','social_facebook','social_tiktok','website_url'];
+    const updates = {};
+    for (const k of allowed) { if (req.body[k] !== undefined) updates[k] = req.body[k]; }
+    updates.updated_at = new Date().toISOString();
+    const { data, error } = await gcr().from('entity').update(updates).eq('id', entity.id).select().single();
     if (error) return res.status(500).json({ error: error.message });
-    res.json(data.social_links);
+    res.json(data);
 });
 
-// ============================================
-// TEAM / STAFF
-// ============================================
-
 router.get('/team', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const { data, error } = await gcr().from('staff').select('*').eq('entity_id', e).order('created_at', { ascending: true });
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data || []);
-    }
-    const { data } = await supabase.from('staff').select('*').eq('site_id', req.siteId).order('created_at', { ascending: true });
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const { data, error } = await gcr().from('entity_team_members').select('*').eq('entity_slug', entity.slug).order('sort_order');
+    if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
 });
 
 router.post('/team', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const body = { ...req.body, entity_id: e };
-        delete body.id; delete body.site_id;
-        const { data, error } = await gcr().from('staff').insert(body).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(201).json(data);
-    }
-    const member = { ...req.body, site_id: req.siteId };
-    delete member.id;
-    const { data, error } = await supabase.from('staff').insert(member).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const member = { ...req.body, entity_slug: entity.slug }; delete member.id;
+    const { data, error } = await gcr().from('entity_team_members').insert(member).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
 });
 
 router.put('/team/:id', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const updates = { ...req.body };
-        delete updates.id; delete updates.site_id; delete updates.entity_id;
-        const { data, error } = await gcr().from('staff').update(updates).eq('id', req.params.id).eq('entity_id', e).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data);
-    }
-    const updates = { ...req.body };
-    delete updates.site_id; delete updates.id;
-    const { data, error } = await supabase.from('staff').update(updates).eq('id', req.params.id).eq('site_id', req.siteId).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const updates = { ...req.body }; delete updates.id; delete updates.entity_slug;
+    const { data, error } = await gcr().from('entity_team_members').update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
 });
 
 router.delete('/team/:id', async (req, res) => {
-    if (req.role === 'admin') {
-        const e = await requireEntity(req, res); if (!e) return;
-        const { error } = await gcr().from('staff').delete().eq('id', req.params.id).eq('entity_id', e);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true });
-    }
-    const { error } = await supabase.from('staff').delete().eq('id', req.params.id).eq('site_id', req.siteId);
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { error } = await gcr().from('entity_team_members').delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
 
-// ============================================
-// MENU ITEMS (restaurants, bakeries, retail)
-// ============================================
-
-// Admin (req.role === 'admin') → GCR DB. Everyone else (e.g. Circle Boats) → old DB.
 router.get('/menu-items', async (req, res) => {
     const entityId = await resolveEntityId(req);
     if (entityId) {
@@ -857,50 +694,38 @@ router.delete('/menu-subcategories/:id', async (req, res) => {
 // ============================================
 
 router.get('/events', async (req, res) => {
-    // Admin with no entity linked → return all events
-    if (req.role === 'admin') {
-        const e = await resolveEntityId(req);
-        let query = gcr().from('entity_events').select('*, entity(name, city, slug)').order('event_date', { ascending: true });
-        if (e) query = query.eq('entity_id', e);
-        const { data, error } = await query;
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data || []);
-    }
-    const e = await requireEntity(req, res); if (!e) return;
-    const { data, error } = await gcr().from('entity_events').select('*').eq('entity_id', e).order('event_date', { ascending: true });
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const { data, error } = await gcr().from('entity_events').select('*').eq('entity_slug', entity.slug).order('event_date');
     if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
 });
 
 router.post('/events', async (req, res) => {
-    const e = await requireEntity(req, res); if (!e) return;
-    const body = { ...req.body, entity_id: e };
-    if (body.is_active === undefined) body.is_active = true;
-    delete body.id; delete body.site_id;
-    const { data, error } = await gcr().from('entity_events').insert(body).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const ev = { ...req.body, entity_slug: entity.slug, is_active: req.body.is_active !== false }; delete ev.id;
+    const { data, error } = await gcr().from('entity_events').insert(ev).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
 });
 
 router.put('/events/:id', async (req, res) => {
-    const e = await requireEntity(req, res); if (!e) return;
-    const updates = { ...req.body };
-    delete updates.id; delete updates.site_id; delete updates.entity_id;
-    const { data, error } = await gcr().from('entity_events').update(updates).eq('id', req.params.id).eq('entity_id', e).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const updates = { ...req.body }; delete updates.id; delete updates.entity_slug;
+    const { data, error } = await gcr().from('entity_events').update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
 });
 
 router.delete('/events/:id', async (req, res) => {
-    const e = await requireEntity(req, res); if (!e) return;
-    const { error } = await gcr().from('entity_events').delete().eq('id', req.params.id).eq('entity_id', e);
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { error } = await gcr().from('entity_events').delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
-
-// ============================================
-// CUSTOM DOMAINS (dedicated domains table)
-// ============================================
 
 router.get('/domains', async (req, res) => {
     const { data, error } = await supabase
@@ -2059,61 +1884,39 @@ router.delete('/coupons/:id', async (req, res) => {
 // ============================================
 
 router.get('/specials', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const { data, error } = await gcr().from('entity_specials').select('*').eq('entity_id', entityId);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data || []);
-    }
-    const { data } = await supabase.from('specials').select('*').eq('site_id', req.siteId);
+    const entity = await getEntity(req);
+    if (!entity) return res.json([]);
+    const { data, error } = await gcr().from('entity_specials').select('*').eq('entity_slug', entity.slug);
+    if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
 });
 
 router.post('/specials', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const body = { ...req.body, entity_id: entityId };
-        delete body.id; delete body.site_id;
-        const { data, error } = await gcr().from('entity_specials').insert(body).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.status(201).json(data);
-    }
-    const special = { ...req.body, site_id: req.siteId };
-    delete special.id;
-    const { data, error } = await supabase.from('specials').insert(special).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const special = { ...req.body, entity_slug: entity.slug, is_active: req.body.is_active !== false }; delete special.id;
+    const { data, error } = await gcr().from('entity_specials').insert(special).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
 });
 
 router.put('/specials/:id', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const updates = { ...req.body };
-        delete updates.id; delete updates.site_id; delete updates.entity_id;
-        const { data, error } = await gcr().from('entity_specials').update(updates).eq('id', req.params.id).eq('entity_id', entityId).select().single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data);
-    }
-    const updates = { ...req.body };
-    delete updates.site_id; delete updates.id;
-    const { data, error } = await supabase.from('specials').update(updates).eq('id', req.params.id).eq('site_id', req.siteId).select().single();
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const updates = { ...req.body }; delete updates.id; delete updates.entity_slug;
+    const { data, error } = await gcr().from('entity_specials').update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
 });
 
 router.delete('/specials/:id', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        const { error } = await gcr().from('entity_specials').delete().eq('id', req.params.id).eq('entity_id', entityId);
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json({ success: true });
-    }
-    const { error } = await supabase.from('specials').delete().eq('id', req.params.id).eq('site_id', req.siteId);
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { error } = await gcr().from('entity_specials').delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
 
-// GET /api/dashboard/qr-theme
 router.get('/qr-theme', authRequired, async (req, res) => {
     const siteId = (req.role === 'admin' && req.query.site_id) ? req.query.site_id : req.siteId;
     const { data, error } = await supabase.from('businesses').select('metadata').eq('site_id', siteId).maybeSingle();
