@@ -990,9 +990,37 @@ router.get('/home-feed', async (req, res) => {
     // Filter happy hours to only ones active right now
     const happyHoursNow = (hhRes.data || []).filter(e => {
       if (!e.hh_start || !e.hh_end) return false;
-      const days = (e.hh_days || '').toLowerCase();
-      if (days && !days.includes(todayName.slice(0,3)) && !days.includes(todayName)) return false;
-      return nowTime >= e.hh_start && nowTime <= e.hh_end;
+      const days = (e.hh_days || '').toLowerCase().trim();
+
+      // Check if today's day is covered
+      const dayMatch = (() => {
+        if (!days) return true;                          // no restriction = always
+        if (days.includes('daily')) return true;         // "Daily" always matches
+        if (days.includes('every day')) return true;
+        if (days.includes(todayName)) return true;       // "sunday" in string
+        if (days.includes(todayName.slice(0, 3))) return true; // "sun" in string
+        // Handle "Mon-Fri" / "Monday–Friday" style ranges
+        const dayOrder = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        const todayIdx = dayOrder.indexOf(todayName);
+        // Look for range patterns like "mon-fri", "monday–friday", "mon–sat"
+        const rangeMatch = days.match(/(\w+)\s*[-–]\s*(\w+)/);
+        if (rangeMatch) {
+          const startDay = dayOrder.findIndex(d => d.startsWith(rangeMatch[1].slice(0,3)));
+          const endDay   = dayOrder.findIndex(d => d.startsWith(rangeMatch[2].slice(0,3)));
+          if (startDay !== -1 && endDay !== -1) {
+            if (startDay <= endDay) return todayIdx >= startDay && todayIdx <= endDay;
+            else return todayIdx >= startDay || todayIdx <= endDay; // wraps Sat→Sun
+          }
+        }
+        return false;
+      })();
+
+      if (!dayMatch) return false;
+
+      // Compare times — hh_start/hh_end are "HH:MM:SS", nowTime is "HH:MM"
+      const start = e.hh_start.slice(0, 5);
+      const end   = e.hh_end.slice(0, 5);
+      return nowTime >= start && nowTime <= end;
     });
 
     // Social posts for home feed
@@ -1006,12 +1034,18 @@ router.get('/home-feed', async (req, res) => {
 
     res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
     res.json({
-      events:      eventsRes.data   || [],
-      specials:    specialsRes.data || [],
-      happyHours:  happyHoursNow,
-      liveMusic:   liveMusicRes.data || [],
-      thingsToDo:  thingsRes.data   || [],
-      socialPosts: socialPosts      || [],
+      events:           eventsRes.data   || [],
+      specials:         specialsRes.data || [],
+      happyHours:       happyHoursNow,
+      happyHoursAll:    hhRes.data       || [],   // full list for "coming up" fallback
+      liveMusic:        liveMusicRes.data || [],
+      thingsToDo:       thingsRes.data   || [],
+      socialPosts:      socialPosts      || [],
+      meta: {
+        serverTime:  nowTime,
+        serverDay:   todayName,
+        serverDate:  today,
+      }
     });
   } catch (err) {
     console.error('home-feed error:', err.message);
