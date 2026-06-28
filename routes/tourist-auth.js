@@ -159,7 +159,7 @@ router.post('/signup', async (req, res) => {
         if (error) return res.status(500).json({ error: error.message });
     }
 
-    const send = await sendEmail(email, '🌊 Your Gulf Coast Radar verification code', codeEmailHtml({ code }));
+    const send = await sendEmail({ to: email, subject: '🌊 Your Gulf Coast Radar verification code', html: codeEmailHtml({ code }) });
     if (!send.success) return res.status(500).json({ error: 'Failed to send verification email: ' + (send.error || send.reason || send.message || 'unknown') });
 
     res.json({ success: true, message: 'Verification code sent — check your inbox.' });
@@ -261,7 +261,7 @@ router.post('/resend', async (req, res) => {
         user_metadata: { ...(user.user_metadata || {}), verification_code: code, verification_expires_at: expiresAt },
     });
 
-    const send = await sendEmail(email, '🌊 Your new Gulf Coast Radar verification code', codeEmailHtml({ code }));
+    const send = await sendEmail({ to: email, subject: '🌊 Your new Gulf Coast Radar verification code', html: codeEmailHtml({ code }) });
     if (!send.success) return res.status(500).json({ error: 'Failed to send email' });
 
     res.json({ success: true, message: 'New code sent — check your inbox.' });
@@ -303,7 +303,7 @@ router.post('/forgot-password', async (req, res) => {
     </table>
   </td></tr></table>
 </body></html>`;
-    await sendEmail(email, 'Reset your Gulf Coast Radar password', html);
+    await sendEmail({ to: email, subject: 'Reset your Gulf Coast Radar password', html });
     res.json({ success: true, message: 'If that email is registered, a reset link was sent.' });
 });
 
@@ -546,7 +546,7 @@ router.post('/add-email', touristAuth, async (req, res) => {
     });
     if (updErr) return res.status(500).json({ error: 'Could not save code: ' + updErr.message });
 
-    const send = await sendEmail(email, '🌊 Your Gulf Coast Radar verification code', codeEmailHtml({ code }));
+    const send = await sendEmail({ to: email, subject: '🌊 Your Gulf Coast Radar verification code', html: codeEmailHtml({ code }) });
     if (!send.success) return res.status(500).json({ error: 'Failed to send verification email' });
 
     res.json({ success: true, message: 'Verification code sent — check your inbox.' });
