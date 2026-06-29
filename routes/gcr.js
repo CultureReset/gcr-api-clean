@@ -121,7 +121,7 @@ async function buildFullEntity(slug) {
       db.from('property_fees').select('id,name,amount,type,mandatory').eq('entity_slug', slug),
       db.from('stay_links').select('id,label,url,platform').eq('entity_slug', slug),
       db.from('availability').select('id,date,status,spots_remaining').eq('entity_slug', slug).gte('date', new Date().toISOString().split('T')[0]).order('date').limit(60),
-      db.from('bookable_resources').select('id,name,type,capacity').eq('entity_slug', slug).eq('is_active', true),
+      db.from('bookable_resources').select('id,name,slug,resource_type,description,nightly_price,cleaning_fee,service_fee,bedrooms,bathrooms,sqft,capacity,min_nights,check_in_time,check_out_time,amenities,faqs,house_rules,photo_urls,booking_url,wifi_ssid,parking_info,is_active').eq('entity_slug', slug).eq('is_active', true),
     );
     conditionalKeys.push('propertyDetails','roomTypes','amenities','propertyFees','stayLinks','availability','bookableResources');
   }
@@ -409,10 +409,11 @@ router.get('/events', async (req, res) => {
       end_time: ev.end_time,
       day_of_week: ev.day_of_week,
       recurring: ev.recurring,
+      event_type: ev.event_type || null,
       artist_name: ev.artist?.name || ev.artist_name || null,
       artist: ev.artist || null,
       cover_charge: ev.cover_charge,
-      image_url: normalizeImageUrl(ev.image_url || ev.artist?.image_url),
+      image_url: normalizeImageUrl(ev.image_url || ev.artist?.image_url || ev.entity?.hero_image_url),
       entity_slug: ev.entity_slug,
       entity_name: ev.entity?.name || '',
       icon: ev.entity?.icon || '🏪',
@@ -421,6 +422,15 @@ router.get('/events', async (req, res) => {
       address_line_1: ev.entity?.address_line_1 || '',
       phone: ev.entity?.phone || '',
     }));
+
+    // Sort: dated events first (ascending), then recurring by day_of_week
+    results.sort((a, b) => {
+      if (a.event_date && b.event_date) return a.event_date.localeCompare(b.event_date);
+      if (a.event_date && !b.event_date) return -1;
+      if (!a.event_date && b.event_date) return 1;
+      const dowOrder = { sunday:0, monday:1, tuesday:2, wednesday:3, thursday:4, friday:5, saturday:6 };
+      return (dowOrder[a.day_of_week] ?? 7) - (dowOrder[b.day_of_week] ?? 7);
+    });
 
     res.json({ events: results, total: results.length });
   } catch (err) {
