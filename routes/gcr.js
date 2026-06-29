@@ -177,7 +177,7 @@ async function buildFullEntity(slug) {
 
   if (menuSectionIds.length) { itemPromises.push(db.from('menu_items').select('id,section_id,item_name,description,price,image_url,sort_order,is_available').in('section_id', menuSectionIds).order('sort_order')); itemKeys.push('menuItems'); }
   if (drinkSectionIds.length) { itemPromises.push(db.from('drink_items').select('id,section_id,item_name,description,price,is_on_tap,sort_order').in('section_id', drinkSectionIds).order('sort_order')); itemKeys.push('drinkItems'); }
-  if (hhSectionIds.length) { itemPromises.push(db.from('happy_hour_items').select('id,section_id,item_name,description,hh_price,price,sort_order').in('section_id', hhSectionIds).order('sort_order')); itemKeys.push('hhItems'); }
+  if (hhSectionIds.length) { itemPromises.push(db.from('happy_hour_items').select('id,section_id,item_name,description,price,original_price,sort_order,is_available').in('section_id', hhSectionIds).order('sort_order')); itemKeys.push('hhItems'); }
   if (pricingItemIds.length) { itemPromises.push(db.from('price_tiers').select('*').in('price_item_id', pricingItemIds).order('sort_order')); itemKeys.push('priceTiers'); }
   if (roomTypeIds.length) { itemPromises.push(db.from('room_amenities').select('id,room_type_id,name').in('room_type_id', roomTypeIds)); itemKeys.push('roomAmenities'); }
 
