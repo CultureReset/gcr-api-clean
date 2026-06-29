@@ -214,7 +214,7 @@ async function buildFullEntity(slug) {
     policies: policies.data || [],
     blog_posts: blogPosts.data || [],
     announcements: announcements.data || [],
-    social_posts: socialPostsRes?.data || [],
+    social_posts: [],
     modules: [...modules],
     // Food/Menu
     menu_sections: nest(cond.menuSections?.data, items.menuItems),
