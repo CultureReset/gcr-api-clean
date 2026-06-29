@@ -930,8 +930,6 @@ router.post('/nfc-card-lead', async (req, res) => {
   res.json({ success: true, lead: data });
 });
 
-module.exports = router;
-
 // ─── GET /api/gcr/home-feed ───────────────────────────────────────────────────
 // Returns all sliding card rows for the home page in one request
 router.get('/home-feed', async (req, res) => {
@@ -1052,3 +1050,149 @@ router.get('/home-feed', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─── POST /api/gcr/availability-search ───────────────────────────────────────
+// Search by date range — returns bookable businesses (photographers, charters,
+// rentals, etc.) that have availability data for the requested dates.
+// Tourists who are signed in use this to find who can take them during their trip.
+//
+// Body: { date_from, date_to, type, query, lat, lng }
+//   type: 'charter' | 'photographer' | 'rental' | 'activity' | 'all'
+//   date_from/date_to: YYYY-MM-DD
+router.post('/availability-search', async (req, res) => {
+  try {
+    const {
+      date_from,
+      date_to,
+      type = 'all',
+      query = '',
+      lat,
+      lng,
+      limit = 50,
+    } = req.body;
+
+    if (!date_from) return res.status(400).json({ error: 'date_from required' });
+
+    const dateTo = date_to || date_from;
+
+    // 1. Find entities with availability data in this date range
+    let availQuery = db
+      .from('business_availability')
+      .select('entity_slug, availability_date, time_slot, end_time, status, remaining_spots, total_capacity, booking_type')
+      .gte('availability_date', date_from)
+      .lte('availability_date', dateTo)
+      .neq('status', 'full') // exclude fully booked slots
+      .order('availability_date')
+      .order('time_slot');
+
+    const { data: availRows, error: availErr } = await availQuery;
+    if (availErr) return res.status(500).json({ error: availErr.message });
+
+    // Group availability by entity_slug
+    const availMap = {};
+    (availRows || []).forEach(row => {
+      if (!availMap[row.entity_slug]) availMap[row.entity_slug] = [];
+      availMap[row.entity_slug].push(row);
+    });
+
+    // Slugs that have availability data
+    const availSlugs = Object.keys(availMap);
+
+    // 2. Also search by entity type even without availability data
+    // (businesses that haven't set up email parsing yet still show up,
+    //  just without the slot-level detail)
+    const TYPE_FILTERS = {
+      charter:      ['fishing_charter', 'charter', 'fishing-charter', 'boat_charter'],
+      photographer: ['photographer', 'photography', 'photo_session'],
+      rental:       ['boat_rental', 'boat-rental', 'jet_ski', 'kayak', 'equipment_rental'],
+      activity:     ['activity', 'tour', 'parasailing', 'dolphin_cruise', 'sunset_cruise'],
+      all:          [],
+    };
+
+    const subtypes = TYPE_FILTERS[type] || [];
+
+    let entityQuery = db
+      .from('entity')
+      .select(`
+        id, slug, name, subtitle, entity_type, entity_subtype, icon,
+        phone, rating, review_count, city, state, hero_image_url,
+        booking_url, reservation_url, price_from, price_unit,
+        duration_text, latitude, longitude, daily_capacity, capacity_per_slot,
+        description
+      `)
+      .eq('is_active', true)
+      .limit(limit);
+
+    // Filter by type
+    if (type !== 'all' && subtypes.length > 0) {
+      entityQuery = entityQuery.in('entity_subtype', subtypes);
+    } else if (type === 'all') {
+      // For 'all' with availability — only bookable types
+      entityQuery = entityQuery.in('entity_type', ['activity', 'service']);
+    }
+
+    // Optional keyword filter
+    if (query.trim()) {
+      const term = query.trim();
+      entityQuery = entityQuery.or(`name.ilike.%${term}%,description.ilike.%${term}%,entity_subtype.ilike.%${term}%`);
+    }
+
+    const { data: entities, error: entErr } = await entityQuery;
+    if (entErr) return res.status(500).json({ error: entErr.message });
+
+    const userLat = lat ? parseFloat(lat) : null;
+    const userLng = lng ? parseFloat(lng) : null;
+
+    // 3. Build results — merge entity data with availability slots
+    const results = (entities || []).map(e => {
+      const slots = availMap[e.slug] || [];
+      const hasAvailability = slots.length > 0;
+
+      // Find best available slot in range
+      const openSlots = slots.filter(s => s.status !== 'full');
+      const lowestRemaining = openSlots.length
+        ? Math.min(...openSlots.map(s => s.remaining_spots).filter(n => n != null))
+        : null;
+
+      // Unique dates with availability
+      const availDates = [...new Set(openSlots.map(s => s.availability_date))].sort();
+
+      const distance_miles = (userLat && userLng && e.latitude && e.longitude)
+        ? haversine(userLat, userLng, e.latitude, e.longitude)
+        : null;
+
+      return {
+        ...e,
+        has_availability: hasAvailability,
+        available_dates: availDates,
+        slots: openSlots,
+        lowest_remaining: lowestRemaining,
+        distance_miles,
+        // Availability confidence for sorting:
+        // 0 = no data, 1 = has entity but no slots, 2 = has slots with data
+        _avail_rank: hasAvailability ? 2 : (e.booking_url ? 1 : 0),
+      };
+    });
+
+    // Sort: availability data first, then by distance, then rating
+    results.sort((a, b) => {
+      if (b._avail_rank !== a._avail_rank) return b._avail_rank - a._avail_rank;
+      if (a.distance_miles != null && b.distance_miles != null) return a.distance_miles - b.distance_miles;
+      return (b.rating || 0) - (a.rating || 0);
+    });
+
+    res.json({
+      date_from,
+      date_to: dateTo,
+      type,
+      results,
+      total: results.length,
+      with_availability: results.filter(r => r.has_availability).length,
+    });
+  } catch (err) {
+    console.error('availability-search error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
