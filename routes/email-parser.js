@@ -726,6 +726,96 @@ function detectAndExtract(from, subject, text, html) {
 
 // ─── WRITE TO business_availability ──────────────────────────────────────────
 
+// Auto-create a last_minute deal when availability hits critical thresholds
+async function maybeCreateAutoDeal(entitySlug, date, remaining, total, timeSlot, parsed) {
+  const today    = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  if (date !== today && date !== tomorrow) return; // only today / tomorrow
+
+  // Only create deals for limited spots (not full, not plenty)
+  if (remaining === null || remaining <= 0 || remaining > 5) return;
+
+  // Check if an auto deal already exists for this entity/date/slot
+  const slotKey = timeSlot || '00:00';
+  const { data: existing } = await db
+    .from('gcr_deals')
+    .select('id, spots_remaining')
+    .eq('entity_slug', entitySlug)
+    .eq('valid_date', date)
+    .eq('source', 'email_parser')
+    .maybeSingle();
+
+  // Fetch entity info for the deal card
+  const { data: ent } = await db
+    .from('entity')
+    .select('name, entity_type, entity_subtype, hero_image_url, phone, booking_url, price_from, price_unit')
+    .eq('slug', entitySlug)
+    .maybeSingle();
+
+  if (!ent) return;
+
+  const isToday    = date === today;
+  const isCharter  = (ent.entity_subtype || '').includes('charter') || (ent.entity_subtype || '').includes('fishing');
+  const isRental   = (ent.entity_subtype || '').includes('rental') || (ent.entity_type || '') === 'condo';
+  const dealType   = isCharter ? 'charter_opening' : isRental ? 'rental_gap' : 'last_minute';
+
+  const spotsWord  = remaining === 1 ? 'spot' : 'spots';
+  const timeStr    = timeSlot ? ` at ${timeSlot.replace(/:\d{2}$/, '')}` : '';
+  const whenStr    = isToday ? 'TODAY' : 'TOMORROW';
+
+  let headline;
+  if (isCharter) {
+    headline = `🎣 ${remaining} walk-on ${spotsWord} open — ${whenStr}${timeStr}`;
+  } else if (isRental) {
+    headline = `🏠 Last-minute opening — ${whenStr}${timeStr ? ` · ${timeStr}` : ''}`;
+  } else {
+    headline = `⚡ ${remaining} ${spotsWord} just opened up — ${whenStr}${timeStr}`;
+  }
+
+  const expiresAt = new Date(date + 'T23:59:00').toISOString();
+
+  if (existing) {
+    // Update existing deal with new spot count
+    await db.from('gcr_deals').update({
+      spots_remaining: remaining,
+      headline,
+      is_today_only: isToday,
+      expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    }).eq('id', existing.id);
+  } else {
+    // Create new auto deal
+    await db.from('gcr_deals').insert({
+      entity_slug:    entitySlug,
+      entity_name:    ent.name,
+      entity_type:    ent.entity_type || null,
+      entity_subtype: ent.entity_subtype || null,
+      image_url:      ent.hero_image_url || null,
+      posted_by:      'auto',
+      deal_type:      dealType,
+      headline,
+      deal_price:     ent.price_from || null,
+      price_unit:     ent.price_unit || 'person',
+      valid_date:     date,
+      valid_start_time: timeSlot || null,
+      expires_at:     expiresAt,
+      is_today_only:  isToday,
+      spots_total:    total || null,
+      spots_remaining: remaining,
+      claim_type:     ent.booking_url ? 'link' : 'phone',
+      claim_url:      ent.booking_url || null,
+      claim_phone:    ent.phone || null,
+      is_active:      true,
+      is_featured:    remaining === 1, // feature if truly last spot
+      promoted_feed:  true,
+      swipe_card:     true,
+      promoted_sms:   remaining <= 2, // SMS blast if 1-2 spots
+      source:         'email_parser',
+      created_at:     new Date().toISOString(),
+    });
+  }
+}
+
 async function upsertAvailability(entitySlug, parsed, emailLogId) {
   if (!entitySlug || !parsed.event_date) return;
 
@@ -750,13 +840,16 @@ async function upsertAvailability(entitySlug, parsed, emailLogId) {
   const partySize  = parsed.party_size || 1;
   const isCancelled = parsed.status === 'cancelled';
 
+  let remaining = null;
+  let tc = null;
+
   if (existing) {
     const newBooked = isCancelled
       ? Math.max(0, (existing.booked_count || 0) - partySize)
       : (existing.booked_count || 0) + partySize;
 
-    const tc = existing.total_capacity || totalCapacity;
-    const remaining = tc ? Math.max(0, tc - newBooked) : null;
+    tc = existing.total_capacity || totalCapacity;
+    remaining = tc ? Math.max(0, tc - newBooked) : null;
     const status = !tc ? 'unknown'
       : remaining === 0 ? 'full'
       : remaining <= 3 ? 'limited'
@@ -773,8 +866,9 @@ async function upsertAvailability(entitySlug, parsed, emailLogId) {
       })
       .eq('id', existing.id);
   } else if (!isCancelled) {
-    const remaining = totalCapacity ? Math.max(0, totalCapacity - partySize) : null;
-    const status = !totalCapacity ? 'unknown'
+    tc = totalCapacity;
+    remaining = tc ? Math.max(0, tc - partySize) : null;
+    const status = !tc ? 'unknown'
       : remaining === 0 ? 'full'
       : remaining <= 3 ? 'limited'
       : 'available';
@@ -786,7 +880,7 @@ async function upsertAvailability(entitySlug, parsed, emailLogId) {
         availability_date: parsed.event_date,
         time_slot: parsed.event_time || null,
         end_time: parsed.end_time || null,
-        total_capacity: totalCapacity,
+        total_capacity: tc,
         booked_count: partySize,
         remaining_spots: remaining,
         status,
@@ -795,6 +889,13 @@ async function upsertAvailability(entitySlug, parsed, emailLogId) {
         last_updated: new Date().toISOString(),
         last_email_log_id: emailLogId,
       });
+  }
+
+  // Auto-create last_minute deal if today/tomorrow and spots are limited
+  if (remaining !== null) {
+    maybeCreateAutoDeal(entitySlug, parsed.event_date, remaining, tc, parsed.event_time, parsed).catch(e =>
+      console.warn('[email-parser] auto-deal error:', e.message)
+    );
   }
 }
 
@@ -1075,5 +1176,72 @@ const PLATFORM_DESCRIPTIONS = {
   generic:      'Generic — any booking/confirmation email',
 };
 
+/**
+ * POST /api/email-parser/setup/:slug
+ * Business onboarding — set capacity and BCC email address
+ * Body: { daily_capacity, capacity_per_slot, bcc_email }
+ */
+router.post('/setup/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { daily_capacity, capacity_per_slot } = req.body;
+
+    if (!daily_capacity) {
+      return res.status(400).json({ error: 'daily_capacity required' });
+    }
+
+    const { error } = await db
+      .from('entity')
+      .update({
+        daily_capacity:    parseInt(daily_capacity),
+        capacity_per_slot: capacity_per_slot ? parseInt(capacity_per_slot) : null,
+        updated_at:        new Date().toISOString(),
+      })
+      .eq('slug', slug);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    const bccEmail = `gcr-${slug}@parse.gulfcoastradar.com`;
+
+    res.json({
+      success: true,
+      bcc_email: bccEmail,
+      instructions: `BCC every booking confirmation to: ${bccEmail}. Set this in your FareHarbor / Peek / BoatBooker notification settings.`,
+      daily_capacity: parseInt(daily_capacity),
+      capacity_per_slot: capacity_per_slot ? parseInt(capacity_per_slot) : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/email-parser/setup/:slug
+ * Returns current capacity config + BCC address for a business
+ */
+router.get('/setup/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { data, error } = await db
+      .from('entity')
+      .select('name, daily_capacity, capacity_per_slot')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error || !data) return res.status(404).json({ error: 'Business not found' });
+
+    res.json({
+      slug,
+      name: data.name,
+      daily_capacity: data.daily_capacity || null,
+      capacity_per_slot: data.capacity_per_slot || null,
+      bcc_email: `gcr-${slug}@parse.gulfcoastradar.com`,
+      configured: !!data.daily_capacity,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
-module.exports.EXTRACTORS = EXTRACTORS; // exported for testing
+module.exports.EXTRACTORS = EXTRACTORS;
