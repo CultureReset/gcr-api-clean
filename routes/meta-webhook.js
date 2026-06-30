@@ -90,7 +90,101 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
   }
 })
 
-// ── Instagram media event ─────────────────────────────────────────────────────
+// ── Claude post analyzer ──────────────────────────────────────────────────────
+// One call does three things: classifies the image, extracts any hours change,
+// and decides whether the image should be saved to the business gallery.
+async function analyzePost({ caption, imageUrl, entitySlug }) {
+  try {
+    const prompt = `You are analyzing a social media post from a local Gulf Coast business.
+
+Business slug: ${entitySlug || 'unknown'}
+Caption: ${caption || '(no caption)'}
+Image URL: ${imageUrl || '(no image)'}
+
+Respond with ONLY a JSON object, no markdown, no explanation:
+{
+  "photo_type": "food" | "exterior" | "interior" | "outdoor" | "event" | "other" | null,
+  "save_to_gallery": true | false,
+  "gallery_title": "short descriptive title if saving, else null",
+  "hours_change": true | false,
+  "hours": {
+    "date": "YYYY-MM-DD or null if not today/tomorrow",
+    "closed": true | false,
+    "open_time": "HH:MM or null",
+    "close_time": "HH:MM or null",
+    "note": "plain english summary of the change"
+  } | null
+}
+
+Rules:
+- save_to_gallery = true only if there is an image AND photo_type is food, exterior, interior, or outdoor
+- food = any dish, drink, plate, menu item
+- hours_change = true only if caption explicitly mentions opening late, closing early, closed today/tomorrow, or special hours
+- For hours.date: "today" means ${new Date().toISOString().split('T')[0]}, "tomorrow" means ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+- All times in 24h format`
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 512,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+    if (!res.ok) return null
+    const d = await res.json()
+    const text = d.content?.[0]?.text || ''
+    const clean = text.replace(/```json|```/g, '').trim()
+    return JSON.parse(clean)
+  } catch (e) {
+    console.error('[meta-webhook] Claude analysis failed:', e.message)
+    return null
+  }
+}
+
+// Apply analysis results — save image to gallery and/or update hours
+async function applyAnalysis(analysis, { entitySlug, imageUrl, postUrl }) {
+  if (!analysis || !entitySlug) return
+
+  // 1. Save image to entity_photos gallery
+  if (analysis.save_to_gallery && imageUrl) {
+    await db.from('entity_photos').insert({
+      entity_slug:   entitySlug,
+      url:           imageUrl,
+      photo_type:    analysis.photo_type,
+      title:         analysis.gallery_title || null,
+      source_name:   'Social Media Post',
+      source_page_url: postUrl || null,
+      usage_note:    'social_auto_saved',
+      is_cover:      false,
+      sort_order:    999, // goes to end of gallery, business can reorder
+    })
+    console.log(`[meta-webhook] Saved ${analysis.photo_type} photo to gallery: ${entitySlug}`)
+  }
+
+  // 2. Write hours exception if hours changed
+  if (analysis.hours_change && analysis.hours) {
+    const h = analysis.hours
+    const date = h.date || new Date().toISOString().split('T')[0]
+    await db.from('hours_exceptions').upsert({
+      entity_slug: entitySlug,
+      date,
+      closed:      h.closed || false,
+      open_time:   h.open_time || null,
+      close_time:  h.close_time || null,
+      note:        h.note || 'Updated via social media post',
+      created_at:  new Date().toISOString(),
+    }, { onConflict: 'entity_slug,date' })
+    console.log(`[meta-webhook] Hours exception written for ${entitySlug} on ${date}: ${h.note}`)
+  }
+}
+
+
 // Fires when you (or a connected business) posts a photo, video, or Reel.
 async function handleInstagram(entry) {
   const changes = entry.changes || []
@@ -155,6 +249,12 @@ async function handleInstagram(entry) {
     }, { onConflict: 'platform_post_id' })
 
     console.log(`[meta-webhook] IG post saved: ${mediaId} → entity: ${entitySlug || 'GCR own'}`)
+
+    // Analyze caption + image — save to gallery, update hours if needed
+    if (entitySlug) {
+      const analysis = await analyzePost({ caption, imageUrl, entitySlug })
+      await applyAnalysis(analysis, { entitySlug, imageUrl, postUrl: permalink })
+    }
   }
 }
 
@@ -213,6 +313,12 @@ async function handleFacebook(entry) {
     }, { onConflict: 'platform_post_id' })
 
     console.log(`[meta-webhook] FB post saved: ${postId} → entity: ${entitySlug || 'GCR own'}`)
+
+    // Analyze caption + image — save to gallery, update hours if needed
+    if (entitySlug) {
+      const analysis = await analyzePost({ caption, imageUrl, entitySlug })
+      await applyAnalysis(analysis, { entitySlug, imageUrl, postUrl: permalink })
+    }
   }
 }
 
