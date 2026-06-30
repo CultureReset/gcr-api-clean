@@ -71,6 +71,7 @@ mount('/api/sms', () => require('./routes/sms'));
 
 // QR & Redirects
 mount('/api/qr', () => require('./routes/qr'));
+mount('/api/ar-hunts', () => require('./routes/ar-hunts'));
 mount('/api/links', () => require('./routes/links'));
 
 // Update links
