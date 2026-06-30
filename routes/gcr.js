@@ -85,7 +85,7 @@ async function buildFullEntity(slug) {
     db.from('entity_photos').select('id,url,image_url,caption,alt_text,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
     db.from('entity_tags').select('tag_name,tag_category').eq('entity_slug', slug),
     db.from('entity_events').select('id,event_name,description,event_date,start_time,end_time,cover_charge,image_url,artist_name,artist_id,day_of_week,recurring, artist:artists!entity_events_artist_id_fkey(id,slug,name,genre,image_url,social_instagram,social_facebook,spotify_url)').eq('entity_slug', slug).eq('is_active', true).order('event_date').limit(20),
-    db.from('entity_reviews').select('id,author_name,rating,title,body,source,review_date').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }).limit(20),
+    db.from('entity_reviews').select('id,reviewer_name,rating,title,body,verified_purchase,created_at').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }).limit(20),
     db.from('faqs').select('id,question,answer,category,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_team_members').select('id,name,title,bio,photo_url,specialty,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_policies').select('id,policy_type,title,type,body,content').eq('entity_slug', slug),
