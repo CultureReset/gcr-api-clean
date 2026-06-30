@@ -2,6 +2,26 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
+// ─── Central-time helper ────────────────────────────────────────────────────
+// Vercel serverless functions run in UTC. now.toTimeString()/getDay() return
+// UTC-based "local" values which are WRONG for Gulf Coast business hours.
+// Always use this to get the real Gulf Coast (America/Chicago) clock.
+function getCentralNow() {
+  const TZ = 'America/Chicago';
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    weekday: 'long',
+  }).formatToParts(now).reduce((acc, p) => { acc[p.type] = p.value; return acc; }, {});
+  return {
+    nowTime: `${parts.hour === '24' ? '00' : parts.hour}:${parts.minute}`, // "HH:MM"
+    today: `${parts.year}-${parts.month}-${parts.day}`,                    // "YYYY-MM-DD"
+    todayName: parts.weekday.toLowerCase(),                                // "tuesday"
+  };
+}
+
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
   process.env.GCR_SUPABASE_SERVICE_KEY
@@ -860,9 +880,7 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
 // ─── GET /api/gcr/live-now ────────────────────────────────────────────────────
 router.get('/live-now', async (req, res) => {
   try {
-    const now = new Date();
-    const nowTime = now.toTimeString().slice(0, 5);
-    const nowDate = now.toISOString().split('T')[0];
+    const { nowTime, today: nowDate } = getCentralNow();
 
     const { data: entities, error } = await db
       .from('entity')
@@ -968,11 +986,8 @@ router.post('/nfc-card-lead', async (req, res) => {
 // Returns all sliding card rows for the home page in one request
 router.get('/home-feed', async (req, res) => {
   try {
-    const now = new Date();
-    const nowTime = now.toTimeString().slice(0, 5); // "HH:MM"
-    const today = now.toISOString().split('T')[0];
+    const { nowTime, today, todayName } = getCentralNow();
     const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-    const todayName = dayNames[now.getDay()];
 
     const ENTITY_COLS = 'id,slug,name,entity_type,entity_subtype,hero_image_url,rating,city,price_range';
 
