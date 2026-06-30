@@ -1671,4 +1671,137 @@ router.post('/availability-search', async (req, res) => {
   }
 });
 
+// GET /api/gcr/social-posts/feed — all active social posts across all entities for the swipe deck
+router.get('/social-posts/feed', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50)
+    const { data, error } = await db
+      .from('entity_social_posts')
+      .select('id, entity_slug, platform, post_url, media_type, thumbnail_url, video_url, caption, duration_seconds')
+      .eq('is_active', true)
+      .order('sort_order')
+      .limit(limit)
+    if (error) return res.status(500).json({ error: error.message })
+
+    // Enrich with entity name for the card display
+    const slugs = [...new Set((data || []).map(p => p.entity_slug))]
+    const { data: entities } = await db.from('entity').select('slug, name').in('slug', slugs)
+    const nameMap = Object.fromEntries((entities || []).map(e => [e.slug, e.name]))
+
+    const posts = (data || []).map(p => ({ ...p, entity_name: nameMap[p.entity_slug] || null }))
+    res.json({ posts })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Social Posts — business pastes their IG/FB/TikTok URL, we fetch metadata ──
+// GET  /api/gcr/entity/:slug/social-posts  — list active posts for a profile page
+// POST /api/gcr/entity/:slug/social-posts  — paste a URL, fetch oEmbed, save
+// DELETE /api/gcr/social-posts/:id         — remove a post
+
+// Resolve oEmbed metadata from Instagram, Facebook, or TikTok
+async function fetchOEmbed(postUrl) {
+  const url = postUrl.trim()
+  let oembedUrl = null
+
+  if (url.includes('instagram.com')) {
+    oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&fields=thumbnail_url,title,author_name,media_type&maxwidth=640`
+    // Instagram oEmbed is free without token for basic fields — try it first
+    // Fallback: just store the URL and derive thumbnail from post shortcode
+  } else if (url.includes('facebook.com')) {
+    oembedUrl = `https://www.facebook.com/plugins/post/oembed.json/?url=${encodeURIComponent(url)}&maxwidth=640`
+  } else if (url.includes('tiktok.com')) {
+    oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`
+  }
+
+  if (!oembedUrl) return null
+
+  try {
+    const res = await fetch(oembedUrl, { headers: { 'User-Agent': 'GulfCoastRadar/1.0' }, signal: AbortSignal.timeout(5000) })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+// Detect platform and media type from URL
+function detectPost(url) {
+  if (url.includes('instagram.com')) {
+    const platform = 'instagram'
+    const isReel = url.includes('/reel/')
+    const isVideo = url.includes('/tv/')
+    const media_type = isReel ? 'reel' : isVideo ? 'video' : 'image'
+    return { platform, media_type }
+  }
+  if (url.includes('facebook.com')) return { platform: 'facebook', media_type: 'video' }
+  if (url.includes('tiktok.com')) return { platform: 'tiktok', media_type: 'video' }
+  return null
+}
+
+router.get('/entity/:slug/social-posts', async (req, res) => {
+  try {
+    const { data, error } = await db.from('entity_social_posts')
+      .select('id, platform, post_url, media_type, thumbnail_url, video_url, caption, duration_seconds, sort_order')
+      .eq('entity_slug', req.params.slug)
+      .eq('is_active', true)
+      .order('sort_order')
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ posts: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.post('/entity/:slug/social-posts', async (req, res) => {
+  try {
+    const { post_url, duration_seconds } = req.body
+    if (!post_url) return res.status(400).json({ error: 'post_url required' })
+
+    const detected = detectPost(post_url)
+    if (!detected) return res.status(400).json({ error: 'URL must be from Instagram, Facebook, or TikTok' })
+
+    // Try oEmbed to get thumbnail + caption
+    const oembed = await fetchOEmbed(post_url)
+
+    // For Instagram Reels, derive a thumbnail from the shortcode as fallback
+    let thumbnail_url = oembed?.thumbnail_url || null
+    if (!thumbnail_url && post_url.includes('instagram.com')) {
+      const match = post_url.match(/\/(p|reel|tv)\/([A-Za-z0-9_-]+)/)
+      if (match) {
+        // Public Instagram CDN thumbnail pattern
+        thumbnail_url = `https://www.instagram.com/${match[1]}/${match[2]}/media/?size=l`
+      }
+    }
+
+    const { data, error } = await db.from('entity_social_posts').insert({
+      entity_slug: req.params.slug,
+      platform: detected.platform,
+      post_url: post_url.trim(),
+      media_type: detected.media_type,
+      thumbnail_url,
+      caption: oembed?.title || oembed?.author_name || null,
+      duration_seconds: duration_seconds || null,
+      is_active: true,
+      fetched_at: new Date().toISOString(),
+    }).select('*').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true, post: data })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+router.delete('/social-posts/:id', async (req, res) => {
+  try {
+    const { error } = await db.from('entity_social_posts').delete().eq('id', req.params.id)
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router;
