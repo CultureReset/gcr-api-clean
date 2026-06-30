@@ -127,6 +127,21 @@ router.get('/gcr/entities', async (req, res) => {
   try {
     const db = getDb();
     const cols = 'id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon';
+    const search = req.query.search;
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 1000) : null;
+
+    if (search || limit) {
+      // Targeted lookup — used by admin search boxes (e.g. Page Rails slot picker).
+      // Single query, no full-table pagination.
+      let query = db.from('entity').select(cols).order('name');
+      if (search) query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%`);
+      query = query.limit(limit || 50);
+      const { data, error } = await query;
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ entities: data || [], total: data?.length || 0 });
+    }
+
+    // No search/limit — original behavior, fetch everything for the businesses list page
     const PAGE = 1000;
     let all = [];
     let from = 0;
