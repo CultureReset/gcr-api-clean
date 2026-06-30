@@ -24,6 +24,7 @@ const express = require('express')
 const crypto  = require('crypto')
 const router  = express.Router()
 const { createClient } = require('@supabase/supabase-js')
+const { callAI } = require('../utils/ai-provider')
 
 const db = createClient(
   process.env.SUPABASE_URL,
@@ -123,26 +124,15 @@ Rules:
 - For hours.date: "today" means ${new Date().toISOString().split('T')[0]}, "tomorrow" means ${new Date(Date.now() + 86400000).toISOString().split('T')[0]}
 - All times in 24h format`
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        messages: [{ role: 'user', content: prompt }]
-      })
+    const text = await callAI('post_analysis', prompt, {
+      maxTokens: 512,
+      systemPrompt: 'You analyze social media posts for a local business discovery platform. Always respond with valid JSON only.',
+      imageUrl,
     })
-    if (!res.ok) return null
-    const d = await res.json()
-    const text = d.content?.[0]?.text || ''
     const clean = text.replace(/```json|```/g, '').trim()
     return JSON.parse(clean)
   } catch (e) {
-    console.error('[meta-webhook] Claude analysis failed:', e.message)
+    console.error('[meta-webhook] Post analysis failed:', e.message)
     return null
   }
 }

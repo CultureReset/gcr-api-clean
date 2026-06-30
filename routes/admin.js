@@ -2810,6 +2810,36 @@ router.delete('/gcr/page-rail-items/:id', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── AI Provider Config — admin control of which AI does what ─────────────────
+const { invalidateCache: invalidateAICache, PROVIDERS } = require('../utils/ai-provider')
+
+// GET /api/admin/ai-config — get all task configs + available providers/models
+router.get('/ai-config', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('ai_provider_config').select('*').order('task')
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ configs: data || [], providers: PROVIDERS })
+})
+
+// PUT /api/admin/ai-config/:task — update which AI handles a task
+router.put('/ai-config/:task', authRequired, async (req, res) => {
+  const { provider, model, is_active, notes } = req.body
+  if (!provider || !model) return res.status(400).json({ error: 'provider and model required' })
+
+  const { data, error } = await getDb().from('ai_provider_config').upsert({
+    task: req.params.task,
+    provider,
+    model,
+    is_active: is_active !== false,
+    notes: notes || null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'task' }).select('*').single()
+
+  if (error) return res.status(500).json({ error: error.message })
+
+  invalidateAICache()
+  res.json({ success: true, config: data })
+})
+
 module.exports = router;
 
 // ── SOCIAL POSTS — paste FB/IG URLs, each becomes a card ──────────────────────
