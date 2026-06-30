@@ -72,14 +72,35 @@ async function buildFullEntity(slug) {
     db.from('entity_blog_posts').select('id,title,slug,excerpt,body,cover_url,published_at').eq('entity_slug', slug).order('published_at', { ascending: false }).limit(10),
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug),
     db.from('announcements').select('id,message,type,starts_at,ends_at').eq('entity_slug', slug).eq('active', true),
-    db.from('entity_modules').select('module_key').eq('entity_slug', slug).eq('enabled', true),
+    db.from('entity_modules').select('module_key,enabled,sort_order,settings').eq('entity_slug', slug),
+    db.from('entity_sections').select('id,module_key,section_type,section_name,subtitle,icon,layout,sort_order,is_active').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
   ];
 
   const [
-    hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes
+    hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes
   ] = await Promise.all(corePromises);
 
-  const modules = new Set((modulesRes.data || []).map(m => m.module_key));
+  // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
+  const sectionRows = sectionsRes?.data || [];
+  const sectionIds = sectionRows.map(s => s.id);
+  const sectionItemsRes = sectionIds.length
+    ? await db.from('entity_section_items')
+        .select('id,section_id,item_name,description,duration,price_from,price_to,price_label,icon,sort_order,metadata')
+        .in('section_id', sectionIds).order('sort_order')
+    : { data: [] };
+  const sectionItems = sectionItemsRes.data || [];
+  const flexSections = sectionRows.map(s => ({
+    ...s,
+    items: sectionItems.filter(i => i.section_id === s.id),
+  }));
+
+  const modulesData = modulesRes.data || [];
+  // Full module list for the response (control panel: enabled + order + settings)
+  const modulesFull = modulesData
+    .map(m => ({ module_key: m.module_key, enabled: m.enabled !== false, sort_order: m.sort_order ?? 0, settings: m.settings || {} }))
+    .sort((a, b) => a.sort_order - b.sort_order);
+  // Set of enabled module keys — preserves existing conditional-fetch logic below
+  const modules = new Set(modulesData.filter(m => m.enabled !== false).map(m => m.module_key));
 
   // ── CONDITIONAL queries — only run if module is enabled ───────────────────
   const conditionalPromises = [];
@@ -195,6 +216,8 @@ async function buildFullEntity(slug) {
   return {
     ...entity,
     hero_image_url: normalizeImageUrl(entity.hero_image_url),
+    // Flexible offerings (charters, rentals, tours, services) — universal
+    sections: flexSections,
     // Core
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
@@ -215,7 +238,8 @@ async function buildFullEntity(slug) {
     blog_posts: blogPosts.data || [],
     announcements: announcements.data || [],
     social_posts: [],
-    modules: [...modules],
+    modules: modulesFull,
+    module_keys: [...modules],
     // Food/Menu
     menu_sections: nest(cond.menuSections?.data, items.menuItems),
     drink_sections: nest(cond.drinkSections?.data, items.drinkItems),
