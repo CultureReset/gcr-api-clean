@@ -578,6 +578,145 @@ router.get('/entities/paginated', async (req, res) => {
   }
 });
 
+// ─── Page Rails — admin-configured horizontal card rows, sponsored or algorithmic ──
+// Same building block used on the homepage AND on category pages (per Matt's
+// design: every page is a stack of swipeable rails, each independently sellable
+// for ad placement). One rail = one row of ~5-12 cards that slides left/right.
+
+// Resolve one rail's content — either the curated sponsored list, or run the
+// named algorithm against the rail's target category.
+async function resolveRailContent(rail, { userLat, userLng, userId } = {}) {
+  const limit = rail.card_limit || 12;
+
+  if (rail.rail_type === 'sponsored') {
+    const now = new Date().toISOString();
+    const { data: items } = await db
+      .from('page_rail_items')
+      .select('entity_slug, sort_order, is_ad, badge_text, starts_at, ends_at')
+      .eq('rail_id', rail.id)
+      .order('sort_order')
+      .limit(limit);
+    const active = (items || []).filter(i => (!i.starts_at || i.starts_at <= now) && (!i.ends_at || i.ends_at >= now));
+    if (!active.length) return [];
+
+    const slugs = active.map(i => i.entity_slug);
+    const { data: entities } = await db
+      .from('entity')
+      .select('id, slug, name, subtitle, entity_type, entity_subtype, icon, rating, review_count, city, hero_image_url, price_range, latitude, longitude')
+      .in('slug', slugs)
+      .eq('is_active', true);
+    const bySlug = Object.fromEntries((entities || []).map(e => [e.slug, e]));
+
+    return active
+      .map(i => {
+        const e = bySlug[i.entity_slug];
+        if (!e) return null;
+        return { ...e, is_ad: i.is_ad !== false, badge_text: i.badge_text || null };
+      })
+      .filter(Boolean);
+  }
+
+  // Algorithm rails — pull from the same category-mapped pool as /entities/paginated
+  const { subtypesForCategory } = require('../utils/listing-category-map');
+  const category = rail.category;
+  let query = db
+    .from('entity')
+    .select('id, slug, name, subtitle, entity_type, entity_subtype, icon, rating, review_count, city, hero_image_url, price_range, latitude, longitude')
+    .eq('is_active', true);
+
+  if (category) {
+    const subtypes = subtypesForCategory(category);
+    if (category === 'staying') {
+      query = query.or(`entity_type.in.(hotel,condo,vacation-rental),entity_subtype.in.(${subtypes.join(',')})`);
+    } else if (subtypes.length) {
+      query = query.in('entity_subtype', subtypes);
+    } else {
+      return [];
+    }
+  }
+
+  const { data: candidates } = await query.limit(500);
+  if (!candidates?.length) return [];
+
+  if (rail.algorithm === 'newest') {
+    return candidates.slice(0, limit); // DB already orders by insertion in practice; good enough for a "newest" rail without an extra query
+  }
+
+  const slugs = candidates.map(e => e.slug);
+
+  if (rail.algorithm === 'near_you') {
+    if (userLat == null || userLng == null) return []; // nothing to show without a location
+    const withDist = candidates
+      .filter(e => e.latitude && e.longitude)
+      .map(e => ({ ...e, distance_miles: haversine(userLat, userLng, e.latitude, e.longitude) }))
+      .sort((a, b) => a.distance_miles - b.distance_miles);
+    return withDist.slice(0, limit);
+  }
+
+  if (rail.algorithm === 'for_you') {
+    if (!userId) return []; // no personalization possible for anonymous visitors
+    const [tagRows, scores] = await Promise.all([
+      db.from('entity_tags').select('entity_slug, tag_name').in('entity_slug', slugs),
+      db.from('user_preference_scores').select('tag, score').eq('tourist_id', userId),
+    ]);
+    const prefScoreByTag = {};
+    (scores.data || []).forEach(s => { prefScoreByTag[(s.tag || '').toLowerCase().trim()] = s.score; });
+    if (!Object.keys(prefScoreByTag).length) return []; // no signal yet — let the page fall back to other rails
+
+    const tagMap = {};
+    (tagRows.data || []).forEach(r => { if (!tagMap[r.entity_slug]) tagMap[r.entity_slug] = []; tagMap[r.entity_slug].push(r.tag_name); });
+
+    const scored = candidates.map(e => {
+      const tagNames = (tagMap[e.slug] || []).map(t => (t || '').toLowerCase().trim());
+      const matched = tagNames.map(t => prefScoreByTag[t]).filter(s => s != null);
+      const affinity = matched.length ? matched.reduce((a, b) => a + b, 0) / matched.length : -Infinity;
+      return { ...e, _affinity: affinity };
+    }).filter(e => e._affinity > -Infinity);
+    scored.sort((a, b) => b._affinity - a._affinity);
+    scored.forEach(e => { delete e._affinity; });
+    return scored.slice(0, limit);
+  }
+
+  // Default / 'top_rated'
+  return candidates
+    .filter(e => e.rating != null)
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, limit);
+}
+
+// GET /api/gcr/page-rails/:page — resolved rails for a page (e.g. 'home', 'restaurants').
+// Query params: lat, lng, user_id (optional, improves near_you/for_you rails)
+// Returns: { rails: [ { id, title, eyebrow, emoji, rail_type, algorithm, items: [...] } ] }
+// Empty rails (e.g. for_you with no signal yet, near_you with no location) are
+// omitted from the response so the frontend never renders an empty row.
+router.get('/page-rails/:page', async (req, res) => {
+  try {
+    const { data: rails, error } = await db
+      .from('page_rails')
+      .select('*')
+      .eq('page', req.params.page)
+      .eq('is_active', true)
+      .order('sort_order');
+    if (error) return res.status(500).json({ error: error.message });
+
+    const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
+    const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
+    const userId = req.query.user_id || null;
+
+    const resolved = await Promise.all(
+      (rails || []).map(async rail => {
+        const items = await resolveRailContent(rail, { userLat, userLng, userId });
+        return { id: rail.id, title: rail.title, eyebrow: rail.eyebrow, emoji: rail.emoji, rail_type: rail.rail_type, algorithm: rail.algorithm, items };
+      })
+    );
+
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.json({ rails: resolved.filter(r => r.items.length > 0) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/gcr/entity/:slug ────────────────────────────────────────────────
 // ─── Ad Network — public serving + tracking (consumed by qr-menu.html etc.) ──
 

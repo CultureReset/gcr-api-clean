@@ -2682,6 +2682,119 @@ router.get('/gcr/customers', authRequired, async (req, res) => {
   res.json({ customers });
 });
 
+// ── Page Rails — admin management of sponsored/algorithmic card rows ───────
+// Powers the "Rail Manager" panel: create/reorder rails per page, and for
+// sponsored rails, manage which businesses fill each slot.
+
+// GET /api/admin/gcr/page-rails?page=restaurants — list rails for a page (all, including inactive)
+router.get('/gcr/page-rails', authRequired, async (req, res) => {
+  let query = getDb().from('page_rails').select('*').order('page').order('sort_order');
+  if (req.query.page) query = query.eq('page', req.query.page);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ rails: data || [] });
+});
+
+// POST /api/admin/gcr/page-rails — create a rail
+router.post('/gcr/page-rails', authRequired, async (req, res) => {
+  const { page, title, eyebrow, emoji, rail_type, algorithm, category, sort_order, card_limit } = req.body;
+  if (!page || !title) return res.status(400).json({ error: 'page and title required' });
+  if (!['sponsored', 'algorithm'].includes(rail_type)) return res.status(400).json({ error: "rail_type must be 'sponsored' or 'algorithm'" });
+  if (rail_type === 'algorithm' && !['top_rated', 'near_you', 'for_you', 'newest'].includes(algorithm)) {
+    return res.status(400).json({ error: 'algorithm rails require a valid algorithm value' });
+  }
+
+  const { data, error } = await getDb().from('page_rails').insert({
+    page, title,
+    eyebrow: eyebrow || null,
+    emoji: emoji || null,
+    rail_type,
+    algorithm: rail_type === 'algorithm' ? algorithm : null,
+    category: category || null,
+    sort_order: sort_order ?? 0,
+    card_limit: card_limit || 12,
+    is_active: true,
+  }).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, rail: data });
+});
+
+// PUT /api/admin/gcr/page-rails/:id — update a rail
+router.put('/gcr/page-rails/:id', authRequired, async (req, res) => {
+  const { title, eyebrow, emoji, rail_type, algorithm, category, sort_order, card_limit, is_active } = req.body;
+  const updates = { updated_at: new Date().toISOString() };
+  if (title !== undefined) updates.title = title;
+  if (eyebrow !== undefined) updates.eyebrow = eyebrow;
+  if (emoji !== undefined) updates.emoji = emoji;
+  if (rail_type !== undefined) updates.rail_type = rail_type;
+  if (algorithm !== undefined) updates.algorithm = algorithm;
+  if (category !== undefined) updates.category = category;
+  if (sort_order !== undefined) updates.sort_order = sort_order;
+  if (card_limit !== undefined) updates.card_limit = card_limit;
+  if (is_active !== undefined) updates.is_active = !!is_active;
+
+  const { data, error } = await getDb().from('page_rails').update(updates).eq('id', req.params.id).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, rail: data });
+});
+
+// DELETE /api/admin/gcr/page-rails/:id
+router.delete('/gcr/page-rails/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('page_rails').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// GET /api/admin/gcr/page-rails/:id/items — sponsored slots for one rail
+router.get('/gcr/page-rails/:id/items', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('page_rail_items').select('*').eq('rail_id', req.params.id).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ items: data || [] });
+});
+
+// POST /api/admin/gcr/page-rails/:id/items — add a business to a sponsored rail
+router.post('/gcr/page-rails/:id/items', authRequired, async (req, res) => {
+  const { entity_slug, sort_order, is_ad, badge_text, starts_at, ends_at } = req.body;
+  if (!entity_slug) return res.status(400).json({ error: 'entity_slug required' });
+
+  const { data: entity } = await getDb().from('entity').select('slug').eq('slug', entity_slug).maybeSingle();
+  if (!entity) return res.status(404).json({ error: 'No entity with that slug' });
+
+  const { data, error } = await getDb().from('page_rail_items').insert({
+    rail_id: req.params.id,
+    entity_slug,
+    sort_order: sort_order ?? 0,
+    is_ad: is_ad !== false,
+    badge_text: badge_text || null,
+    starts_at: starts_at || null,
+    ends_at: ends_at || null,
+  }).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, item: data });
+});
+
+// PUT /api/admin/gcr/page-rail-items/:id — update a sponsored slot (reorder, change dates/badge)
+router.put('/gcr/page-rail-items/:id', authRequired, async (req, res) => {
+  const { sort_order, is_ad, badge_text, starts_at, ends_at } = req.body;
+  const updates = {};
+  if (sort_order !== undefined) updates.sort_order = sort_order;
+  if (is_ad !== undefined) updates.is_ad = !!is_ad;
+  if (badge_text !== undefined) updates.badge_text = badge_text;
+  if (starts_at !== undefined) updates.starts_at = starts_at;
+  if (ends_at !== undefined) updates.ends_at = ends_at;
+
+  const { data, error } = await getDb().from('page_rail_items').update(updates).eq('id', req.params.id).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, item: data });
+});
+
+// DELETE /api/admin/gcr/page-rail-items/:id — remove a business from a sponsored rail
+router.delete('/gcr/page-rail-items/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('page_rail_items').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 module.exports = router;
 
 // ── SOCIAL POSTS — paste FB/IG URLs, each becomes a card ──────────────────────
