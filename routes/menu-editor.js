@@ -126,10 +126,10 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
   // Try extended select (includes rotating_sections + theme if columns exist)
   let entity;
   const { data: entityFull, error: entitySelErr } = await db.from('entity')
-    .select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections, rotating_sections, theme')
+    .select('id, slug, name, description, hero_image_url, phone, website_url, address_line_1, hh_days, hh_start, hh_end, hh_description, gallery_sections, rotating_sections, theme')
     .eq('slug', slug).single();
   if (entitySelErr && (entitySelErr.code === '42703' || (entitySelErr.message || '').includes('does not exist'))) {
-    const { data } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
+    const { data } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, address_line_1, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
     entity = data;
   } else {
     entity = entityFull;
