@@ -342,7 +342,6 @@ router.get('/entities', async (req, res) => {
         national_phone, google_place_id, business_status
       `)
       .eq('is_active', true)
-      .order('name')
       .range(offset, offset + limit - 1);
 
     if (req.query.type) {
@@ -388,7 +387,19 @@ router.get('/entities', async (req, res) => {
 
     const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
-    const sortByDist = req.query.sort === 'distance' && userLat !== null && userLng !== null;
+    const userId = req.query.user_id || null;
+    const sortMode = req.query.sort || 'default'; // 'distance' | 'rating' | 'default'
+
+    // ── Personalization: reuse the same tag-score system that already powers
+    // Trip Swipe (GET /api/tourist/preferences → user_preference_scores), so
+    // listing-page ranking and swipe-deck ranking learn from the same signal
+    // instead of maintaining two different recommendation systems.
+    let prefScoreByTag = {};
+    if (userId && sortMode === 'default') {
+      const { data: scores } = await db.from('user_preference_scores').select('tag, score').eq('tourist_id', userId);
+      (scores || []).forEach(s => { prefScoreByTag[(s.tag || '').toLowerCase().trim()] = s.score; });
+    }
+    const hasPrefSignal = Object.keys(prefScoreByTag).length > 0;
 
     const results = (entities || []).map(e => {
       const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
@@ -399,7 +410,32 @@ router.get('/entities', async (req, res) => {
       return row;
     });
 
-    if (sortByDist) results.sort((a, b) => (a.distance_miles ?? 9999) - (b.distance_miles ?? 9999));
+    if (sortMode === 'distance') {
+      results.sort((a, b) => (a.distance_miles ?? 9999) - (b.distance_miles ?? 9999));
+    } else if (sortMode === 'rating') {
+      results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else {
+      // Default ranking: blend personalization (when we have it), rating, and proximity.
+      // This replaces the old hardcoded alphabetical-by-name default.
+      results.forEach(row => {
+        let affinityScore = 0;
+        if (hasPrefSignal) {
+          const tagNames = (row.tags || []).map(t => (t.tag_name || '').toLowerCase().trim()).filter(Boolean);
+          const matchedScores = tagNames.map(t => prefScoreByTag[t]).filter(s => s != null);
+          if (matchedScores.length) {
+            const avg = matchedScores.reduce((a, b) => a + b, 0) / matchedScores.length;
+            affinityScore = Math.max(0, Math.min(1, avg / 30)); // scores are roughly 0-30+, clamp to 0..1
+          }
+        }
+        const ratingScore = (row.rating || 0) / 5; // 0..1
+        const distanceScore = row.distance_miles != null ? Math.max(0, 1 - row.distance_miles / 25) : 0.5; // closer = higher, neutral if unknown
+        // Weights: personalization matters most once we have signal, otherwise
+        // this naturally falls back to a rating/distance blend (score ~= 0 + ratingScore*0.6 + distanceScore*0.4)
+        row._score = affinityScore * 0.5 + ratingScore * 0.3 + distanceScore * 0.2;
+      });
+      results.sort((a, b) => b._score - a._score);
+      results.forEach(row => { delete row._score; });
+    }
 
     res.set('Cache-Control', 'public, s-maxage=180, stale-while-revalidate=900');
     res.json({ entities: results, total: results.length, offset, limit });
@@ -408,7 +444,176 @@ router.get('/entities', async (req, res) => {
   }
 });
 
+// ─── GET /api/gcr/entities/paginated ──────────────────────────────────────────
+// NEW small-page endpoint for CategoryListings.jsx's infinite-scroll path.
+// Sits ALONGSIDE the existing /entities (which still fetches everything for the
+// old client-side-filter path) — nothing about /entities changes.
+//
+// Query params:
+//   category   — listing-page bucket (restaurants, things-to-do, nightlife, etc.)
+//                resolved via utils/listing-category-map.js, same mapping the
+//                frontend's categoryMap.js uses client-side today.
+//   tag        — filter to entities having this entity_tags.tag_name
+//   search     — name search (same as /entities)
+//   sort       — 'distance' | 'rating' | 'default' (personalized blend)
+//   lat/lng    — for distance scoring/sorting
+//   user_id    — for personalized ranking via user_preference_scores
+//   limit      — page size, default 24, max 100
+//   offset     — pagination offset
+//
+// Returns: { entities, total, offset, limit, hasMore }
+router.get('/entities/paginated', async (req, res) => {
+  try {
+    const { subtypesForCategory } = require('../utils/listing-category-map');
+    const limit = Math.min(parseInt(req.query.limit) || 24, 100);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const category = req.query.category || null;
+    const tag = req.query.tag || null;
+
+    let query = db
+      .from('entity')
+      .select(`
+        id, slug, name, subtitle, entity_type, entity_subtype, icon,
+        phone, rating, review_count, city, state, address_line_1,
+        hero_image_url, website_url, directions_url, call_url,
+        booking_url, reservation_url, order_url, price_range,
+        hh_days, hh_start, hh_end, hh_description,
+        live_music, outdoor_seating,
+        featured, is_active, description,
+        latitude, longitude
+      `, { count: 'exact' })
+      .eq('is_active', true);
+
+    if (category) {
+      const subtypes = subtypesForCategory(category);
+      if (category === 'staying') {
+        query = query.or(`entity_type.in.(hotel,condo,vacation-rental),entity_subtype.in.(${subtypes.join(',')})`);
+      } else if (subtypes.length) {
+        query = query.in('entity_subtype', subtypes);
+      } else {
+        // Unknown category — return nothing rather than silently ignoring the filter
+        return res.json({ entities: [], total: 0, offset, limit, hasMore: false });
+      }
+    }
+    if (req.query.search) query = query.ilike('name', `%${req.query.search}%`);
+
+    // Tag filtering requires a join — resolve matching slugs first when a tag is given
+    if (tag) {
+      const { data: tagRows } = await db.from('entity_tags').select('entity_slug').eq('tag_name', tag);
+      const slugsWithTag = [...new Set((tagRows || []).map(r => r.entity_slug))];
+      if (!slugsWithTag.length) return res.json({ entities: [], total: 0, offset, limit, hasMore: false });
+      query = query.in('slug', slugsWithTag);
+    }
+
+    // We need the full matching set (pre-pagination) to rank, then slice —
+    // capped at 3000 as a safety bound so a category filter that somehow
+    // matches almost everything can't blow up memory/latency.
+    const { data: allMatching, error } = await query.limit(3000);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const total = allMatching?.length || 0;
+    const slugs = (allMatching || []).map(e => e.slug);
+
+    const [tagRows2, photoRows] = await Promise.all([
+      slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
+      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption').in('entity_slug', slugs).eq('is_cover', true).limit(3000) : { data: [] },
+    ]);
+    const tagMap = {}, photoMap = {};
+    (tagRows2.data || []).forEach(r => { if (!tagMap[r.entity_slug]) tagMap[r.entity_slug] = []; tagMap[r.entity_slug].push(r); });
+    (photoRows.data || []).forEach(r => { photoMap[r.entity_slug] = r; });
+
+    const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
+    const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
+    const userId = req.query.user_id || null;
+    const sortMode = req.query.sort || 'default';
+
+    let prefScoreByTag = {};
+    if (userId && sortMode === 'default') {
+      const { data: scores } = await db.from('user_preference_scores').select('tag, score').eq('tourist_id', userId);
+      (scores || []).forEach(s => { prefScoreByTag[(s.tag || '').toLowerCase().trim()] = s.score; });
+    }
+    const hasPrefSignal = Object.keys(prefScoreByTag).length > 0;
+
+    const scored = (allMatching || []).map(e => {
+      const row = {
+        ...e,
+        tags: tagMap[e.slug] || [],
+        hero_image_url: normalizeImageUrl(photoMap[e.slug]?.url || e.hero_image_url),
+      };
+      if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
+        row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
+      }
+      return row;
+    });
+
+    if (sortMode === 'distance') {
+      scored.sort((a, b) => (a.distance_miles ?? 9999) - (b.distance_miles ?? 9999));
+    } else if (sortMode === 'rating') {
+      scored.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else {
+      scored.forEach(row => {
+        let affinityScore = 0;
+        if (hasPrefSignal) {
+          const tagNames = (row.tags || []).map(t => (t.tag_name || '').toLowerCase().trim()).filter(Boolean);
+          const matchedScores = tagNames.map(t => prefScoreByTag[t]).filter(s => s != null);
+          if (matchedScores.length) {
+            const avg = matchedScores.reduce((a, b) => a + b, 0) / matchedScores.length;
+            affinityScore = Math.max(0, Math.min(1, avg / 30));
+          }
+        }
+        const ratingScore = (row.rating || 0) / 5;
+        const distanceScore = row.distance_miles != null ? Math.max(0, 1 - row.distance_miles / 25) : 0.5;
+        row._score = affinityScore * 0.5 + ratingScore * 0.3 + distanceScore * 0.2;
+      });
+      scored.sort((a, b) => b._score - a._score);
+      scored.forEach(row => { delete row._score; });
+    }
+
+    const page = scored.slice(offset, offset + limit);
+
+    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.json({ entities: page, total, offset, limit, hasMore: offset + limit < total });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/gcr/entity/:slug ────────────────────────────────────────────────
+// ─── Ad Network — public serving + tracking (consumed by qr-menu.html etc.) ──
+
+// GET /api/gcr/ads?limit=6 — weighted-random selection of active ads
+router.get('/ads', async (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 6;
+  const { data, error } = await db.from('ads').select('*').eq('is_active', true);
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Weighted shuffle: higher weight = more likely to appear earlier
+  const pool = (data || []).flatMap(ad => Array(Math.max(1, ad.weight || 1)).fill(ad));
+  const seen = new Set();
+  const picked = [];
+  while (picked.length < limit && seen.size < (data || []).length) {
+    const ad = pool[Math.floor(Math.random() * pool.length)];
+    if (!ad || seen.has(ad.id)) continue;
+    seen.add(ad.id);
+    picked.push(ad);
+  }
+  res.json({ ads: picked });
+});
+
+// POST /api/gcr/ads/:id/impression — fire-and-forget view counter
+router.post('/ads/:id/impression', async (req, res) => {
+  const { data } = await db.from('ads').select('impressions').eq('id', req.params.id).single();
+  if (data) await db.from('ads').update({ impressions: (data.impressions || 0) + 1 }).eq('id', req.params.id);
+  res.json({ success: true });
+});
+
+// POST /api/gcr/ads/:id/click — fire-and-forget click counter
+router.post('/ads/:id/click', async (req, res) => {
+  const { data } = await db.from('ads').select('clicks').eq('id', req.params.id).single();
+  if (data) await db.from('ads').update({ clicks: (data.clicks || 0) + 1 }).eq('id', req.params.id);
+  res.json({ success: true });
+});
+
 router.get('/entity/:slug', async (req, res) => {
   try {
     const entity = await buildFullEntity(req.params.slug);
@@ -974,16 +1179,29 @@ router.get('/live-now', async (req, res) => {
 // ─── Page view tracking ───────────────────────────────────────────────────────
 router.post('/track', async (req, res) => {
   try {
-    const { page_path, referrer, session_id, device_type, source, utm_source, utm_medium, utm_campaign, utm_term, utm_content } = req.body;
-    if (!page_path) return res.status(200).json({ ok: true });
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null;
-    await db.from('gcr_page_views').insert({
-      page_path, referrer: referrer || null, session_id: session_id || null,
-      device_type: device_type || null, source: source || null,
-      utm_source: utm_source || null, utm_medium: utm_medium || null,
-      utm_campaign: utm_campaign || null, utm_term: utm_term || null,
-      utm_content: utm_content || null, ip_address: ip
-    });
+    const { page_path, entity_slug } = req.body;
+    if (!page_path && !entity_slug) return res.status(200).json({ ok: true });
+
+    // gcr_page_views is a daily rollup table (entity_id, view_date, view_count),
+    // not a raw event log — only entity profile views are tracked here.
+    // Resolve slug from the path if not given directly (e.g. /business/:slug)
+    let slug = entity_slug;
+    if (!slug && page_path) {
+      const m = page_path.match(/\/business\/([^/?]+)/);
+      if (m) slug = decodeURIComponent(m[1]);
+    }
+    if (!slug) return res.status(200).json({ ok: true }); // not an entity page — nothing to roll up
+
+    const { data: entity } = await db.from('entity').select('id').eq('slug', slug).maybeSingle();
+    if (!entity) return res.status(200).json({ ok: true });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: existing } = await db.from('gcr_page_views').select('id, view_count').eq('entity_id', entity.id).eq('view_date', today).maybeSingle();
+    if (existing) {
+      await db.from('gcr_page_views').update({ view_count: (existing.view_count || 0) + 1 }).eq('id', existing.id);
+    } else {
+      await db.from('gcr_page_views').insert({ entity_id: entity.id, view_date: today, view_count: 1 });
+    }
     res.status(200).json({ ok: true });
   } catch {
     res.status(200).json({ ok: true });

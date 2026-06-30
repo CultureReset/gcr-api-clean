@@ -692,6 +692,178 @@ router.post('/gcr/import-specials', authRequired, async (req, res) => {
   res.json({ success: true, count: rows.length });
 });
 
+// POST /api/admin/gcr/import-section-based — the default bulk-upload CSV format.
+// Body: raw array of CSV rows (NOT pre-grouped), each row shaped:
+//   { restaurant_name, city, state, address, phone, section_type, section, item_name, description, price, tags }
+// section_type: profile | menu | special | event | tags | service | dietary
+// Restaurants are matched by name (case-insensitive) + address; created if not found.
+// Designed to be safe to re-run: menu items are upserted by (entity_slug, section_name, item_name)
+// rather than wiping the whole menu every time, since CSV uploads happen repeatedly over time.
+router.post('/gcr/import-section-based', authRequired, async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body?.rows;
+  if (!Array.isArray(rows) || !rows.length) return res.status(400).json({ error: 'Expected a non-empty array of CSV rows' });
+
+  const db = getDb();
+  const errors = [];
+  let inserted = 0;
+  const entityCache = new Map(); // "name|address" -> slug, avoids a lookup per row
+
+  function slugify(name) {
+    return String(name || '').toLowerCase().trim()
+      .replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
+
+  async function resolveEntity(row) {
+    const name = (row.restaurant_name || '').trim();
+    const address = (row.address || '').trim();
+    if (!name) throw new Error('restaurant_name is required');
+    const cacheKey = name.toLowerCase() + '|' + address.toLowerCase();
+    if (entityCache.has(cacheKey)) return entityCache.get(cacheKey);
+
+    // Try to find an existing entity by name (case-insensitive) first
+    const { data: matches } = await db.from('entity').select('slug, address_line_1').ilike('name', name);
+    let match = (matches || []).find(m => !address || (m.address_line_1 || '').toLowerCase().trim() === address.toLowerCase());
+    if (!match && matches?.length === 1 && !address) match = matches[0];
+
+    let slug;
+    if (match) {
+      slug = match.slug;
+    } else {
+      // Create a new minimal entity so this row (and following rows for the same
+      // restaurant) has somewhere to attach
+      const baseSlug = slugify(name);
+      let candidate = baseSlug, suffix = 2;
+      while (true) {
+        const { data: existing } = await db.from('entity').select('slug').eq('slug', candidate).maybeSingle();
+        if (!existing) break;
+        candidate = `${baseSlug}-${suffix++}`;
+        if (suffix > 50) throw new Error('Could not generate a unique slug for ' + name);
+      }
+      slug = candidate;
+      const { error: createErr } = await db.from('entity').insert({
+        slug, name,
+        city: row.city || null,
+        state: row.state || null,
+        address_line_1: address || null,
+        phone: row.phone || null,
+        entity_type: 'restaurant',
+        entity_subtype: 'restaurant',
+        is_active: true,
+      });
+      if (createErr) throw new Error('Could not create entity: ' + createErr.message);
+    }
+    entityCache.set(cacheKey, slug);
+    return slug;
+  }
+
+  for (const row of rows) {
+    try {
+      const slug = await resolveEntity(row);
+      const type = (row.section_type || 'menu').toLowerCase().trim();
+
+      if (type === 'profile') {
+        // Profile rows update entity-level fields rather than creating items
+        const updates = {};
+        if (row.item_name) updates.name = row.item_name; // item_name doubles as display name in profile rows
+        if (row.description) updates.description = row.description;
+        if (row.tags) updates.subtitle = row.tags;
+        if (Object.keys(updates).length) {
+          const { error } = await db.from('entity').update(updates).eq('slug', slug);
+          if (error) throw error;
+        }
+        inserted++;
+        continue;
+      }
+
+      if (type === 'menu' || type === 'dietary') {
+        const sectionName = row.section || 'Menu';
+        let { data: section } = await db.from('menu_sections').select('id').eq('entity_slug', slug).eq('section_name', sectionName).maybeSingle();
+        if (!section) {
+          const { data: created, error: secErr } = await db.from('menu_sections').insert({ entity_slug: slug, section_name: sectionName }).select('id').single();
+          if (secErr) throw secErr;
+          section = created;
+        }
+        // Upsert-by-name so re-running the same CSV doesn't duplicate items
+        const { data: existingItem } = await db.from('menu_items').select('id').eq('section_id', section.id).eq('item_name', row.item_name).maybeSingle();
+        const itemRow = {
+          entity_slug: slug,
+          section_id: section.id,
+          item_name: row.item_name,
+          description: row.description || null,
+          price: row.price ? parseFloat(String(row.price).replace(/[^0-9.]/g, '')) || null : null,
+        };
+        if (existingItem) await db.from('menu_items').update(itemRow).eq('id', existingItem.id);
+        else await db.from('menu_items').insert(itemRow);
+        inserted++;
+        continue;
+      }
+
+      if (type === 'special') {
+        await db.from('entity_specials').insert({
+          entity_slug: slug,
+          special_name: row.item_name,
+          description: row.description || null,
+          discount_text: row.price || null,
+          is_active: true,
+        });
+        inserted++;
+        continue;
+      }
+
+      if (type === 'event') {
+        await db.from('entity_events').insert({
+          entity_slug: slug,
+          event_name: row.item_name,
+          description: row.description || null,
+          is_active: true,
+        });
+        inserted++;
+        continue;
+      }
+
+      if (type === 'service') {
+        // No dedicated services table is wired up yet — store as a generic
+        // entity_section so it's at least captured and visible, not dropped.
+        let { data: section } = await db.from('entity_sections').select('id').eq('entity_slug', slug).eq('section_name', row.section || 'Services').maybeSingle();
+        if (!section) {
+          const { data: created, error: secErr } = await db.from('entity_sections').insert({ entity_slug: slug, section_type: 'offerings', section_name: row.section || 'Services' }).select('id').single();
+          if (secErr) throw secErr;
+          section = created;
+        }
+        await db.from('entity_section_items').insert({
+          entity_slug: slug,
+          section_id: section.id,
+          item_name: row.item_name,
+          description: row.description || null,
+          price_label: row.price || null,
+        });
+        inserted++;
+        continue;
+      }
+
+      if (type === 'tags') {
+        const tagList = String(row.tags || row.item_name || '').split(',').map(t => t.trim()).filter(Boolean);
+        for (const tag of tagList) {
+          await db.from('entity_tags').insert({ entity_slug: slug, tag_name: tag }).then(() => {}).catch(() => {});
+        }
+        inserted++;
+        continue;
+      }
+
+      errors.push(`Unknown section_type "${row.section_type}" for ${row.restaurant_name}`);
+    } catch (e) {
+      errors.push(`${row.restaurant_name || 'row'}: ${e.message}`);
+    }
+  }
+
+  res.json({
+    success: true,
+    restaurants: entityCache.size,
+    inserted,
+    errors,
+  });
+});
+
 router.post('/gcr/import-photos', authRequired, async (req, res) => {
   const { entity_slug, photos } = req.body;
   if (!entity_slug || !photos?.length) return res.status(400).json({ error: 'entity_slug and photos required' });
@@ -1342,6 +1514,45 @@ router.put('/tripswipe/settings/:slug', authRequired, async (req, res) => {
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// GET /api/admin/gcr/analytics — entity-level view counts, rolled up daily in gcr_page_views
+router.get('/gcr/analytics', authRequired, async (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 8) + '01';
+
+  const [todayRes, monthRes] = await Promise.all([
+    getDb().from('gcr_page_views').select('entity_id, view_count').eq('view_date', today),
+    getDb().from('gcr_page_views').select('entity_id, view_count').gte('view_date', monthStart),
+  ]);
+
+  const todayRows = todayRes.data || [];
+  const monthRows = monthRes.data || [];
+  const todayViews = todayRows.reduce((s, r) => s + (r.view_count || 0), 0);
+  const monthViews = monthRows.reduce((s, r) => s + (r.view_count || 0), 0);
+  // Distinct entities viewed today is a reasonable stand-in for "today visitors"
+  // since this table doesn't track unique sessions, only per-entity daily counts.
+  const todayVisitors = new Set(todayRows.map(r => r.entity_id)).size;
+
+  // Top entities this month by total views
+  const totals = {};
+  monthRows.forEach(r => { totals[r.entity_id] = (totals[r.entity_id] || 0) + (r.view_count || 0); });
+  const topIds = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id]) => id);
+
+  let topEntities = [];
+  if (topIds.length) {
+    const { data: entities } = await getDb().from('entity').select('id, name, slug').in('id', topIds);
+    const byId = Object.fromEntries((entities || []).map(e => [e.id, e]));
+    topEntities = topIds.map(id => ({ entity_id: id, entity: byId[id] || null, count: totals[id] }));
+  }
+
+  res.json({
+    today_visitors: todayVisitors,
+    today_views: todayViews,
+    today_conversions: 0, // no conversion tracking source wired up yet
+    month_views: monthViews,
+    top_entities: topEntities,
+  });
 });
 
 // ─── PLATFORM ANALYTICS ───────────────────────────────────────────────────
@@ -2288,6 +2499,187 @@ router.get('/users', authRequired, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/gcr/import-gcr-items — bulk "GCR Section Items" CSV format.
+// Body: raw array of CSV rows shaped:
+//   { entity_slug, section_key, group_title, item_name, item_description, price_text, price_numeric, item_type }
+// Upserts the section by (entity_slug, section_name=section_key) and the item by
+// (section_id, item_name) so re-running the same CSV updates rather than duplicates.
+// group_title (if present) is stored in metadata.group since entity_section_items
+// has no separate grouping table.
+router.post('/gcr/import-gcr-items', authRequired, async (req, res) => {
+  const rows = Array.isArray(req.body) ? req.body : req.body?.rows;
+  if (!Array.isArray(rows) || !rows.length) return res.status(400).json({ error: 'Expected a non-empty array of CSV rows' });
+
+  const db = getDb();
+  const errors = [];
+  let inserted = 0, skipped = 0;
+  const sectionCache = new Map(); // "slug|section_key" -> section_id
+
+  for (const row of rows) {
+    try {
+      const slug = (row.entity_slug || '').trim();
+      const sectionKey = (row.section_key || '').trim();
+      const itemName = (row.item_name || '').trim();
+      if (!slug || !sectionKey || !itemName) { errors.push('Missing entity_slug/section_key/item_name on a row'); continue; }
+
+      const { data: entity } = await db.from('entity').select('slug').eq('slug', slug).maybeSingle();
+      if (!entity) { errors.push(`Entity not found: ${slug}`); continue; }
+
+      const cacheKey = slug + '|' + sectionKey;
+      let sectionId = sectionCache.get(cacheKey);
+      if (!sectionId) {
+        const { data: existingSection } = await db.from('entity_sections').select('id').eq('entity_slug', slug).eq('section_name', sectionKey).maybeSingle();
+        if (existingSection) {
+          sectionId = existingSection.id;
+        } else {
+          const { data: created, error: secErr } = await db.from('entity_sections')
+            .insert({ entity_slug: slug, section_type: 'offerings', section_name: sectionKey })
+            .select('id').single();
+          if (secErr) throw secErr;
+          sectionId = created.id;
+        }
+        sectionCache.set(cacheKey, sectionId);
+      }
+
+      const { data: existingItem } = await db.from('entity_section_items').select('id').eq('section_id', sectionId).eq('item_name', itemName).maybeSingle();
+      const itemRow = {
+        entity_slug: slug,
+        section_id: sectionId,
+        item_name: itemName,
+        description: row.item_description || null,
+        price_from: row.price_numeric ? parseFloat(row.price_numeric) || null : null,
+        price_label: row.price_text || null,
+        metadata: { group: row.group_title || null, item_type: row.item_type || null },
+      };
+      if (existingItem) {
+        await db.from('entity_section_items').update(itemRow).eq('id', existingItem.id);
+        skipped++;
+      } else {
+        await db.from('entity_section_items').insert(itemRow);
+        inserted++;
+      }
+    } catch (e) {
+      errors.push(`${row.entity_slug || 'row'}: ${e.message}`);
+    }
+  }
+
+  res.json({ success: true, inserted, updated: skipped, errors });
+});
+
+// ── Ad Network — rotating ads shown on free-tier QR menus ──────────────────
+
+// GET /api/admin/gcr/ads — list all ads (admin view)
+router.get('/gcr/ads', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('ads').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ads: data || [] });
+});
+
+// POST /api/admin/gcr/ads — create an ad
+router.post('/gcr/ads', authRequired, async (req, res) => {
+  const { advertiser_name, tagline, image_url, logo_url, badge_text, cta_text, cta_url, weight, is_active } = req.body;
+  if (!advertiser_name || !String(advertiser_name).trim()) return res.status(400).json({ error: 'advertiser_name required' });
+
+  const { data, error } = await getDb().from('ads').insert({
+    advertiser_name: String(advertiser_name).trim(),
+    tagline: tagline || null,
+    image_url: image_url || null,
+    logo_url: logo_url || null,
+    badge_text: badge_text || null,
+    cta_text: cta_text || 'Learn More',
+    cta_url: cta_url || null,
+    weight: weight != null ? parseInt(weight, 10) : 1,
+    is_active: is_active !== false,
+  }).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, ad: data });
+});
+
+// PUT /api/admin/gcr/ads/:id — update an ad
+router.put('/gcr/ads/:id', authRequired, async (req, res) => {
+  const { advertiser_name, tagline, image_url, logo_url, badge_text, cta_text, cta_url, weight, is_active } = req.body;
+  const updates = { updated_at: new Date().toISOString() };
+  if (advertiser_name !== undefined) updates.advertiser_name = advertiser_name;
+  if (tagline !== undefined) updates.tagline = tagline;
+  if (image_url !== undefined) updates.image_url = image_url;
+  if (logo_url !== undefined) updates.logo_url = logo_url;
+  if (badge_text !== undefined) updates.badge_text = badge_text;
+  if (cta_text !== undefined) updates.cta_text = cta_text;
+  if (cta_url !== undefined) updates.cta_url = cta_url;
+  if (weight !== undefined) updates.weight = parseInt(weight, 10);
+  if (is_active !== undefined) updates.is_active = !!is_active;
+
+  const { data, error } = await getDb().from('ads').update(updates).eq('id', req.params.id).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, ad: data });
+});
+
+// DELETE /api/admin/gcr/ads/:id
+router.delete('/gcr/ads/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('ads').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ── GCR Coupons — platform-wide promo codes (separate from per-business CyberCheck coupons) ──
+
+router.get('/gcr/coupons', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('gcr_coupons').select('*').order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ coupons: data || [] });
+});
+
+router.post('/gcr/coupons', authRequired, async (req, res) => {
+  const { code, type, amount, max_uses, expires_at, description } = req.body;
+  if (!code || !String(code).trim()) return res.status(400).json({ error: 'code required' });
+  if (amount == null) return res.status(400).json({ error: 'amount required' });
+
+  const { data, error } = await getDb().from('gcr_coupons').insert({
+    code: String(code).trim().toUpperCase(),
+    type: type === 'fixed' ? 'fixed' : 'percentage',
+    amount: parseFloat(amount),
+    max_uses: max_uses != null && max_uses !== '' ? parseInt(max_uses, 10) : null,
+    expires_at: expires_at || null,
+    description: description || null,
+    active: true,
+  }).select('*').single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, coupon: data });
+});
+
+router.delete('/gcr/coupons/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('gcr_coupons').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// GET /api/admin/gcr/customers — platform-wide view of tourists who've used GCR.
+// "Customer" here means a tourist_profiles row (the closest real signal we have
+// to a CyberCheck-style customer record at the platform level, since the
+// `customers` table is per-business/site-scoped, not GCR-wide).
+// status is derived, not stored: lead = hasn't finished onboarding,
+// vip = has set up a trip AND opted into SMS (real engagement), customer = everyone else.
+router.get('/gcr/customers', authRequired, async (req, res) => {
+  const { data, error } = await getDb()
+    .from('tourist_profiles')
+    .select('user_id, name, phone, destination, arrival, departure, setup_complete, sms_opt_in, last_active, created_at')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const customers = (data || []).map(t => ({
+    id: t.user_id,
+    name: t.name || null,
+    email: null, // tourist auth is phone-based, no email captured
+    phone: t.phone || null,
+    status: !t.setup_complete ? 'lead' : (t.sms_opt_in ? 'vip' : 'customer'),
+    destination: t.destination || null,
+    last_active: t.last_active || null,
+    created_at: t.created_at,
+  }));
+
+  res.json({ customers });
 });
 
 module.exports = router;
