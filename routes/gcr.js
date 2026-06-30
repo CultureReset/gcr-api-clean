@@ -430,6 +430,76 @@ router.post('/entity/:slug/set-pin', async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── POST /api/gcr/entity/:slug/daily-update ──────────────────────────────────
+// Quick same-day save from cybercheck-links- daily-menu.html — manager-facing
+// "today's specials / menu tweaks" page. PIN-authenticated via x-menu-pin header
+// (must match entity.menu_pin exactly — this page has no token exchange step).
+// Body: { specials: [...], menu: [...], drinks: [...], hh: [...], events: [...] }
+//   Each array element with an `id` is treated as an update to an existing row;
+//   elements without an `id` are inserted as new rows.
+router.post('/entity/:slug/daily-update', async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const pin = req.headers['x-menu-pin'];
+    if (!pin) return res.status(401).json({ error: 'PIN required' });
+
+    const { data: entity } = await db.from('entity').select('slug, menu_pin').eq('slug', slug).single();
+    if (!entity) return res.status(404).json({ error: 'Business not found' });
+    if (!entity.menu_pin) return res.status(403).json({ error: 'Menu editing not enabled for this business' });
+    if (String(entity.menu_pin) !== String(pin)) return res.status(401).json({ error: 'Incorrect PIN' });
+
+    const { specials = [], menu = [], drinks = [], hh = [], events = [] } = req.body;
+
+    // Specials — entity_specials has no section grouping, just entity_slug-owned rows
+    for (const s of specials) {
+      const row = {
+        entity_slug: slug,
+        special_name: s.name || s.special_name,
+        description: s.description || null,
+        discount_text: s.price != null && s.price !== '' ? `$${s.price}` : (s.discount_text || null),
+        is_active: true,
+      };
+      if (s.id) await db.from('entity_specials').update(row).eq('id', s.id).eq('entity_slug', slug);
+      else await db.from('entity_specials').insert(row);
+    }
+
+    // Menu / Drinks / Happy Hour items — these live in menu_items/drink_items/happy_hour_items,
+    // each tied to a section_id. Only update items that already have an id + section_id;
+    // skip brand-new items here since there's no section context to attach them to
+    // (use the full menu editor at /api/menu-editor for creating new sections/items).
+    const updateItemTable = async (table, items, priceField = 'price') => {
+      for (const it of items) {
+        if (!it.id) continue; // no section to attach a new item to from this quick-edit page
+        const row = {
+          item_name: it.name || it.item_name,
+          description: it.description || null,
+        };
+        if (priceField) row[priceField] = it.price != null && it.price !== '' ? parseFloat(it.price) : null;
+        await db.from(table).update(row).eq('id', it.id);
+      }
+    };
+    await updateItemTable('menu_items', menu);
+    await updateItemTable('drink_items', drinks);
+    await updateItemTable('happy_hour_items', hh);
+
+    // Events — entity_events owned directly by entity_slug
+    for (const e of events) {
+      const row = {
+        entity_slug: slug,
+        event_name: e.name || e.event_name,
+        description: e.description || null,
+        is_active: true,
+      };
+      if (e.id) await db.from('entity_events').update(row).eq('id', e.id).eq('entity_slug', slug);
+      else await db.from('entity_events').insert(row);
+    }
+
+    res.json({ success: true, slug });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/gcr/events ──────────────────────────────────────────────────────
 router.get('/events', async (req, res) => {
   try {
