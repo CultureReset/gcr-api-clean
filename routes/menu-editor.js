@@ -46,6 +46,62 @@ async function pinAuth(req, res, next) {
   next();
 }
 
+// ─── POST /api/menu-editor/create ──────────────────────────────────────────────
+// Create a brand-new entity from the menu editor's "New Restaurant" / AI-onboard flow.
+// Body: { name, slug?, tagline?, icon?, pin?, ai_data?, ai_summary? }
+//   - slug: optional explicit slug (from pages/new.js); auto-generated from name if absent
+//   - pin: optional explicit PIN (from pages/new.js); random 4-digit if absent (AI flow)
+// Returns: { success, slug, pin, token, name }
+router.post('/create', async (req, res) => {
+  try {
+    const { name, slug: requestedSlug, tagline, icon, pin: requestedPin, ai_data, ai_summary } = req.body;
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'Restaurant name required' });
+
+    // Build a URL-safe slug from the provided one or derive from name
+    const baseSlug = (requestedSlug || name)
+      .toString().toLowerCase().trim()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    if (!baseSlug) return res.status(400).json({ error: 'Could not derive a valid slug' });
+
+    // Ensure slug is unique — append -2, -3, etc. if taken
+    let slug = baseSlug;
+    let suffix = 2;
+    while (true) {
+      const { data: existing } = await db.from('entity').select('slug').eq('slug', slug).maybeSingle();
+      if (!existing) break;
+      slug = `${baseSlug}-${suffix++}`;
+      if (suffix > 50) return res.status(409).json({ error: 'Could not generate a unique slug' });
+    }
+
+    // PIN: use requested 4-digit PIN if valid, otherwise generate a random one
+    let pin = requestedPin && /^\d{4}$/.test(String(requestedPin)) ? String(requestedPin) : null;
+    if (!pin) pin = String(Math.floor(1000 + Math.random() * 9000));
+
+    const insertRow = {
+      slug,
+      name: String(name).trim(),
+      subtitle: tagline || null,
+      icon: icon || '🍽️',
+      entity_type: 'restaurant',
+      entity_subtype: 'restaurant',
+      menu_pin: pin,
+      is_active: true,
+    };
+    // Stash AI onboarding chat/summary in description so nothing is lost, if provided
+    if (ai_summary) insertRow.description = typeof ai_summary === 'string' ? ai_summary : JSON.stringify(ai_summary);
+
+    const { data: created, error } = await db.from('entity').insert(insertRow).select('slug, name').single();
+    if (error) return res.status(500).json({ error: error.message });
+
+    const token = makeToken(created.slug, pin);
+    res.json({ success: true, slug: created.slug, name: created.name, pin, token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST /api/menu-editor/:slug/auth ─────────────────────────────────────────
 // Body: { pin }
 // Returns: { token, slug, name }
