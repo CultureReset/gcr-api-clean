@@ -127,6 +127,16 @@ router.post('/', authRequired, async (req, res) => {
 });
 
 // PATCH /api/qr/:id  — update label, destination, active
+// DELETE /api/qr/locations/:id — free up an id for reassignment (must be registered
+// before the generic DELETE /:id route below, or "/locations" would be swallowed
+// as if it were a qr_codes id)
+router.delete('/locations/:id', authRequired, async (req, res) => {
+    const locId = parseInt(req.params.id, 10);
+    const { error } = await supabase.from('qr_locations').delete().eq('id', locId);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
 router.patch('/:id', authRequired, async (req, res) => {
     const allowed = ['label', 'destination_url', 'active', 'metadata', 'type', 'notes', 'location', 'placement'];
     const updates = {};
@@ -188,6 +198,39 @@ router.get('/stats/summary', authRequired, async (req, res) => {
     const { data, error } = await query.order('scan_count', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QR Locations — numbered (1-9999) name/notes registry, independent of any
+// single QR code. Lets staff print "Location ID" stickers ahead of time and
+// look up what each number means later (table numbers, condo units, ad spots).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/qr/locations — returns { "1": {name, notes}, "2": {...}, ... }
+router.get('/locations', authRequired, async (req, res) => {
+    const { data, error } = await supabase.from('qr_locations').select('id, name, notes').order('id');
+    if (error) return res.status(500).json({ error: error.message });
+    const out = {};
+    (data || []).forEach(loc => { out[loc.id] = { name: loc.name, notes: loc.notes || '' }; });
+    res.json(out);
+});
+
+// POST /api/qr/locations — create or upsert a location by id
+// Body: { id, name, notes }
+router.post('/locations', authRequired, async (req, res) => {
+    const { id, name, notes } = req.body;
+    const locId = parseInt(id, 10);
+    if (!locId || locId < 1 || locId > 9999) return res.status(400).json({ error: 'id must be between 1 and 9999' });
+    if (!name || !String(name).trim()) return res.status(400).json({ error: 'name required' });
+
+    const { error } = await supabase.from('qr_locations').upsert({
+        id: locId,
+        name: String(name).trim(),
+        notes: notes || null,
+        updated_at: new Date().toISOString(),
+    });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, id: locId });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
