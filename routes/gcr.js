@@ -1674,20 +1674,23 @@ router.post('/availability-search', async (req, res) => {
 // GET /api/gcr/social-posts/feed — all active social posts across all entities for the swipe deck
 router.get('/social-posts/feed', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 20, 50)
+    const limit  = Math.min(parseInt(req.query.limit)  || 20, 50)
+    const offset = Math.max(parseInt(req.query.offset) || 0,  0)
     const { data, error } = await db
-      .from('entity_social_posts')
-      .select('id, entity_slug, platform, post_url, media_type, thumbnail_url, video_url, caption, duration_seconds')
+      .from('social_posts')
+      .select('id, entity_slug, source, post_url, image_url, video_url, caption, media_type, post_date, platform_post_id')
       .eq('is_active', true)
-      .order('sort_order')
-      .limit(limit)
+      .order('post_date', { ascending: false })
+      .range(offset, offset + limit - 1)
     if (error) return res.status(500).json({ error: error.message })
 
     // Enrich with entity name for the card display
-    const slugs = [...new Set((data || []).map(p => p.entity_slug))]
-    const { data: entities } = await db.from('entity').select('slug, name').in('slug', slugs)
-    const nameMap = Object.fromEntries((entities || []).map(e => [e.slug, e.name]))
-
+    const slugs = [...new Set((data || []).map(p => p.entity_slug).filter(Boolean))]
+    const nameMap = {}
+    if (slugs.length) {
+      const { data: entities } = await db.from('entity').select('slug, name').in('slug', slugs)
+      ;(entities || []).forEach(e => { nameMap[e.slug] = e.name })
+    }
     const posts = (data || []).map(p => ({ ...p, entity_name: nameMap[p.entity_slug] || null }))
     res.json({ posts })
   } catch (err) {
