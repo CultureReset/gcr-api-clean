@@ -466,6 +466,9 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
     // 2. Handle gallery images
     if (gallery.length > 0) {
       await db.from('entity_photos').delete().eq('entity_slug', slug);
+
+      let heroUrl = null;
+
       for (let i = 0; i < gallery.length; i++) {
         const img = gallery[i];
         let imageUrl = img.url;
@@ -476,13 +479,36 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
           if (uploaded) imageUrl = uploaded.url;
         }
 
+        // Map gallery type to photo_type and is_cover
+        const typeMap = {
+          'Hero':       { photo_type: 'exterior', is_cover: false },
+          'Business':   { photo_type: null,        is_cover: false },
+          'Trip Swipe': { photo_type: null,        is_cover: true  },
+          'food':       { photo_type: 'food',      is_cover: false },
+          'exterior':   { photo_type: 'exterior',  is_cover: false },
+          'interior':   { photo_type: 'interior',  is_cover: false },
+          'outdoor':    { photo_type: 'outdoor',   is_cover: false },
+          'event':      { photo_type: 'event',     is_cover: false },
+        };
+        const mapped = typeMap[img.type] || { photo_type: null, is_cover: false };
+
+        // First Hero photo becomes the entity hero_image_url
+        if (img.type === 'Hero' && !heroUrl) heroUrl = imageUrl;
+
         await db.from('entity_photos').insert({
-          entity_slug: slug,
-          url: imageUrl,
-          is_cover: i === 0,
-          sort_order: i,
-          caption: img.label || null,
+          entity_slug:  slug,
+          url:          imageUrl,
+          photo_type:   img.photo_type || mapped.photo_type || null,
+          is_cover:     img.is_cover || mapped.is_cover || false,
+          sort_order:   i,
+          caption:      img.label || img.caption || null,
+          usage_note:   img.type || null,
         });
+      }
+
+      // Update hero image on the entity if one was marked as Hero
+      if (heroUrl) {
+        await db.from('entity').update({ hero_image_url: heroUrl }).eq('slug', slug);
       }
     }
 
@@ -753,6 +779,36 @@ router.get('/:slug/qr-menu', async (req, res) => {
     sides: sides.data || [],
     daily_features: dailyFeatures.data || [],
   });
+});
+
+// POST /:slug/set-hero — immediately set a gallery photo as the entity hero
+router.post('/:slug/set-hero', pinAuth, async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+  const { error } = await db.from('entity').update({ hero_image_url: url }).eq('slug', req.params.slug);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, hero_image_url: url });
+});
+
+// PATCH /:slug/photo/:id — update a single photo's type, caption, sort_order, is_cover
+router.patch('/:slug/photo/:id', pinAuth, async (req, res) => {
+  const { photo_type, caption, sort_order, is_cover, usage_note } = req.body;
+  const update = {};
+  if (photo_type   !== undefined) update.photo_type  = photo_type;
+  if (caption      !== undefined) update.caption     = caption;
+  if (sort_order   !== undefined) update.sort_order  = sort_order;
+  if (is_cover     !== undefined) update.is_cover    = is_cover;
+  if (usage_note   !== undefined) update.usage_note  = usage_note;
+  const { error } = await db.from('entity_photos').update(update).eq('id', req.params.id).eq('entity_slug', req.params.slug);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// DELETE /:slug/photo/:id — delete a single gallery photo
+router.delete('/:slug/photo/:id', pinAuth, async (req, res) => {
+  const { error } = await db.from('entity_photos').delete().eq('id', req.params.id).eq('entity_slug', req.params.slug);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 module.exports = router;
