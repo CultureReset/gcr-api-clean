@@ -94,10 +94,14 @@ async function buildFullEntity(slug) {
     db.from('announcements').select('id,message,type,starts_at,ends_at').eq('entity_slug', slug).eq('active', true),
     db.from('entity_modules').select('module_key,enabled,sort_order,settings').eq('entity_slug', slug),
     db.from('entity_sections').select('id,module_key,section_type,section_name,subtitle,icon,layout,sort_order,is_active').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('entity_about_bullets').select('id,text,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_perfect_for').select('id,label,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_social_posts').select('id,platform,post_url,caption,media_url,thumbnail_url,posted_at,likes_count').eq('entity_slug', slug).order('posted_at', { ascending: false }).limit(12),
   ];
 
   const [
-    hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes
+    hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
+    aboutBulletsRes, perfectForRes, socialPostsRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -257,7 +261,10 @@ async function buildFullEntity(slug) {
     policies: policies.data || [],
     blog_posts: blogPosts.data || [],
     announcements: announcements.data || [],
-    social_posts: [],
+    social_posts: socialPostsRes.data || [],
+    about_bullets: aboutBulletsRes.data || [],
+    perfect_for: perfectForRes.data || [],
+    good_for_children: entity.good_for_children ?? entity.good_for_kids ?? null,
     modules: modulesFull,
     module_keys: [...modules],
     // Food/Menu
