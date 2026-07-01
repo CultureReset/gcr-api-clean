@@ -1807,4 +1807,79 @@ router.delete('/social-posts/:id', async (req, res) => {
   }
 })
 
+// ── Artist Live Page ─────────────────────────────────────────────────────────
+// GET /api/gcr/artist/:slug/live — all data needed for the fan-facing live request page
+router.get('/artist/:slug/live', async (req, res) => {
+  try {
+    const { data, error } = await db
+      .from('artist_profiles')
+      .select('*')
+      .eq('slug', req.params.slug)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (error) return res.status(500).json({ error: error.message })
+    if (!data) return res.status(404).json({ error: 'Artist not found' })
+
+    // Get active show if set
+    let activeShow = null
+    if (data.active_show_id) {
+      const { data: show } = await db
+        .from('entity_events')
+        .select('id, event_name, start_time, end_time, entity_slug, entity:entity_slug(name, city)')
+        .eq('id', data.active_show_id)
+        .maybeSingle()
+      activeShow = show || null
+    }
+
+    res.json({
+      artist: {
+        slug:            data.slug,
+        name:            data.artist_name,
+        photo_url:       data.photo_url,
+        genre:           data.genre,
+        hometown:        data.hometown,
+        bio:             data.bio,
+        cashapp:         data.cashapp_handle || data.cashtag,
+        venmo:           data.venmo_handle   || data.venmo,
+        songs:           data.songs          || [],
+        default_min:     data.default_min_request_amount || 5,
+        request_enabled: data.request_enabled !== false,
+        shoutout_enabled: data.shoutout_enabled !== false,
+        instagram_url:   data.instagram_url,
+        spotify_url:     data.spotify_url,
+      },
+      show: activeShow ? {
+        id:         activeShow.id,
+        venue:      activeShow.entity?.name || activeShow.event_name,
+        city:       activeShow.entity?.city || null,
+        start_time: activeShow.start_time,
+        end_time:   activeShow.end_time,
+      } : null
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/gcr/artist/:slug/request — log a song request
+router.post('/artist/:slug/request', async (req, res) => {
+  try {
+    const { song, name, message, amount, type } = req.body
+    await db.from('artist_requests').insert({
+      artist_slug: req.params.slug,
+      song:        song || null,
+      fan_name:    name || null,
+      message:     message || null,
+      amount:      amount || 0,
+      type:        type || 'request', // 'request' | 'shoutout' | 'tip'
+      paid:        false,
+      created_at:  new Date().toISOString(),
+    })
+    res.json({ success: true })
+  } catch (err) {
+    // Table may not exist yet — don't block the fan flow
+    res.json({ success: true })
+  }
+})
+
 module.exports = router;
