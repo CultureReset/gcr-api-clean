@@ -492,7 +492,7 @@ router.get('/entities/paginated', async (req, res) => {
       .eq('is_active', true);
 
     if (category) {
-      const subtypes = subtypesForCategory(category);
+      const subtypes = await subtypesForCategory(category);
       if (category === 'staying') {
         query = query.or(`entity_type.in.(hotel,condo,vacation-rental),entity_subtype.in.(${subtypes.join(',')})`);
       } else if (subtypes.length) {
@@ -632,7 +632,7 @@ async function resolveRailContent(rail, { userLat, userLng, userId } = {}) {
     .eq('is_active', true);
 
   if (category) {
-    const subtypes = subtypesForCategory(category);
+    const subtypes = await subtypesForCategory(category);
     if (category === 'staying') {
       query = query.or(`entity_type.in.(hotel,condo,vacation-rental),entity_subtype.in.(${subtypes.join(',')})`);
     } else if (subtypes.length) {
@@ -1276,6 +1276,22 @@ router.get('/category-page-config/:category', async (req, res) => {
     if (!config) return res.status(404).json({ error: 'Category not found' });
 
     res.json({ config });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gcr/taxonomy ─────────────────────────────────────────────────────
+// Canonical subtype→category map, sourced from the subtype_taxonomy table.
+// The frontend (categoryMap.js) fetches this once at startup and prefers it
+// over its own hardcoded map, so both sides read from the same source of
+// truth instead of maintaining independent copies that can drift apart.
+router.get('/taxonomy', async (req, res) => {
+  try {
+    const { loadTaxonomy } = require('../utils/taxonomy-cache');
+    const { bySubtype, byCategory } = await loadTaxonomy();
+    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+    res.json({ bySubtype, byCategory });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
