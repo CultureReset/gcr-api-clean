@@ -17,7 +17,10 @@ function getDb() {
   return db;
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-jwt-secret-change-in-production';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET env var is required — refusing to mount /api/admin with an insecure default secret');
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Cache-control for GET requests (10 min for entity lists, helps with slow loads)
 router.use((req, res, next) => {
@@ -47,6 +50,9 @@ function authRequired(req, res, next) {
   // Check if it's a JWT token
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
     req.admin = decoded;
     next();
   } catch (e) {
