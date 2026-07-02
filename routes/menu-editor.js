@@ -564,6 +564,10 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
                 description: item.description || null,
                 price: item.price ? parseFloat(item.price) : null,
                 image_url: imageUrl || null,
+                is_catch_of_day: item.catch_of_the_day || false,
+                is_available: item.available !== false,
+                has_market_price: item.market_price || false,
+                metadata: (item.images && item.images.length > 0) ? { images: item.images.slice(0, 3) } : null,
               });
             }
           }
@@ -601,6 +605,8 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
                 description: item.description || null,
                 price: item.price ? parseFloat(item.price) : null,
                 image_url: imageUrl || null,
+                is_on_tap: item.on_tap || false,
+                is_available: item.available !== false,
               });
             }
           }
