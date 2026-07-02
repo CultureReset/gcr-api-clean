@@ -54,6 +54,9 @@ function toClientShape(row) {
         startsAt: row.starts_at || null,
         endsAt: row.ends_at || null,
         createdAt: row.created_at,
+        // Per-hunt override of the default capture radius — a hunt tucked in a
+        // small alcove might want a tighter radius than one on an open beach lot.
+        captureRadiusMeters: row.capture_radius_meters ?? CAPTURE_RADIUS_METERS,
     };
 }
 
@@ -74,9 +77,13 @@ router.get('/', authRequired, async (req, res) => {
 // POST /api/ar-hunts — create a hunt
 // Body matches admin.html's saveHunt(): { brandName, imageData, latitude, longitude, hint, difficulty, reward, points }
 router.post('/', authRequired, async (req, res) => {
-    const { brandName, imageData, latitude, longitude, hint, difficulty, reward, points, maxCaptures, startsAt, endsAt } = req.body;
+    const { brandName, imageData, latitude, longitude, hint, difficulty, reward, points, maxCaptures, startsAt, endsAt, captureRadiusMeters } = req.body;
     if (!brandName || !String(brandName).trim()) return res.status(400).json({ error: 'brandName required' });
     if (latitude == null || longitude == null) return res.status(400).json({ error: 'latitude and longitude required' });
+    if (captureRadiusMeters != null && captureRadiusMeters !== '') {
+        const r = parseFloat(captureRadiusMeters);
+        if (Number.isNaN(r) || r < 5 || r > 500) return res.status(400).json({ error: 'captureRadiusMeters must be between 5 and 500' });
+    }
 
     const row = {
         brand_name: String(brandName).trim(),
@@ -92,6 +99,7 @@ router.post('/', authRequired, async (req, res) => {
         ends_at: endsAt || null,
         active: true,
         capture_count: 0,
+        capture_radius_meters: captureRadiusMeters != null && captureRadiusMeters !== '' ? parseFloat(captureRadiusMeters) : null,
     };
 
     const { data, error } = await supabase.from('ar_hunts').insert(row).select('*').single();
@@ -115,6 +123,15 @@ router.patch('/:id', authRequired, async (req, res) => {
     if (b.startsAt !== undefined) updates.starts_at = b.startsAt || null;
     if (b.endsAt !== undefined) updates.ends_at = b.endsAt || null;
     if (b.active !== undefined) updates.active = !!b.active;
+    if (b.captureRadiusMeters !== undefined) {
+        if (b.captureRadiusMeters === '' || b.captureRadiusMeters == null) {
+            updates.capture_radius_meters = null;
+        } else {
+            const r = parseFloat(b.captureRadiusMeters);
+            if (Number.isNaN(r) || r < 5 || r > 500) return res.status(400).json({ error: 'captureRadiusMeters must be between 5 and 500' });
+            updates.capture_radius_meters = r;
+        }
+    }
     updates.updated_at = new Date().toISOString();
 
     const { data, error } = await supabase
@@ -195,7 +212,7 @@ router.post('/:id/capture', async (req, res) => {
 
     const { data: hunt, error: huntErr } = await supabase
         .from('ar_hunts')
-        .select('id, lat, lng, active, capture_count, max_captures, starts_at, ends_at')
+        .select('id, lat, lng, active, capture_count, max_captures, starts_at, ends_at, capture_radius_meters')
         .eq('id', req.params.id)
         .single();
     if (huntErr || !hunt) return res.status(404).json({ error: 'Hunt not found' });
@@ -214,8 +231,9 @@ router.post('/:id/capture', async (req, res) => {
     }
 
     // ── The actual security check: real distance from the hunt's real coordinates ──
+    const captureRadius = hunt.capture_radius_meters ?? CAPTURE_RADIUS_METERS;
     const dist = distanceMeters(userLat, userLng, hunt.lat, hunt.lng);
-    if (dist > CAPTURE_RADIUS_METERS) {
+    if (dist > captureRadius) {
         logAttempt(false);
         return res.status(403).json({ error: `You're too far away (${Math.round(dist)}m). Get closer to capture this item.` });
     }
