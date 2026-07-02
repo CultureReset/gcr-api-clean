@@ -117,9 +117,19 @@ async function buildFullEntity(slug) {
         .in('section_id', sectionIds).order('sort_order')
     : { data: [] };
   const sectionItems = sectionItemsRes.data || [];
+  // price_tiers can link via section_item_id (universal entity_section_items —
+  // this is what real data actually uses) or price_item_id (activity-specific
+  // pricing_items, below). Fetch both; whichever side has rows attaches.
+  const sectionItemIds = sectionItems.map(i => i.id);
+  const sectionTiersRes = sectionItemIds.length
+    ? await db.from('price_tiers').select('*').in('section_item_id', sectionItemIds).order('sort_order')
+    : { data: [] };
+  const sectionTiers = sectionTiersRes.data || [];
   const flexSections = sectionRows.map(s => ({
     ...s,
-    items: sectionItems.filter(i => i.section_id === s.id),
+    items: sectionItems
+      .filter(i => i.section_id === s.id)
+      .map(i => ({ ...i, tiers: sectionTiers.filter(t => t.section_item_id === i.id) })),
   }));
 
   const modulesData = modulesRes.data || [];
