@@ -97,11 +97,15 @@ async function buildFullEntity(slug) {
     db.from('entity_about_bullets').select('id,text,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_perfect_for').select('id,label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_social_posts').select('id,platform,post_url,caption,media_url,thumbnail_url,posted_at,likes_count').eq('entity_slug', slug).order('posted_at', { ascending: false }).limit(12),
+    // Hub detection: does anything list this entity as its parent? (marinas,
+    // condo towers, multi-venue complexes — see entity.parent_slug). head:true
+    // + count:'exact' means Postgres only returns the count, not the rows.
+    db.from('entity').select('id', { count: 'exact', head: true }).eq('parent_slug', slug).eq('is_active', true),
   ];
 
   const [
     hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
-    aboutBulletsRes, perfectForRes, socialPostsRes
+    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -264,6 +268,8 @@ async function buildFullEntity(slug) {
     social_posts: socialPostsRes.data || [],
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
+    child_count: childCountRes?.count || 0,
+    is_hub: (childCountRes?.count || 0) > 0,
     good_for_children: entity.good_for_children ?? entity.good_for_kids ?? null,
     modules: modulesFull,
     module_keys: [...modules],
