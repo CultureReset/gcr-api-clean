@@ -8,27 +8,27 @@ const router = express.Router();
 // QR menu minted with ?site_id=X keeps working after the business is
 // migrated to GCR.
 async function serveMenuFromGcr(res, gcrDb, entity) {
-    const entityId = entity.id;
+    const entitySlug = entity.slug;
     const [menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, specials, photos, hours, social, artistData] = await Promise.all([
-        gcrDb.from('menu_sections').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('menu_items').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('drink_sections').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('drink_items').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('happy_hour_sections').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('happy_hour_items').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('entity_events').select('*').eq('entity_id', entityId).order('event_date', { ascending: true }),
-        gcrDb.from('entity_specials').select('*').eq('entity_id', entityId),
-        gcrDb.from('entity_photos').select('*').eq('entity_id', entityId).order('sort_order', { ascending: true }),
-        gcrDb.from('entity_hours').select('*').eq('entity_id', entityId),
-        gcrDb.from('social_media_accounts').select('platform, account_url').eq('entity_id', entityId),
+        gcrDb.from('menu_sections').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('menu_items').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('drink_sections').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('drink_items').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('happy_hour_sections').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('happy_hour_items').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('entity_events').select('*').eq('entity_slug', entitySlug).order('event_date', { ascending: true }),
+        gcrDb.from('entity_specials').select('*').eq('entity_slug', entitySlug),
+        gcrDb.from('entity_photos').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
+        gcrDb.from('entity_hours').select('*').eq('entity_slug', entitySlug),
+        Promise.resolve({ data: [] }), // social_media_accounts is legacy/site_id-keyed OAuth data, not applicable here — modern social links come straight off entity.social_instagram/facebook/tiktok below
         entity.live_artist_id ? gcrDb.from('artist_profiles').select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount').eq('id', entity.live_artist_id).eq('is_active', true).maybeSingle() : Promise.resolve({ data: null }),
     ]);
 
-    const groupItems = (sections, items, fk, priceField) => {
+    const groupItems = (sections, items, priceField) => {
         const byId = {};
         (sections.data || []).forEach(s => { byId[s.id] = { name: s.section_name, items: [] }; });
         (items.data || []).forEach(i => {
-            const bucket = byId[i[fk]];
+            const bucket = byId[i.section_id];
             if (!bucket) return;
             bucket.items.push({
                 id: i.id,
@@ -44,24 +44,27 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         return Object.values(byId).filter(s => s.items.length);
     };
 
-    const foodSections = groupItems(menuSections, menuItems, 'menu_section_id', 'price');
-    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'drink_section_id', 'price');
-    const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_section_id', 'hh_price');
+    const foodSections = groupItems(menuSections, menuItems, 'price');
+    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price');
+    const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price');
 
     const social_links = {};
     (social.data || []).forEach(s => { if (s.account_url) social_links[s.platform] = s.account_url; });
+    if (entity.social_instagram) social_links.instagram = entity.social_instagram;
+    if (entity.social_facebook) social_links.facebook = entity.social_facebook;
+    if (entity.social_tiktok) social_links.tiktok = entity.social_tiktok;
 
     return res.json({
         business_name: entity.name || '',
         logo_url: entity.hero_image_url || '',
         tagline: '',
         hours: (hours.data || []).reduce((acc, h) => {
-            acc[h.day_of_week] = h.is_closed ? 'Closed' : `${h.open_time || ''} - ${h.close_time || ''}`.trim();
+            acc[h.day_of_week] = h.is_closed ? 'Closed' : `${h.opens_at || ''} - ${h.closes_at || ''}`.trim();
             return acc;
         }, {}),
         social_links: Object.keys(social_links).length ? social_links : null,
-        address: '',
-        phone: '',
+        address: entity.address_line_1 || '',
+        phone: entity.phone || entity.national_phone || '',
         sections: {
             food: foodSections.map(s => ({ name: s.name, items: s.items })),
             drink: drinkSectionsOut.map(s => ({ name: s.name, items: s.items })),
@@ -2861,7 +2864,7 @@ router.get('/menu', async (req, res) => {
         let siteId = req.siteId; // from domain resolution
         const getGcrDb = require('../db');
         const gcrDb = getGcrDb();
-        const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description';
+        const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok';
 
         // 1) Direct GCR lookup — ?entity_id=UUID
         if (req.query.entity_id) {
