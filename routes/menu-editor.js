@@ -483,7 +483,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
         const typeMap = {
           'Hero':       { photo_type: 'exterior', is_cover: false },
           'Business':   { photo_type: null,        is_cover: false },
-          'Trip Swipe': { photo_type: null,        is_cover: true  },
+          'Trip Swipe': { photo_type: null,        is_cover: false },
           'food':       { photo_type: 'food',      is_cover: false },
           'exterior':   { photo_type: 'exterior',  is_cover: false },
           'interior':   { photo_type: 'interior',  is_cover: false },

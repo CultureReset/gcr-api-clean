@@ -399,7 +399,7 @@ router.get('/entities', async (req, res) => {
     // Batch fetch tags, photos, hours for all entities
     const [tagRows, photoRows, hourRows] = await Promise.all([
       slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
+      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
       slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
     ]);
 
