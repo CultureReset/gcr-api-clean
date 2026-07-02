@@ -362,7 +362,7 @@ router.get('/entities', async (req, res) => {
         wheelchair_accessible_entrance, wheelchair_accessible_parking,
         wheelchair_accessible_restroom, wheelchair_accessible_seating,
         google_maps_uri, primary_type_display, also_appears_on,
-        national_phone, google_place_id, business_status
+        national_phone, google_place_id, business_status, parent_slug
       `)
       .eq('is_active', true)
       .range(offset, offset + limit - 1);

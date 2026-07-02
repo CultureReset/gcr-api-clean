@@ -132,7 +132,7 @@ router.post('/login', async (req, res) => {
 router.get('/gcr/entities', async (req, res) => {
   try {
     const db = getDb();
-    const cols = 'id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon';
+    const cols = 'id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon, parent_slug';
     const search = req.query.search;
     const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 1000) : null;
 
@@ -214,6 +214,22 @@ router.patch('/gcr/entities/:slug', authRequired, async (req, res) => {
 
   // 1. Core entity
   if (entity) {
+    // parent_slug (hub linkage) needs its own validation before the generic
+    // passthrough update below — an unchecked write here could point an
+    // entity at a slug that doesn't exist, or at itself.
+    if ('parent_slug' in entity) {
+      const parentSlug = entity.parent_slug || null;
+      if (parentSlug === slug) {
+        return res.status(400).json({ error: 'An entity cannot be its own parent' });
+      }
+      if (parentSlug) {
+        const { data: parentRow } = await getDb().from('entity').select('slug').eq('slug', parentSlug).eq('is_active', true).maybeSingle();
+        if (!parentRow) {
+          return res.status(400).json({ error: `parent_slug "${parentSlug}" does not match an active entity` });
+        }
+      }
+      entity.parent_slug = parentSlug;
+    }
     const { error } = await getDb().from('entity').update({ ...entity, updated_at: new Date().toISOString() }).eq('slug', slug);
     if (error) errors.push('entity: ' + error.message);
   }
