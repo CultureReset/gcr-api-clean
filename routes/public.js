@@ -1743,6 +1743,17 @@ Be helpful, enthusiastic, and specific. Recommend real places. Keep responses co
         }
     }
 
+    // Universal context: the SAME rich data the website displays — menus, offerings,
+    // bookable options, child businesses at this location, FAQs, policies, everything.
+    // Additive + non-fatal: if unavailable, the legacy ctx above is used unchanged.
+    try {
+        const { buildAIContext } = require('../lib/ai-context');
+        const universalCtx = await buildAIContext({ slug: biz.slug, name: biz.name, city: c.city });
+        if (universalCtx) ctx = `${universalCtx}\n\n=== ADDITIONAL NOTES ===\n${ctx}`;
+    } catch (e) {
+        console.error('[ai-context] non-fatal:', e.message);
+    }
+
     const systemPrompt = `You are the AI assistant for ${biz.name}. You know EVERYTHING about this business — answer any question a customer could possibly ask. You can also check real-time availability, create bookings, and send SMS confirmations.
 
 ${ctx}
