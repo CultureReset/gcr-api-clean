@@ -1287,7 +1287,7 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
     const { data, error } = await db
       .from('entity')
       .select('*')
-      .eq('parent_slug', req.params.parentSlug)
+      .eq('parent_entity_slug', req.params.parentSlug)
       .eq('is_active', true)
       .order('name');
 
