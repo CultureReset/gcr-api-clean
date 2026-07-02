@@ -10,9 +10,15 @@
 // primary page assignment elsewhere in this codebase — do not merge them,
 // they serve different purposes and aren't interchangeable.
 //
-// If you add/change a category mapping in the frontend, mirror the same
-// change here, or the new paginated endpoint will silently disagree with
-// the old client-filtered path on which businesses belong to which category.
+// The `subtype_taxonomy` DB table (utils/taxonomy-cache.js) is now the
+// canonical source — subtypeToCategory()/subtypesForCategory() check it
+// first. This hardcoded map is kept only as a fallback for subtypes that
+// haven't been backfilled into the taxonomy table yet, and to keep this
+// module usable even if the DB is briefly unreachable. If you add/change a
+// category mapping, prefer updating the subtype_taxonomy table (and mirror
+// in categoryMap.js) over editing this fallback map.
+
+const { loadTaxonomy } = require('./taxonomy-cache');
 
 const SUBTYPE_TO_CATEGORY = {
   // --- restaurants ---
@@ -150,18 +156,25 @@ const SUBTYPE_TO_CATEGORY = {
 
 const LODGING_TYPES = new Set(['hotel', 'condo', 'motel', 'lodging', 'resort', 'cabin', 'cottage', 'inn', 'lodge']);
 
-function subtypeToCategory(entity) {
+async function subtypeToCategory(entity) {
   const sub = (entity.entity_subtype || '').toLowerCase();
   const type = (entity.entity_type || '').toLowerCase();
   const subUnder = sub.replace(/-/g, '_');
   if (LODGING_TYPES.has(type)) return 'staying';
-  return SUBTYPE_TO_CATEGORY[sub] || SUBTYPE_TO_CATEGORY[subUnder] || SUBTYPE_TO_CATEGORY[type] || null;
+  const { bySubtype } = await loadTaxonomy();
+  return bySubtype[subUnder] || bySubtype[sub]
+    || SUBTYPE_TO_CATEGORY[sub] || SUBTYPE_TO_CATEGORY[subUnder] || SUBTYPE_TO_CATEGORY[type] || null;
 }
 
 // All subtype keys belonging to a given listing-page category — used to build
 // a SQL .in() filter instead of fetching everything and filtering in JS.
-function subtypesForCategory(category) {
-  return Object.keys(SUBTYPE_TO_CATEGORY).filter(k => SUBTYPE_TO_CATEGORY[k] === category);
+// Merges the taxonomy table (canonical) with the hardcoded map (fallback,
+// covers any subtype not yet backfilled into subtype_taxonomy).
+async function subtypesForCategory(category) {
+  const { byCategory } = await loadTaxonomy();
+  const fromTaxonomy = byCategory[category] || [];
+  const fromFallback = Object.keys(SUBTYPE_TO_CATEGORY).filter(k => SUBTYPE_TO_CATEGORY[k] === category);
+  return [...new Set([...fromTaxonomy, ...fromFallback])];
 }
 
 module.exports = { SUBTYPE_TO_CATEGORY, LODGING_TYPES, subtypeToCategory, subtypesForCategory };
