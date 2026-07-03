@@ -845,24 +845,21 @@ router.post('/gcr/import-section-based', authRequired, async (req, res) => {
       }
 
       if (type === 'special') {
-        await db.from('entity_specials').insert({
-          entity_slug: slug,
-          special_name: row.item_name,
-          description: row.description || null,
-          discount_text: row.price || null,
-          is_active: true,
-        });
+        // Upsert-by-name so re-running the same CSV updates instead of duplicating
+        const { data: existing } = await db.from('entity_specials').select('id').eq('entity_slug', slug).eq('special_name', row.item_name).maybeSingle();
+        const specialRow = { entity_slug: slug, special_name: row.item_name, description: row.description || null, discount_text: row.price || null, is_active: true };
+        if (existing) await db.from('entity_specials').update(specialRow).eq('id', existing.id);
+        else await db.from('entity_specials').insert(specialRow);
         inserted++;
         continue;
       }
 
       if (type === 'event') {
-        await db.from('entity_events').insert({
-          entity_slug: slug,
-          event_name: row.item_name,
-          description: row.description || null,
-          is_active: true,
-        });
+        // Upsert-by-name so re-running the same CSV updates instead of duplicating
+        const { data: existing } = await db.from('entity_events').select('id').eq('entity_slug', slug).eq('event_name', row.item_name).maybeSingle();
+        const eventRow = { entity_slug: slug, event_name: row.item_name, description: row.description || null, is_active: true };
+        if (existing) await db.from('entity_events').update(eventRow).eq('id', existing.id);
+        else await db.from('entity_events').insert(eventRow);
         inserted++;
         continue;
       }
@@ -890,7 +887,10 @@ router.post('/gcr/import-section-based', authRequired, async (req, res) => {
       if (type === 'tags') {
         const tagList = String(row.tags || row.item_name || '').split(',').map(t => t.trim()).filter(Boolean);
         for (const tag of tagList) {
-          await db.from('entity_tags').insert({ entity_slug: slug, tag_name: tag }).then(() => {}).catch(() => {});
+          // Skip if this exact tag already exists for the entity — this is the
+          // path that previously duplicated tags into the tens of thousands
+          const { data: existing } = await db.from('entity_tags').select('id').eq('entity_slug', slug).eq('tag_name', tag).maybeSingle();
+          if (!existing) await db.from('entity_tags').insert({ entity_slug: slug, tag_name: tag }).then(() => {}).catch(() => {});
         }
         inserted++;
         continue;
@@ -946,8 +946,9 @@ router.post('/gcr/import-master', authRequired, async (req, res) => {
     results.tags = tags.length;
   }
 
-  // Photos
+  // Photos — replace, don't append, so re-uploading a business doesn't duplicate its gallery
   if (photos?.length) {
+    await getDb().from('entity_photos').delete().eq('entity_slug', slug);
     await getDb().from('entity_photos').insert(photos.map((p, i) => ({ entity_slug: slug, url: p.url, image_path: p.image_path || null, is_cover: !!p.is_cover, sort_order: p.sort_order ?? i, caption: p.caption || null })));
     results.photos = photos.length;
   }
@@ -988,14 +989,16 @@ router.post('/gcr/import-master', authRequired, async (req, res) => {
     results.happyHour = 'ok';
   }
 
-  // Events
+  // Events — replace, don't append (keeps every field: date, times, day, artist, recurring)
   if (events?.length) {
+    await getDb().from('entity_events').delete().eq('entity_slug', slug);
     await getDb().from('entity_events').insert(events.map(e => ({ entity_slug: slug, event_name: e.event_name || e.name, description: e.description || null, event_date: e.event_date || null, start_time: e.start_time || null, end_time: e.end_time || null, day_of_week: e.day_of_week || null, recurring: !!e.recurring, artist_name: e.artist_name || null, is_active: true, image_url: e.image_url || null })));
     results.events = events.length;
   }
 
-  // Specials
+  // Specials — replace, don't append
   if (specials?.length) {
+    await getDb().from('entity_specials').delete().eq('entity_slug', slug);
     await getDb().from('entity_specials').insert(specials.map(s => ({ entity_slug: slug, special_name: s.special_name || s.name, description: s.description || null, discount_type: s.discount_type || null, discount_value: s.discount_value || null, discount_text: s.discount_text || null, days: s.days || null, day_of_week: s.day_of_week || null, is_active: true, image_url: s.image_url || null })));
     results.specials = specials.length;
   }
