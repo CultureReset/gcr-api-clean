@@ -132,7 +132,11 @@ router.post('/login', async (req, res) => {
 router.get('/gcr/entities', async (req, res) => {
   try {
     const db = getDb();
-    const cols = 'id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon, parent_slug';
+    // parent_slug:parent_entity_slug aliases the real column to the API's
+    // established field name — the actual DB column is parent_entity_slug,
+    // not parent_slug (a schema mismatch that silently broke every
+    // parent/child hub feature; see PATCH handler below for the write side).
+    const cols = 'id, slug, name, entity_subtype, city, is_active, featured, hero_image_url, rating, icon, parent_slug:parent_entity_slug';
     const search = req.query.search;
     const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 1000) : null;
 
@@ -216,9 +220,14 @@ router.patch('/gcr/entities/:slug', authRequired, async (req, res) => {
   if (entity) {
     // parent_slug (hub linkage) needs its own validation before the generic
     // passthrough update below — an unchecked write here could point an
-    // entity at a slug that doesn't exist, or at itself.
+    // entity at a slug that doesn't exist, or at itself. The request/response
+    // field is parent_slug, but the real DB column is parent_entity_slug (a
+    // schema mismatch that silently broke every parent/child hub feature) —
+    // delete the request-shaped key and set the real column name so the
+    // generic `.update({...entity})` below writes to the column that exists.
     if ('parent_slug' in entity) {
       const parentSlug = entity.parent_slug || null;
+      delete entity.parent_slug;
       if (parentSlug === slug) {
         return res.status(400).json({ error: 'An entity cannot be its own parent' });
       }
@@ -228,7 +237,7 @@ router.patch('/gcr/entities/:slug', authRequired, async (req, res) => {
           return res.status(400).json({ error: `parent_slug "${parentSlug}" does not match an active entity` });
         }
       }
-      entity.parent_slug = parentSlug;
+      entity.parent_entity_slug = parentSlug;
     }
     const { error } = await getDb().from('entity').update({ ...entity, updated_at: new Date().toISOString() }).eq('slug', slug);
     if (error) errors.push('entity: ' + error.message);

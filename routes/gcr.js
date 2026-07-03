@@ -98,9 +98,11 @@ async function buildFullEntity(slug) {
     db.from('entity_perfect_for').select('id,label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_social_posts').select('id,platform,post_url,caption,media_url,thumbnail_url,posted_at,likes_count').eq('entity_slug', slug).order('posted_at', { ascending: false }).limit(12),
     // Hub detection: does anything list this entity as its parent? (marinas,
-    // condo towers, multi-venue complexes — see entity.parent_slug). head:true
-    // + count:'exact' means Postgres only returns the count, not the rows.
-    db.from('entity').select('id', { count: 'exact', head: true }).eq('parent_slug', slug).eq('is_active', true),
+    // condo towers, multi-venue complexes — see entity.parent_entity_slug,
+    // NOT parent_slug — that column doesn't exist and silently made this
+    // query fail/return 0 for every entity). head:true + count:'exact'
+    // means Postgres only returns the count, not the rows.
+    db.from('entity').select('id', { count: 'exact', head: true }).eq('parent_entity_slug', slug).eq('is_active', true),
   ];
 
   const [
@@ -362,7 +364,7 @@ router.get('/entities', async (req, res) => {
         wheelchair_accessible_entrance, wheelchair_accessible_parking,
         wheelchair_accessible_restroom, wheelchair_accessible_seating,
         google_maps_uri, primary_type_display, also_appears_on,
-        national_phone, google_place_id, business_status, parent_slug
+        national_phone, google_place_id, business_status, parent_slug:parent_entity_slug
       `)
       .eq('is_active', true)
       .range(offset, offset + limit - 1);
@@ -1303,7 +1305,7 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
     const { data, error } = await db
       .from('entity')
       .select('*')
-      .eq('parent_slug', req.params.parentSlug)
+      .eq('parent_entity_slug', req.params.parentSlug)
       .eq('is_active', true)
       .order('name');
 
