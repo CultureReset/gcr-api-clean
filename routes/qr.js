@@ -32,6 +32,7 @@ async function uniqueCode() {
 
 // GET /api/qr  — list all codes (admin sees all; business sees theirs)
 router.get('/', authRequired, async (req, res) => {
+    const { seq_from, seq_to, limit } = req.query;
     let query = supabase
         .from('qr_codes')
         .select('*')
@@ -39,6 +40,11 @@ router.get('/', authRequired, async (req, res) => {
 
     // Non-admin scoped to their site
     if (req.role !== 'admin') query = query.eq('site_id', req.siteId);
+
+    // Optional seq-number range — used by the print-sheet / mailing-batch views
+    if (seq_from) query = query.gte('seq_number', parseInt(seq_from, 10));
+    if (seq_to)   query = query.lte('seq_number', parseInt(seq_to, 10));
+    if (limit)    query = query.limit(parseInt(limit, 10));
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
