@@ -94,13 +94,27 @@ async function backfillAnonymousActivity(userId, visitorId) {
     }
 }
 
-// Lookup user by email using admin API
+// Lookup user by email using admin API.
+// NOTE: supabase-js has no admin.getUserByEmail() — it does not exist in any
+// released version (checked 2.39.0 through 2.110.0). listUsers() is the only
+// option and it's paginated with no email filter, so we page through and
+// match client-side. Fine at current user counts; if this ever gets slow,
+// switch to maintaining a user_id/email lookup table instead of paging.
 async function getUserByEmail(email) {
     const sb = admin();
+    const target = email.trim().toLowerCase();
     try {
-        const { data, error } = await sb.auth.admin.getUserByEmail(email);
-        if (error || !data?.user) return null;
-        return data.user;
+        let page = 1;
+        const perPage = 1000;
+        for (let i = 0; i < 20; i++) { // safety cap: 20k users
+            const { data, error } = await sb.auth.admin.listUsers({ page, perPage });
+            if (error || !data?.users?.length) return null;
+            const match = data.users.find(u => (u.email || '').toLowerCase() === target);
+            if (match) return match;
+            if (data.users.length < perPage) return null; // last page
+            page++;
+        }
+        return null;
     } catch { return null; }
 }
 
@@ -427,11 +441,7 @@ router.post('/phone-verify', async (req, res) => {
     const stablePassword = require('crypto').createHash('sha256').update(phone + 'gcr-salt').digest('hex');
 
     // Find or create Supabase auth user
-    let authUser = null;
-    try {
-        const { data: existing } = await sb.auth.admin.getUserByEmail(fakeEmail);
-        authUser = existing?.user || null;
-    } catch {}
+    let authUser = await getUserByEmail(fakeEmail);
 
     if (!authUser) {
         const { data: created, error: createErr } = await sb.auth.admin.createUser({
