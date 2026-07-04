@@ -68,32 +68,6 @@ async function touristAuth(req, res, next) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Backfill: Link all pre-signup activity to the new user (fire-and-forget)
-// ─────────────────────────────────────────────────────────────────────────────
-async function backfillAnonymousActivity(userId, visitorId) {
-    try {
-        // Update all tables where visitor_id matches with the new user_id
-        await Promise.all([
-            mainDb.from('gcr_page_views')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-            mainDb.from('session_events')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-            mainDb.from('qr_scans')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-        ]);
-        console.log('[Backfill] Linked anonymous activity for', userId, 'from visitor', visitorId);
-    } catch (err) {
-        console.error('[Backfill error]', err.message);
-    }
-}
-
 // Lookup user by email using admin API.
 // NOTE: supabase-js has no admin.getUserByEmail() — it does not exist in any
 // released version (checked 2.39.0 through 2.110.0). listUsers() is the only
@@ -216,13 +190,6 @@ router.post('/verify', async (req, res) => {
             first_app: first_app,
             anonymous_visitor_id: anonymous_visitor_id
         }, { onConflict: 'user_id', ignoreDuplicates: true });
-
-    // Fire-and-forget backfill: link all pre-signup activity to this user
-    if (anonymous_visitor_id) {
-        backfillAnonymousActivity(user.id, anonymous_visitor_id).catch(err => {
-            console.warn('Backfill failed for', user.id, ':', err.message);
-        });
-    }
 
     res.json({ success: true });
 });
