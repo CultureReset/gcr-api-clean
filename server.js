@@ -112,6 +112,7 @@ mount('/api/artist-bookings', () => require('./routes/artist-bookings'));
 mount('/api/cooperatives', () => require('./routes/cooperatives'));
 mount('/api/goals', () => require('./routes/goals'));
 mount('/api/webhooks', () => require('./routes/email-webhook'));
+mount('/api/webhooks', () => require('./routes/inbound-email'));
 mount('/api/meta-webhook', () => require('./routes/meta-webhook'));
 
 // Messaging
