@@ -31,11 +31,15 @@ function hashMessageId(messageId) {
   return crypto.createHash('sha256').update(messageId || '').digest('hex');
 }
 
-function detectSourceType(fromAddress = '') {
-  const addr = fromAddress.toLowerCase();
+// Checks both the From header and the body text, since a forwarded/BCC'd
+// email's From is whoever forwarded it, not the original cash.app/venmo.com/
+// paypal.com sender — but that original sender is still visible as quoted
+// text in the forwarded body.
+function detectSourceType(fromAddress = '', bodyText = '') {
+  const addr = (fromAddress + ' ' + bodyText).toLowerCase();
   if (addr.includes('cash.app') || addr.includes('square')) return 'cashapp';
-  if (addr.includes('venmo.com')) return 'venmo';
-  if (addr.includes('paypal.com')) return 'paypal';
+  if (addr.includes('venmo.com') || addr.includes('venmo')) return 'venmo';
+  if (addr.includes('paypal.com') || addr.includes('paypal')) return 'paypal';
   return 'unknown';
 }
 
@@ -89,7 +93,7 @@ router.post('/brevo-inbound/:secret', async (req, res) => {
       const messageId = item.MessageId || '';
 
       const emailHash = hashMessageId(messageId);
-      const sourceType = detectSourceType(fromAddress);
+      const sourceType = detectSourceType(fromAddress, rawText + ' ' + subject);
       const entitySlug = extractEntitySlugFromTo(toAddress);
 
       // Dedup: Brevo (and any retry logic upstream) can redeliver.
