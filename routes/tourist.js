@@ -20,10 +20,20 @@
 
 const express = require('express');
 const multer = require('multer');
+const twilio = require('twilio');
 const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Same Twilio number/credentials used everywhere else in the app (sms.js,
+// tourist-auth.js) — one provider, one number, no separate config to manage.
+const TWILIO_SID   = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM  = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
+function sendTwilioText(to, body) {
+    return twilio(TWILIO_SID, TWILIO_TOKEN).messages.create({ from: TWILIO_FROM, to, body });
+}
 
 // Tourist media (photo/video) uploads — held in memory, capped at 50MB for short video clips
 const touristUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
@@ -1694,18 +1704,7 @@ async function checkGeofence(touristId, lat, lng) {
 
     const msg = `📍 You're near ${biz.name}!\n${special.special_name}${special.discount_text ? ' — ' + special.discount_text : ''}\n\nEnjoy! 🌊`;
 
-    // Send via Sendblue
-    const { data: cfgRow } = await mainDb.from('platform_settings').select('value').eq('key', 'sms_config').maybeSingle();
-    const keyId  = cfgRow?.value?.sendblue_key_id || process.env.SENDBLUE_KEY_ID;
-    const secret = cfgRow?.value?.sendblue_secret  || process.env.SENDBLUE_SECRET;
-
-    if (!keyId || !secret) return;
-
-    await fetch('https://api.sendblue.co/api/send-message', {
-        method: 'POST',
-        headers: { 'sb-api-key-id': keyId, 'sb-api-secret-key': secret, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number: profile.phone, content: msg }),
-    }).catch(() => {});
+    await sendTwilioText(profile.phone, msg).catch(() => {});
 
     // Log it
     await mainDb.from('tourist_sms_log').insert({
@@ -1720,7 +1719,7 @@ async function checkGeofence(touristId, lat, lng) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/tourist/sms-campaign — admin triggers a targeted Sendblue blast
+// POST /api/tourist/sms-campaign — admin triggers a targeted Twilio blast
 // Body: { business_slug, message, tags[], min_score? }
 // Sends ONLY to opted-in tourists whose preference scores match the business tags
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1728,12 +1727,6 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     const { business_slug, message, tags = [], min_score = 10 } = req.body || {};
     if (!message) return res.status(400).json({ error: 'message required' });
     if (!tags.length) return res.status(400).json({ error: 'tags array required' });
-
-    // Load Sendblue config
-    const { data: cfgRow } = await mainDb.from('platform_settings').select('value').eq('key', 'sms_config').maybeSingle();
-    const keyId  = cfgRow?.value?.sendblue_key_id || process.env.SENDBLUE_KEY_ID;
-    const secret = cfgRow?.value?.sendblue_secret  || process.env.SENDBLUE_SECRET;
-    if (!keyId || !secret) return res.status(500).json({ error: 'Sendblue not configured' });
 
     // Find tourists who match the tags with sufficient score and opted in
     const { data: matches } = await mainDb
@@ -1768,16 +1761,21 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
 
     if (!profiles?.length) return res.json({ sent: 0 });
 
-    // Send via Sendblue group message
-    const numbers = profiles.map(p => p.phone);
-    await fetch('https://api.sendblue.co/api/send-group-message', {
-        method: 'POST',
-        headers: { 'sb-api-key-id': keyId, 'sb-api-secret-key': secret, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numbers, content: message }),
-    });
+    // Twilio has no bulk/group-send endpoint — send individually, same pattern
+    // as sms.js's /blast route, with a small delay to stay under rate limits.
+    const sentTo = [];
+    for (const p of profiles) {
+        try {
+            await sendTwilioText(p.phone, message);
+            sentTo.push(p.phone);
+            await new Promise(r => setTimeout(r, 100));
+        } catch (e) {
+            console.error('sms-campaign: failed to send to', p.phone, e.message);
+        }
+    }
 
-    // Log each send
-    const logRows = profiles.map(p => ({
+    // Log each successful send
+    const logRows = profiles.filter(p => sentTo.includes(p.phone)).map(p => ({
         tourist_id:    p.id,
         phone:         p.phone,
         message,
@@ -1788,7 +1786,7 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     }));
     await mainDb.from('tourist_sms_log').insert(logRows).catch(() => {});
 
-    res.json({ sent: profiles.length, numbers });
+    res.json({ sent: sentTo.length, total: profiles.length, numbers: sentTo });
 });
 
 // GET /api/tourist/analytics — swipe trends and engagement metrics
