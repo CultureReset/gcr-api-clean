@@ -98,13 +98,22 @@ async function backfillAnonymousActivity(userId, visitorId) {
     }
 }
 
-// Lookup user by email using admin API
+// Lookup user by email — supabase-js's admin API has no getUserByEmail method
+// (only createUser/listUsers/getUserById exist), so page through listUsers and
+// match client-side instead.
 async function getUserByEmail(email) {
     const sb = admin();
+    const target = (email || '').trim().toLowerCase();
+    if (!target) return null;
     try {
-        const { data, error } = await sb.auth.admin.getUserByEmail(email);
-        if (error || !data?.user) return null;
-        return data.user;
+        for (let page = 1; page <= 20; page++) {
+            const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+            if (error || !data?.users?.length) return null;
+            const match = data.users.find(u => (u.email || '').toLowerCase() === target);
+            if (match) return match;
+            if (data.users.length < 1000) return null; // last page
+        }
+        return null;
     } catch { return null; }
 }
 
@@ -442,11 +451,7 @@ async function establishPhoneSession(phone) {
     const stablePassword = require('crypto').createHash('sha256').update(phone + 'gcr-salt').digest('hex');
 
     // Find or create Supabase auth user
-    let authUser = null;
-    try {
-        const { data: existing } = await sb.auth.admin.getUserByEmail(fakeEmail);
-        authUser = existing?.user || null;
-    } catch {}
+    let authUser = await getUserByEmail(fakeEmail);
 
     if (!authUser) {
         const { data: created, error: createErr } = await sb.auth.admin.createUser({
