@@ -892,7 +892,7 @@ async function touristOrAdminAuth(req, res, next) {
 }
 
 router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
-    const { message = '', history = [], image, url, conversation_id: clientConvId } = req.body || {};
+    const { message = '', history = [], image, url, conversation_id: clientConvId, lat: userLat, lng: userLng } = req.body || {};
     if (!message && !image) return res.status(400).json({ error: 'Message required' });
 
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -928,12 +928,27 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
 
     // Pull live GCR data — entities + menus + specials + pricing + activity details
     const gcrDb = require('../db')();
-    const { data: gcrEntities } = await gcrDb
+    const hasUserLoc = userLat != null && userLng != null;
+    const { data: gcrEntitiesRaw } = await gcrDb
         .from('entity')
-        .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active')
+        .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active, latitude, longitude')
         .eq('is_active', true)
         .order('rating', { ascending: false, nullsFirst: false })
-        .limit(200);
+        .limit(400);
+
+    // If we know where the user is, compute distance and lead with proximity
+    // instead of pure rating — otherwise a great, close-by spot can get cut
+    // just for not being top-rated.
+    let gcrEntities = gcrEntitiesRaw || [];
+    if (hasUserLoc) {
+        gcrEntities = gcrEntities.map(e => ({
+            ...e,
+            distance_mi: (e.latitude != null && e.longitude != null)
+                ? distanceMiles(userLat, userLng, e.latitude, e.longitude)
+                : null,
+        })).sort((a, b) => (a.distance_mi ?? 9999) - (b.distance_mi ?? 9999));
+    }
+    gcrEntities = gcrEntities.slice(0, 200);
 
     const slugs = (gcrEntities || []).map(e => e.slug);
 
@@ -1029,6 +1044,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         ].filter(Boolean).join(', ');
 
         let lines = `• ${e.name} [${type}] ${e.city || ''} ${e.rating ? `⭐${e.rating} (${e.review_count || 0} reviews)` : ''} ${priceLevel}${priceRange}`;
+        if (e.distance_mi != null) lines += ` · 📍${e.distance_mi.toFixed(1)}mi from user`;
         if (e.address_line_1) lines += `\n  📍 ${e.address_line_1}, ${e.city || ''}`;
         if (e.phone) lines += ` · 📞 ${e.phone}`;
         const blurb = e.description || e.editorial_summary;
@@ -1128,6 +1144,7 @@ ${savesBlock}${memoryBlock}
 LIVE GULF COAST DATA (only recommend places from this list — never invent):
 ${gcrContext}
 ${urlContent ? `\nWEBPAGE CONTENT (URL they shared):\n${urlContent}\n` : ''}
+${hasUserLoc ? `\nThe traveler's current location is known — each place above shows its distance from them. Prefer closer options when relevant, but don't force it if a farther spot is clearly the better fit.\n` : ''}
 HOW TO CHAT:
 - Warm, casual, fun — like texting a friend who's a local. Short sentences.
 - Drop in local flavor: "trust me on this one", "locals don't even tell tourists about this spot"
