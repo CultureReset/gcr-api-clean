@@ -1634,15 +1634,41 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Maps the category checkboxes tourists opt into (set at signup, see Profile.jsx)
+// to the entity_type values actually stored on businesses — mirrors
+// gcr-unified/src/data/categories.js so a "food" opt-in matches the same
+// business types the app itself calls "Food & Drink".
+const GEOFENCE_CATEGORY_TYPES = {
+    food:       ['restaurant', 'bar', 'cafe'],
+    activities: ['rental', 'tour', 'activity'],
+    nightlife:  ['bar', 'nightclub', 'lounge'],
+    shopping:   ['retail', 'shop'],
+    stay:       ['hotel', 'resort', 'lodging'],
+    events:     ['event', 'festival'],
+};
+
 async function checkGeofence(touristId, lat, lng) {
-    // Get tourist phone + sms_opt_in
+    // Get tourist phone + sms_opt_in + their geofence preferences
     const { data: profile } = await mainDb
         .from('tourist_profiles')
-        .select('phone, sms_opt_in')
+        .select('phone, sms_opt_in, geofence_radius_miles, sms_frequency, sms_categories')
         .eq('user_id', touristId)
         .maybeSingle();
 
     if (!profile?.phone || !profile.sms_opt_in) return;
+
+    // Respect "once per day" — skip if we've already sent them ANY geofence
+    // text in the last 24h, before even checking what's nearby.
+    if (profile.sms_frequency === 'once_per_day') {
+        const { data: todayLog } = await mainDb
+            .from('tourist_sms_log')
+            .select('id')
+            .eq('tourist_id', touristId)
+            .eq('trigger_type', 'geofence')
+            .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .limit(1);
+        if (todayLog?.length) return;
+    }
 
     // Get their top preference tags
     const { data: scores } = await mainDb
@@ -1653,7 +1679,8 @@ async function checkGeofence(touristId, lat, lng) {
         .limit(10);
     const topTags = (scores || []).filter(s => s.score > 0).map(s => s.tag);
 
-    // Find businesses within 0.5 miles that have active specials today
+    // Find businesses within their chosen radius (default 0.5mi if never set)
+    // that have active specials today
     const gcrDb = require('../db')();
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
@@ -1666,11 +1693,20 @@ async function checkGeofence(touristId, lat, lng) {
 
     if (!nearby?.length) return;
 
-    const RADIUS_MILES = 0.5;
-    const close = nearby.filter(b => {
+    const RADIUS_MILES = profile.geofence_radius_miles || 0.5;
+    let close = nearby.filter(b => {
         if (!b.latitude || !b.longitude) return false;
         return distanceMiles(lat, lng, b.latitude, b.longitude) <= RADIUS_MILES;
     });
+
+    if (!close.length) return;
+
+    // Respect their opted-in categories (food/nightlife/activities/stay/...) —
+    // if they never set any, don't filter rather than matching nothing.
+    if (profile.sms_categories?.length) {
+        const allowedTypes = new Set(profile.sms_categories.flatMap(c => GEOFENCE_CATEGORY_TYPES[c] || []));
+        close = close.filter(b => allowedTypes.has((b.entity_type || '').toLowerCase()));
+    }
 
     if (!close.length) return;
 
@@ -1686,6 +1722,7 @@ async function checkGeofence(touristId, lat, lng) {
     if (!specials?.length) return;
 
     // Only ping if they haven't been geofenced for this business in 6 hours
+    // (secondary guard alongside the once-per-day gate above)
     const { data: recentLog } = await mainDb
         .from('tourist_sms_log')
         .select('id')
