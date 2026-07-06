@@ -260,7 +260,7 @@ const SWIPE_WEIGHTS = { like: 5, nope: -4, super: 15, save: 8, book: 20, view: 2
 // Fetch entity tags from the correct GCR tables (entity + entity_tags)
 async function fetchEntityTagMap(slugs) {
     if (!slugs?.length) return {};
-    const gcrDb = require('../db')();
+    const gcrDb = require('../db');
     const tagMap = {}; // slug → string[]
 
     try {
@@ -929,7 +929,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     const memories  = memoriesRes.data || [];
 
     // Pull live GCR data — entities + menus + specials + pricing + activity details
-    const gcrDb = require('../db')();
+    const gcrDb = require('../db');
     const hasUserLoc = userLat != null && userLng != null;
     const { data: gcrEntitiesRaw } = await gcrDb
         .from('entity')
@@ -1376,7 +1376,7 @@ router.post('/upload-media', touristAuth, touristUpload.single('file'), async (r
     const ext = (mime.split('/')[1] || (isVideo ? 'mp4' : 'jpg')).replace('jpeg', 'jpg').replace('quicktime', 'mov');
     const fileName = `tourist/${req.touristId}/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
     try {
-        const gcrDb = require('../db')();
+        const gcrDb = require('../db');
         let { error } = await gcrDb.storage.from('customer-photos').upload(fileName, req.file.buffer, { contentType: mime, upsert: false });
         if (error && /bucket|not found/i.test(error.message || '')) {
             await gcrDb.storage.createBucket('customer-photos', { public: true }).catch(() => {});
@@ -1453,7 +1453,7 @@ router.post('/reviews', touristAuth, async (req, res) => {
     const { data: profile } = await mainDb.from('tourist_profiles').select('name').eq('user_id', req.touristId).maybeSingle();
     const reviewerName = profile?.name || 'Traveler';
 
-    const gcrDb = require('../db')();
+    const gcrDb = require('../db');
     const row = {
         entity_slug,
         reviewer_name: reviewerName,
@@ -1480,7 +1480,7 @@ router.post('/reviews', touristAuth, async (req, res) => {
 
 // GET /api/tourist/reviews — the tourist's own reviews, for their dashboard
 router.get('/reviews', touristAuth, async (req, res) => {
-    const gcrDb = require('../db')();
+    const gcrDb = require('../db');
     const { data, error } = await gcrDb.from('entity_reviews')
         .select('*')
         .eq('user_id', req.touristId)
@@ -1669,7 +1669,7 @@ async function checkGeofence(touristId, lat, lng) {
 
     // Find businesses within their chosen radius (default 0.5mi if never set)
     // that have active specials today
-    const gcrDb = require('../db')();
+    const gcrDb = require('../db');
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
     const { data: nearby } = await gcrDb
