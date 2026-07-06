@@ -19,10 +19,24 @@
  */
 
 const express = require('express');
+const multer = require('multer');
+const twilio = require('twilio');
 const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Same Twilio number/credentials used everywhere else in the app (sms.js,
+// tourist-auth.js) — one provider, one number, no separate config to manage.
+const TWILIO_SID   = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_FROM  = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
+function sendTwilioText(to, body) {
+    return twilio(TWILIO_SID, TWILIO_TOKEN).messages.create({ from: TWILIO_FROM, to, body });
+}
+
+// Tourist media (photo/video) uploads — held in memory, capped at 50MB for short video clips
+const touristUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ── Tourist middleware: verify Supabase JWT, attach tourist user id ─────────
 async function touristAuth(req, res, next) {
@@ -241,7 +255,7 @@ router.post('/swipes', touristAuth, async (req, res) => {
 });
 
 // Score weights per swipe direction
-const SWIPE_WEIGHTS = { like: 5, nope: -4, super: 15, save: 8, book: 20, view: 2 };
+const SWIPE_WEIGHTS = { like: 5, nope: -4, super: 15, save: 8, book: 20, view: 2, maybe: 1 };
 
 // Fetch entity tags from the correct GCR tables (entity + entity_tags)
 async function fetchEntityTagMap(slugs) {
@@ -305,24 +319,12 @@ async function applyScoreDeltas(touristId, updates) {
     }
 
     for (const [tag, delta] of Object.entries(totals)) {
-        try {
-            const { error } = await mainDb.rpc('upsert_preference_score', {
-                p_tourist_id: touristId,
-                p_tag:        tag,
-                p_delta:      delta,
-            });
-            if (error) throw error;
-        } catch {
-            // Fallback: increment existing score, insert if new, clamp between -50 and 200
-            await mainDb.rpc('exec_sql', { sql: `
-                INSERT INTO user_preference_scores (tourist_id, tag, score, updated_at)
-                VALUES ('${touristId}', '${tag.replace(/'/g, "''")}', GREATEST(-50, LEAST(200, ${delta})), NOW())
-                ON CONFLICT (tourist_id, tag)
-                DO UPDATE SET
-                    score = GREATEST(-50, LEAST(200, user_preference_scores.score + ${delta})),
-                    updated_at = NOW()
-            ` }).catch(() => {});
-        }
+        const { error } = await mainDb.rpc('upsert_preference_score', {
+            p_tourist_id: touristId,
+            p_tag:        tag,
+            p_delta:      delta,
+        });
+        if (error) console.error('[preference] upsert_preference_score failed:', error.message);
     }
 }
 
@@ -356,7 +358,7 @@ async function recomputeAllPreferences(touristId) {
     if (!touristId) return;
 
     // Wipe existing scores so we recompute clean
-    await mainDb.from('user_preference_scores').delete().eq('tourist_id', touristId).catch(() => {});
+    await mainDb.from('user_preference_scores').delete().eq('user_id', touristId).catch(() => {});
 
     // Load full swipe history
     const { data: events } = await mainDb
@@ -417,7 +419,7 @@ router.get('/preferences', touristAuth, async (req, res) => {
     const { data: scores } = await mainDb
         .from('user_preference_scores')
         .select('tag, score, updated_at')
-        .eq('tourist_id', touristId)
+        .eq('user_id', touristId)
         .order('score', { ascending: false });
 
     const all = scores || [];
@@ -892,7 +894,7 @@ async function touristOrAdminAuth(req, res, next) {
 }
 
 router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
-    const { message = '', history = [], image, url, conversation_id: clientConvId } = req.body || {};
+    const { message = '', history = [], image, url, conversation_id: clientConvId, lat: userLat, lng: userLng } = req.body || {};
     if (!message && !image) return res.status(400).json({ error: 'Message required' });
 
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -928,12 +930,27 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
 
     // Pull live GCR data — entities + menus + specials + pricing + activity details
     const gcrDb = require('../db')();
-    const { data: gcrEntities } = await gcrDb
+    const hasUserLoc = userLat != null && userLng != null;
+    const { data: gcrEntitiesRaw } = await gcrDb
         .from('entity')
-        .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active')
+        .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active, latitude, longitude')
         .eq('is_active', true)
         .order('rating', { ascending: false, nullsFirst: false })
-        .limit(200);
+        .limit(400);
+
+    // If we know where the user is, compute distance and lead with proximity
+    // instead of pure rating — otherwise a great, close-by spot can get cut
+    // just for not being top-rated.
+    let gcrEntities = gcrEntitiesRaw || [];
+    if (hasUserLoc) {
+        gcrEntities = gcrEntities.map(e => ({
+            ...e,
+            distance_mi: (e.latitude != null && e.longitude != null)
+                ? distanceMiles(userLat, userLng, e.latitude, e.longitude)
+                : null,
+        })).sort((a, b) => (a.distance_mi ?? 9999) - (b.distance_mi ?? 9999));
+    }
+    gcrEntities = gcrEntities.slice(0, 200);
 
     const slugs = (gcrEntities || []).map(e => e.slug);
 
@@ -1029,6 +1046,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         ].filter(Boolean).join(', ');
 
         let lines = `• ${e.name} [${type}] ${e.city || ''} ${e.rating ? `⭐${e.rating} (${e.review_count || 0} reviews)` : ''} ${priceLevel}${priceRange}`;
+        if (e.distance_mi != null) lines += ` · 📍${e.distance_mi.toFixed(1)}mi from user`;
         if (e.address_line_1) lines += `\n  📍 ${e.address_line_1}, ${e.city || ''}`;
         if (e.phone) lines += ` · 📞 ${e.phone}`;
         const blurb = e.description || e.editorial_summary;
@@ -1128,6 +1146,7 @@ ${savesBlock}${memoryBlock}
 LIVE GULF COAST DATA (only recommend places from this list — never invent):
 ${gcrContext}
 ${urlContent ? `\nWEBPAGE CONTENT (URL they shared):\n${urlContent}\n` : ''}
+${hasUserLoc ? `\nThe traveler's current location is known — each place above shows its distance from them. Prefer closer options when relevant, but don't force it if a farther spot is clearly the better fit.\n` : ''}
 HOW TO CHAT:
 - Warm, casual, fun — like texting a friend who's a local. Short sentences.
 - Drop in local flavor: "trust me on this one", "locals don't even tell tourists about this spot"
@@ -1341,11 +1360,39 @@ router.delete('/ai-chat/memories/:id', touristOrAdminAuth, async (req, res) => {
     res.json({ success: true });
 });
 
-// ── Community Photos ────────────────────────────────────────────────────────
+// ── Community Photos & Videos ───────────────────────────────────────────────
 
-// POST /api/tourist/photos — submit a photo (auth or anon via review link)
+// POST /api/tourist/upload-media — upload an image OR video, return its public URL.
+// The tourist (identified by their phone-based account) then attaches this URL to
+// a photo submission or a review. Files go to the shared customer-photos bucket
+// under a per-tourist folder so everything traces back to their account.
+router.post('/upload-media', touristAuth, touristUpload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const mime = req.file.mimetype || '';
+    const isVideo = mime.startsWith('video/');
+    const isImage = mime.startsWith('image/');
+    if (!isVideo && !isImage) return res.status(400).json({ error: 'Only image or video files are allowed' });
+
+    const ext = (mime.split('/')[1] || (isVideo ? 'mp4' : 'jpg')).replace('jpeg', 'jpg').replace('quicktime', 'mov');
+    const fileName = `tourist/${req.touristId}/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+    try {
+        const gcrDb = require('../db')();
+        let { error } = await gcrDb.storage.from('customer-photos').upload(fileName, req.file.buffer, { contentType: mime, upsert: false });
+        if (error && /bucket|not found/i.test(error.message || '')) {
+            await gcrDb.storage.createBucket('customer-photos', { public: true }).catch(() => {});
+            ({ error } = await gcrDb.storage.from('customer-photos').upload(fileName, req.file.buffer, { contentType: mime, upsert: false }));
+        }
+        if (error) return res.status(500).json({ error: error.message });
+        const { data } = gcrDb.storage.from('customer-photos').getPublicUrl(fileName);
+        res.json({ url: data.publicUrl, media_type: isVideo ? 'video' : 'image' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/tourist/photos — submit a photo or video (auth or anon via review link)
 router.post('/photos', async (req, res) => {
-    const { entity_slug, image_url, caption, uploader_name, category } = req.body;
+    const { entity_slug, image_url, caption, uploader_name, category, media_type } = req.body;
     if (!entity_slug || !image_url) return res.status(400).json({ error: 'entity_slug and image_url required' });
     // Attempt to read user_id from token if present (not required)
     let userId = null;
@@ -1357,7 +1404,7 @@ router.post('/photos', async (req, res) => {
             userId = user?.id || null;
         } catch (_) {}
     }
-    const { data, error } = await mainDb.from('tourist_photos').insert({
+    const row = {
         user_id: userId,
         entity_slug,
         image_url,
@@ -1365,20 +1412,158 @@ router.post('/photos', async (req, res) => {
         uploader_name: uploader_name || null,
         category: category || 'general',
         status: 'pending',
-    }).select().single();
+        media_type: media_type === 'video' ? 'video' : 'image',
+    };
+    let { data, error } = await mainDb.from('tourist_photos').insert(row).select().single();
+    // If the media_type column doesn't exist yet, retry without it
+    if (error && error.message?.includes('media_type')) {
+        const { media_type: _dropped, ...rowWithout } = row;
+        ({ data, error } = await mainDb.from('tourist_photos').insert(rowWithout).select().single());
+    }
     if (error) return res.status(500).json({ error: error.message });
+    if (userId) awardPoints(userId, row.media_type === 'video' ? 'video' : 'photo', entity_slug).catch(() => {});
     res.json({ success: true, photo: data });
 });
 
 // GET /api/tourist/photos — get photos submitted by the logged-in user
 router.get('/photos', touristAuth, async (req, res) => {
     const { data, error } = await mainDb.from('tourist_photos')
-        .select('id, entity_slug, image_url, caption, category, status, submitted_at, reviewed_at')
+        .select('*')
         .eq('user_id', req.touristId)
         .order('submitted_at', { ascending: false })
         .limit(100);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ photos: data || [] });
+});
+
+// ── Authentic Reviews — every review tied to the tourist's phone account ─────
+// A review can only be written by a logged-in tourist, so it is provably from a
+// real, identified person (their phone-based user_id) rather than an anonymous
+// typed-in email. Supports photo/video reviews via media_url/media_type.
+
+// POST /api/tourist/reviews — write a review as the logged-in tourist
+router.post('/reviews', touristAuth, async (req, res) => {
+    const { entity_slug, rating, title, body, media_url, media_type } = req.body || {};
+    if (!entity_slug || !rating || !title || !body) {
+        return res.status(400).json({ error: 'entity_slug, rating, title and body are required' });
+    }
+    const r = parseInt(rating);
+    if (!(r >= 1 && r <= 5)) return res.status(400).json({ error: 'Rating must be 1–5' });
+
+    const { data: profile } = await mainDb.from('tourist_profiles').select('name').eq('user_id', req.touristId).maybeSingle();
+    const reviewerName = profile?.name || 'Traveler';
+
+    const gcrDb = require('../db')();
+    const row = {
+        entity_slug,
+        reviewer_name: reviewerName,
+        reviewer_email: req.touristEmail || null,
+        user_id: req.touristId,             // ← ties the review to the phone account
+        rating: r,
+        title: String(title).trim(),
+        body: String(body).trim(),
+        media_url: media_url || null,
+        media_type: media_type === 'video' ? 'video' : (media_url ? 'image' : null),
+        approved: false,
+        created_at: new Date().toISOString(),
+    };
+    let { data, error } = await gcrDb.from('entity_reviews').insert(row).select().single();
+    // If newer columns (user_id / media_*) don't exist yet, retry with the base shape
+    if (error && /column|user_id|media_url|media_type/i.test(error.message || '')) {
+        const { user_id, media_url: _mu, media_type: _mt, ...base } = row;
+        ({ data, error } = await gcrDb.from('entity_reviews').insert(base).select().single());
+    }
+    if (error) return res.status(500).json({ error: error.message });
+    awardPoints(req.touristId, 'review', entity_slug).catch(() => {});
+    res.status(201).json({ ok: true, review: data });
+});
+
+// GET /api/tourist/reviews — the tourist's own reviews, for their dashboard
+router.get('/reviews', touristAuth, async (req, res) => {
+    const gcrDb = require('../db')();
+    const { data, error } = await gcrDb.from('entity_reviews')
+        .select('*')
+        .eq('user_id', req.touristId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+    // If the user_id column isn't present yet, there's nothing to tie to — return empty
+    if (error) return res.json({ reviews: [] });
+    res.json({ reviews: data || [] });
+});
+
+// ── Points / Rewards ─────────────────────────────────────────────────────────
+// One append-only ledger tied to the phone account. Balance = SUM(delta).
+// Points never expire, so they roll over trip to trip automatically.
+
+// Award points for an action, using the admin-configured earn amount.
+async function awardPoints(userId, reason, entitySlug) {
+    if (!userId || !reason) return;
+    try {
+        const { data: cfg } = await mainDb.from('points_config').select('earn').eq('id', 1).maybeSingle();
+        const delta = cfg?.earn?.[reason];
+        if (!delta) return;
+        await mainDb.from('tourist_points').insert({ user_id: userId, delta, reason, entity_slug: entitySlug || null });
+    } catch (e) { console.error('[points] award failed:', e?.message); }
+}
+
+// GET /api/tourist/points — balance, current tier, next tier, recent history
+router.get('/points', touristAuth, async (req, res) => {
+    const [{ data: rows }, { data: cfg }] = await Promise.all([
+        mainDb.from('tourist_points').select('delta, reason, entity_slug, created_at').eq('user_id', req.touristId).order('created_at', { ascending: false }),
+        mainDb.from('points_config').select('tiers').eq('id', 1).maybeSingle(),
+    ]);
+    const history = rows || [];
+    const balance = history.reduce((s, r) => s + (r.delta || 0), 0);
+    const tiers = (cfg?.tiers || []).slice().sort((a, b) => (a.min || 0) - (b.min || 0));
+    let tier = tiers[0] || { name: 'Member', min: 0 };
+    let next = null;
+    for (const t of tiers) {
+        if (balance >= (t.min || 0)) tier = t;
+        else { next = t; break; }
+    }
+    res.json({ balance, tier, next, history: history.slice(0, 50) });
+});
+
+// GET/PUT /api/tourist/points-config — admin edits earn amounts + tiers/perks
+router.get('/points-config', adminRequired, async (req, res) => {
+    const { data } = await mainDb.from('points_config').select('*').eq('id', 1).maybeSingle();
+    res.json({ config: data || null });
+});
+router.put('/points-config', adminRequired, async (req, res) => {
+    const { earn, tiers } = req.body || {};
+    const patch = { updated_at: new Date().toISOString() };
+    if (earn)  patch.earn  = earn;
+    if (tiers) patch.tiers = tiers;
+    const { data, error } = await mainDb.from('points_config').update(patch).eq('id', 1).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ config: data });
+});
+
+// POST /api/tourist/track-click — log an outbound click (Book Now, order, reserve…)
+// tied to the tourist's account. Returns a click id (gcr_ref) to append to the
+// outbound URL so a later conversion can be attributed back to them.
+router.post('/track-click', async (req, res) => {
+    const { entity_slug, click_type, target_url } = req.body || {};
+    let userId = null;
+    const header = req.headers.authorization;
+    if (header && header.startsWith('Bearer ')) {
+        try {
+            const { data: { user } } = await mainDb.auth.getUser(header.slice(7));
+            userId = user?.id || null;
+        } catch (_) {}
+    }
+    try {
+        const { data, error } = await mainDb.from('tourist_click_events').insert({
+            user_id: userId,
+            entity_slug: entity_slug || null,
+            click_type: click_type || 'book',
+            target_url: target_url || null,
+        }).select('id').single();
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ click_id: data.id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1437,26 +1622,53 @@ function distanceMiles(lat1, lng1, lat2, lng2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Maps the category checkboxes tourists opt into (set at signup, see Profile.jsx)
+// to the entity_type values actually stored on businesses — mirrors
+// gcr-unified/src/data/categories.js so a "food" opt-in matches the same
+// business types the app itself calls "Food & Drink".
+const GEOFENCE_CATEGORY_TYPES = {
+    food:       ['restaurant', 'bar', 'cafe'],
+    activities: ['rental', 'tour', 'activity'],
+    nightlife:  ['bar', 'nightclub', 'lounge'],
+    shopping:   ['retail', 'shop'],
+    stay:       ['hotel', 'resort', 'lodging'],
+    events:     ['event', 'festival'],
+};
+
 async function checkGeofence(touristId, lat, lng) {
-    // Get tourist phone + sms_opt_in
+    // Get tourist phone + sms_opt_in + their geofence preferences
     const { data: profile } = await mainDb
         .from('tourist_profiles')
-        .select('phone, sms_opt_in')
+        .select('phone, sms_opt_in, geofence_radius_miles, sms_frequency, sms_categories')
         .eq('user_id', touristId)
         .maybeSingle();
 
     if (!profile?.phone || !profile.sms_opt_in) return;
 
+    // Respect "once per day" — skip if we've already sent them ANY geofence
+    // text in the last 24h, before even checking what's nearby.
+    if (profile.sms_frequency === 'once_per_day') {
+        const { data: todayLog } = await mainDb
+            .from('tourist_sms_log')
+            .select('id')
+            .eq('tourist_id', touristId)
+            .eq('trigger_type', 'geofence')
+            .gte('sent_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+            .limit(1);
+        if (todayLog?.length) return;
+    }
+
     // Get their top preference tags
     const { data: scores } = await mainDb
         .from('user_preference_scores')
         .select('tag, score')
-        .eq('tourist_id', touristId)
+        .eq('user_id', touristId)
         .order('score', { ascending: false })
         .limit(10);
     const topTags = (scores || []).filter(s => s.score > 0).map(s => s.tag);
 
-    // Find businesses within 0.5 miles that have active specials today
+    // Find businesses within their chosen radius (default 0.5mi if never set)
+    // that have active specials today
     const gcrDb = require('../db')();
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
 
@@ -1469,11 +1681,20 @@ async function checkGeofence(touristId, lat, lng) {
 
     if (!nearby?.length) return;
 
-    const RADIUS_MILES = 0.5;
-    const close = nearby.filter(b => {
+    const RADIUS_MILES = profile.geofence_radius_miles || 0.5;
+    let close = nearby.filter(b => {
         if (!b.latitude || !b.longitude) return false;
         return distanceMiles(lat, lng, b.latitude, b.longitude) <= RADIUS_MILES;
     });
+
+    if (!close.length) return;
+
+    // Respect their opted-in categories (food/nightlife/activities/stay/...) —
+    // if they never set any, don't filter rather than matching nothing.
+    if (profile.sms_categories?.length) {
+        const allowedTypes = new Set(profile.sms_categories.flatMap(c => GEOFENCE_CATEGORY_TYPES[c] || []));
+        close = close.filter(b => allowedTypes.has((b.entity_type || '').toLowerCase()));
+    }
 
     if (!close.length) return;
 
@@ -1489,6 +1710,7 @@ async function checkGeofence(touristId, lat, lng) {
     if (!specials?.length) return;
 
     // Only ping if they haven't been geofenced for this business in 6 hours
+    // (secondary guard alongside the once-per-day gate above)
     const { data: recentLog } = await mainDb
         .from('tourist_sms_log')
         .select('id')
@@ -1507,18 +1729,7 @@ async function checkGeofence(touristId, lat, lng) {
 
     const msg = `📍 You're near ${biz.name}!\n${special.special_name}${special.discount_text ? ' — ' + special.discount_text : ''}\n\nEnjoy! 🌊`;
 
-    // Send via Sendblue
-    const { data: cfgRow } = await mainDb.from('platform_settings').select('value').eq('key', 'sms_config').maybeSingle();
-    const keyId  = cfgRow?.value?.sendblue_key_id || process.env.SENDBLUE_KEY_ID;
-    const secret = cfgRow?.value?.sendblue_secret  || process.env.SENDBLUE_SECRET;
-
-    if (!keyId || !secret) return;
-
-    await fetch('https://api.sendblue.co/api/send-message', {
-        method: 'POST',
-        headers: { 'sb-api-key-id': keyId, 'sb-api-secret-key': secret, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ number: profile.phone, content: msg }),
-    }).catch(() => {});
+    await sendTwilioText(profile.phone, msg).catch(() => {});
 
     // Log it
     await mainDb.from('tourist_sms_log').insert({
@@ -1533,7 +1744,7 @@ async function checkGeofence(touristId, lat, lng) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/tourist/sms-campaign — admin triggers a targeted Sendblue blast
+// POST /api/tourist/sms-campaign — admin triggers a targeted Twilio blast
 // Body: { business_slug, message, tags[], min_score? }
 // Sends ONLY to opted-in tourists whose preference scores match the business tags
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1542,23 +1753,17 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     if (!message) return res.status(400).json({ error: 'message required' });
     if (!tags.length) return res.status(400).json({ error: 'tags array required' });
 
-    // Load Sendblue config
-    const { data: cfgRow } = await mainDb.from('platform_settings').select('value').eq('key', 'sms_config').maybeSingle();
-    const keyId  = cfgRow?.value?.sendblue_key_id || process.env.SENDBLUE_KEY_ID;
-    const secret = cfgRow?.value?.sendblue_secret  || process.env.SENDBLUE_SECRET;
-    if (!keyId || !secret) return res.status(500).json({ error: 'Sendblue not configured' });
-
     // Find tourists who match the tags with sufficient score and opted in
     const { data: matches } = await mainDb
         .from('user_preference_scores')
-        .select('tourist_id, tag, score')
+        .select('user_id, tag, score')
         .in('tag', tags.map(t => t.toLowerCase().trim()))
         .gte('score', min_score);
 
     if (!matches?.length) return res.json({ sent: 0, message: 'No matching users' });
 
     // Group by tourist — keep those who match at least one tag
-    const touristIds = [...new Set(matches.map(m => m.tourist_id))];
+    const touristIds = [...new Set(matches.map(m => m.user_id))];
 
     // Get opted-in phones — exclude anyone messaged by this business in last 24h
     const { data: recentSent } = await mainDb
@@ -1574,24 +1779,29 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
 
     const { data: profiles } = await mainDb
         .from('tourist_profiles')
-        .select('id, phone')
-        .in('id', eligibleIds)
+        .select('user_id, phone')
+        .in('user_id', eligibleIds)
         .eq('sms_opt_in', true)
         .not('phone', 'is', null);
 
     if (!profiles?.length) return res.json({ sent: 0 });
 
-    // Send via Sendblue group message
-    const numbers = profiles.map(p => p.phone);
-    await fetch('https://api.sendblue.co/api/send-group-message', {
-        method: 'POST',
-        headers: { 'sb-api-key-id': keyId, 'sb-api-secret-key': secret, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numbers, content: message }),
-    });
+    // Twilio has no bulk/group-send endpoint — send individually, same pattern
+    // as sms.js's /blast route, with a small delay to stay under rate limits.
+    const sentTo = [];
+    for (const p of profiles) {
+        try {
+            await sendTwilioText(p.phone, message);
+            sentTo.push(p.phone);
+            await new Promise(r => setTimeout(r, 100));
+        } catch (e) {
+            console.error('sms-campaign: failed to send to', p.phone, e.message);
+        }
+    }
 
-    // Log each send
-    const logRows = profiles.map(p => ({
-        tourist_id:    p.id,
+    // Log each successful send
+    const logRows = profiles.filter(p => sentTo.includes(p.phone)).map(p => ({
+        tourist_id:    p.user_id,
         phone:         p.phone,
         message,
         trigger_type:  'campaign',
@@ -1601,56 +1811,7 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     }));
     await mainDb.from('tourist_sms_log').insert(logRows).catch(() => {});
 
-    res.json({ sent: profiles.length, numbers });
-});
-
-// GET /api/tourist/analytics — swipe trends and engagement metrics
-router.get('/analytics', touristAuth, async (req, res) => {
-    const touristId = req.touristId;
-
-    try {
-        const { data: events } = await mainDb
-            .from('tourist_swipes')
-            .select('direction, category, swiped_at')
-            .eq('tourist_id', touristId)
-            .order('swiped_at', { ascending: false });
-
-        const { data: saves } = await mainDb
-            .from('tourist_saves')
-            .select('category:entity_slug, saved_at')
-            .eq('tourist_id', touristId);
-
-        const directionCounts = { left: 0, right: 0 };
-        const categoryCounts = {};
-        const dailySwipes = {};
-
-        for (const ev of (events || [])) {
-            directionCounts[ev.direction] = (directionCounts[ev.direction] || 0) + 1;
-            categoryCounts[ev.category] = (categoryCounts[ev.category] || 0) + 1;
-
-            const date = new Date(ev.swiped_at).toISOString().split('T')[0];
-            dailySwipes[date] = (dailySwipes[date] || 0) + 1;
-        }
-
-        const totalSwipes = events?.length || 0;
-        const likeRate = totalSwipes > 0 ? (directionCounts.right / totalSwipes * 100).toFixed(1) : 0;
-        const avgSwipesPerDay = totalSwipes > 0 ? (totalSwipes / (Object.keys(dailySwipes).length || 1)).toFixed(1) : 0;
-
-        res.json({
-            total_swipes: totalSwipes,
-            total_saves: saves?.length || 0,
-            swipe_breakdown: directionCounts,
-            like_rate: parseFloat(likeRate),
-            category_distribution: categoryCounts,
-            daily_swipes: dailySwipes,
-            avg_swipes_per_day: parseFloat(avgSwipesPerDay),
-            first_swipe: events?.[events.length - 1]?.swiped_at || null,
-            last_swipe: events?.[0]?.swiped_at || null,
-        });
-    } catch (e) {
-        console.error('[analytics] Error:', e?.message);
-        return res.status(500).json({ error: 'Failed to fetch analytics' });
-    }
+    res.json({ sent: sentTo.length, total: profiles.length, numbers: sentTo });
 });
 
 module.exports = router;

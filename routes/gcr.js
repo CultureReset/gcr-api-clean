@@ -421,7 +421,7 @@ router.get('/entities', async (req, res) => {
     // instead of maintaining two different recommendation systems.
     let prefScoreByTag = {};
     if (userId && sortMode === 'default') {
-      const { data: scores } = await db.from('user_preference_scores').select('tag, score').eq('tourist_id', userId);
+      const { data: scores } = await db.from('user_preference_scores').select('tag, score').eq('user_id', userId);
       (scores || []).forEach(s => { prefScoreByTag[(s.tag || '').toLowerCase().trim()] = s.score; });
     }
     const hasPrefSignal = Object.keys(prefScoreByTag).length > 0;
@@ -554,7 +554,7 @@ router.get('/entities/paginated', async (req, res) => {
 
     let prefScoreByTag = {};
     if (userId && sortMode === 'default') {
-      const { data: scores } = await db.from('user_preference_scores').select('tag, score').eq('tourist_id', userId);
+      const { data: scores } = await db.from('user_preference_scores').select('tag, score').eq('user_id', userId);
       (scores || []).forEach(s => { prefScoreByTag[(s.tag || '').toLowerCase().trim()] = s.score; });
     }
     const hasPrefSignal = Object.keys(prefScoreByTag).length > 0;
@@ -682,7 +682,7 @@ async function resolveRailContent(rail, { userLat, userLng, userId } = {}) {
     if (!userId) return []; // no personalization possible for anonymous visitors
     const [tagRows, scores] = await Promise.all([
       db.from('entity_tags').select('entity_slug, tag_name').in('entity_slug', slugs),
-      db.from('user_preference_scores').select('tag, score').eq('tourist_id', userId),
+      db.from('user_preference_scores').select('tag, score').eq('user_id', userId),
     ]);
     const prefScoreByTag = {};
     (scores.data || []).forEach(s => { prefScoreByTag[(s.tag || '').toLowerCase().trim()] = s.score; });

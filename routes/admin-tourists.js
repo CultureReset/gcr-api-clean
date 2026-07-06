@@ -121,7 +121,7 @@ router.get('/:user_id/preferences', adminRequired, async (req, res) => {
     const uid = req.params.user_id;
 
     const [scoresRes, swipeRes, savesRes] = await Promise.all([
-        db.from('user_preference_scores').select('tag, score, updated_at').eq('tourist_id', uid).order('score', { ascending: false }),
+        db.from('user_preference_scores').select('tag, score, updated_at').eq('user_id', uid).order('score', { ascending: false }),
         db.from('tourist_swipe_events').select('direction').eq('user_id', uid),
         db.from('tourist_saves').select('id').eq('user_id', uid),
     ]);

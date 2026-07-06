@@ -191,15 +191,6 @@ router.post('/twilio', express.urlencoded({ extended: false }), async (req, res)
 });
 
 // ============================================
-// POST /api/webhooks/sendblue — SendBlue iMessage events
-// ============================================
-router.post('/sendblue', express.json(), async (req, res) => {
-    const { from, body, timestamp } = req.body || {};
-    console.log(`SendBlue webhook: from=${from} timestamp=${timestamp} body=${body}`);
-    res.json({ received: true });
-});
-
-// ============================================
 // POST /api/webhooks/google — Google Business events
 // ============================================
 router.post('/google', async (req, res) => {
