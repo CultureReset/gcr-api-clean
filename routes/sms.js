@@ -10,6 +10,27 @@ const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
 const FROM_NUMBER    = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
 const GCR_URL        = process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com';
+// Must exactly match the "A message comes in" webhook URL configured on the
+// Twilio phone number's console page — Twilio signs against that literal
+// URL, not whatever the server thinks its own host is. VERIFY THIS MATCHES
+// before relying on it; a mismatch makes every real inbound text fail
+// silently with a 403, not just a security check that's merely too loose.
+const TWILIO_INBOUND_URL = process.env.TWILIO_INBOUND_WEBHOOK_URL || 'https://gcr-api-clean.vercel.app/api/sms/inbound';
+
+// Twilio's inbound webhook has no built-in auth — anyone who finds the URL
+// can POST a forged `From` and, without this check, get back whatever the
+// handler would have texted that number (including a magic sign-in token).
+// This validates the request actually came from Twilio using the shared
+// auth token, per Twilio's request-validation scheme.
+function verifyTwilioSignature(req, res, next) {
+  const signature = req.headers['x-twilio-signature'];
+  const valid = AUTH_TOKEN && signature && twilio.validateRequest(AUTH_TOKEN, signature, TWILIO_INBOUND_URL, req.body || {});
+  if (!valid) {
+    console.error('[sms/inbound] Twilio signature validation failed — rejecting request');
+    return res.status(403).send('Forbidden');
+  }
+  next();
+}
 
 let _adminClient = null;
 function adminSb() {
@@ -128,7 +149,7 @@ async function issueMagicToken(phone) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // POST /api/sms/inbound — Twilio webhook
-router.post('/inbound', express.urlencoded({ extended: false }), async (req, res) => {
+router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSignature, async (req, res) => {
   const twiml = new twilio.twiml.MessagingResponse();
   const from  = req.body?.From;
   const body  = (req.body?.Body || '').trim();
@@ -225,10 +246,7 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
 
 // POST /api/sms/blast — send promos/deals to all tourists currently in town
 // Body: { message, tags? } — admin only
-router.post('/blast', async (req, res) => {
-  const token = (req.headers.authorization || '').replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+router.post('/blast', adminRequired, async (req, res) => {
   const { message, tags } = req.body || {};
   if (!message) return res.status(400).json({ error: 'message required' });
 
@@ -267,8 +285,9 @@ router.post('/blast', async (req, res) => {
   }
 });
 
-// POST /api/sms/send — send a one-off SMS
-router.post('/send', async (req, res) => {
+// POST /api/sms/send — send a one-off SMS (admin only — this sends real
+// texts on your Twilio balance to any number, must never be public)
+router.post('/send', adminRequired, async (req, res) => {
   const { to, message } = req.body;
   if (!to || !message) return res.status(400).json({ error: 'to and message required' });
   try {
