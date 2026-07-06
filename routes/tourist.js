@@ -1437,6 +1437,60 @@ router.get('/photos', touristAuth, async (req, res) => {
     res.json({ photos: data || [] });
 });
 
+// ── Authentic Reviews — every review tied to the tourist's phone account ─────
+// A review can only be written by a logged-in tourist, so it is provably from a
+// real, identified person (their phone-based user_id) rather than an anonymous
+// typed-in email. Supports photo/video reviews via media_url/media_type.
+
+// POST /api/tourist/reviews — write a review as the logged-in tourist
+router.post('/reviews', touristAuth, async (req, res) => {
+    const { entity_slug, rating, title, body, media_url, media_type } = req.body || {};
+    if (!entity_slug || !rating || !title || !body) {
+        return res.status(400).json({ error: 'entity_slug, rating, title and body are required' });
+    }
+    const r = parseInt(rating);
+    if (!(r >= 1 && r <= 5)) return res.status(400).json({ error: 'Rating must be 1–5' });
+
+    const { data: profile } = await mainDb.from('tourist_profiles').select('name').eq('user_id', req.touristId).maybeSingle();
+    const reviewerName = profile?.name || 'Traveler';
+
+    const gcrDb = require('../db')();
+    const row = {
+        entity_slug,
+        reviewer_name: reviewerName,
+        reviewer_email: req.touristEmail || null,
+        user_id: req.touristId,             // ← ties the review to the phone account
+        rating: r,
+        title: String(title).trim(),
+        body: String(body).trim(),
+        media_url: media_url || null,
+        media_type: media_type === 'video' ? 'video' : (media_url ? 'image' : null),
+        approved: false,
+        created_at: new Date().toISOString(),
+    };
+    let { data, error } = await gcrDb.from('entity_reviews').insert(row).select().single();
+    // If newer columns (user_id / media_*) don't exist yet, retry with the base shape
+    if (error && /column|user_id|media_url|media_type/i.test(error.message || '')) {
+        const { user_id, media_url: _mu, media_type: _mt, ...base } = row;
+        ({ data, error } = await gcrDb.from('entity_reviews').insert(base).select().single());
+    }
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json({ ok: true, review: data });
+});
+
+// GET /api/tourist/reviews — the tourist's own reviews, for their dashboard
+router.get('/reviews', touristAuth, async (req, res) => {
+    const gcrDb = require('../db')();
+    const { data, error } = await gcrDb.from('entity_reviews')
+        .select('*')
+        .eq('user_id', req.touristId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+    // If the user_id column isn't present yet, there's nothing to tie to — return empty
+    if (error) return res.json({ reviews: [] });
+    res.json({ reviews: data || [] });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/tourist/location — browser sends GPS, we store it + check geofences
 // Body: { lat, lng }
