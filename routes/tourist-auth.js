@@ -14,6 +14,10 @@ const crypto  = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { sendEmail } = require('../utils/email');
 
+// Host serving the web app — must match exactly for WebOTP auto-fill to work
+// (Android Chrome only fills the code if the SMS's last line is "@host #code").
+const WEBOTP_HOST = (process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com').replace(/^https?:\/\//, '').replace(/\/$/, '');
+
 // Firebase Admin — verifies Firebase phone auth tokens
 let _firebaseAdmin = null;
 function getFirebaseAdmin() {
@@ -377,7 +381,9 @@ router.post('/phone', async (req, res) => {
     }
 
     try {
-        await sendTwilioSMS(phone, `Your Gulf Coast Radar code is ${code}\n\nExpires in 10 minutes.`);
+        // Last line "@host #code" lets Android Chrome auto-fill the code via WebOTP —
+        // no typing needed, the form fills itself the instant the text arrives.
+        await sendTwilioSMS(phone, `Your Gulf Coast Radar code is ${code}\n\nExpires in 10 minutes.\n\n@${WEBOTP_HOST} #${code}`);
     } catch (e) {
         console.error('Twilio OTP send failed:', e.message);
         return res.status(500).json({ error: 'Failed to send code. Check Twilio config.' });

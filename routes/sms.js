@@ -4,6 +4,7 @@ const twilio   = require('twilio');
 const crypto   = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const mainDb = require('../db');
+const { adminRequired } = require('../middleware/auth');
 
 const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
@@ -145,6 +146,19 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     return res.type('text/xml').send(twiml.toString());
   }
 
+  // QR-code attribution — a QR-driven text reads "BEACH <CODE>" / "BEACHES <CODE>".
+  // The tourist never sees or types the code (the QR pre-fills it); we just log
+  // which physical QR code drove this text so it shows up in the admin dashboard.
+  // Awaited (not fire-and-forget) since Vercel functions can be frozen the
+  // instant the response is sent, which would silently drop an un-awaited insert.
+  const qrMatch = upper.match(/^(?:BEACH|BEACHES|THE BEACH)\s+([A-Z0-9]{4,8})\b/);
+  if (qrMatch) {
+    try {
+      const { data: qr } = await mainDb.from('sms_qr_codes').select('id').eq('keyword', qrMatch[1]).maybeSingle();
+      if (qr) await mainDb.from('sms_qr_scans').insert({ qr_code_id: qr.id, phone });
+    } catch (e) { console.error('QR scan log failed:', e.message); }
+  }
+
   try {
     const { data: existing } = await mainDb
       .from('tourist_profiles')
@@ -263,6 +277,86 @@ router.post('/send', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── QR code campaigns ─────────────────────────────────────────────────────────
+// Each QR code encodes an sms: link pre-filled with "BEACHES <CODE>" — scanning
+// it just opens Messages with Send ready to tap. The code itself is invisible
+// to the tourist; the inbound webhook above logs which code drove the text.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const QR_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I — stays readable in the dashboard
+function generateKeyword() {
+  let s = '';
+  for (let i = 0; i < 5; i++) s += QR_CHARSET[crypto.randomInt(QR_CHARSET.length)];
+  return s;
+}
+function qrLinks(keyword) {
+  const body = `BEACHES ${keyword}`;
+  return { sms_body: body, sms_link: `sms:${FROM_NUMBER}?body=${encodeURIComponent(body)}` };
+}
+
+// POST /api/sms/qr-codes — admin: create a new trackable QR code
+router.post('/qr-codes', adminRequired, async (req, res) => {
+  const label = (req.body?.label || '').trim();
+  if (!label) return res.status(400).json({ error: 'label required' });
+
+  let row = null, error = null;
+  for (let attempt = 0; attempt < 5 && !row; attempt++) {
+    const keyword = generateKeyword();
+    ({ data: row, error } = await mainDb
+      .from('sms_qr_codes')
+      .insert({ label, keyword })
+      .select('id, label, keyword, created_at')
+      .single());
+    if (error && error.code !== '23505') break; // anything but a unique-violation is fatal — stop retrying
+  }
+  if (!row) return res.status(500).json({ error: error?.message || 'Could not generate a unique code' });
+
+  res.json({ ...row, ...qrLinks(row.keyword) });
+});
+
+// GET /api/sms/qr-codes — admin: list all QR codes with scan counts
+router.get('/qr-codes', adminRequired, async (req, res) => {
+  const { data: codes, error } = await mainDb
+    .from('sms_qr_codes')
+    .select('id, label, keyword, created_at')
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const { data: scans } = await mainDb.from('sms_qr_scans').select('qr_code_id');
+  const counts = {};
+  for (const s of scans || []) counts[s.qr_code_id] = (counts[s.qr_code_id] || 0) + 1;
+
+  res.json({
+    codes: (codes || []).map(c => ({ ...c, scans: counts[c.id] || 0, ...qrLinks(c.keyword) })),
+  });
+});
+
+// GET /api/sms/qr-codes/:id/scans — admin: who signed up from this code (phone + name if known)
+router.get('/qr-codes/:id/scans', adminRequired, async (req, res) => {
+  const { data: scans, error } = await mainDb
+    .from('sms_qr_scans')
+    .select('phone, created_at')
+    .eq('qr_code_id', req.params.id)
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const phones = [...new Set((scans || []).map(s => s.phone).filter(Boolean))];
+  const names = {};
+  if (phones.length) {
+    const { data: profiles } = await mainDb.from('tourist_profiles').select('phone, name').in('phone', phones);
+    for (const p of profiles || []) names[p.phone] = p.name;
+  }
+
+  res.json({ scans: (scans || []).map(s => ({ ...s, name: names[s.phone] || null })) });
+});
+
+// DELETE /api/sms/qr-codes/:id — admin: remove a QR code (and its scan log)
+router.delete('/qr-codes/:id', adminRequired, async (req, res) => {
+  const { error } = await mainDb.from('sms_qr_codes').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 module.exports = router;
