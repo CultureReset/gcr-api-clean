@@ -421,6 +421,15 @@ router.post('/phone-verify', async (req, res) => {
         return res.status(400).json({ error: 'idToken or code required' });
     }
 
+    const result = await establishPhoneSession(phone);
+    if (result.error) return res.status(result.status || 500).json({ error: result.error });
+    res.json(result.body);
+});
+
+// Shared: given a proven phone, find/create the auth user, link the profile,
+// clear any pending OTP/token, sign in, and return the session response body.
+// Used by both /phone-verify (code path) and /phone-token (magic-link path).
+async function establishPhoneSession(phone) {
     const sb = admin();
     const fakeEmail = `${phone.replace(/\+/, '')}@gcr.tourist`;
     // stable password derived from phone — same every time so sign-in always works
@@ -440,11 +449,11 @@ router.post('/phone-verify', async (req, res) => {
             email_confirm: true,
             user_metadata: { phone },
         });
-        if (createErr) return res.status(500).json({ error: 'Could not create account: ' + createErr.message });
+        if (createErr) return { error: 'Could not create account: ' + createErr.message };
         authUser = created?.user || null;
     }
 
-    if (!authUser) return res.status(500).json({ error: 'Could not create account' });
+    if (!authUser) return { error: 'Could not create account' };
 
     // Upsert tourist_profiles keyed by user_id, linking phone
     const { data: profile, error: upsertErr } = await mainDb
@@ -463,10 +472,10 @@ router.post('/phone-verify', async (req, res) => {
 
     if (upsertErr) {
         console.error('tourist_profiles upsert error:', upsertErr.message);
-        return res.status(500).json({ error: 'Could not save profile' });
+        return { error: 'Could not save profile' };
     }
 
-    // Clear OTP from tourist_otps now that it's been used
+    // Clear OTP/token from tourist_otps now that it's been used
     await mainDb.from('tourist_otps')
         .update({ otp_code: null, otp_expires: null })
         .eq('phone', phone)
@@ -477,28 +486,51 @@ router.post('/phone-verify', async (req, res) => {
         email: fakeEmail,
         password: stablePassword,
     });
-    if (signInErr) return res.status(500).json({ error: 'Sign in failed: ' + signInErr.message });
+    if (signInErr) return { error: 'Sign in failed: ' + signInErr.message };
 
     const sess = signIn?.session || null;
 
-    res.json({
-        success:       true,
-        tourist:       profile,
-        // Legacy fields (existing clients)
-        access_token:  sess?.access_token || null,
-        // Full session + user (matches /signin response shape so clients can share hydration code)
-        session: sess ? {
-            access_token:  sess.access_token,
-            refresh_token: sess.refresh_token,
-            expires_at:    sess.expires_at,
-        } : null,
-        user: authUser ? {
-            id:    authUser.id,
-            email: authUser.email,
-            phone,
-            role:  'tourist',
-        } : null,
-    });
+    return {
+        body: {
+            success:      true,
+            tourist:      profile,
+            // Legacy field (existing clients)
+            access_token: sess?.access_token || null,
+            // Full session + user (matches /signin response shape so clients can share hydration code)
+            session: sess ? {
+                access_token:  sess.access_token,
+                refresh_token: sess.refresh_token,
+                expires_at:    sess.expires_at,
+            } : null,
+            user: {
+                id:    authUser.id,
+                email: authUser.email,
+                phone,
+                role:  'tourist',
+            },
+        },
+    };
+}
+
+// POST /phone-token — tap-to-sign-in via magic link. Verifies a one-time token
+// (texted to the tourist by the SMS webhook), resolves the phone, signs in.
+// No 6-digit code to type — the token in the link IS the proof.
+router.post('/phone-token', async (req, res) => {
+    const token = (req.body?.token || '').trim();
+    if (!token || token.length < 20) return res.status(400).json({ error: 'Invalid sign-in link' });
+
+    const { data: row } = await mainDb
+        .from('tourist_otps')
+        .select('phone, otp_code, otp_expires')
+        .eq('otp_code', token)
+        .maybeSingle();
+
+    if (!row?.phone) return res.status(400).json({ error: 'This sign-in link is invalid or already used. Text us again for a new one.' });
+    if (new Date(row.otp_expires) < new Date()) return res.status(400).json({ error: 'This sign-in link expired. Text us again for a new one.' });
+
+    const result = await establishPhoneSession(row.phone);
+    if (result.error) return res.status(result.status || 500).json({ error: result.error });
+    res.json(result.body);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

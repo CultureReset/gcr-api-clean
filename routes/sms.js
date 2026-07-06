@@ -108,6 +108,18 @@ async function getOrCreateTourist(phone) {
   return { profile };
 }
 
+// Issue a one-time magic sign-in token for a phone (30 min). The tourist taps a
+// link carrying this token and is signed straight in — no 6-digit code to type.
+async function issueMagicToken(phone) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  await mainDb.from('tourist_otps').upsert(
+    { phone, otp_code: token, otp_expires: expires, updated_at: new Date().toISOString() },
+    { onConflict: 'phone' }
+  );
+  return token;
+}
+
 // ── Inbound SMS state machine ─────────────────────────────────────────────────
 // States stored in tourist_profiles.sms_state:
 //   null / 'active'  → normal
@@ -154,8 +166,9 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
           updated_at: new Date().toISOString(),
         }).eq('user_id', existing.user_id);
 
+        const token = await issueMagicToken(phone);
         twiml.message(
-          `Perfect! We'll text you deals, happy hours & specials while you're in town 🌊\n\nOpen Gulf Coast Radar here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWe'll text you a code to sign in — no password needed.`
+          `Perfect! We'll text you deals, happy hours & specials while you're in town 🌊\n\nTap to sign in — you're in instantly, no code to type:\n${GCR_URL}/auth?token=${token}`
         );
       } else {
         twiml.message(
@@ -166,10 +179,11 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
       return res.type('text/xml').send(twiml.toString());
     }
 
-    // ── Already signed up — re-send the link ─────────────────────────────────
+    // ── Already signed up — re-send a fresh tap-to-sign-in link ───────────────
     if (existing?.sms_opt_in) {
+      const token = await issueMagicToken(phone);
       twiml.message(
-        `Welcome back to Gulf Coast Radar! 🌊\n\nOpen the app here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWe'll text you a code to sign in.\n\nReply DATES to update your visit dates anytime.`
+        `Welcome back to Gulf Coast Radar! 🌊\n\nTap to sign in — no code needed:\n${GCR_URL}/auth?token=${token}\n\nReply DATES to update your visit dates anytime.`
       );
       return res.type('text/xml').send(twiml.toString());
     }
@@ -182,8 +196,9 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
       updated_at: new Date().toISOString(),
     }).eq('user_id', profile.user_id);
 
+    const token = await issueMagicToken(phone);
     twiml.message(
-      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nSave our contact (1 tap):\n${GCR_URL}/gcr.vcf\n\nOpen the app here:\n${GCR_URL}/auth?phone=${phoneEncoded}\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
+      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nSave our contact (1 tap):\n${GCR_URL}/gcr.vcf\n\nTap to sign in — you're in instantly, no code to type:\n${GCR_URL}/auth?token=${token}\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
     );
 
   } catch (e) {
