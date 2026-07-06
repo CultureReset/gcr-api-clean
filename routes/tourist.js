@@ -319,24 +319,12 @@ async function applyScoreDeltas(touristId, updates) {
     }
 
     for (const [tag, delta] of Object.entries(totals)) {
-        try {
-            const { error } = await mainDb.rpc('upsert_preference_score', {
-                p_tourist_id: touristId,
-                p_tag:        tag,
-                p_delta:      delta,
-            });
-            if (error) throw error;
-        } catch {
-            // Fallback: increment existing score, insert if new, clamp between -50 and 200
-            await mainDb.rpc('exec_sql', { sql: `
-                INSERT INTO user_preference_scores (tourist_id, tag, score, updated_at)
-                VALUES ('${touristId}', '${tag.replace(/'/g, "''")}', GREATEST(-50, LEAST(200, ${delta})), NOW())
-                ON CONFLICT (tourist_id, tag)
-                DO UPDATE SET
-                    score = GREATEST(-50, LEAST(200, user_preference_scores.score + ${delta})),
-                    updated_at = NOW()
-            ` }).catch(() => {});
-        }
+        const { error } = await mainDb.rpc('upsert_preference_score', {
+            p_tourist_id: touristId,
+            p_tag:        tag,
+            p_delta:      delta,
+        });
+        if (error) console.error('[preference] upsert_preference_score failed:', error.message);
     }
 }
 
@@ -370,7 +358,7 @@ async function recomputeAllPreferences(touristId) {
     if (!touristId) return;
 
     // Wipe existing scores so we recompute clean
-    await mainDb.from('user_preference_scores').delete().eq('tourist_id', touristId).catch(() => {});
+    await mainDb.from('user_preference_scores').delete().eq('user_id', touristId).catch(() => {});
 
     // Load full swipe history
     const { data: events } = await mainDb
@@ -431,7 +419,7 @@ router.get('/preferences', touristAuth, async (req, res) => {
     const { data: scores } = await mainDb
         .from('user_preference_scores')
         .select('tag, score, updated_at')
-        .eq('tourist_id', touristId)
+        .eq('user_id', touristId)
         .order('score', { ascending: false });
 
     const all = scores || [];
@@ -1674,7 +1662,7 @@ async function checkGeofence(touristId, lat, lng) {
     const { data: scores } = await mainDb
         .from('user_preference_scores')
         .select('tag, score')
-        .eq('tourist_id', touristId)
+        .eq('user_id', touristId)
         .order('score', { ascending: false })
         .limit(10);
     const topTags = (scores || []).filter(s => s.score > 0).map(s => s.tag);
@@ -1768,14 +1756,14 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     // Find tourists who match the tags with sufficient score and opted in
     const { data: matches } = await mainDb
         .from('user_preference_scores')
-        .select('tourist_id, tag, score')
+        .select('user_id, tag, score')
         .in('tag', tags.map(t => t.toLowerCase().trim()))
         .gte('score', min_score);
 
     if (!matches?.length) return res.json({ sent: 0, message: 'No matching users' });
 
     // Group by tourist — keep those who match at least one tag
-    const touristIds = [...new Set(matches.map(m => m.tourist_id))];
+    const touristIds = [...new Set(matches.map(m => m.user_id))];
 
     // Get opted-in phones — exclude anyone messaged by this business in last 24h
     const { data: recentSent } = await mainDb
@@ -1791,8 +1779,8 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
 
     const { data: profiles } = await mainDb
         .from('tourist_profiles')
-        .select('id, phone')
-        .in('id', eligibleIds)
+        .select('user_id, phone')
+        .in('user_id', eligibleIds)
         .eq('sms_opt_in', true)
         .not('phone', 'is', null);
 
@@ -1813,7 +1801,7 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
 
     // Log each successful send
     const logRows = profiles.filter(p => sentTo.includes(p.phone)).map(p => ({
-        tourist_id:    p.id,
+        tourist_id:    p.user_id,
         phone:         p.phone,
         message,
         trigger_type:  'campaign',
@@ -1824,55 +1812,6 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     await mainDb.from('tourist_sms_log').insert(logRows).catch(() => {});
 
     res.json({ sent: sentTo.length, total: profiles.length, numbers: sentTo });
-});
-
-// GET /api/tourist/analytics — swipe trends and engagement metrics
-router.get('/analytics', touristAuth, async (req, res) => {
-    const touristId = req.touristId;
-
-    try {
-        const { data: events } = await mainDb
-            .from('tourist_swipes')
-            .select('direction, category, swiped_at')
-            .eq('tourist_id', touristId)
-            .order('swiped_at', { ascending: false });
-
-        const { data: saves } = await mainDb
-            .from('tourist_saves')
-            .select('category:entity_slug, saved_at')
-            .eq('tourist_id', touristId);
-
-        const directionCounts = { left: 0, right: 0 };
-        const categoryCounts = {};
-        const dailySwipes = {};
-
-        for (const ev of (events || [])) {
-            directionCounts[ev.direction] = (directionCounts[ev.direction] || 0) + 1;
-            categoryCounts[ev.category] = (categoryCounts[ev.category] || 0) + 1;
-
-            const date = new Date(ev.swiped_at).toISOString().split('T')[0];
-            dailySwipes[date] = (dailySwipes[date] || 0) + 1;
-        }
-
-        const totalSwipes = events?.length || 0;
-        const likeRate = totalSwipes > 0 ? (directionCounts.right / totalSwipes * 100).toFixed(1) : 0;
-        const avgSwipesPerDay = totalSwipes > 0 ? (totalSwipes / (Object.keys(dailySwipes).length || 1)).toFixed(1) : 0;
-
-        res.json({
-            total_swipes: totalSwipes,
-            total_saves: saves?.length || 0,
-            swipe_breakdown: directionCounts,
-            like_rate: parseFloat(likeRate),
-            category_distribution: categoryCounts,
-            daily_swipes: dailySwipes,
-            avg_swipes_per_day: parseFloat(avgSwipesPerDay),
-            first_swipe: events?.[events.length - 1]?.swiped_at || null,
-            last_swipe: events?.[0]?.swiped_at || null,
-        });
-    } catch (e) {
-        console.error('[analytics] Error:', e?.message);
-        return res.status(500).json({ error: 'Failed to fetch analytics' });
-    }
 });
 
 module.exports = router;

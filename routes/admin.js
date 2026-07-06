@@ -1262,7 +1262,7 @@ router.get('/tourists/:user_id/preferences', authRequired, async (req, res) => {
     const uid = req.params.user_id;
 
     const [{ data: prefs }, { data: swipeStats }, { data: saves }, { data: swipedRight }] = await Promise.all([
-      getDb().from('user_preference_scores').select('tag, score').eq('tourist_id', uid).order('score', { ascending: false }),
+      getDb().from('user_preference_scores').select('tag, score').eq('user_id', uid).order('score', { ascending: false }),
       getDb().from('tourist_swipe_events').select('direction').eq('user_id', uid),
       getDb().from('tourist_saves').select('entity_slug, business_name, category, hero_image_url, is_super_like, saved_at').eq('user_id', uid).order('saved_at', { ascending: false }),
       getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }),
@@ -1303,7 +1303,7 @@ router.delete('/tourists/:user_id', authRequired, async (req, res) => {
       getDb().from('tourist_saves').delete().eq('user_id', uid),
       getDb().from('tourist_swipe_events').delete().eq('user_id', uid),
       getDb().from('tourist_itineraries').delete().eq('user_id', uid),
-      getDb().from('user_preference_scores').delete().eq('tourist_id', uid),
+      getDb().from('user_preference_scores').delete().eq('user_id', uid),
       getDb().from('tourist_profiles').delete().eq('user_id', uid)
     ]);
 
@@ -1613,7 +1613,7 @@ router.get('/platform-analytics', authRequired, async (req, res) => {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
     const [tourists, saves, swipes, itineraries] = await Promise.all([
-      getDb().from('tourist_profiles').select('id', { count: 'exact', head: true }).gte('created_at', since),
+      getDb().from('tourist_profiles').select('user_id', { count: 'exact', head: true }).gte('created_at', since),
       getDb().from('tourist_saves').select('id', { count: 'exact', head: true }).gte('created_at', since),
       getDb().from('tourist_swipe_events').select('id', { count: 'exact', head: true }).gte('created_at', since),
       getDb().from('tourist_itineraries').select('id', { count: 'exact', head: true }).gte('created_at', since)
@@ -1851,7 +1851,7 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     // Step 1 — start with all opted-in tourists who have a phone
     let baseQuery = db
       .from('tourist_profiles')
-      .select('id, phone, name, arrival, departure')
+      .select('user_id, phone, name, arrival, departure')
       .eq('sms_opt_in', true)
       .not('phone', 'is', null);
 
@@ -1863,21 +1863,21 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     if (baseErr) throw baseErr;
     if (!allTourists?.length) return res.json({ sent: 0, total: 0, message: 'No tourists match base filters' });
 
-    let eligible = new Set(allTourists.map(t => t.id));
+    let eligible = new Set(allTourists.map(t => t.user_id));
 
     // Step 2 — filter by preference tags
     if (tags.length > 0) {
       const { data: scores } = await db
         .from('user_preference_scores')
-        .select('tourist_id, tag, score')
+        .select('user_id, tag, score')
         .in('tag', tags.map(t => t.toLowerCase().trim()))
         .gte('score', min_score);
 
       if (scores?.length) {
         const byTourist = {};
         scores.forEach(s => {
-          if (!byTourist[s.tourist_id]) byTourist[s.tourist_id] = new Set();
-          byTourist[s.tourist_id].add(s.tag.toLowerCase().trim());
+          if (!byTourist[s.user_id]) byTourist[s.user_id] = new Set();
+          byTourist[s.user_id].add(s.tag.toLowerCase().trim());
         });
 
         const tagSet = new Set(tags.map(t => t.toLowerCase().trim()));
@@ -1895,11 +1895,11 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     if (swiped_right.length > 0) {
       const { data: swipes } = await db
         .from('tourist_swipe_events')
-        .select('tourist_id, entity_slug')
+        .select('user_id, entity_slug')
         .in('entity_slug', swiped_right)
         .eq('direction', 'right');
 
-      const swipers = new Set((swipes || []).map(s => s.tourist_id));
+      const swipers = new Set((swipes || []).map(s => s.user_id));
       eligible = new Set([...eligible].filter(id => swipers.has(id)));
     }
 
@@ -1917,11 +1917,11 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     // Step 5 — filter by category engagement (swiped right OR saved in this category)
     if (category) {
       const [{ data: catSwipes }, { data: catSaves }] = await Promise.all([
-        db.from('tourist_swipe_events').select('tourist_id').eq('category', category).eq('direction', 'right'),
+        db.from('tourist_swipe_events').select('user_id').eq('category', category).eq('direction', 'right'),
         db.from('tourist_saves').select('user_id').eq('category', category),
       ]);
       const catEngaged = new Set([
-        ...(catSwipes || []).map(s => s.tourist_id),
+        ...(catSwipes || []).map(s => s.user_id),
         ...(catSaves || []).map(s => s.user_id),
       ]);
       eligible = new Set([...eligible].filter(id => catEngaged.has(id)));
@@ -1930,7 +1930,7 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     if (!eligible.size) return res.json({ sent: 0, total: 0, message: 'No tourists match all filters' });
 
     // Step 6 — get phones for eligible tourist IDs
-    const eligibleTourists = allTourists.filter(t => eligible.has(t.id));
+    const eligibleTourists = allTourists.filter(t => eligible.has(t.user_id));
 
     // Step 7 — send via Twilio with small delay between messages
     let sent = 0;
@@ -1996,7 +1996,7 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
   try {
     let baseQuery = db
       .from('tourist_profiles')
-      .select('id')
+      .select('user_id')
       .eq('sms_opt_in', true)
       .not('phone', 'is', null);
 
@@ -2005,17 +2005,17 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
     const { data: allTourists } = await baseQuery;
     if (!allTourists?.length) return res.json({ count: 0 });
 
-    let eligible = new Set(allTourists.map(t => t.id));
+    let eligible = new Set(allTourists.map(t => t.user_id));
 
     if (tags.length > 0) {
       const { data: scores } = await db
         .from('user_preference_scores')
-        .select('tourist_id, tag, score')
+        .select('user_id, tag, score')
         .in('tag', tags.map(t => t.toLowerCase().trim()))
         .gte('score', min_score);
       if (scores?.length) {
         const byTourist = {};
-        scores.forEach(s => { if (!byTourist[s.tourist_id]) byTourist[s.tourist_id] = new Set(); byTourist[s.tourist_id].add(s.tag); });
+        scores.forEach(s => { if (!byTourist[s.user_id]) byTourist[s.user_id] = new Set(); byTourist[s.user_id].add(s.tag); });
         const tagSet = new Set(tags.map(t => t.toLowerCase().trim()));
         eligible = new Set([...eligible].filter(id => {
           const m = byTourist[id] || new Set();
@@ -2025,8 +2025,8 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
     }
 
     if (swiped_right.length > 0) {
-      const { data: swipes } = await db.from('tourist_swipe_events').select('tourist_id').in('entity_slug', swiped_right).eq('direction', 'right');
-      const s = new Set((swipes || []).map(s => s.tourist_id));
+      const { data: swipes } = await db.from('tourist_swipe_events').select('user_id').in('entity_slug', swiped_right).eq('direction', 'right');
+      const s = new Set((swipes || []).map(s => s.user_id));
       eligible = new Set([...eligible].filter(id => s.has(id)));
     }
 
@@ -2038,10 +2038,10 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
 
     if (category) {
       const [{ data: cs }, { data: cv }] = await Promise.all([
-        db.from('tourist_swipe_events').select('tourist_id').eq('category', category).eq('direction', 'right'),
+        db.from('tourist_swipe_events').select('user_id').eq('category', category).eq('direction', 'right'),
         db.from('tourist_saves').select('user_id').eq('category', category),
       ]);
-      const ce = new Set([...(cs||[]).map(s=>s.tourist_id), ...(cv||[]).map(s=>s.user_id)]);
+      const ce = new Set([...(cs||[]).map(s=>s.user_id), ...(cv||[]).map(s=>s.user_id)]);
       eligible = new Set([...eligible].filter(id => ce.has(id)));
     }
 
