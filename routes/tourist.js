@@ -1541,6 +1541,33 @@ router.put('/points-config', adminRequired, async (req, res) => {
     res.json({ config: data });
 });
 
+// POST /api/tourist/track-click — log an outbound click (Book Now, order, reserve…)
+// tied to the tourist's account. Returns a click id (gcr_ref) to append to the
+// outbound URL so a later conversion can be attributed back to them.
+router.post('/track-click', async (req, res) => {
+    const { entity_slug, click_type, target_url } = req.body || {};
+    let userId = null;
+    const header = req.headers.authorization;
+    if (header && header.startsWith('Bearer ')) {
+        try {
+            const { data: { user } } = await mainDb.auth.getUser(header.slice(7));
+            userId = user?.id || null;
+        } catch (_) {}
+    }
+    try {
+        const { data, error } = await mainDb.from('tourist_click_events').insert({
+            user_id: userId,
+            entity_slug: entity_slug || null,
+            click_type: click_type || 'book',
+            target_url: target_url || null,
+        }).select('id').single();
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ click_id: data.id });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/tourist/location — browser sends GPS, we store it + check geofences
 // Body: { lat, lng }
