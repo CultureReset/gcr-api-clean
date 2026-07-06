@@ -255,7 +255,7 @@ router.post('/swipes', touristAuth, async (req, res) => {
 });
 
 // Score weights per swipe direction
-const SWIPE_WEIGHTS = { like: 5, nope: -4, super: 15, save: 8, book: 20, view: 2 };
+const SWIPE_WEIGHTS = { like: 5, nope: -4, super: 15, save: 8, book: 20, view: 2, maybe: 1 };
 
 // Fetch entity tags from the correct GCR tables (entity + entity_tags)
 async function fetchEntityTagMap(slugs) {
