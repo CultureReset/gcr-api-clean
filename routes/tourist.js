@@ -19,10 +19,14 @@
  */
 
 const express = require('express');
+const multer = require('multer');
 const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Tourist media (photo/video) uploads — held in memory, capped at 50MB for short video clips
+const touristUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ── Tourist middleware: verify Supabase JWT, attach tourist user id ─────────
 async function touristAuth(req, res, next) {
@@ -1358,11 +1362,39 @@ router.delete('/ai-chat/memories/:id', touristOrAdminAuth, async (req, res) => {
     res.json({ success: true });
 });
 
-// ── Community Photos ────────────────────────────────────────────────────────
+// ── Community Photos & Videos ───────────────────────────────────────────────
 
-// POST /api/tourist/photos — submit a photo (auth or anon via review link)
+// POST /api/tourist/upload-media — upload an image OR video, return its public URL.
+// The tourist (identified by their phone-based account) then attaches this URL to
+// a photo submission or a review. Files go to the shared customer-photos bucket
+// under a per-tourist folder so everything traces back to their account.
+router.post('/upload-media', touristAuth, touristUpload.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const mime = req.file.mimetype || '';
+    const isVideo = mime.startsWith('video/');
+    const isImage = mime.startsWith('image/');
+    if (!isVideo && !isImage) return res.status(400).json({ error: 'Only image or video files are allowed' });
+
+    const ext = (mime.split('/')[1] || (isVideo ? 'mp4' : 'jpg')).replace('jpeg', 'jpg').replace('quicktime', 'mov');
+    const fileName = `tourist/${req.touristId}/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+    try {
+        const gcrDb = require('../db')();
+        let { error } = await gcrDb.storage.from('customer-photos').upload(fileName, req.file.buffer, { contentType: mime, upsert: false });
+        if (error && /bucket|not found/i.test(error.message || '')) {
+            await gcrDb.storage.createBucket('customer-photos', { public: true }).catch(() => {});
+            ({ error } = await gcrDb.storage.from('customer-photos').upload(fileName, req.file.buffer, { contentType: mime, upsert: false }));
+        }
+        if (error) return res.status(500).json({ error: error.message });
+        const { data } = gcrDb.storage.from('customer-photos').getPublicUrl(fileName);
+        res.json({ url: data.publicUrl, media_type: isVideo ? 'video' : 'image' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/tourist/photos — submit a photo or video (auth or anon via review link)
 router.post('/photos', async (req, res) => {
-    const { entity_slug, image_url, caption, uploader_name, category } = req.body;
+    const { entity_slug, image_url, caption, uploader_name, category, media_type } = req.body;
     if (!entity_slug || !image_url) return res.status(400).json({ error: 'entity_slug and image_url required' });
     // Attempt to read user_id from token if present (not required)
     let userId = null;
@@ -1374,7 +1406,7 @@ router.post('/photos', async (req, res) => {
             userId = user?.id || null;
         } catch (_) {}
     }
-    const { data, error } = await mainDb.from('tourist_photos').insert({
+    const row = {
         user_id: userId,
         entity_slug,
         image_url,
@@ -1382,7 +1414,14 @@ router.post('/photos', async (req, res) => {
         uploader_name: uploader_name || null,
         category: category || 'general',
         status: 'pending',
-    }).select().single();
+        media_type: media_type === 'video' ? 'video' : 'image',
+    };
+    let { data, error } = await mainDb.from('tourist_photos').insert(row).select().single();
+    // If the media_type column doesn't exist yet, retry without it
+    if (error && error.message?.includes('media_type')) {
+        const { media_type: _dropped, ...rowWithout } = row;
+        ({ data, error } = await mainDb.from('tourist_photos').insert(rowWithout).select().single());
+    }
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true, photo: data });
 });
@@ -1390,7 +1429,7 @@ router.post('/photos', async (req, res) => {
 // GET /api/tourist/photos — get photos submitted by the logged-in user
 router.get('/photos', touristAuth, async (req, res) => {
     const { data, error } = await mainDb.from('tourist_photos')
-        .select('id, entity_slug, image_url, caption, category, status, submitted_at, reviewed_at')
+        .select('*')
         .eq('user_id', req.touristId)
         .order('submitted_at', { ascending: false })
         .limit(100);
