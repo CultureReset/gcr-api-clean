@@ -1423,6 +1423,7 @@ router.post('/photos', async (req, res) => {
         ({ data, error } = await mainDb.from('tourist_photos').insert(rowWithout).select().single());
     }
     if (error) return res.status(500).json({ error: error.message });
+    if (userId) awardPoints(userId, row.media_type === 'video' ? 'video' : 'photo', entity_slug).catch(() => {});
     res.json({ success: true, photo: data });
 });
 
@@ -1475,6 +1476,7 @@ router.post('/reviews', touristAuth, async (req, res) => {
         ({ data, error } = await gcrDb.from('entity_reviews').insert(base).select().single());
     }
     if (error) return res.status(500).json({ error: error.message });
+    awardPoints(req.touristId, 'review', entity_slug).catch(() => {});
     res.status(201).json({ ok: true, review: data });
 });
 
@@ -1489,6 +1491,54 @@ router.get('/reviews', touristAuth, async (req, res) => {
     // If the user_id column isn't present yet, there's nothing to tie to — return empty
     if (error) return res.json({ reviews: [] });
     res.json({ reviews: data || [] });
+});
+
+// ── Points / Rewards ─────────────────────────────────────────────────────────
+// One append-only ledger tied to the phone account. Balance = SUM(delta).
+// Points never expire, so they roll over trip to trip automatically.
+
+// Award points for an action, using the admin-configured earn amount.
+async function awardPoints(userId, reason, entitySlug) {
+    if (!userId || !reason) return;
+    try {
+        const { data: cfg } = await mainDb.from('points_config').select('earn').eq('id', 1).maybeSingle();
+        const delta = cfg?.earn?.[reason];
+        if (!delta) return;
+        await mainDb.from('tourist_points').insert({ user_id: userId, delta, reason, entity_slug: entitySlug || null });
+    } catch (e) { console.error('[points] award failed:', e?.message); }
+}
+
+// GET /api/tourist/points — balance, current tier, next tier, recent history
+router.get('/points', touristAuth, async (req, res) => {
+    const [{ data: rows }, { data: cfg }] = await Promise.all([
+        mainDb.from('tourist_points').select('delta, reason, entity_slug, created_at').eq('user_id', req.touristId).order('created_at', { ascending: false }),
+        mainDb.from('points_config').select('tiers').eq('id', 1).maybeSingle(),
+    ]);
+    const history = rows || [];
+    const balance = history.reduce((s, r) => s + (r.delta || 0), 0);
+    const tiers = (cfg?.tiers || []).slice().sort((a, b) => (a.min || 0) - (b.min || 0));
+    let tier = tiers[0] || { name: 'Member', min: 0 };
+    let next = null;
+    for (const t of tiers) {
+        if (balance >= (t.min || 0)) tier = t;
+        else { next = t; break; }
+    }
+    res.json({ balance, tier, next, history: history.slice(0, 50) });
+});
+
+// GET/PUT /api/tourist/points-config — admin edits earn amounts + tiers/perks
+router.get('/points-config', adminRequired, async (req, res) => {
+    const { data } = await mainDb.from('points_config').select('*').eq('id', 1).maybeSingle();
+    res.json({ config: data || null });
+});
+router.put('/points-config', adminRequired, async (req, res) => {
+    const { earn, tiers } = req.body || {};
+    const patch = { updated_at: new Date().toISOString() };
+    if (earn)  patch.earn  = earn;
+    if (tiers) patch.tiers = tiers;
+    const { data, error } = await mainDb.from('points_config').update(patch).eq('id', 1).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ config: data });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
