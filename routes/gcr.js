@@ -1448,6 +1448,80 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
   }
 });
 
+// ─── GET /api/gcr/stay-units ──────────────────────────────────────────────────
+// Booking-platform data for the staying page: every unit under a stay-type
+// complex (with rental specs), plus a per-complex summary for listing cards
+// (unit count, available count, from-price, bedroom range).
+router.get('/stay-units', async (req, res) => {
+  try {
+    const { data: parents, error: pErr } = await db
+      .from('entity')
+      .select('slug,name,city,hero_image_url')
+      .in('entity_type', ['condo', 'hotel', 'vacation-rental'])
+      .eq('is_active', true);
+    if (pErr) return res.status(500).json({ error: pErr.message });
+
+    const parentSlugs = (parents || []).map(p => p.slug);
+    const parentName = new Map((parents || []).map(p => [p.slug, p.name]));
+
+    // Units = child entities of stay complexes (chunked .in to stay under URL limits)
+    const units = [];
+    for (let i = 0; i < parentSlugs.length; i += 150) {
+      const chunk = parentSlugs.slice(i, i + 150);
+      const { data } = await db
+        .from('entity')
+        .select('id,slug,name,entity_type,entity_subtype,parent_entity_slug,city,state,hero_image_url,unit_number,building,unit_floor,view_type,rating,review_count,is_active')
+        .in('parent_entity_slug', chunk)
+        .eq('is_active', true);
+      units.push(...(data || []));
+    }
+
+    // Rental specs from bookable_resources keyed by unit slug (richest row wins)
+    const unitSlugs = units.map(u => u.slug);
+    const bySlug = new Map();
+    for (let i = 0; i < unitSlugs.length; i += 200) {
+      const chunk = unitSlugs.slice(i, i + 200);
+      const { data: resources } = await db
+        .from('bookable_resources')
+        .select('entity_slug,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url')
+        .in('entity_slug', chunk)
+        .eq('is_active', true);
+      for (const r of resources || []) {
+        const score = ['nightly_price', 'bedrooms', 'bathrooms', 'capacity'].filter(k => r[k] != null).length;
+        const prev = bySlug.get(r.entity_slug);
+        if (!prev || score > prev._score) bySlug.set(r.entity_slug, { ...r, _score: score });
+      }
+    }
+
+    const summary = {};
+    for (const u of units) {
+      const r = bySlug.get(u.slug);
+      if (r) {
+        const { _score, entity_slug, ...rental } = r;
+        u.rental = rental;
+      }
+      u.parent_name = parentName.get(u.parent_entity_slug) || null;
+      const s = summary[u.parent_entity_slug] || (summary[u.parent_entity_slug] = {
+        unit_count: 0, available_units: 0, price_min: null, beds_min: null, beds_max: null,
+      });
+      s.unit_count += 1;
+      // "available" = actively listed & bookable today; live calendar
+      // availability can tighten this later via booking_calendar
+      s.available_units += 1;
+      if (u.rental?.nightly_price != null) s.price_min = s.price_min == null ? u.rental.nightly_price : Math.min(s.price_min, u.rental.nightly_price);
+      if (u.rental?.bedrooms != null) {
+        s.beds_min = s.beds_min == null ? u.rental.bedrooms : Math.min(s.beds_min, u.rental.bedrooms);
+        s.beds_max = s.beds_max == null ? u.rental.bedrooms : Math.max(s.beds_max, u.rental.bedrooms);
+      }
+    }
+
+    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+    res.json({ units, summary, total_units: units.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/gcr/live-now ────────────────────────────────────────────────────
 router.get('/live-now', async (req, res) => {
   try {
