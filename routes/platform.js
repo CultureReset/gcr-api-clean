@@ -1128,6 +1128,11 @@ router.get('/page/:slug', async (req, res) => {
                 checkout: !!man.checkout,
                 booking: man.checkout ? { mode: bc.mode, slots: bc.slots, resource: bc.resourceKey, party: bc.party, maxParty: bc.maxParty || undefined } : undefined,
                 cart: man.cart || undefined,
+                // content sections render inline as a real landing page; their
+                // copy lives in the install config (singletons) or records
+                // (repeatables via publicData). Nothing here is industry-specific.
+                section: man.section || undefined,
+                content: man.section ? cfg : undefined,
                 fields: (man.fields || []).filter(function (f) { return f.key !== 'status'; })
                     .map(function (f) {
                         // universal choice lists: a field can source its options
