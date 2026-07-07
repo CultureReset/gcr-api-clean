@@ -270,6 +270,26 @@ router.delete('/records/:dataKey/:id', authRequired, async (req, res) => {
     }
 });
 
+// ── Image upload: any business, any app — base64 in, public URL out.
+//    Reuses the existing entity-media storage bucket. ──
+router.post('/upload', authRequired, async (req, res) => {
+    try {
+        const b64 = String(req.body.image || '');
+        const mime = String(req.body.mime || 'image/jpeg').slice(0, 40);
+        if (!b64) return res.status(400).json({ error: 'image (base64) required' });
+        if (b64.length > 8 * 1024 * 1024) return res.status(413).json({ error: 'Image too large — keep it under ~6MB' });
+        if (!/^image\//.test(mime)) return res.status(400).json({ error: 'Only images can be uploaded' });
+        const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace(/[^a-z0-9]/g, '') || 'jpg';
+        const fileName = 'platform/' + req.siteId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+        const buffer = Buffer.from(b64, 'base64');
+        const { error } = await supabase.storage.from('entity-media')
+            .upload(fileName, buffer, { contentType: mime, upsert: false });
+        if (error) throw new Error(error.message);
+        const { data } = supabase.storage.from('entity-media').getPublicUrl(fileName);
+        res.json({ success: true, url: data.publicUrl });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============================================================
 // UNIFIED CALENDAR — every date-claiming event, one table.
 // Internal writes sync automatically; external platforms upsert
