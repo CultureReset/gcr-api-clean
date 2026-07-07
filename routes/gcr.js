@@ -82,7 +82,9 @@ async function buildFullEntity(slug) {
   // ── CORE queries — every business ──────────────────────────────────────────
   const corePromises = [
     db.from('entity_hours').select('day_of_week,opens_at,closes_at,is_closed').eq('entity_slug', slug).order('day_of_week'),
-    db.from('entity_photos').select('id,url,image_url,caption,alt_text,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
+    // entity_photos has url/caption (NOT image_url/alt_text — selecting missing
+    // columns errors the whole query and silently blanked photos platform-wide)
+    db.from('entity_photos').select('id,url,image_path,caption,photo_type,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
     db.from('entity_tags').select('tag_name,tag_category').eq('entity_slug', slug),
     db.from('entity_events').select('id,event_name,description,event_date,start_time,end_time,cover_charge,image_url,artist_name,artist_id,day_of_week,recurring, artist:artists!entity_events_artist_id_fkey(id,slug,name,genre,image_url,social_instagram,social_facebook,spotify_url)').eq('entity_slug', slug).eq('is_active', true).order('event_date').limit(20),
     db.from('entity_reviews').select('id,reviewer_name,rating,title,body,verified_purchase,created_at').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }).limit(20),
@@ -350,7 +352,7 @@ async function buildFullEntity(slug) {
       ...sec, items: (itemList || []).filter(i => i.section_id === sec.id),
     }));
 
-  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.image_url) }));
+  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.url), alt_text: p.caption || null }));
 
   return {
     ...entity,
@@ -1521,6 +1523,27 @@ router.get('/stay-units', async (req, res) => {
       if (u.rental?.bedrooms != null) {
         s.beds_min = s.beds_min == null ? u.rental.bedrooms : Math.min(s.beds_min, u.rental.bedrooms);
         s.beds_max = s.beds_max == null ? u.rental.bedrooms : Math.max(s.beds_max, u.rental.bedrooms);
+      }
+    }
+
+    // Complex amenities for listing cards — the card sells the whole condo
+    // (pools, splash pad, tennis, fitness), not just the unit counts. All
+    // stay complexes get amenities, units or not.
+    for (let i = 0; i < parentSlugs.length; i += 150) {
+      const chunk = parentSlugs.slice(i, i + 150);
+      const { data: amenityTags } = await db
+        .from('entity_tags')
+        .select('entity_slug,tag_name')
+        .in('entity_slug', chunk)
+        .eq('tag_category', 'amenity');
+      for (const t of amenityTags || []) {
+        const s = summary[t.entity_slug] || (summary[t.entity_slug] = {
+          unit_count: 0, available_units: 0, price_min: null, beds_min: null, beds_max: null,
+        });
+        if (!s.amenities) s.amenities = [];
+        if (s.amenities.length < 12 && t.tag_name && !s.amenities.some(a => a.toLowerCase() === t.tag_name.toLowerCase())) {
+          s.amenities.push(t.tag_name);
+        }
       }
     }
 
