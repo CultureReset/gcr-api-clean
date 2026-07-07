@@ -816,8 +816,46 @@ async function maybeCreateAutoDeal(entitySlug, date, remaining, total, timeSlot,
   }
 }
 
+// Mirror every parsed external booking into booking_calendar — ONE
+// slug-keyed store of date-claims, so a date taken on Airbnb/FareHarbor/
+// OpenTable blocks the direct checkout too. Dedupe on (source,
+// external_uid): re-forwarded emails never double-claim a date.
+async function mirrorToCalendar(entitySlug, parsed, emailLogId) {
+  try {
+    if (!entitySlug || !parsed.event_date) return;
+    const source = 'email:' + (parsed.platform || 'unknown');
+    const uid = parsed.confirmation_no
+      || [parsed.platform, parsed.event_date, parsed.event_time || '', parsed.party_size || ''].join('|');
+    const row = {
+      entity_slug: entitySlug,
+      date: parsed.event_date,
+      end_date: parsed.checkout_date || parsed.end_date || null,
+      start_time: parsed.event_time || null,
+      end_time: parsed.end_time || null,
+      kind: 'booking',
+      source: source,
+      status: parsed.status === 'cancelled' ? 'cancelled' : 'active',
+      title: [parsed.platform, parsed.guest_name || parsed.activity_name].filter(Boolean).join(' · ') || source,
+      party: parseInt(parsed.party_size, 10) || null,
+      external_uid: String(uid).slice(0, 120),
+      details: { ...parsed, email_log_id: emailLogId || null },
+      updated_at: new Date().toISOString(),
+    };
+    const { data: existing } = await db.from('booking_calendar')
+      .select('id').eq('entity_slug', entitySlug).eq('source', source)
+      .eq('external_uid', row.external_uid).maybeSingle();
+    if (existing) await db.from('booking_calendar').update(row).eq('id', existing.id);
+    else await db.from('booking_calendar').insert(row);
+  } catch (e) {
+    console.warn('[email-parser] calendar mirror failed:', e.message);
+  }
+}
+
 async function upsertAvailability(entitySlug, parsed, emailLogId) {
   if (!entitySlug || !parsed.event_date) return;
+
+  // every parsed booking claims its date on the unified calendar
+  mirrorToCalendar(entitySlug, parsed, emailLogId).catch(() => {});
 
   // Fetch business capacity config
   const { data: cap } = await db
