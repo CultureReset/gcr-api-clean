@@ -352,12 +352,30 @@ async function calendarBackfill(siteId) {
 }
 
 // ── Availability: blocked dates + capacity, enforced server-side ──
-async function getAvailability(siteId, installed, dataKey, month) {
+// Booking behavior is declared by the app's own manifest + install config:
+//   manifest.booking = { mode: 'date'|'slots'|'range', resource: '<dataKey>' }
+//   config.slot_times ("6:00 AM, 12:30 PM"), config.slot_capacity
+function bookingCfg(inst) {
+    const man = (inst && inst.manifest) || {};
+    const cfg = (inst && inst.config) || {};
+    const b = man.booking || {};
+    const slots = String(cfg.slot_times || b.slots || '')
+        .split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    return {
+        mode: b.mode || 'date',
+        slots: slots,
+        slotCap: parseInt(cfg.slot_capacity, 10) || parseInt(b.slot_capacity, 10) || 1,
+        resourceKey: b.resource || null
+    };
+}
+
+async function getAvailability(siteId, installed, dataKey, month, opts) {
+    opts = opts || {};
     // ONE source of truth: the unified calendar. Blocks from the owner,
     // bookings from the direct checkout, and entries imported from any
     // external platform all claim dates here.
     const { data: entries } = await supabase.from('unified_calendar')
-        .select('date, end_date, kind, status')
+        .select('date, end_date, kind, status, start_time, record')
         .eq('site_id', siteId).eq('status', 'active').limit(3000);
 
     // capacity per date comes from the availability app's config
@@ -380,17 +398,51 @@ async function getAvailability(siteId, installed, dataKey, month) {
             fn(d.toISOString().slice(0, 10));
         }
     }
+    const slotCounts = {};   // 'date|time' -> active bookings
+    const resourceBusy = {}; // date -> [resource_id, ...]
     (entries || []).forEach(function (e) {
+        const rec = e.record || {};
         if (e.kind === 'block') eachDate(e, function (ds) { if (blocked.indexOf(ds) === -1) blocked.push(ds); });
-        else eachDate(e, function (ds) { counts[ds] = (counts[ds] || 0) + 1; });
+        else eachDate(e, function (ds) {
+            counts[ds] = (counts[ds] || 0) + 1;
+            const t = e.start_time || rec.time;
+            if (t) slotCounts[ds + '|' + t] = (slotCounts[ds + '|' + t] || 0) + 1;
+            if (rec.resource_id) {
+                if (!resourceBusy[ds]) resourceBusy[ds] = [];
+                if (resourceBusy[ds].indexOf(String(rec.resource_id)) === -1) resourceBusy[ds].push(String(rec.resource_id));
+            }
+        });
     });
     let full = capacity ? Object.keys(counts).filter(function (d) { return counts[d] >= capacity; }) : [];
     let b = blocked;
+
+    // a specific resource (boat, stylist, condo) is unavailable on dates it's already booked
+    if (opts.resource) {
+        Object.keys(resourceBusy).forEach(function (ds) {
+            if (resourceBusy[ds].indexOf(String(opts.resource)) !== -1 && b.indexOf(ds) === -1) b = b.concat([ds]);
+        });
+    }
+    // per-slot remaining for a specific date (slots mode)
+    let slots = null;
+    if (opts.slots && opts.slots.length && opts.date) {
+        slots = opts.slots.map(function (t) {
+            let used = slotCounts[opts.date + '|' + t] || 0;
+            if (opts.resource) {
+                // per-resource: the slot is taken if THIS resource has it
+                used = (entries || []).some(function (e) {
+                    const rec = e.record || {};
+                    return e.kind !== 'block' && e.date === opts.date &&
+                        (e.start_time || rec.time) === t && String(rec.resource_id || '') === String(opts.resource);
+                }) ? opts.slotCap : used;
+            }
+            return { time: t, remaining: Math.max(0, (opts.slotCap || 1) - used) };
+        });
+    }
     if (month) {
-        b = blocked.filter(function (d) { return d.slice(0, 7) === month; });
+        b = b.filter(function (d) { return d.slice(0, 7) === month; });
         full = full.filter(function (d) { return d.slice(0, 7) === month; });
     }
-    return { blocked: b, full: full, capacity: capacity, counts: counts };
+    return { blocked: b, full: full, capacity: capacity, counts: counts, slots: slots };
 }
 
 // Owner's unified calendar — every source, one view
@@ -459,7 +511,13 @@ router.get('/page/:slug/availability', async (req, res) => {
         let dataKey = null;
         const inst = (state.installed || {})[req.query.app];
         if (inst && inst.manifest) dataKey = inst.manifest.dataKey;
-        const avail = await getAvailability(state.site_id, state.installed, dataKey, req.query.month);
+        const bc = bookingCfg(inst);
+        const avail = await getAvailability(state.site_id, state.installed, dataKey, req.query.month, {
+            resource: req.query.resource || null,
+            date: req.query.date || null,
+            slots: bc.slots, slotCap: bc.slotCap
+        });
+        avail.mode = bc.mode;
         res.json(avail);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -924,6 +982,8 @@ router.get('/page/:slug', async (req, res) => {
         order.forEach(function (id) {
             const man = installed[id].manifest;
             if (man.publicData && man.dataKey) publicKeys.push(man.dataKey);
+            // a cart block needs its source stream (e.g. ordering ← menu_items)
+            if (man.cart && man.cart.source && publicKeys.indexOf(man.cart.source) === -1) publicKeys.push(man.cart.source);
         });
 
         let publicData = {};
@@ -939,11 +999,13 @@ router.get('/page/:slug', async (req, res) => {
             });
         }
 
-        const blocks = order.map(function (id) {
+        const blocks = [];
+        for (const id of order) {
             const inst = installed[id];
             const man = inst.manifest;
             const cfg = inst.config || {};
-            return {
+            const bc = bookingCfg(inst);
+            const block = {
                 id: id,
                 icon: man.icon || '📦',
                 title: cfg.label || man.block.title || man.name,
@@ -952,9 +1014,44 @@ router.get('/page/:slug', async (req, res) => {
                 dataKey: man.dataKey || null,
                 publicData: !!man.publicData,
                 checkout: !!man.checkout,
+                booking: man.checkout ? { mode: bc.mode, slots: bc.slots, resource: bc.resourceKey } : undefined,
+                cart: man.cart || undefined,
                 fields: (man.fields || []).filter(function (f) { return f.key !== 'status'; })
+                    .map(function (f) {
+                        // universal choice lists: a field can source its options
+                        // from the business's own install config (optionsFrom)
+                        if (!f.optionsFrom) return f;
+                        var raw = cfg[f.optionsFrom] != null ? cfg[f.optionsFrom] : '';
+                        if (!raw) {
+                            var sd = (man.setup || []).filter(function (s) { return s.key === f.optionsFrom; })[0];
+                            raw = (sd && sd.def) || '';
+                        }
+                        var opts = String(raw).split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+                        var out = {}; Object.keys(f).forEach(function (k) { out[k] = f[k]; });
+                        out.options = opts;
+                        return out;
+                    })
             };
-        });
+            // resource-linked checkout: include the pickable resources
+            if (man.checkout && bc.resourceKey) {
+                const { data: rs } = await supabase.from('app_records')
+                    .select('id, record').eq('site_id', state.site_id).eq('data_key', bc.resourceKey).limit(50);
+                block.resources = (rs || []).map(function (r) {
+                    const rec = r.record || {};
+                    if (rec.status && ['retired', 'maintenance', 'inactive'].indexOf(rec.status) !== -1) return null;
+                    return {
+                        id: r.id,
+                        name: rec.name || rec.item || 'Option',
+                        desc: [rec.type, rec.sleeps ? 'sleeps ' + rec.sleeps : null, rec.capacity ? 'up to ' + rec.capacity : null, rec.role].filter(Boolean).join(' · '),
+                        url: rec.url && /^https?:/i.test(rec.url) ? rec.url : null,
+                        rate_hourly: parseFloat(rec.rate_hourly) || null,
+                        rate_full: parseFloat(rec.rate_full) || null,
+                        rate_night: parseFloat(rec.rate_night) || null
+                    };
+                }).filter(Boolean);
+            }
+            blocks.push(block);
+        }
 
         // payment config comes from the installed payments app, if any
         let payment = null;
@@ -1011,14 +1108,55 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         if (req.body.payment_intent_id) record.payment_id = String(req.body.payment_intent_id).slice(0, 100);
         if (req.body.amount_paid) record.amount_paid = String(req.body.amount_paid).slice(0, 20);
 
-        // availability enforcement: no bookings on blocked or full dates
-        if (record.date) {
-            const avail = await getAvailability(state.site_id, state.installed, inst.manifest.dataKey, null);
-            if (avail.blocked.indexOf(record.date) !== -1) {
-                return res.status(409).json({ error: 'That date is unavailable — please pick another.' });
+        // referral + resource + range extras from the checkout
+        const bc = bookingCfg(inst);
+        if (req.body.resource_id && bc.resourceKey) {
+            const { data: rr } = await supabase.from('app_records')
+                .select('id, record').eq('id', String(req.body.resource_id))
+                .eq('site_id', state.site_id).eq('data_key', bc.resourceKey).maybeSingle();
+            if (rr) {
+                record.resource_id = rr.id;
+                record.resource = (rr.record || {}).name || (rr.record || {}).item || '';
             }
-            if (avail.full.indexOf(record.date) !== -1) {
-                return res.status(409).json({ error: 'That date is fully booked — please pick another.' });
+        }
+        if (bc.mode === 'range' && req.body.end_date) {
+            const ed = String(req.body.end_date).match(/^\d{4}-\d{2}-\d{2}/);
+            if (ed) record.end_date = ed[0];
+        }
+
+        // availability enforcement: no bookings on blocked/full dates,
+        // taken slots, or a resource that's already out. mode 'none'
+        // means the date is informational (membership start, etc.)
+        if (record.date && bc.mode !== 'none') {
+            const avail = await getAvailability(state.site_id, state.installed, inst.manifest.dataKey, null, {
+                resource: record.resource_id || null,
+                date: record.date,
+                slots: bc.slots, slotCap: bc.slotCap
+            });
+            const nights = [];
+            {
+                const start = new Date(record.date + 'T00:00:00Z');
+                const end = record.end_date ? new Date(record.end_date + 'T00:00:00Z') : start;
+                for (let d = new Date(start), i = 0; d <= end && i < 60; d.setUTCDate(d.getUTCDate() + 1), i++) {
+                    nights.push(d.toISOString().slice(0, 10));
+                }
+            }
+            for (const ds of nights) {
+                if (avail.blocked.indexOf(ds) !== -1) {
+                    return res.status(409).json({ error: (record.resource ? record.resource + ' is' : 'That date is') + ' unavailable on ' + ds + ' — please pick different dates.' });
+                }
+                if (avail.full.indexOf(ds) !== -1) {
+                    return res.status(409).json({ error: ds + ' is fully booked — please pick different dates.' });
+                }
+            }
+            if (bc.mode === 'slots') {
+                if (!record.time || bc.slots.indexOf(record.time) === -1) {
+                    return res.status(400).json({ error: 'Please pick a time.' });
+                }
+                const slot = (avail.slots || []).filter(function (x) { return x.time === record.time; })[0];
+                if (!slot || slot.remaining <= 0) {
+                    return res.status(409).json({ error: record.time + ' is fully booked — please pick another time.' });
+                }
             }
         }
 
@@ -1029,7 +1167,9 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         if (error) throw error;
 
         runAutomations(state.site_id, dataKey, record, state).catch(function () {});
-        calendarSync(state.site_id, dataKey, inserted.id, record).catch(function () {});
+        // mode 'none' = not a date-claiming product (gift card, membership,
+        // pickup order) — it never lands on the availability calendar
+        if (bc.mode !== 'none') calendarSync(state.site_id, dataKey, inserted.id, record).catch(function () {});
 
         // Notify the owner by SMS if the business has a phone on file
         try {
