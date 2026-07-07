@@ -146,10 +146,18 @@ async function buildFullEntity(slug) {
   const offeringRows = offeringsRes.data || [];
   const offeringPrices = offeringPricesRes.data || [];
   const marinaDetails = marinaRes?.data || null;
-  // Connected parent (marina/complex/condo hub) — child pages link back to it
-  const parentInfo = entity.parent_entity_slug
-    ? (await db.from('entity').select('slug,name,entity_type,entity_subtype,hero_image_url').eq('slug', entity.parent_entity_slug).eq('is_active', true).maybeSingle()).data || null
-    : null;
+  // Connected parent (marina/complex/condo hub) — child pages link back to it,
+  // and unit pages show the complex's amenities alongside their own
+  let parentInfo = null;
+  let parentAmenities = [];
+  if (entity.parent_entity_slug) {
+    const [pRes, paRes] = await Promise.all([
+      db.from('entity').select('slug,name,entity_type,entity_subtype,hero_image_url').eq('slug', entity.parent_entity_slug).eq('is_active', true).maybeSingle(),
+      db.from('entity_tags').select('tag_name').eq('entity_slug', entity.parent_entity_slug).eq('tag_category', 'amenity'),
+    ]);
+    parentInfo = pRes.data || null;
+    parentAmenities = [...new Set((paRes.data || []).map(t => t.tag_name).filter(Boolean))];
+  }
   if (marinaDetails) {
     const md = marinaDetails;
     const facts = [
@@ -385,6 +393,7 @@ async function buildFullEntity(slug) {
     perfect_for: perfectForRes.data || [],
     child_count: childCountRes?.count || 0,
     parent: parentInfo,
+    parent_amenities: parentAmenities,
     is_hub: (childCountRes?.count || 0) > 0,
     good_for_children: entity.good_for_children ?? entity.good_for_kids ?? null,
     modules: modulesFull,
@@ -1423,7 +1432,7 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
       const slugs = children.map(c => c.slug);
       const { data: resources } = await db
         .from('bookable_resources')
-        .select('entity_slug,name,resource_type,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url')
+        .select('entity_slug,name,resource_type,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url,amenities')
         .in('entity_slug', slugs)
         .eq('is_active', true);
       const bySlug = new Map();
@@ -1483,7 +1492,7 @@ router.get('/stay-units', async (req, res) => {
       const chunk = unitSlugs.slice(i, i + 200);
       const { data: resources } = await db
         .from('bookable_resources')
-        .select('entity_slug,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url')
+        .select('entity_slug,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url,amenities')
         .in('entity_slug', chunk)
         .eq('is_active', true);
       for (const r of resources || []) {
