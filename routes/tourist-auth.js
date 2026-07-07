@@ -76,26 +76,11 @@ async function touristAuth(req, res, next) {
 // Backfill: Link all pre-signup activity to the new user (fire-and-forget)
 // ─────────────────────────────────────────────────────────────────────────────
 async function backfillAnonymousActivity(userId, visitorId) {
-    try {
-        // Update all tables where visitor_id matches with the new user_id
-        await Promise.all([
-            mainDb.from('gcr_page_views')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-            mainDb.from('session_events')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-            mainDb.from('qr_scans')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-        ]);
-        console.log('[Backfill] Linked anonymous activity for', userId, 'from visitor', visitorId);
-    } catch (err) {
-        console.error('[Backfill error]', err.message);
-    }
+    // Disabled: no analytics table carries user_id/visitor_id columns.
+    // gcr_page_views keys on entity_id (per-business daily counts) and
+    // qr_scans on entity_slug/qr_code_id; session_events does not exist.
+    // Re-enable only after an identity column actually exists on a table.
+    console.log('[Backfill] skipped (no identity columns in analytics tables) for', userId, visitorId);
 }
 
 // Lookup user by email — supabase-js's admin API has no getUserByEmail method

@@ -47,19 +47,20 @@ const supabase = db(); // update_links lives in GCR
 async function syncToGcr(siteId, type, data) {
     try {
         const gcrDb = db();
-        const { data: entity } = await gcrDb.from('entity')
-            .select('id').eq('legacy_site_id', siteId).maybeSingle();
-        if (!entity) return;
-        const eid = entity.id;
+        // resolve through entity_owners — the slug is the business key
+        const { data: owner } = await gcrDb.from('entity_owners')
+            .select('entity_slug').eq('user_id', siteId).maybeSingle();
+        if (!owner || !owner.entity_slug) return;
+        const eid = owner.entity_slug;
         if (type === 'menu_item') {
             const itemType = data.item_type || 'food';
             if (itemType === 'drink') {
                 const secName = data.category || 'Drinks';
-                let { data: sec } = await gcrDb.from('drink_sections').select('id').eq('entity_id', eid).eq('section_name', secName).maybeSingle();
-                if (!sec) { const ins = await gcrDb.from('drink_sections').insert({ entity_id: eid, section_name: secName }).select('id').single(); sec = ins.data; }
-                if (sec) await gcrDb.from('drink_items').insert({ entity_id: eid, drink_section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
+                let { data: sec } = await gcrDb.from('drink_sections').select('id').eq('entity_slug', eid).eq('section_name', secName).maybeSingle();
+                if (!sec) { const ins = await gcrDb.from('drink_sections').insert({ entity_slug: eid, section_name: secName }).select('id').single(); sec = ins.data; }
+                if (sec) await gcrDb.from('drink_items').insert({ entity_slug: eid, section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
             } else {
-                await gcrDb.from('menu_items').insert({ entity_id: eid, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
+                await gcrDb.from('menu_items').insert({ entity_slug: eid, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
             }
         } else if (type === 'special') {
             await gcrDb.from('entity_specials').insert({
@@ -113,18 +114,26 @@ async function validateToken(req, res, next) {
     }
     req.link = link;
     // site_id businesses are stored as "s:<site_id>" in the entity_id field.
-    // Promote to GCR entity_id when entity.legacy_site_id is populated so writes
+    // Promote to the owner's claimed GCR entity (entity_owners) so writes
     // land in the GCR DB (single source of truth).
     if (link.entity_id && String(link.entity_id).startsWith('s:')) {
         const siteId = String(link.entity_id).slice(2);
-        const { data: ent } = await db().from('entity').select('id').eq('legacy_site_id', siteId).maybeSingle();
-        if (ent && ent.id) {
-            req.entityId = ent.id;
+        // owners claim their entity in entity_owners — the slug is the key
+        const { data: own } = await db().from('entity_owners')
+            .select('entity_id, entity_slug').eq('user_id', siteId).maybeSingle();
+        if (own && own.entity_slug) {
+            req.entityId = own.entity_id;
+            req.entitySlug = own.entity_slug;
         } else {
             req.siteId = siteId;
         }
     } else {
         req.entityId = link.entity_id;
+    }
+    // child tables key on entity_slug — resolve it once
+    if (req.entityId && !req.entitySlug) {
+        const { data: ent2 } = await db().from('entity').select('slug').eq('id', req.entityId).maybeSingle();
+        if (ent2) req.entitySlug = ent2.slug;
     }
     if (req.method !== 'GET' && !link.submitted_at) markSubmitted(token);
     next();
@@ -328,16 +337,16 @@ router.get('/:token/data', validateToken, async (req, res) => {
     const g = db();
     const [entity, specials, menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, photos, sections, sectionItems] = await Promise.all([
         g.from('entity').select('name,icon,description,hh_days,hh_start,hh_end,hh_description,hero_image_url,slug').eq('id', eid).single(),
-        g.from('entity_specials').select('*').eq('entity_id', eid).order('created_at'),
-        g.from('menu_sections').select('*').eq('entity_id', eid).order('sort_order'),
-        g.from('menu_items').select('*').eq('entity_id', eid).order('sort_order'),
-        g.from('drink_sections').select('*').eq('entity_id', eid).order('created_at'),
-        g.from('drink_items').select('*').eq('entity_id', eid).order('created_at'),
-        g.from('happy_hour_sections').select('*').eq('entity_id', eid).order('created_at'),
-        g.from('happy_hour_items').select('*').eq('entity_id', eid).order('created_at'),
-        g.from('entity_events').select('*').eq('entity_id', eid).eq('is_active', true).order('event_date'),
-        g.from('entity_photos').select('*').eq('entity_id', eid).order('sort_order').limit(20),
-        g.from('entity_sections').select('*').eq('entity_id', eid).order('sort_order'),
+        g.from('entity_specials').select('*').eq('entity_slug', eid).order('created_at'),
+        g.from('menu_sections').select('*').eq('entity_slug', eid).order('sort_order'),
+        g.from('menu_items').select('*').eq('entity_slug', eid).order('sort_order'),
+        g.from('drink_sections').select('*').eq('entity_slug', eid).order('created_at'),
+        g.from('drink_items').select('*').eq('entity_slug', eid).order('created_at'),
+        g.from('happy_hour_sections').select('*').eq('entity_slug', eid).order('created_at'),
+        g.from('happy_hour_items').select('*').eq('entity_slug', eid).order('created_at'),
+        g.from('entity_events').select('*').eq('entity_slug', eid).eq('is_active', true).order('event_date'),
+        g.from('entity_photos').select('*').eq('entity_slug', eid).order('sort_order').limit(20),
+        g.from('entity_sections').select('*').eq('entity_slug', eid).order('sort_order'),
         g.from('section_items').select('*,section_id(id,entity_id,section_type)').eq('entity_id', eid).order('sort_order'),
     ]);
 
@@ -436,7 +445,7 @@ router.post('/:token/upload', validateToken, upload.single('image'), async (req,
     // If this is a standalone business photo (not an item image), persist it to entity_photos
     if (req.query.save_photo === '1') {
         const caption = req.body.caption || null;
-        const { data: photo } = await g.from('entity_photos').insert({ entity_id: req.entityId, image_url: publicUrl, caption }).select().single();
+        const { data: photo } = await g.from('entity_photos').insert({ entity_slug: req.entitySlug, image_url: publicUrl, caption }).select().single();
         return res.json({ url: publicUrl, photo });
     }
 
@@ -445,7 +454,7 @@ router.post('/:token/upload', validateToken, upload.single('image'), async (req,
 
 // DELETE /update/:token/photos/:id
 router.delete('/:token/photos/:id', validateToken, async (req, res) => {
-    const { error } = await db().from('entity_photos').delete().eq('id', req.params.id).eq('entity_id', req.entityId);
+    const { error } = await db().from('entity_photos').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
@@ -464,9 +473,9 @@ router.post('/:token/specials', validateToken, async (req, res) => {
     } else {
         const g = db();
         if (id) {
-            ({ data, error } = await g.from('entity_specials').update({ special_name, discount_text, description, days, start_time, end_time, image_url, is_active }).eq('id', id).eq('entity_id', req.entityId).select().single());
+            ({ data, error } = await g.from('entity_specials').update({ special_name, discount_text, description, days, start_time, end_time, image_url, is_active }).eq('id', id).eq('entity_slug', req.entitySlug).select().single());
         } else {
-            ({ data, error } = await g.from('entity_specials').insert({ entity_id: req.entityId, special_name, discount_text, description, days, start_time, end_time, image_url, is_active }).select().single());
+            ({ data, error } = await g.from('entity_specials').insert({ entity_slug: req.entitySlug, special_name, discount_text, description, days, start_time, end_time, image_url, is_active }).select().single());
         }
     }
     if (error) return res.status(500).json({ error: error.message });
@@ -476,7 +485,7 @@ router.post('/:token/specials', validateToken, async (req, res) => {
 router.delete('/:token/specials/:id', validateToken, async (req, res) => {
     const { error } = req.siteId
         ? (await mainDb.from('specials').delete().eq('id', req.params.id).eq('site_id', req.siteId))
-        : (await db().from('entity_specials').delete().eq('id', req.params.id).eq('entity_id', req.entityId));
+        : (await db().from('entity_specials').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug));
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
@@ -503,7 +512,7 @@ router.put('/:token/menu-sections/:id', validateToken, async (req, res) => {
 });
 
 router.delete('/:token/menu-sections/:id', validateToken, async (req, res) => {
-    const { error } = await db().from('menu_sections').delete().eq('id', req.params.id).eq('entity_id', req.entityId);
+    const { error } = await db().from('menu_sections').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
@@ -550,9 +559,9 @@ router.post('/:token/menu-items', validateToken, async (req, res) => {
         } else {
             const payload = { item_name, description: description || null, price: price !== '' && price != null ? parseFloat(price) : null, price_text: price_text || null, menu_section_id: menu_section_id || null, image_url: image_url || null, is_available, is_featured, is_catch_of_day, is_on_tap, has_market_price, sort_order };
             if (id) {
-                ({ data, error } = await g.from('menu_items').update(payload).eq('id', id).eq('entity_id', req.entityId).select().single());
+                ({ data, error } = await g.from('menu_items').update(payload).eq('id', id).eq('entity_slug', req.entitySlug).select().single());
             } else {
-                ({ data, error } = await g.from('menu_items').insert({ entity_id: req.entityId, ...payload }).select().single());
+                ({ data, error } = await g.from('menu_items').insert({ entity_slug: req.entitySlug, ...payload }).select().single());
             }
         }
     }
@@ -570,7 +579,7 @@ router.delete('/:token/menu-items/:id', validateToken, async (req, res) => {
         const id = req.params.id;
         // Try section_items first (where new data goes), then menu_items (legacy)
         await g.from('section_items').delete().eq('id', id).eq('entity_id', req.entityId).then(() => {}).catch(() => {});
-        await g.from('menu_items').delete().eq('id', id).eq('entity_id', req.entityId).then(() => {}).catch(() => {});
+        await g.from('menu_items').delete().eq('id', id).eq('entity_slug', req.entitySlug).then(() => {}).catch(() => {});
     }
     res.json({ success: true });
 });
@@ -601,9 +610,9 @@ router.post('/:token/drink-items', validateToken, async (req, res) => {
     } else {
         const payload = { item_name, description: description || null, price: price !== '' && price != null ? parseFloat(price) : null, price_text: price_text || null, drink_section_id: drink_section_id || null, image_url: image_url || null, is_available };
         if (id) {
-            ({ data, error } = await g.from('drink_items').update(payload).eq('id', id).eq('entity_id', req.entityId).select().single());
+            ({ data, error } = await g.from('drink_items').update(payload).eq('id', id).eq('entity_slug', req.entitySlug).select().single());
         } else {
-            ({ data, error } = await g.from('drink_items').insert({ entity_id: req.entityId, ...payload }).select().single());
+            ({ data, error } = await g.from('drink_items').insert({ entity_slug: req.entitySlug, ...payload }).select().single());
         }
     }
     if (error) return res.status(500).json({ error: error.message });
@@ -615,7 +624,7 @@ router.delete('/:token/drink-items/:id', validateToken, async (req, res) => {
     const id = req.params.id;
     // Try section_items first (where new data goes), then drink_items (legacy)
     await g.from('section_items').delete().eq('id', id).eq('entity_id', req.entityId).then(() => {}).catch(() => {});
-    await g.from('drink_items').delete().eq('id', id).eq('entity_id', req.entityId).then(() => {}).catch(() => {});
+    await g.from('drink_items').delete().eq('id', id).eq('entity_slug', req.entitySlug).then(() => {}).catch(() => {});
     res.json({ success: true });
 });
 
@@ -634,16 +643,16 @@ router.post('/:token/hh-items', validateToken, async (req, res) => {
     const g = db();
     let data, error;
     if (id) {
-        ({ data, error } = await g.from('happy_hour_items').update(payload).eq('id', id).eq('entity_id', req.entityId).select().single());
+        ({ data, error } = await g.from('happy_hour_items').update(payload).eq('id', id).eq('entity_slug', req.entitySlug).select().single());
     } else {
-        ({ data, error } = await g.from('happy_hour_items').insert({ entity_id: req.entityId, ...payload }).select().single());
+        ({ data, error } = await g.from('happy_hour_items').insert({ entity_slug: req.entitySlug, ...payload }).select().single());
     }
     if (error) return res.status(500).json({ error: error.message });
     res.json({ item: data });
 });
 
 router.delete('/:token/hh-items/:id', validateToken, async (req, res) => {
-    const { error } = await db().from('happy_hour_items').delete().eq('id', req.params.id).eq('entity_id', req.entityId);
+    const { error } = await db().from('happy_hour_items').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
@@ -656,16 +665,16 @@ router.post('/:token/events', validateToken, async (req, res) => {
     const g = db();
     let data, error;
     if (id) {
-        ({ data, error } = await g.from('entity_events').update(payload).eq('id', id).eq('entity_id', req.entityId).select().single());
+        ({ data, error } = await g.from('entity_events').update(payload).eq('id', id).eq('entity_slug', req.entitySlug).select().single());
     } else {
-        ({ data, error } = await g.from('entity_events').insert({ entity_id: req.entityId, ...payload }).select().single());
+        ({ data, error } = await g.from('entity_events').insert({ entity_slug: req.entitySlug, ...payload }).select().single());
     }
     if (error) return res.status(500).json({ error: error.message });
     res.json({ item: data });
 });
 
 router.delete('/:token/events/:id', validateToken, async (req, res) => {
-    const { error } = await db().from('entity_events').delete().eq('id', req.params.id).eq('entity_id', req.entityId);
+    const { error } = await db().from('entity_events').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
@@ -678,16 +687,16 @@ router.get('/:token/catch', validateToken, async (req, res) => {
     const eid = req.entityId;
     const g = db();
     const [sectionRes, itemsRes] = await Promise.all([
-        g.from('menu_sections').select('*').eq('entity_id', eid).eq('section_name', CATCH_SECTION_NAME).maybeSingle(),
-        g.from('menu_sections').select('id').eq('entity_id', eid).eq('section_name', CATCH_SECTION_NAME).maybeSingle(),
+        g.from('menu_sections').select('*').eq('entity_slug', eid).eq('section_name', CATCH_SECTION_NAME).maybeSingle(),
+        g.from('menu_sections').select('id').eq('entity_slug', eid).eq('section_name', CATCH_SECTION_NAME).maybeSingle(),
     ]);
     let section = sectionRes.data;
     if (!section) {
-        const ins = await g.from('menu_sections').insert({ entity_id: eid, section_name: CATCH_SECTION_NAME }).select().single();
+        const ins = await g.from('menu_sections').insert({ entity_slug: eid, section_name: CATCH_SECTION_NAME }).select().single();
         section = ins.data;
     }
     const items = section
-        ? (await g.from('menu_items').select('*').eq('entity_id', eid).eq('menu_section_id', section.id).order('created_at')).data || []
+        ? (await g.from('menu_items').select('*').eq('entity_slug', eid).eq('menu_section_id', section.id).order('created_at')).data || []
         : [];
     res.json({ section, items });
 });
@@ -699,9 +708,9 @@ router.post('/:token/catch', validateToken, async (req, res) => {
     const g = db();
 
     // Find or create the Catch of the Day section
-    let { data: section } = await g.from('menu_sections').select('id').eq('entity_id', eid).eq('section_name', CATCH_SECTION_NAME).maybeSingle();
+    let { data: section } = await g.from('menu_sections').select('id').eq('entity_slug', eid).eq('section_name', CATCH_SECTION_NAME).maybeSingle();
     if (!section) {
-        const ins = await g.from('menu_sections').insert({ entity_id: eid, section_name: CATCH_SECTION_NAME }).select().single();
+        const ins = await g.from('menu_sections').insert({ entity_slug: eid, section_name: CATCH_SECTION_NAME }).select().single();
         section = ins.data;
     }
 
@@ -717,16 +726,16 @@ router.post('/:token/catch', validateToken, async (req, res) => {
 
     let data, error;
     if (id) {
-        ({ data, error } = await g.from('menu_items').update(payload).eq('id', id).eq('entity_id', eid).select().single());
+        ({ data, error } = await g.from('menu_items').update(payload).eq('id', id).eq('entity_slug', eid).select().single());
     } else {
-        ({ data, error } = await g.from('menu_items').insert({ entity_id: eid, ...payload }).select().single());
+        ({ data, error } = await g.from('menu_items').insert({ entity_slug: eid, ...payload }).select().single());
     }
     if (error) return res.status(500).json({ error: error.message });
     res.json({ item: data });
 });
 
 router.delete('/:token/catch/:id', validateToken, async (req, res) => {
-    const { error } = await db().from('menu_items').delete().eq('id', req.params.id).eq('entity_id', req.entityId);
+    const { error } = await db().from('menu_items').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });

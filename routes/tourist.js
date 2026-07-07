@@ -206,9 +206,9 @@ router.post('/swipes', touristAuth, async (req, res) => {
     const rows = events
         .filter(e => e.slug && e.direction)
         .map(e => ({
-            user_id: req.touristId,
+            tourist_id: req.touristId,
             entity_slug: e.slug,
-            business_name: e.business_name || null,
+            entity_name: e.business_name || null,
             category: e.category || null,
             direction: e.direction, // 'like' | 'nope' | 'super'
         }));
@@ -363,9 +363,9 @@ async function recomputeAllPreferences(touristId) {
     // Load full swipe history
     const { data: events } = await mainDb
         .from('tourist_swipe_events')
-        .select('entity_slug, direction, category, swiped_at')
-        .eq('user_id', touristId)
-        .order('swiped_at', { ascending: false });
+        .select('entity_slug, direction, category, created_at')
+        .eq('tourist_id', touristId)
+        .order('created_at', { ascending: false });
 
     if (!events?.length) return;
 
@@ -431,7 +431,7 @@ router.get('/preferences', touristAuth, async (req, res) => {
     const { data: swipeStats } = await mainDb
         .from('tourist_swipe_events')
         .select('direction')
-        .eq('user_id', touristId);
+        .eq('tourist_id', touristId);
 
     const counts = { like: 0, nope: 0, super: 0 };
     for (const s of (swipeStats || [])) counts[s.direction] = (counts[s.direction] || 0) + 1;
@@ -461,9 +461,9 @@ router.get('/analytics', touristAuth, async (req, res) => {
     try {
         const { data: events } = await mainDb
             .from('tourist_swipe_events')
-            .select('direction, category, swiped_at')
-            .eq('user_id', touristId)
-            .order('swiped_at', { ascending: false });
+            .select('direction, category, created_at')
+            .eq('tourist_id', touristId)
+            .order('created_at', { ascending: false });
 
         const { data: saves } = await mainDb
             .from('tourist_saves')
@@ -523,10 +523,10 @@ router.get('/recommendations', touristAuth, async (req, res) => {
                 .eq('user_id', req.touristId),
             mainDb.from('tourist_swipe_events')
                 .select('category, direction')
-                .eq('user_id', req.touristId),
+                .eq('tourist_id', req.touristId),
             mainDb.from('tourist_profiles')
                 .select('interests, seen_slugs:answers->seen_slugs')
-                .eq('user_id', req.touristId)
+                .eq('tourist_id', req.touristId)
                 .maybeSingle(),
         ]);
 
@@ -551,7 +551,7 @@ router.get('/recommendations', touristAuth, async (req, res) => {
         // Build query for recommended businesses
         // Prefer categories they've shown interest in, exclude seen
         let query = mainDb.from('entity')
-            .select('slug, name, icon, subtitle, category, hero_image_url, rating, price_range')
+            .select('slug, name, icon, subtitle, entity_type, hero_image_url, rating, price_range')
             .eq('is_active', true)
             .limit(limit * 2); // Fetch 2x to filter
 
@@ -574,9 +574,9 @@ router.get('/recommendations', touristAuth, async (req, res) => {
         // If no recommendations (new user), return featured businesses
         if (recommendations.length === 0) {
             const { data: featured } = await mainDb.from('entity')
-                .select('slug, name, icon, subtitle, category, hero_image_url, rating, price_range')
+                .select('slug, name, icon, subtitle, entity_type, hero_image_url, rating, price_range')
                 .eq('is_active', true)
-                .eq('is_featured', true)
+                .eq('featured', true)
                 .limit(limit);
             return res.json({ recommendations: featured || [], based_on: { saves: saves?.length || 0, swipes: swipes?.length || 0 } });
         }

@@ -23,41 +23,43 @@ async function uploadEntityMedia(base64, mime) {
 
 // ── GCR write-through ────────────────────────────────────────────────────────
 // When data is saved to the main DB via site_id, also mirror it to the GCR
-// entity if one exists with a matching legacy_site_id. Fire-and-forget.
+// entity claimed by this owner (entity_owners). Fire-and-forget.
 async function syncToGcr(siteId, type, data) {
     const gcrDb = gcr();
-    const { data: entity } = await gcrDb.from('entity')
-        .select('id').eq('legacy_site_id', siteId).maybeSingle();
-    if (!entity) return;
-    const eid = entity.id;
+    // resolve the owner's entity through entity_owners (the claim table) —
+    // entity.legacy_site_id never existed; the slug is the business key
+    const { data: owner } = await gcrDb.from('entity_owners')
+        .select('entity_slug').eq('user_id', siteId).maybeSingle();
+    if (!owner || !owner.entity_slug) return;
+    const eid = owner.entity_slug;
 
     if (type === 'menu_item') {
         const itemType = data.item_type || 'food';
         if (itemType === 'drink') {
             // Drinks go to GCR drink_sections + drink_items
             const secName = data.category || 'Drinks';
-            let { data: sec } = await gcrDb.from('drink_sections').select('id').eq('entity_id', eid).eq('section_name', secName).maybeSingle();
+            let { data: sec } = await gcrDb.from('drink_sections').select('id').eq('entity_slug', eid).eq('section_name', secName).maybeSingle();
             if (!sec) {
-                const ins = await gcrDb.from('drink_sections').insert({ entity_id: eid, section_name: secName }).select('id').single();
+                const ins = await gcrDb.from('drink_sections').insert({ entity_slug: eid, section_name: secName }).select('id').single();
                 sec = ins.data;
             }
-            if (sec) await gcrDb.from('drink_items').insert({ entity_id: eid, drink_section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null, tags: data.tags || [], modifiers: data.modifiers || [], is_available: true });
+            if (sec) await gcrDb.from('drink_items').insert({ entity_slug: eid, section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null, tags: data.tags || [], is_available: true });
         } else if (itemType === 'happy_hour') {
             // Happy hour items go to GCR happy_hour_sections + happy_hour_items
             const secName = data.category || 'Happy Hour';
-            let { data: sec } = await gcrDb.from('happy_hour_sections').select('id').eq('entity_id', eid).maybeSingle();
+            let { data: sec } = await gcrDb.from('happy_hour_sections').select('id').eq('entity_slug', eid).maybeSingle();
             if (!sec) {
-                const ins = await gcrDb.from('happy_hour_sections').insert({ entity_id: eid, section_name: secName }).select('id').single();
+                const ins = await gcrDb.from('happy_hour_sections').insert({ entity_slug: eid, section_name: secName }).select('id').single();
                 sec = ins.data;
             }
-            if (sec) await gcrDb.from('happy_hour_items').insert({ entity_id: eid, item_name: data.name, hh_price: data.price || null, description: data.description || null });
+            if (sec) await gcrDb.from('happy_hour_items').insert({ entity_slug: eid, section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null });
         } else {
             // Food goes to GCR menu_items
-            await gcrDb.from('menu_items').insert({ entity_id: eid, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
+            await gcrDb.from('menu_items').insert({ entity_slug: eid, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
         }
     } else if (type === 'special') {
         await gcrDb.from('entity_specials').insert({
-            entity_id: eid,
+            entity_slug: eid,
             special_name: data.special_name || data.name,
             discount_text: data.discount_text || '',
             description: data.description || null,
@@ -68,7 +70,7 @@ async function syncToGcr(siteId, type, data) {
         });
     } else if (type === 'event') {
         await gcrDb.from('entity_events').insert({
-            entity_id: eid,
+            entity_slug: eid,
             event_name: data.name || data.event_name,
             description: data.description || null,
             event_date: data.event_date || null,
@@ -186,7 +188,7 @@ function _gcrEntityToAdminProfile(e) {
     if (!e) return { business: null, content: null };
     return {
         business: {
-            site_id: e.legacy_site_id || null,
+            site_id: e.slug || null, // the slug IS the business key
             name: e.name || '',
             type: e.entity_subtype || e.entity_type || '',
             logo_url: e.hero_image_url || '',
@@ -3211,7 +3213,10 @@ router.post('/ai-chat', async (req, res) => {
 
     // Look up GCR entity early so executeTool and context can use it
     const _gcrDb = gcr();
-    const { data: _gcrEntity } = await _gcrDb.from('entity').select('id,slug').eq('legacy_site_id', siteId).maybeSingle();
+    const { data: _own } = await _gcrDb.from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle();
+    const { data: _gcrEntity } = _own && _own.entity_slug
+        ? await _gcrDb.from('entity').select('id,slug').eq('slug', _own.entity_slug).maybeSingle()
+        : { data: null };
     const gcrEntityId = _gcrEntity?.id || null;
     const gcrEntitySlug = _gcrEntity?.slug || null;
 
