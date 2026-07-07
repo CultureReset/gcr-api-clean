@@ -61,6 +61,7 @@ mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 // Apps & Modules
 mount('/api/apps', () => require('./routes/apps'));
 mount('/api/modules', () => require('./routes/modules'));
+mount('/api/platform', () => require('./routes/platform'));
 
 // Google Business
 mount('/api/google-business', () => require('./routes/google-business'));
