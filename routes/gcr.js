@@ -140,7 +140,7 @@ async function buildFullEntity(slug) {
   // storage tiers, ride tickets. Merged into the same sections shape the page
   // already renders, grouped by offerings.section (fallback: kind).
   const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes] = await Promise.all([
-    db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order').eq('entity_slug', slug).eq('active', true).order('sort_order'),
+    db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order,image_url').eq('entity_slug', slug).eq('active', true).order('sort_order'),
     db.from('offering_prices').select('id,offering_id,label,price,age_min,age_max,season,duration_label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_amenities').select('id,amenity,category,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('marina_details').select('*').eq('entity_slug', slug).maybeSingle(),
@@ -171,6 +171,12 @@ async function buildFullEntity(slug) {
       (md.has_live_bait || md.has_frozen_bait || md.has_tackle) && { name: 'Bait & tackle', desc: [md.has_live_bait && 'live bait', md.has_frozen_bait && 'frozen bait', md.has_tackle && 'tackle'].filter(Boolean).join(', ') },
       md.vhf_channel && { name: 'VHF channel', desc: String(md.vhf_channel) },
       md.daily_rate_per_ft && { name: 'Daily rate', desc: `$${md.daily_rate_per_ft}/ft` },
+      md.transient_rate_per_ft && { name: 'Transient slip rate', desc: `$${md.transient_rate_per_ft}/ft` },
+      md.parking_available && { name: 'Trailer / vehicle parking', desc: md.parking_fee_text || 'available' },
+      md.shore_power_amps && { name: 'Shore power', desc: md.shore_power_amps },
+      md.power_fee_text && { name: 'Commercial power', desc: md.power_fee_text },
+      md.store_items?.length && { name: 'Dock store carries', desc: md.store_items.join(', ') },
+      md.tackle_notes && { name: 'Tackle notes', desc: md.tackle_notes },
       md.notes && { name: 'Notes', desc: md.notes },
     ].filter(Boolean);
     if (facts.length) {
@@ -203,6 +209,7 @@ async function buildFullEntity(slug) {
           price_from: o.price_from, price_to: null,
           price_label: o.unit ? String(o.unit).replace(/_/g, ' ') : null,
           icon: null, sort_order: o.sort_order ?? 0,
+          image_url: o.image_url || null,
           metadata: { kind: o.kind, capacity: o.capacity, event_date: o.event_date },
           tiers: offeringPrices.filter(p => p.offering_id === o.id).map(p => ({
             id: p.id, label: [p.label, p.duration_label, p.season && p.season !== 'regular' ? p.season : null].filter(Boolean).join(' — '),
