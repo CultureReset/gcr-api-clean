@@ -2891,10 +2891,14 @@ router.get('/menu', async (req, res) => {
             return res.status(400).json({ error: 'No business specified. Use ?slug=xxx, ?entity_id=xxx, or ?site_id=xxx.' });
         }
 
-        // 4) Bridge: site_id → GCR entity via legacy_site_id
+        // 4) Bridge: site_id → the owner's claimed GCR entity (entity_owners).
+        //    entity.legacy_site_id never existed — the slug is the business key.
         try {
-            const { data: gcrEntity } = await gcrDb.from('entity').select(ENTITY_COLS).eq('legacy_site_id', siteId).maybeSingle();
-            if (gcrEntity) return await serveMenuFromGcr(res, gcrDb, gcrEntity);
+            const { data: own } = await gcrDb.from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle();
+            if (own && own.entity_slug) {
+                const { data: gcrEntity } = await gcrDb.from('entity').select(ENTITY_COLS).eq('slug', own.entity_slug).maybeSingle();
+                if (gcrEntity) return await serveMenuFromGcr(res, gcrDb, gcrEntity);
+            }
         } catch (_) { /* fall through to legacy DB */ }
 
         const [{ data: bizData }, { data: siteContent }, { data: items, error }, { data: eventsData }, { data: specialsData }, { data: gcrEntity }] = await Promise.all([
@@ -2905,7 +2909,11 @@ router.get('/menu', async (req, res) => {
                 .order('category', { ascending: true }),
             supabase.from('events').select('*').eq('site_id', siteId).order('event_date', { ascending: true }),
             supabase.from('specials').select('*').eq('site_id', siteId),
-            getGcrDb().from('entity').select('live_artist_id').eq('legacy_site_id', siteId).maybeSingle().catch(() => ({ data: null }))
+            getGcrDb().from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
+                .then(r => (r.data && r.data.entity_slug)
+                    ? getGcrDb().from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
+                    : { data: null })
+                .catch(() => ({ data: null }))
         ]);
 
         if (error) throw error;

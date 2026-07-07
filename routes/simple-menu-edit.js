@@ -22,7 +22,7 @@ router.get('/:slug/data', async (req, res) => {
       return res.status(404).json({ error: 'Business not found' });
     }
 
-    const eid = entity.id;
+    const eid = entity.slug; // children key on entity_slug
 
     // Get all menu data from LIVE tables in parallel
     const [
@@ -36,15 +36,15 @@ router.get('/:slug/data', async (req, res) => {
       { data: events },
       { data: photos }
     ] = await Promise.all([
-      db().from('menu_sections').select('*').eq('entity_id', eid),
-      db().from('menu_items').select('*').eq('entity_id', eid),
-      db().from('drink_sections').select('*').eq('entity_id', eid),
-      db().from('drink_items').select('*').eq('entity_id', eid),
-      db().from('happy_hour_sections').select('*').eq('entity_id', eid),
-      db().from('happy_hour_items').select('*').eq('entity_id', eid),
-      db().from('entity_specials').select('*').eq('entity_id', eid),
-      db().from('entity_events').select('*').eq('entity_id', eid).eq('is_active', true),
-      db().from('entity_photos').select('*').eq('entity_id', eid),
+      db().from('menu_sections').select('*').eq('entity_slug', eid),
+      db().from('menu_items').select('*').eq('entity_slug', eid),
+      db().from('drink_sections').select('*').eq('entity_slug', eid),
+      db().from('drink_items').select('*').eq('entity_slug', eid),
+      db().from('happy_hour_sections').select('*').eq('entity_slug', eid),
+      db().from('happy_hour_items').select('*').eq('entity_slug', eid),
+      db().from('entity_specials').select('*').eq('entity_slug', eid),
+      db().from('entity_events').select('*').eq('entity_slug', eid).eq('is_active', true),
+      db().from('entity_photos').select('*').eq('entity_slug', eid),
     ]);
 
     res.json({
@@ -101,14 +101,14 @@ router.post('/:slug/items', async (req, res) => {
         .from(table)
         .update({ item_name, description: item_description, price: item_price })
         .eq('id', id)
-        .eq('entity_id', entity.id)
+        .eq('entity_slug', entity.slug)
         .select();
       if (error) return res.status(500).json({ error: error.message });
       result = data[0];
     } else {
       // Create
       const itemData = {
-        entity_id: entity.id,
+        entity_slug: entity.slug,
         [sectionIdColumn]: section_id,
         item_name,
         description: item_description || null,
@@ -152,7 +152,7 @@ router.delete('/:slug/items/:id', async (req, res) => {
       .from(table)
       .delete()
       .eq('id', id)
-      .eq('entity_id', entity.id);
+      .eq('entity_slug', entity.slug);
 
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
@@ -181,14 +181,14 @@ router.post('/:slug/specials', async (req, res) => {
         .from('entity_specials')
         .update({ special_name, description, days, start_time, end_time })
         .eq('id', id)
-        .eq('entity_id', entity.id)
+        .eq('entity_slug', entity.slug)
         .select();
       if (error) return res.status(500).json({ error: error.message });
       result = data[0];
     } else {
       const { data, error } = await db()
         .from('entity_specials')
-        .insert({ entity_id: entity.id, special_name, description, days, start_time, end_time, is_active: true })
+        .insert({ entity_slug: entity.slug, special_name, description, days, start_time, end_time, is_active: true })
         .select();
       if (error) return res.status(500).json({ error: error.message });
       result = data[0];
@@ -217,7 +217,7 @@ router.delete('/:slug/specials/:id', async (req, res) => {
       .from('entity_specials')
       .delete()
       .eq('id', id)
-      .eq('entity_id', entity.id);
+      .eq('entity_slug', entity.slug);
 
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
@@ -254,7 +254,7 @@ router.post('/:slug/upload', upload.single('image'), async (req, res) => {
     // Save to entity_photos
     const { data: photo } = await db()
       .from('entity_photos')
-      .insert({ entity_id: entity.id, image_url: publicUrl })
+      .insert({ entity_slug: entity.slug, image_url: publicUrl })
       .select()
       .single();
 

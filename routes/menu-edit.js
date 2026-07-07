@@ -43,12 +43,12 @@ router.get('/:id/data', validatePasscode, async (req, res) => {
       { data: drinkItems },
       { data: hhItems }
     ] = await Promise.all([
-      db.from('menu_sections').select('*').eq('entity_id', id),
-      db.from('drink_sections').select('*').eq('entity_id', id),
-      db.from('happy_hour_sections').select('*').eq('entity_id', id),
-      db.from('menu_items').select('*').eq('entity_id', id),
-      db.from('drink_items').select('*').eq('entity_id', id),
-      db.from('happy_hour_items').select('*').eq('entity_id', id)
+      db.from('menu_sections').select('*').eq('entity_slug', entity.slug),
+      db.from('drink_sections').select('*').eq('entity_slug', entity.slug),
+      db.from('happy_hour_sections').select('*').eq('entity_slug', entity.slug),
+      db.from('menu_items').select('*').eq('entity_slug', entity.slug),
+      db.from('drink_items').select('*').eq('entity_slug', entity.slug),
+      db.from('happy_hour_items').select('*').eq('entity_slug', entity.slug)
     ]);
 
     res.json({
@@ -75,6 +75,10 @@ router.post('/:id/menu-items', validatePasscode, async (req, res) => {
     const { id } = req.params;
     const { section_id, section_type, name, description, price } = req.body;
 
+    // resolve the entity's slug — every menu table keys on entity_slug
+    const { data: ent } = await db.from('entity').select('slug').eq('id', id).single();
+    if (!ent) return res.status(404).json({ error: 'Business not found' });
+
     // Determine which table to write to based on section_type
     const table =
       section_type === 'drink' ? 'drink_items' :
@@ -82,14 +86,11 @@ router.post('/:id/menu-items', validatePasscode, async (req, res) => {
       'menu_items';
 
     const itemData = {
-      entity_id: id,
-      ...(section_type === 'drink' ? { drink_section_id: section_id } :
-          section_type === 'happy_hour' ? { hh_section_id: section_id } :
-          { menu_section_id: section_id }),
+      entity_slug: ent.slug,
+      section_id: section_id,     // uniform link column across all three tables
       item_name: name,
       description: description || null,
       price: price ? parseFloat(price) : null,
-      price_text: price ? '$' + price : null,
     };
 
     const { data, error } = await db.from(table).insert(itemData).select();
@@ -163,6 +164,10 @@ router.post('/:id/menu-sections', validatePasscode, async (req, res) => {
     const { id } = req.params;
     const { section_name, section_type } = req.body;
 
+    // resolve the entity's slug — every menu table keys on entity_slug
+    const { data: ent } = await db.from('entity').select('slug').eq('id', id).single();
+    if (!ent) return res.status(404).json({ error: 'Business not found' });
+
     // Determine which table based on section_type
     const table =
       section_type === 'drink' ? 'drink_sections' :
@@ -172,7 +177,7 @@ router.post('/:id/menu-sections', validatePasscode, async (req, res) => {
     const { data, error } = await db
       .from(table)
       .insert({
-        entity_id: id,
+        entity_slug: ent.slug,
         section_name: section_name,
         sort_order: 0,
       })

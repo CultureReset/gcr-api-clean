@@ -551,7 +551,7 @@ router.get('/recommendations', touristAuth, async (req, res) => {
         // Build query for recommended businesses
         // Prefer categories they've shown interest in, exclude seen
         let query = mainDb.from('entity')
-            .select('slug, name, icon, subtitle, category, hero_image_url, rating, price_range')
+            .select('slug, name, icon, subtitle, entity_type, hero_image_url, rating, price_range')
             .eq('is_active', true)
             .limit(limit * 2); // Fetch 2x to filter
 
@@ -574,9 +574,9 @@ router.get('/recommendations', touristAuth, async (req, res) => {
         // If no recommendations (new user), return featured businesses
         if (recommendations.length === 0) {
             const { data: featured } = await mainDb.from('entity')
-                .select('slug, name, icon, subtitle, category, hero_image_url, rating, price_range')
+                .select('slug, name, icon, subtitle, entity_type, hero_image_url, rating, price_range')
                 .eq('is_active', true)
-                .eq('is_featured', true)
+                .eq('featured', true)
                 .limit(limit);
             return res.json({ recommendations: featured || [], based_on: { saves: saves?.length || 0, swipes: swipes?.length || 0 } });
         }
