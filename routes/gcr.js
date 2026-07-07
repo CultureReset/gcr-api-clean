@@ -183,10 +183,11 @@ async function buildFullEntity(slug) {
         sort_order: 900 + flexSections.length, is_active: true,
         items: items.map(o => ({
           id: o.id, section_id: null,
-          item_name: o.name, description: o.description,
+          item_name: o.name,
+          description: [o.description, o.fee_note].filter(Boolean).join(' — '),
           duration: o.duration_minutes ? (o.duration_minutes % 60 === 0 ? `${o.duration_minutes / 60} hr` : `${o.duration_minutes} min`) : null,
           price_from: o.price_from, price_to: null,
-          price_label: [o.unit, o.fee_note].filter(Boolean).join(' • ') || null,
+          price_label: o.unit ? String(o.unit).replace(/_/g, ' ') : null,
           icon: null, sort_order: o.sort_order ?? 0,
           metadata: { kind: o.kind, capacity: o.capacity, event_date: o.event_date },
           tiers: offeringPrices.filter(p => p.offering_id === o.id).map(p => ({
