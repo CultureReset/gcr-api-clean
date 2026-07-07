@@ -38,6 +38,17 @@ const CATEGORY_MAP = {
 
 const SKIP_CATEGORY = 'Visitor Information';
 
+// Boilerplate tags every Wharf record carries (its own category name, "the wharf",
+// "orange beach") — useful for filtering, worthless as AI-facing signal, so they're
+// excluded from known_for/highlights/seo_keywords but kept in the full tag set below.
+function distinctiveTags(rec) {
+  const boilerplate = new Set([
+    'the wharf', 'orange beach',
+    ...Object.keys(CATEGORY_MAP).map(c => c.toLowerCase()),
+  ]);
+  return (rec.tags || []).filter(t => !boilerplate.has(t.toLowerCase()));
+}
+
 function typeInfoFor(categories) {
   for (const c of categories || []) {
     if (CATEGORY_MAP[c]) return CATEGORY_MAP[c];
@@ -53,6 +64,7 @@ function parsePriceToFloat(priceStr) {
 
 async function upsertEntity(rec) {
   const typeInfo = typeInfoFor(rec.categories);
+  const dTags = distinctiveTags(rec);
 
   const entityRecord = {
     slug: rec.slug,
@@ -69,6 +81,14 @@ async function upsertEntity(rec) {
     state: 'AL',
     address_line_1: rec.location ? `The Wharf — ${rec.location}` : 'The Wharf',
     is_active: true,
+    // AI/RAG-facing fields — short, distinctive signals a concierge chat can quote
+    // directly instead of re-summarizing the full description every time. Left null
+    // (not []) when the source has no real signal beyond its own category/location —
+    // about 80% of Wharf records are that thin; description still carries real content
+    // for those via rec.summary, so nothing is lost, we just don't fabricate a highlight.
+    known_for: dTags.length ? dTags.slice(0, 3) : null,
+    highlights: dTags.length ? dTags : null,
+    seo_keywords: rec.tags || [],
   };
 
   const { data: existing } = await db.from('entity').select('slug').eq('slug', rec.slug);
@@ -86,9 +106,10 @@ async function upsertEntity(rec) {
     await db.from('entity_photos').insert({ entity_slug: rec.slug, url: rec.image_url, sort_order: 0, is_cover: true });
   }
 
-  // Tags
-  await db.from('entity_tags').delete().eq('entity_slug', rec.slug).eq('tag_category', 'wharf_directory');
-  const tagRows = (rec.tags || []).map(t => ({ entity_slug: rec.slug, tag_name: t, tag_category: 'wharf_directory' }));
+  // Tags — 'amenity' is the standard tag_category used platform-wide (see admin.html's
+  // Tags tab), so these join/filter consistently alongside every other entity's tags.
+  await db.from('entity_tags').delete().eq('entity_slug', rec.slug).eq('tag_category', 'amenity');
+  const tagRows = (rec.tags || []).map(t => ({ entity_slug: rec.slug, tag_name: t, tag_category: 'amenity' }));
   if (tagRows.length) await db.from('entity_tags').insert(tagRows);
 
   // Price items -> menu_items, only when present and none already exist (don't clobber
