@@ -240,6 +240,7 @@ router.post('/records/:dataKey', authRequired, async (req, res) => {
             .select('id').single();
         if (error) throw error;
         runAutomations(req.siteId, req.params.dataKey, record).catch(function () {});
+        calendarSync(req.siteId, req.params.dataKey, data.id, record).catch(function () {});
         res.json({ success: true, id: data.id });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -251,6 +252,7 @@ router.patch('/records/:dataKey/:id', authRequired, async (req, res) => {
         await supabase.from('app_records')
             .update({ record: req.body.record || {}, updated_at: new Date().toISOString() })
             .eq('id', req.params.id).eq('site_id', req.siteId);
+        calendarSync(req.siteId, req.params.dataKey, req.params.id, req.body.record || {}).catch(function () {});
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -261,21 +263,82 @@ router.delete('/records/:dataKey/:id', authRequired, async (req, res) => {
     try {
         await supabase.from('app_records')
             .delete().eq('id', req.params.id).eq('site_id', req.siteId);
+        calendarRemove(req.params.id).catch(function () {});
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
+// ============================================================
+// UNIFIED CALENDAR — every date-claiming event, one table.
+// Internal writes sync automatically; external platforms upsert
+// through /calendar/import (email parser, FareHarbor, iCal, ...).
+// Availability is computed from THIS table, so a date taken on any
+// platform blocks the direct checkout too.
+// ============================================================
+function calDate(v) {
+    const m = String(v || '').match(/^\d{4}-\d{2}-\d{2}/);
+    return m ? m[0] : null;
+}
+
+async function calendarSync(siteId, dataKey, refId, record) {
+    try {
+        const date = calDate(record.date || record.event_date || record.start_date);
+        if (!date) return;
+        const isBlock = dataKey === 'blocks';
+        if (isBlock && record.kind && record.kind !== 'blocked') return; // only blocked entries claim dates
+        const cancelled = ['cancelled', 'declined', 'no-show'].indexOf(record.status) !== -1;
+        const entry = {
+            site_id: siteId,
+            date: date,
+            end_date: calDate(record.end_date) || null,
+            start_time: record.time || record.departure || record.start_time || null,
+            kind: isBlock ? 'block' : 'booking',
+            source: record.source === 'public_page' ? 'direct' : (record.calendar_source || 'manual'),
+            status: cancelled ? 'cancelled' : 'active',
+            title: record.service || record.trip || record.boat || record.session || record.item || record.title || record.note || dataKey.replace(/_/g, ' '),
+            party: parseInt(record.party || record.guests || record.adults, 10) || null,
+            ref_id: String(refId),
+            record: record,
+            updated_at: new Date().toISOString()
+        };
+        const { data: existing } = await supabase.from('unified_calendar')
+            .select('id').eq('ref_id', String(refId)).maybeSingle();
+        if (existing) await supabase.from('unified_calendar').update(entry).eq('id', existing.id);
+        else await supabase.from('unified_calendar').insert(entry);
+    } catch (e) { console.error('[calendar] sync failed:', e.message); }
+}
+
+async function calendarRemove(refId) {
+    try { await supabase.from('unified_calendar').delete().eq('ref_id', String(refId)); }
+    catch (e) { console.error('[calendar] remove failed:', e.message); }
+}
+
+// Backfill a site's existing dated records into the calendar (idempotent)
+async function calendarBackfill(siteId) {
+    const { data: recs } = await supabase.from('app_records')
+        .select('id, data_key, record').eq('site_id', siteId)
+        .neq('data_key', 'automation_log').limit(2000);
+    let n = 0;
+    for (const r of (recs || [])) {
+        const rec = r.record || {};
+        if (!calDate(rec.date || rec.event_date || rec.start_date)) continue;
+        if (['reward_offers', 'redemptions', 'ugc_videos', 'reviews', 'menu_items', 'specials'].indexOf(r.data_key) !== -1) continue;
+        await calendarSync(siteId, r.data_key, r.id, rec);
+        n++;
+    }
+    return n;
+}
+
 // ── Availability: blocked dates + capacity, enforced server-side ──
 async function getAvailability(siteId, installed, dataKey, month) {
-    // blocked dates come from the availability app's own data stream
-    const { data: blockRecs } = await supabase.from('app_records')
-        .select('record').eq('site_id', siteId).eq('data_key', 'blocks').limit(1000);
-    const blocked = (blockRecs || [])
-        .map(function (r) { return r.record || {}; })
-        .filter(function (r) { return r.kind === 'blocked' && r.date; })
-        .map(function (r) { return r.date; });
+    // ONE source of truth: the unified calendar. Blocks from the owner,
+    // bookings from the direct checkout, and entries imported from any
+    // external platform all claim dates here.
+    const { data: entries } = await supabase.from('unified_calendar')
+        .select('date, end_date, kind, status')
+        .eq('site_id', siteId).eq('status', 'active').limit(3000);
 
     // capacity per date comes from the availability app's config
     let capacity = null;
@@ -287,24 +350,86 @@ async function getAvailability(siteId, installed, dataKey, month) {
         }
     });
 
-    let full = [];
-    if (capacity && dataKey) {
-        const { data: recs } = await supabase.from('app_records')
-            .select('record').eq('site_id', siteId).eq('data_key', dataKey).limit(2000);
-        const counts = {};
-        (recs || []).forEach(function (r) {
-            const rec = r.record || {};
-            if (!rec.date || rec.status === 'cancelled' || rec.status === 'declined') return;
-            counts[rec.date] = (counts[rec.date] || 0) + 1;
-        });
-        full = Object.keys(counts).filter(function (d) { return counts[d] >= capacity; });
+    const blocked = [];
+    const counts = {};
+    function eachDate(e, fn) {
+        // multi-day entries claim every date in their range (max 60)
+        const start = new Date(e.date + 'T00:00:00Z');
+        const end = e.end_date ? new Date(e.end_date + 'T00:00:00Z') : start;
+        for (let d = new Date(start), i = 0; d <= end && i < 60; d.setUTCDate(d.getUTCDate() + 1), i++) {
+            fn(d.toISOString().slice(0, 10));
+        }
     }
+    (entries || []).forEach(function (e) {
+        if (e.kind === 'block') eachDate(e, function (ds) { if (blocked.indexOf(ds) === -1) blocked.push(ds); });
+        else eachDate(e, function (ds) { counts[ds] = (counts[ds] || 0) + 1; });
+    });
+    let full = capacity ? Object.keys(counts).filter(function (d) { return counts[d] >= capacity; }) : [];
+    let b = blocked;
     if (month) {
-        blocked.filter(function (d) { return String(d).slice(0, 7) === month; });
-        full = full.filter(function (d) { return String(d).slice(0, 7) === month; });
+        b = blocked.filter(function (d) { return d.slice(0, 7) === month; });
+        full = full.filter(function (d) { return d.slice(0, 7) === month; });
     }
-    return { blocked: blocked, full: full, capacity: capacity };
+    return { blocked: b, full: full, capacity: capacity, counts: counts };
 }
+
+// Owner's unified calendar — every source, one view
+router.get('/calendar', authRequired, async (req, res) => {
+    try {
+        // first call on a site with dated records but an empty calendar → backfill
+        const { data: any } = await supabase.from('unified_calendar')
+            .select('id').eq('site_id', req.siteId).limit(1);
+        if (!any || !any.length) await calendarBackfill(req.siteId);
+
+        let q = supabase.from('unified_calendar')
+            .select('id, date, end_date, start_time, kind, source, status, title, party, ref_id, external_uid')
+            .eq('site_id', req.siteId).order('date', { ascending: true }).limit(2000);
+        if (req.query.month && /^\d{4}-\d{2}$/.test(req.query.month)) {
+            const m = req.query.month;
+            const last = new Date(Date.UTC(parseInt(m.slice(0, 4), 10), parseInt(m.slice(5, 7), 10), 0)).toISOString().slice(0, 10);
+            q = q.gte('date', m + '-01').lte('date', last);
+        }
+        const { data: entries } = await q;
+        res.json({ entries: entries || [] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// External sources push normalized entries here: the email parser,
+// FareHarbor sync, iCal feeds, manual imports — anything. Upserts on
+// (source, external_uid) so re-imports never duplicate.
+router.post('/calendar/import', authRequired, async (req, res) => {
+    try {
+        const entries = Array.isArray(req.body.entries) ? req.body.entries : [req.body];
+        let imported = 0, skipped = 0;
+        for (const e of entries.slice(0, 500)) {
+            const date = calDate(e.date);
+            const source = String(e.source || '').slice(0, 60);
+            const uid = String(e.external_uid || '').slice(0, 120);
+            if (!date || !source || !uid) { skipped++; continue; }
+            const row = {
+                site_id: req.siteId,
+                date: date,
+                end_date: calDate(e.end_date) || null,
+                start_time: e.start_time ? String(e.start_time).slice(0, 20) : null,
+                end_time: e.end_time ? String(e.end_time).slice(0, 20) : null,
+                kind: e.kind === 'block' ? 'block' : 'booking',
+                source: source,
+                status: e.status === 'cancelled' ? 'cancelled' : 'active',
+                title: e.title ? String(e.title).slice(0, 200) : source,
+                party: parseInt(e.party, 10) || null,
+                external_uid: uid,
+                record: e.record || {},
+                updated_at: new Date().toISOString()
+            };
+            const { data: existing } = await supabase.from('unified_calendar')
+                .select('id').eq('site_id', req.siteId).eq('source', source).eq('external_uid', uid).maybeSingle();
+            if (existing) await supabase.from('unified_calendar').update(row).eq('id', existing.id);
+            else await supabase.from('unified_calendar').insert(row);
+            imported++;
+        }
+        res.json({ success: true, imported: imported, skipped: skipped });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 router.get('/page/:slug/availability', async (req, res) => {
     try {
@@ -337,6 +462,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
         await supabase.from('app_records')
             .update({ record: record, updated_at: new Date().toISOString() })
             .eq('id', req.params.id).eq('site_id', req.siteId);
+        calendarSync(req.siteId, req.params.dataKey, req.params.id, record).catch(function () {});
 
         // notify the customer
         const phone = record.phone || record.customer_phone;
@@ -877,11 +1003,13 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         }
 
         const dataKey = inst.manifest.dataKey;
-        const { error } = await supabase.from('app_records')
-            .insert({ site_id: state.site_id, data_key: dataKey, record: record });
+        const { data: inserted, error } = await supabase.from('app_records')
+            .insert({ site_id: state.site_id, data_key: dataKey, record: record })
+            .select('id').single();
         if (error) throw error;
 
         runAutomations(state.site_id, dataKey, record, state).catch(function () {});
+        calendarSync(state.site_id, dataKey, inserted.id, record).catch(function () {});
 
         // Notify the owner by SMS if the business has a phone on file
         try {
