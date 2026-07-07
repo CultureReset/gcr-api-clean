@@ -434,7 +434,14 @@ function bookingCfg(inst) {
         resourceKey: b.resource || null,
         party: party,
         addonsKey: b.addons || null,
-        cutoffHours: parseFloat(cfg.cutoff_hours) || parseFloat(b.cutoff_hours) || 0,
+        // respect an explicit 0 (owner turned the cutoff off) — don't let ||
+        // fall through to the manifest default
+        cutoffHours: (function () {
+            const raw = (cfg.cutoff_hours != null && cfg.cutoff_hours !== '') ? cfg.cutoff_hours
+                : (b.cutoff_hours != null ? b.cutoff_hours : 0);
+            const n = parseFloat(raw);
+            return isNaN(n) ? 0 : n;
+        })(),
         maxParty: parseInt(cfg.max_party, 10) || parseInt(b.max_party, 10) || 0
     };
 }
@@ -642,6 +649,11 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
             .update({ record: record, updated_at: new Date().toISOString() })
             .eq('id', req.params.id).eq('site_id', req.siteId);
         calendarSync(req.siteId, req.params.dataKey, req.params.id, record).catch(function () {});
+        // text-built automations on completed / cancelled
+        if (status === 'completed' || status === 'cancelled') {
+            record._mid = req.params.id;
+            runUserAutomations(req.siteId, status, record).catch(function () {});
+        }
 
         // notify the customer
         const phone = record.phone || record.customer_phone;
@@ -1425,6 +1437,11 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         if (error) throw error;
 
         runAutomations(state.site_id, dataKey, record, state).catch(function () {});
+        // text-built automations: a fresh booking is a 'new_booking' event
+        if (inst.manifest.checkout) {
+            record._mid = inserted.id;
+            runUserAutomations(state.site_id, 'new_booking', record, state).catch(function () {});
+        }
         // mode 'none' = not a date-claiming product (gift card, membership,
         // pickup order) — it never lands on the availability calendar
         if (bc.mode !== 'none') calendarSync(state.site_id, dataKey, inserted.id, record).catch(function () {});
@@ -1661,9 +1678,17 @@ router.get('/cron/reminders', async (req, res) => {
                         '[{business}] Reminder: {title} tomorrow{time}. See you then!';
                 }
             });
-            if (!template) continue;
             const biz = st.business || {};
             const { sendSms } = require('../utils/sms');
+            // text-built 'before_24h' automations also fire for tomorrow's bookings
+            for (const e of bySite[siteId]) {
+                const rec = e.record || {};
+                if (rec._user_reminded || ['cancelled', 'declined', 'no-show'].indexOf(rec.status || '') !== -1) continue;
+                if (!(rec.phone || rec.customer_phone)) continue;
+                rec._mid = e.ref_id;
+                await runUserAutomations(siteId, 'before_24h', rec, st);
+            }
+            if (!template) continue;
             for (const e of bySite[siteId]) {
                 const rec = e.record || {};
                 if (rec.reminded) continue;
@@ -1688,8 +1713,224 @@ router.get('/cron/reminders', async (req, res) => {
             }
             if (sent >= 200) break;
         }
-        res.json({ success: true, sent: sent, date: tomorrow });
+
+        // drain due delayed sends (the 'wait' steps of text-built automations)
+        let drained = 0;
+        const nowIso = new Date().toISOString();
+        const { data: due } = await supabase.from('app_records')
+            .select('id, site_id, record').eq('data_key', 'scheduled_sms').limit(300);
+        for (const row of (due || [])) {
+            const r = row.record || {};
+            if (r.status !== 'pending' || !r.send_at || r.send_at > nowIso) continue;
+            try {
+                const { sendSms } = require('../utils/sms');
+                if (r.to) await sendSms(r.to, r.body, row.site_id, 'automation_delayed', null);
+                r.status = 'sent'; r.sent_at = nowIso;
+                await supabase.from('app_records').update({ record: r, updated_at: nowIso }).eq('id', row.id);
+                drained++;
+            } catch (e) { console.error('[scheduled_sms] send failed:', e.message); }
+        }
+
+        res.json({ success: true, sent: sent, drained: drained, date: tomorrow });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// TEXT-YOUR-DASHBOARD — a business owner texts one number and,
+// in plain English, creates automations, posts content, or asks a
+// question. The business-side twin of the tourist Ghost concierge.
+// Everything it creates lands in the same modular data streams, so
+// the rest of the platform (page, calendar, automations) just works.
+// ============================================================
+
+// match the texter to a business by the phone on their profile
+async function businessByPhone(phone) {
+    const p10 = String(phone || '').replace(/\D/g, '').slice(-10);
+    if (!p10) return null;
+    const { data } = await supabase.from('platform_state')
+        .select('site_id, business, installed').limit(2000);
+    return (data || []).find(function (r) {
+        return String((r.business || {}).phone || '').replace(/\D/g, '').slice(-10) === p10;
+    }) || null;
+}
+
+function renderTpl(tpl, record, business) {
+    return String(tpl || '').replace(/\{(\w+)\}/g, function (_, k) {
+        if (k === 'business') return (business && business.name) || 'our business';
+        if (k === 'title') return record.service || record.trip || record.class || record.title || 'your booking';
+        if (k === 'time') return record.time ? ' at ' + record.time : '';
+        if (k === 'manage') return publicBase() + '/manage/' + (record._mid || '') + '?t=' + manageToken(record._mid || '');
+        return record[k] != null ? String(record[k]) : '';
+    });
+}
+
+// Turn a natural-language text into a structured action. Deterministic
+// for the common verbs (works with zero AI cost / offline); an AI step
+// can be layered on top when an Anthropic key is present.
+function parseBusinessCommand(text) {
+    const t = String(text || '').trim();
+    const low = t.toLowerCase();
+    if (!t) return { action: 'help' };
+    if (/^(help|\?|commands|what can you do)/.test(low)) return { action: 'help' };
+    if (/^(list|my automations|show automations)/.test(low)) return { action: 'list' };
+
+    // pause / turn off an automation by name
+    let m = low.match(/^(?:pause|turn off|disable|stop)\s+(.+)/);
+    if (m) return { action: 'pause', name: m[1].trim() };
+
+    // reminder automation
+    if (/\bremind(er)?\b/.test(low)) {
+        return {
+            action: 'automation',
+            auto: {
+                name: 'Day-before reminder',
+                trigger: 'before_24h',
+                steps: [{ type: 'sms', template: '[{business}] Reminder: {title} tomorrow{time}. Reply to change. {manage}' }]
+            },
+            reply: 'Reminder is ON — everyone with a booking tomorrow gets a text the day before.'
+        };
+    }
+    // thank-you / confirmation-after-booking automation
+    if (/(thank|thanks|confirm).*(book|appoint|reserv)|after (a |an )?(book|appoint)/.test(low)) {
+        return {
+            action: 'automation',
+            auto: {
+                name: 'Thank-you on booking',
+                trigger: 'new_booking',
+                steps: [{ type: 'sms', template: 'Thanks for booking with {business}! We\'ll be in touch. Manage anytime: {manage}' }]
+            },
+            reply: 'Done — every new booking now gets an instant thank-you text.'
+        };
+    }
+    // review-request automation after completion
+    if (/(review|feedback).*(after|complete|done)|ask.*review/.test(low)) {
+        return {
+            action: 'automation',
+            auto: { name: 'Review request', trigger: 'completed', steps: [{ type: 'sms', template: '[{business}] Thanks for coming out! How\'d we do? Leave a quick review — it really helps.' }] },
+            reply: 'Set — after you mark a booking complete, the customer gets a review request.'
+        };
+    }
+    // add a special / event
+    m = t.match(/^(?:add\s+)?special[:\s]+(.+)/i);
+    if (m) return { action: 'add', dataKey: 'specials', record: parseItem(m[1]), reply: 'Added to your specials — it\'s live on your page.' };
+    m = t.match(/^(?:add\s+)?event[:\s]+(.+)/i);
+    if (m) return { action: 'add', dataKey: 'events', record: parseItem(m[1]), reply: 'Added to your events — it\'s live on your page.' };
+    m = t.match(/^(?:add\s+)?(?:menu\s+)?item[:\s]+(.+)/i);
+    if (m) return { action: 'add', dataKey: 'menu_items', record: parseItem(m[1]), reply: 'Added to your menu.' };
+
+    // status query
+    if (/how many|bookings? (today|this)|today.?s? (bookings?|schedule)|what.?s? (on |my )?(today|schedule)/.test(low)) {
+        return { action: 'query', kind: 'today' };
+    }
+    return { action: 'unknown' };
+}
+// "Fish Tacos $9" / "Happy Hour 3-6pm half off" → a record
+function parseItem(s) {
+    const price = (s.match(/\$\s*(\d+(?:\.\d{1,2})?)/) || [])[1];
+    const name = s.replace(/\$\s*\d+(?:\.\d{1,2})?/, '').trim();
+    const rec = { name: name || s.trim(), source: 'sms' };
+    if (price) rec.price = price;
+    return rec;
+}
+
+async function scheduleAutomationSteps(siteId, steps, record, business) {
+    let delayMin = 0;
+    for (const step of (steps || [])) {
+        if (step.type === 'wait') { delayMin += parseInt(step.minutes, 10) || 0; continue; }
+        if (step.type !== 'sms') continue;
+        const to = record.phone || record.customer_phone;
+        if (!to) continue;
+        const body = renderTpl(step.template, record, business);
+        if (delayMin <= 0) {
+            try { const { sendSms } = require('../utils/sms'); await sendSms(to, body, siteId, 'automation', record._mid || null); }
+            catch (e) { console.error('automation sms failed:', e.message); }
+        } else {
+            const sendAt = new Date(Date.now() + delayMin * 60000).toISOString();
+            await supabase.from('app_records').insert({
+                site_id: siteId, data_key: 'scheduled_sms',
+                record: { to: to, body: body, send_at: sendAt, status: 'pending' }
+            });
+        }
+    }
+}
+
+// Run the business's own text-built automations for an event
+async function runUserAutomations(siteId, triggerEvent, record, state) {
+    try {
+        let st = state;
+        if (!st) { const { data } = await supabase.from('platform_state').select('business').eq('site_id', siteId).maybeSingle(); st = data; }
+        const business = (st && st.business) || {};
+        const { data: autos } = await supabase.from('app_records')
+            .select('id, record').eq('site_id', siteId).eq('data_key', 'automations').limit(200);
+        for (const a of (autos || [])) {
+            const auto = a.record || {};
+            if (auto.enabled === false) continue;
+            if (auto.trigger !== triggerEvent) continue;
+            await scheduleAutomationSteps(siteId, auto.steps, record, business);
+        }
+    } catch (e) { console.error('[user-automations]', e.message); }
+}
+
+// Inbound webhook for the BUSINESS number (point a Twilio number here).
+// Production should add Twilio signature verification (see routes/sms.js).
+router.post('/sms/business', express.urlencoded({ extended: false }), async (req, res) => {
+    function reply(msg) {
+        res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response><Message>' +
+            String(msg).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</Message></Response>');
+    }
+    try {
+        const from = req.body.From || req.body.from || '';
+        const body = (req.body.Body || req.body.body || '').trim();
+        const biz = await businessByPhone(from);
+        if (!biz) return reply('This number isn\'t linked to a business yet. Add your phone in your CyberCheck dashboard, then text again.');
+        const bizName = (biz.business || {}).name || 'your business';
+        const cmd = parseBusinessCommand(body);
+
+        if (cmd.action === 'help' || cmd.action === 'unknown') {
+            return reply('Hi from ' + bizName + '! Text me things like:\n• "Remind everyone with a booking tomorrow"\n• "Thank customers after they book"\n• "Add special: Fish Tacos $9"\n• "How many bookings today?"\n• "List" to see your automations');
+        }
+        if (cmd.action === 'automation') {
+            await supabase.from('app_records').insert({
+                site_id: biz.site_id, data_key: 'automations',
+                record: { name: cmd.auto.name, trigger: cmd.auto.trigger, steps: cmd.auto.steps, enabled: true, source: 'sms' }
+            });
+            return reply('✅ ' + cmd.reply + '\n(Text "list" to see all, or "pause ' + cmd.auto.name.toLowerCase() + '" to turn off.)');
+        }
+        if (cmd.action === 'add') {
+            await supabase.from('app_records').insert({ site_id: biz.site_id, data_key: cmd.dataKey, record: cmd.record });
+            return reply('✅ ' + cmd.reply + (cmd.record.name ? ' (' + cmd.record.name + (cmd.record.price ? ' $' + cmd.record.price : '') + ')' : ''));
+        }
+        if (cmd.action === 'list') {
+            const { data: autos } = await supabase.from('app_records')
+                .select('record').eq('site_id', biz.site_id).eq('data_key', 'automations').limit(50);
+            const active = (autos || []).map(function (a) { return a.record; }).filter(function (r) { return r && r.enabled !== false; });
+            if (!active.length) return reply('No automations yet. Try: "Remind everyone with a booking tomorrow".');
+            return reply('Your automations:\n' + active.map(function (r) { return '• ' + r.name; }).join('\n') + '\n\nText "pause <name>" to turn one off.');
+        }
+        if (cmd.action === 'pause') {
+            const { data: autos } = await supabase.from('app_records')
+                .select('id, record').eq('site_id', biz.site_id).eq('data_key', 'automations').limit(50);
+            const hit = (autos || []).find(function (a) { return (a.record || {}).name && a.record.name.toLowerCase().indexOf(cmd.name) !== -1; });
+            if (!hit) return reply('Couldn\'t find an automation matching "' + cmd.name + '". Text "list" to see them.');
+            const rec = hit.record; rec.enabled = false;
+            await supabase.from('app_records').update({ record: rec, updated_at: new Date().toISOString() }).eq('id', hit.id);
+            return reply('⏸️ Paused "' + rec.name + '". Text it again any time to turn it back on.');
+        }
+        if (cmd.action === 'query' && cmd.kind === 'today') {
+            const today = new Date().toISOString().slice(0, 10);
+            const { data: cal } = await supabase.from('unified_calendar')
+                .select('title, start_time, party, status').eq('site_id', biz.site_id).eq('date', today).eq('kind', 'booking');
+            const active = (cal || []).filter(function (e) { return ['cancelled', 'declined'].indexOf(e.status) === -1; });
+            if (!active.length) return reply('Nothing on the schedule for today — it\'s open.');
+            const heads = active.reduce(function (n, e) { return n + (parseInt(e.party, 10) || 1); }, 0);
+            return reply('📅 Today at ' + bizName + ': ' + active.length + ' booking' + (active.length > 1 ? 's' : '') + ' · ' + heads + ' guest' + (heads > 1 ? 's' : '') + '\n' +
+                active.slice(0, 8).map(function (e) { return '• ' + (e.start_time || 'all day') + ' — ' + (e.title || 'booking') + (e.party ? ' (' + e.party + ')' : ''); }).join('\n'));
+        }
+        return reply('Got it. Text "help" to see what I can do.');
+    } catch (err) {
+        console.error('[sms/business]', err.message);
+        return reply('Something hiccuped on our end — try that again in a moment.');
+    }
 });
 
 module.exports = router;
