@@ -348,7 +348,8 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                 const bizName = biz.name || 'the business';
                 const { sendSms } = require('../utils/sms');
                 let msg = null;
-                if (status === 'confirmed') msg = '[' + bizName + '] You\'re confirmed' + (record.date ? ' for ' + record.date : '') + (record.time ? ' at ' + record.time : '') + '. See you then!';
+                if (req.params.dataKey === 'ugc_videos') msg = null; // loyalty hook sends the video-specific text
+                else if (status === 'confirmed') msg = '[' + bizName + '] You\'re confirmed' + (record.date ? ' for ' + record.date : '') + (record.time ? ' at ' + record.time : '') + '. See you then!';
                 else if (status === 'declined' || status === 'cancelled') msg = '[' + bizName + '] Sorry — we couldn\'t take your request' + (record.date ? ' for ' + record.date : '') + '. Reply here and we\'ll find another time.';
                 else if (status === 'completed') {
                     // Authentic review: the link carries the transaction record id,
@@ -366,11 +367,82 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                 if (msg) await sendSms(phone, msg, req.siteId, 'status_' + status, req.params.id);
             } catch (e) { console.error('status sms failed:', e.message); }
         }
+
+        // ── co-op loyalty hooks (fire-and-forget) ──
+        (async () => {
+            try {
+                const { data: st } = await supabase.from('platform_state')
+                    .select('business').eq('site_id', req.siteId).maybeSingle();
+                const slug = (st && st.business && st.business.slug) || null;
+                const bizName = (st && st.business && st.business.name) || 'the business';
+                const custPhone = record.phone || record.customer_phone;
+                const { sendSms } = require('../utils/sms');
+
+                if (req.params.dataKey === 'ugc_videos' && status === 'confirmed') {
+                    // video approved → points to the uploader
+                    const uploader = await touristByPhone(custPhone);
+                    if (uploader) {
+                        const pts = await platformAward(uploader.user_id, 'video', slug);
+                        if (pts && custPhone) await sendSms(custPhone, '[' + bizName + '] Your video was approved — +' + pts + ' points! 🎥', req.siteId, 'points_video', req.params.id);
+                    }
+                } else if (status === 'completed') {
+                    // customer earns for the completed booking
+                    const customer = await touristByPhone(custPhone);
+                    if (customer) {
+                        const pts = await platformAward(customer.user_id, 'booking_completed', slug);
+                        if (pts && custPhone) await sendSms(custPhone, '[' + bizName + '] +' + pts + ' points added to your Gulf Perks wallet! 🎁', req.siteId, 'points_booking', req.params.id);
+                    }
+                    // referrer earns when their booking converts (self-referral blocked)
+                    if (record.ref) {
+                        const { data: refT } = await supabase.from('tourist_profiles')
+                            .select('user_id, phone').eq('ref_code', record.ref).maybeSingle();
+                        const same = refT && String(refT.phone || '').replace(/\D/g, '').slice(-10) === String(custPhone || '').replace(/\D/g, '').slice(-10);
+                        if (refT && !same) {
+                            const pts = await platformAward(refT.user_id, 'referral', slug);
+                            if (pts && refT.phone) await sendSms(refT.phone, 'Someone booked through your link at ' + bizName + ' — +' + pts + ' points! 🤝', req.siteId, 'points_referral', req.params.id);
+                        }
+                    }
+                }
+            } catch (e) { console.error('[loyalty] hook error:', e.message); }
+        })();
+
         res.json({ success: true, status: status });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
+// ============================================================
+// CO-OP LOYALTY — one append-only ledger (tourist_points) on the
+// phone identity. Points for VERIFIED actions only: completed
+// bookings, converted referrals, approved videos. Redemptions are
+// business-funded offers. Points are credits, never cash.
+// ============================================================
+const POINT_DEFAULTS = { booking_completed: 100, referral: 200, video: 100 };
+
+async function platformAward(userId, reason, slug) {
+    if (!userId || !reason) return 0;
+    try {
+        const { data: cfg } = await supabase.from('points_config').select('earn').eq('id', 1).maybeSingle();
+        const delta = parseInt((cfg && cfg.earn && cfg.earn[reason]) != null ? cfg.earn[reason] : POINT_DEFAULTS[reason], 10) || 0;
+        if (!delta) return 0;
+        await supabase.from('tourist_points').insert({ user_id: userId, delta: delta, reason: reason, entity_slug: slug || null });
+        return delta;
+    } catch (e) { console.error('[loyalty] award failed:', e.message); return 0; }
+}
+
+async function touristByPhone(phone) {
+    const p = String(phone || '').replace(/\D/g, '').slice(-10);
+    if (p.length < 10) return null;
+    // fast paths: common stored formats
+    for (const candidate of ['+1' + p, p, '1' + p]) {
+        const { data } = await supabase.from('tourist_profiles')
+            .select('user_id, phone, ref_code, share_enabled, name')
+            .eq('phone', candidate).maybeSingle();
+        if (data) return data;
+    }
+    return null;
+}
 
 // ============================================================
 // TOURIST WALLET — the customer's own view of the platform.
@@ -442,6 +514,138 @@ router.get('/my-bookings', touristAuth, async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// ── Share & earnings: every tourist is a referrer ──
+router.get('/my-share', touristAuth, async (req, res) => {
+    try {
+        const { data: prof } = await supabase.from('tourist_profiles')
+            .select('ref_code, share_enabled, name').eq('user_id', req.touristId).maybeSingle();
+        if (!prof) return res.status(404).json({ error: 'No profile' });
+        let code = prof.ref_code;
+        if (!code) {
+            const base = String(prof.name || 'GC').replace(/[^a-zA-Z]/g, '').slice(0, 6).toUpperCase() || 'GC';
+            code = base + Math.random().toString(36).slice(2, 6).toUpperCase();
+            const { error } = await supabase.from('tourist_profiles')
+                .update({ ref_code: code }).eq('user_id', req.touristId);
+            if (error) { // rare collision — add entropy and retry once
+                code = base + Math.random().toString(36).slice(2, 8).toUpperCase();
+                await supabase.from('tourist_profiles').update({ ref_code: code }).eq('user_id', req.touristId);
+            }
+        }
+        const { data: hist } = await supabase.from('tourist_points')
+            .select('delta, reason, entity_slug, created_at')
+            .eq('user_id', req.touristId)
+            .order('created_at', { ascending: false }).limit(100);
+        res.json({ ref_code: code, share_enabled: !!prof.share_enabled, earnings: hist || [] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/my-share', touristAuth, async (req, res) => {
+    try {
+        await supabase.from('tourist_profiles')
+            .update({ share_enabled: !!req.body.share_enabled }).eq('user_id', req.touristId);
+        res.json({ success: true, share_enabled: !!req.body.share_enabled });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Guest videos: attach to a COMPLETED booking you own → moderation → points ──
+router.post('/my/videos', touristAuth, async (req, res) => {
+    try {
+        const { booking_id, url } = req.body;
+        if (!booking_id || !url || !/^https?:/i.test(url)) {
+            return res.status(400).json({ error: 'booking_id and a valid video URL are required' });
+        }
+        const { data: b } = await supabase.from('app_records')
+            .select('id, site_id, record').eq('id', booking_id).maybeSingle();
+        if (!b) return res.status(404).json({ error: 'Booking not found' });
+        const { data: prof } = await supabase.from('tourist_profiles')
+            .select('phone').eq('user_id', req.touristId).maybeSingle();
+        const mine = prof && String(prof.phone || '').replace(/\D/g, '').slice(-10) ===
+            String((b.record || {}).phone || (b.record || {}).customer_phone || '').replace(/\D/g, '').slice(-10);
+        if (!mine) return res.status(403).json({ error: 'That booking is not yours' });
+        if ((b.record || {}).status !== 'completed') {
+            return res.status(400).json({ error: 'Videos can be added once the trip is completed' });
+        }
+        await supabase.from('app_records').insert({
+            site_id: b.site_id, data_key: 'ugc_videos',
+            record: { url: String(url).slice(0, 500), booking_id: booking_id, phone: prof.phone, status: 'pending', source: 'tourist' }
+        });
+        res.json({ success: true, status: 'pending', note: 'Points are awarded when the business approves it' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Rewards: business-funded offers; redemption debits the ledger ──
+router.get('/rewards/:slug', async (req, res) => {
+    try {
+        const { data: state } = await supabase.from('platform_state')
+            .select('site_id, business').eq('business->>slug', req.params.slug).maybeSingle();
+        if (!state) return res.status(404).json({ error: 'Not found' });
+        const { data: offers } = await supabase.from('app_records')
+            .select('id, record').eq('site_id', state.site_id).eq('data_key', 'reward_offers').limit(50);
+        res.json({
+            business: (state.business || {}).name || '',
+            offers: (offers || []).map(function (o) {
+                return { id: o.id, title: (o.record || {}).title || '', points: parseInt((o.record || {}).points, 10) || 0, detail: (o.record || {}).detail || '' };
+            }).filter(function (o) { return o.title && o.points > 0; })
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/redeem', touristAuth, async (req, res) => {
+    try {
+        const { data: offer } = await supabase.from('app_records')
+            .select('id, site_id, record').eq('id', req.body.offer_id).eq('data_key', 'reward_offers').maybeSingle();
+        if (!offer) return res.status(404).json({ error: 'Offer not found' });
+        const cost = parseInt((offer.record || {}).points, 10) || 0;
+        if (!cost) return res.status(400).json({ error: 'Offer has no point cost' });
+        const { data: rows } = await supabase.from('tourist_points').select('delta').eq('user_id', req.touristId);
+        const balance = (rows || []).reduce(function (sum, r) { return sum + (r.delta || 0); }, 0);
+        if (balance < cost) return res.status(400).json({ error: 'Not enough points — you have ' + balance + ', this needs ' + cost });
+        const { data: st } = await supabase.from('platform_state')
+            .select('business').eq('site_id', offer.site_id).maybeSingle();
+        const code = 'GC-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        await supabase.from('tourist_points').insert({
+            user_id: req.touristId, delta: -cost, reason: 'redeem',
+            entity_slug: (st && st.business && st.business.slug) || null
+        });
+        await supabase.from('app_records').insert({
+            site_id: offer.site_id, data_key: 'redemptions',
+            record: { code: code, offer: (offer.record || {}).title, points: cost, status: 'issued' }
+        });
+        res.json({ success: true, code: code, offer: (offer.record || {}).title, points: cost });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── Public user share page: only what they chose to share ──
+router.get('/u/:code', async (req, res) => {
+    try {
+        const { data: prof } = await supabase.from('tourist_profiles')
+            .select('name, ref_code, share_enabled, phone')
+            .eq('ref_code', req.params.code).maybeSingle();
+        if (!prof || !prof.share_enabled) return res.status(404).json({ error: 'Page not found' });
+        const phone = String(prof.phone || '').replace(/\D/g, '').slice(-10);
+        const { data: recs } = await supabase.from('app_records')
+            .select('site_id, record')
+            .neq('data_key', 'automation_log')
+            .order('created_at', { ascending: false }).limit(2000);
+        const siteIds = [];
+        (recs || []).forEach(function (r) {
+            const rec = r.record || {};
+            const rp = String(rec.phone || rec.customer_phone || '').replace(/\D/g, '').slice(-10);
+            if (rp === phone && rec.status === 'completed' && siteIds.indexOf(r.site_id) === -1) siteIds.push(r.site_id);
+        });
+        let businesses = [];
+        if (siteIds.length) {
+            const { data: states } = await supabase.from('platform_state')
+                .select('business').in('site_id', siteIds);
+            businesses = (states || []).map(function (st) {
+                const b = st.business || {};
+                return { name: b.name, slug: b.slug, emoji: b.emoji || '🏪', tagline: b.tagline || '' };
+            }).filter(function (b) { return b.slug; });
+        }
+        res.json({ name: String(prof.name || 'A Gulf Coast local').split(' ')[0], ref_code: prof.ref_code, businesses: businesses });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ============================================================
@@ -544,6 +748,12 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         });
         record.source = 'public_page';
         record.status = record.status || 'pending';
+        if (req.body.ref) {
+            const code = String(req.body.ref).slice(0, 24);
+            const { data: refT } = await supabase.from('tourist_profiles')
+                .select('user_id').eq('ref_code', code).maybeSingle();
+            if (refT) record.ref = code; // only real codes are stored
+        }
         if (req.body.payment_intent_id) record.payment_id = String(req.body.payment_intent_id).slice(0, 100);
         if (req.body.amount_paid) record.amount_paid = String(req.body.amount_paid).slice(0, 20);
 
