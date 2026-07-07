@@ -340,11 +340,24 @@ async function calendarBackfill(siteId) {
     const { data: recs } = await supabase.from('app_records')
         .select('id, data_key, record').eq('site_id', siteId)
         .neq('data_key', 'automation_log').limit(2000);
+    // manifest-driven skip list: content streams (publicData) and
+    // non-date-claiming products (booking.mode 'none') never claim dates.
+    // The named fallbacks cover data left behind by uninstalled apps.
+    const skip = { reward_offers: 1, redemptions: 1, ugc_videos: 1, reviews: 1, menu_items: 1, specials: 1 };
+    try {
+        const { data: st } = await supabase.from('platform_state')
+            .select('installed').eq('site_id', siteId).maybeSingle();
+        Object.keys((st && st.installed) || {}).forEach(function (id) {
+            const man = (st.installed[id] || {}).manifest || {};
+            if (!man.dataKey) return;
+            if ((man.booking && man.booking.mode === 'none') || (man.publicData && !man.checkout)) skip[man.dataKey] = 1;
+        });
+    } catch (e) { /* fall back to the named list */ }
     let n = 0;
     for (const r of (recs || [])) {
         const rec = r.record || {};
         if (!calDate(rec.date || rec.event_date || rec.start_date)) continue;
-        if (['reward_offers', 'redemptions', 'ugc_videos', 'reviews', 'menu_items', 'specials'].indexOf(r.data_key) !== -1) continue;
+        if (skip[r.data_key]) continue;
         await calendarSync(siteId, r.data_key, r.id, rec);
         n++;
     }
@@ -1117,7 +1130,8 @@ router.get('/page/:slug', async (req, res) => {
         Object.keys(installed).forEach(function (id) {
             const inst = installed[id];
             const man = inst && inst.manifest;
-            if (man && man.id === 'payments' && inst.enabled !== false) {
+            // any app can provide the payment config (stock Payments app does)
+            if (man && (man.provides === 'payments' || man.id === 'payments') && inst.enabled !== false) {
                 const cfg = inst.config || {};
                 if (cfg.mode && cfg.mode !== 'No payment (pay on site)') {
                     payment = { mode: cfg.mode, deposit: parseFloat(cfg.deposit) || 0 };
@@ -1137,11 +1151,21 @@ router.get('/page/:slug', async (req, res) => {
     }
 });
 
-// ── promo codes: validated against the business's own coupons stream ──
-async function findPromo(siteId, code) {
+// ── promo codes: validated against whichever installed app PROVIDES
+// promos (manifest.provides === 'promos'; the stock Coupons app does).
+// Any community-built promo app works the same way — nothing hardwired. ──
+function promoKey(installed) {
+    let key = null;
+    Object.keys(installed || {}).forEach(function (id) {
+        const man = (installed[id] || {}).manifest || {};
+        if ((installed[id] || {}).enabled !== false && man.provides === 'promos' && man.dataKey) key = man.dataKey;
+    });
+    return key || 'coupons';
+}
+async function findPromo(siteId, code, installed) {
     if (!code) return null;
     const { data: recs } = await supabase.from('app_records')
-        .select('id, record').eq('site_id', siteId).eq('data_key', 'coupons').limit(200);
+        .select('id, record').eq('site_id', siteId).eq('data_key', promoKey(installed)).limit(200);
     const today = new Date().toISOString().slice(0, 10);
     const hit = (recs || []).filter(function (r) {
         const rec = r.record || {};
@@ -1164,9 +1188,9 @@ async function findPromo(siteId, code) {
 router.get('/page/:slug/promo/:code', async (req, res) => {
     try {
         const { data: state } = await supabase.from('platform_state')
-            .select('site_id').eq('business->>slug', req.params.slug).maybeSingle();
+            .select('site_id, installed').eq('business->>slug', req.params.slug).maybeSingle();
         if (!state) return res.status(404).json({ error: 'Page not found' });
-        const promo = await findPromo(state.site_id, req.params.code);
+        const promo = await findPromo(state.site_id, req.params.code, state.installed);
         if (!promo) return res.status(404).json({ valid: false, error: 'That code isn\'t valid.' });
         res.json({ valid: true, code: promo.code, off: promo.off, percent: promo.percent, amount: promo.amount });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1260,7 +1284,7 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
 
         // promo: only stored if it's a real, unexpired code
         if (req.body.promo) {
-            const promo = await findPromo(state.site_id, req.body.promo);
+            const promo = await findPromo(state.site_id, req.body.promo, state.installed);
             if (promo) { record.promo = promo.code; record.promo_off = promo.off; }
         }
 
