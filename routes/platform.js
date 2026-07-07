@@ -373,6 +373,78 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
 });
 
 // ============================================================
+// TOURIST WALLET — the customer's own view of the platform.
+// Matched by their verified phone number (the identity anchor):
+// every booking they made through any business's checkout shows
+// up in their GCR account, no matter which business it was with.
+// ============================================================
+async function touristAuth(req, res, next) {
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith('Bearer ')) return res.status(401).json({ error: 'No token provided' });
+    try {
+        const { data, error } = await supabase.auth.getUser(header.split(' ')[1]);
+        if (error || !data || !data.user) return res.status(401).json({ error: 'Invalid token' });
+        req.touristId = data.user.id;
+        next();
+    } catch (e) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+}
+function last10(p) {
+    const d = String(p || '').replace(/\D/g, '');
+    return d.slice(-10);
+}
+
+router.get('/my-bookings', touristAuth, async (req, res) => {
+    try {
+        const { data: prof } = await supabase.from('tourist_profiles')
+            .select('phone').eq('user_id', req.touristId).maybeSingle();
+        const phone = last10(prof && prof.phone);
+        if (!phone || phone.length < 10) return res.json({ bookings: [] });
+
+        const { data: recs } = await supabase.from('app_records')
+            .select('id, site_id, data_key, record, created_at')
+            .neq('data_key', 'automation_log')
+            .order('created_at', { ascending: false }).limit(2000);
+
+        const mine = (recs || []).filter(function (r) {
+            const rec = r.record || {};
+            const rp = last10(rec.phone || rec.customer_phone);
+            return rp.length === 10 && rp === phone;
+        });
+        if (!mine.length) return res.json({ bookings: [] });
+
+        const siteIds = [];
+        mine.forEach(function (r) { if (siteIds.indexOf(r.site_id) === -1) siteIds.push(r.site_id); });
+        const { data: states } = await supabase.from('platform_state')
+            .select('site_id, business').in('site_id', siteIds);
+        const bizMap = {};
+        (states || []).forEach(function (s) { bizMap[s.site_id] = s.business || {}; });
+
+        const bookings = mine.map(function (r) {
+            const rec = r.record || {};
+            const biz = bizMap[r.site_id] || {};
+            return {
+                id: r.id,
+                when: r.created_at,
+                stream: r.data_key,
+                business: biz.name || 'Business',
+                slug: biz.slug || null,
+                title: rec.service || rec.trip || rec.boat || rec.session || rec.item || rec.title || String(r.data_key).replace(/_/g, ' '),
+                date: rec.date || null,
+                time: rec.time || rec.departure || null,
+                party: rec.party || rec.guests || null,
+                status: rec.status || null,
+                amount_paid: rec.amount_paid || null
+            };
+        });
+        res.json({ bookings: bookings });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
 // PUBLIC PAGE — one URL per business, rendered from installed blocks
 // ============================================================
 router.get('/page/:slug', async (req, res) => {
