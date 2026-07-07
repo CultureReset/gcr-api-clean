@@ -146,6 +146,10 @@ async function buildFullEntity(slug) {
   const offeringRows = offeringsRes.data || [];
   const offeringPrices = offeringPricesRes.data || [];
   const marinaDetails = marinaRes?.data || null;
+  // Connected parent (marina/complex/condo hub) — child pages link back to it
+  const parentInfo = entity.parent_entity_slug
+    ? (await db.from('entity').select('slug,name,entity_type,entity_subtype,hero_image_url').eq('slug', entity.parent_entity_slug).eq('is_active', true).maybeSingle()).data || null
+    : null;
   if (marinaDetails) {
     const md = marinaDetails;
     const facts = [
@@ -380,6 +384,7 @@ async function buildFullEntity(slug) {
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
     child_count: childCountRes?.count || 0,
+    parent: parentInfo,
     is_hub: (childCountRes?.count || 0) > 0,
     good_for_children: entity.good_for_children ?? entity.good_for_kids ?? null,
     modules: modulesFull,
