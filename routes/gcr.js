@@ -142,11 +142,33 @@ async function buildFullEntity(slug) {
   // Set of enabled module keys — preserves existing conditional-fetch logic below
   const modules = new Set(modulesData.filter(m => m.enabled !== false).map(m => m.module_key));
 
-  // ── CONDITIONAL queries — only run if module is enabled ───────────────────
+  // ── Data present ⇒ data displays ───────────────────────────────────────────
+  // A pack also loads when its tables actually hold rows for this slug, no
+  // matter the entity_type or module switches (a caterer with a menu, a golf
+  // course with drinks, a park listing with room data — it all shows).
+  // Probes only run for packs whose gate is still false; head-count = cheap,
+  // and the endpoint is edge-cached.
+  const hasRows = async (table) => {
+    try {
+      const { count } = await db.from(table).select('id', { count: 'exact', head: true }).eq('entity_slug', slug);
+      return (count || 0) > 0;
+    } catch (e) { return false; }
+  };
+  const anyRows = async (...tables) => (await Promise.all(tables.map(hasRows))).some(Boolean);
+  const [dataFood, dataActivity, dataStay, dataService, dataShop, dataPark] = await Promise.all([
+    (isFood || modules.has('menu'))       ? false : anyRows('menu_sections', 'drink_sections', 'entity_specials'),
+    (isActivity || modules.has('activity')) ? false : anyRows('activity_schedules', 'whats_included', 'what_to_bring'),
+    (isStay || modules.has('stay'))       ? false : anyRows('property_details', 'room_types'),
+    (isService || modules.has('services')) ? false : anyRows('service_menu', 'class_schedule'),
+    (isShopping || modules.has('shop'))   ? false : anyRows('products'),
+    (isPark || modules.has('park'))       ? false : anyRows('facilities', 'spot_rules'),
+  ]);
+
+  // ── CONDITIONAL queries — module enabled, matching type, OR data present ──
   const conditionalPromises = [];
   const conditionalKeys = [];
 
-  if (isFood || modules.has('menu')) {
+  if (isFood || modules.has('menu') || dataFood) {
     conditionalPromises.push(
       db.from('menu_sections').select('id,section_name,sort_order,time_range,available_days').eq('entity_slug', slug).order('sort_order'),
       db.from('drink_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
@@ -159,7 +181,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('menuSections','drinkSections','hhSections','specials','sides','dailyFeatures','orderLinks');
   }
 
-  if (isActivity || modules.has('activity')) {
+  if (isActivity || modules.has('activity') || dataActivity) {
     conditionalPromises.push(
       db.from('pricing_items').select('*').eq('entity_slug', slug).order('sort_order'),
       db.from('whats_included').select('id,item_name,included_item,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
@@ -174,7 +196,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('pricing','whatsIncluded','requirements','schedules','meetingPoints','activityOptions','fishSpecies','whatToBring','activityDetails');
   }
 
-  if (isStay || modules.has('stay')) {
+  if (isStay || modules.has('stay') || dataStay) {
     conditionalPromises.push(
       db.from('property_details').select('*').eq('entity_slug', slug).maybeSingle(),
       db.from('room_types').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -187,7 +209,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('propertyDetails','roomTypes','amenities','propertyFees','stayLinks','availability','bookableResources');
   }
 
-  if (isService || modules.has('services')) {
+  if (isService || modules.has('services') || dataService) {
     conditionalPromises.push(
       db.from('service_categories').select('id,name,sort_order').eq('entity_slug', slug).order('sort_order'),
       db.from('service_menu').select('id,category_id,name,description,price,duration_minutes,sort_order').eq('entity_slug', slug).order('sort_order'),
@@ -197,7 +219,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('serviceCategories','serviceMenu','servicePackages','classSchedule');
   }
 
-  if (isShopping || modules.has('shop')) {
+  if (isShopping || modules.has('shop') || dataShop) {
     conditionalPromises.push(
       db.from('product_categories').select('id,name,sort_order').eq('entity_slug', slug).order('sort_order'),
       db.from('products').select('id,category_id,name,description,price,in_stock,sort_order').eq('entity_slug', slug).eq('in_stock', true).order('sort_order'),
@@ -205,7 +227,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('productCategories','products');
   }
 
-  if (isPark || modules.has('park')) {
+  if (isPark || modules.has('park') || dataPark) {
     conditionalPromises.push(
       db.from('facilities').select('id,name,available').eq('entity_slug', slug),
       db.from('spot_rules').select('id,rule').eq('entity_slug', slug),
