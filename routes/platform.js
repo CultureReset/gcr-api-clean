@@ -1346,52 +1346,6 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
             if (promo) { record.promo = promo.code; record.promo_off = promo.off; }
         }
 
-        // per-person tiers → seats: record.party drives capacity countdown
-        if (bc.party) {
-            let total = 0;
-            bc.party.tiers.forEach(function (t) {
-                const q = Math.max(0, Math.min(99, parseInt(req.body[t.key], 10) || 0));
-                if (q) record[t.key] = String(q);
-                total += q;
-            });
-            if (total < 1) return res.status(400).json({ error: 'Please add at least one person.' });
-            record.party = total;
-        }
-        const partySize = record.party || Math.max(0, parseInt(record.guests, 10) || 0) || 1;
-        if (bc.maxParty && partySize > bc.maxParty) {
-            return res.status(400).json({ error: 'Maximum party size is ' + bc.maxParty + '.' });
-        }
-
-        // add-ons: only real records from the app's own add-ons stream count
-        if (bc.addonsKey && Array.isArray(req.body.addons) && req.body.addons.length) {
-            const { data: ax } = await supabase.from('app_records')
-                .select('id, record').eq('site_id', state.site_id).eq('data_key', bc.addonsKey).limit(50);
-            const picked = (ax || []).filter(function (a) {
-                return req.body.addons.map(String).indexOf(String(a.id)) !== -1;
-            });
-            if (picked.length) {
-                let addonTotal = 0;
-                const names = picked.map(function (a) {
-                    const rec = a.record || {};
-                    const p = parseFloat(rec.price) || 0;
-                    const mult = rec.per === 'person' ? partySize
-                        : (rec.per === 'day' && record.end_date)
-                            ? Math.max(1, Math.round((new Date(record.end_date) - new Date(record.date)) / 86400e3))
-                            : 1;
-                    addonTotal += p * mult;
-                    return rec.name;
-                });
-                record.addons = names.join(', ');
-                record.addons_total = addonTotal.toFixed(2);
-            }
-        }
-
-        // promo: only stored if it's a real, unexpired code
-        if (req.body.promo) {
-            const promo = await findPromo(state.site_id, req.body.promo, state.installed);
-            if (promo) { record.promo = promo.code; record.promo_off = promo.off; }
-        }
-
         // availability enforcement: no bookings on blocked/full dates,
         // taken slots, or a resource that's already out. mode 'none'
         // means the date is informational (membership start, etc.)
