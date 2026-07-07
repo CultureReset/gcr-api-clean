@@ -364,6 +364,45 @@ async function calendarBackfill(siteId) {
     return n;
 }
 
+// ── Self-serve booking management: HMAC-signed links, no login needed ──
+const crypto = require('crypto');
+function manageToken(recordId) {
+    const secret = process.env.JWT_SECRET || process.env.SUPABASE_KEY || 'cc-manage';
+    return crypto.createHmac('sha256', secret).update('manage:' + String(recordId)).digest('hex').slice(0, 24);
+}
+function manageTokenOk(recordId, t) {
+    try { return crypto.timingSafeEqual(Buffer.from(manageToken(recordId)), Buffer.from(String(t || ''))); }
+    catch (e) { return false; }
+}
+function publicBase() {
+    return (process.env.PUBLIC_PAGE_BASE_URL || 'https://gulfcoastradar.com').replace(/\/$/, '');
+}
+// find the installed app that owns a data stream
+function instByDataKey(installed, dataKey) {
+    let hit = null;
+    Object.keys(installed || {}).forEach(function (id) {
+        const inst = installed[id];
+        if (inst && inst.manifest && inst.manifest.dataKey === dataKey && inst.enabled !== false) hit = { id: id, inst: inst };
+    });
+    return hit;
+}
+// does any installed app provide waivers?
+function waiverApp(installed) {
+    let hit = null;
+    Object.keys(installed || {}).forEach(function (id) {
+        const inst = installed[id];
+        const man = inst && inst.manifest;
+        if (man && inst.enabled !== false && (man.provides === 'waivers' || man.dataKey === 'waivers')) hit = inst;
+    });
+    return hit;
+}
+// when does this booking start? (UTC-ish; cutoff/cancel windows are coarse)
+function bookingStart(record) {
+    if (!record || !record.date) return null;
+    const mins = slotMinutes(record.time || record.departure || '');
+    return new Date(new Date(record.date + 'T00:00:00Z').getTime() + (mins == null ? 0 : mins * 60e3));
+}
+
 // ── Availability: blocked dates + capacity, enforced server-side ──
 // Booking behavior is declared by the app's own manifest + install config:
 //   manifest.booking = { mode: 'date'|'slots'|'range'|'none', resource: '<dataKey>',
@@ -516,7 +555,7 @@ router.get('/calendar', authRequired, async (req, res) => {
         if (!any || !any.length) await calendarBackfill(req.siteId);
 
         let q = supabase.from('unified_calendar')
-            .select('id, date, end_date, start_time, kind, source, status, title, party, ref_id, external_uid')
+            .select('id, date, end_date, start_time, kind, source, status, title, party, ref_id, external_uid, record')
             .eq('site_id', req.siteId).order('date', { ascending: true }).limit(2000);
         if (req.query.month && /^\d{4}-\d{2}$/.test(req.query.month)) {
             const m = req.query.month;
@@ -609,13 +648,24 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
         if (phone) {
             try {
                 const { data: st } = await supabase.from('platform_state')
-                    .select('business').eq('site_id', req.siteId).maybeSingle();
+                    .select('business, installed').eq('site_id', req.siteId).maybeSingle();
                 const biz = (st && st.business) || {};
                 const bizName = biz.name || 'the business';
                 const { sendSms } = require('../utils/sms');
                 let msg = null;
                 if (req.params.dataKey === 'ugc_videos') msg = null; // loyalty hook sends the video-specific text
-                else if (status === 'confirmed') msg = '[' + bizName + '] You\'re confirmed' + (record.date ? ' for ' + record.date : '') + (record.time ? ' at ' + record.time : '') + '. See you then!';
+                else if (status === 'confirmed') {
+                    msg = '[' + bizName + '] You\'re confirmed' + (record.date ? ' for ' + record.date : '') + (record.time ? ' at ' + record.time : '') + '. See you then!';
+                    // self-serve manage link + waiver link (only for date-claiming bookings)
+                    const owner = instByDataKey((st && st.installed) || {}, req.params.dataKey);
+                    const bcOwn = owner ? bookingCfg(owner.inst) : null;
+                    if (record.date && bcOwn && bcOwn.mode !== 'none') {
+                        msg += ' Change plans? ' + publicBase() + '/manage/' + req.params.id + '?t=' + manageToken(req.params.id);
+                        if (waiverApp((st && st.installed) || {})) {
+                            msg += ' · Sign your waiver: ' + publicBase() + '/waiver/' + (biz.slug || '') + '?b=' + req.params.id + '&t=' + manageToken(req.params.id);
+                        }
+                    }
+                }
                 else if (status === 'declined' || status === 'cancelled') msg = '[' + bizName + '] Sorry — we couldn\'t take your request' + (record.date ? ' for ' + record.date : '') + '. Reply here and we\'ll find another time.';
                 else if (status === 'completed') {
                     // Authentic review: the link carries the transaction record id,
@@ -1241,6 +1291,9 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
             const ed = String(req.body.end_date).match(/^\d{4}-\d{2}-\d{2}/);
             if (ed) record.end_date = ed[0];
         }
+        // slots mode: the time is an engine concept, not dependent on the
+        // app's field names (charter uses "departure", salon uses "time")
+        if (bc.mode === 'slots' && req.body.time) record.time = String(req.body.time).slice(0, 40);
 
         // per-person tiers → seats: record.party drives capacity countdown
         if (bc.party) {
@@ -1377,6 +1430,253 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// ============================================================
+// SELF-SERVE MANAGE — cancel / reschedule via the SMS link.
+// Auth = HMAC token on the record id; no account needed.
+// ============================================================
+async function loadManaged(req, res) {
+    const { data: row } = await supabase.from('app_records')
+        .select('id, site_id, data_key, record').eq('id', req.params.id).maybeSingle();
+    if (!row) { res.status(404).json({ error: 'Booking not found' }); return null; }
+    if (!manageTokenOk(row.id, req.query.t || req.body.t)) { res.status(403).json({ error: 'Bad link' }); return null; }
+    const { data: st } = await supabase.from('platform_state')
+        .select('business, installed').eq('site_id', row.site_id).maybeSingle();
+    const owner = instByDataKey((st && st.installed) || {}, row.data_key);
+    return { row: row, state: st || {}, owner: owner, bc: owner ? bookingCfg(owner.inst) : bookingCfg(null) };
+}
+function cancelWindow(owner) {
+    const cfg = (owner && owner.inst && owner.inst.config) || {};
+    const man = (owner && owner.inst && owner.inst.manifest) || {};
+    const h = parseFloat(cfg.cancel_hours);
+    if (!isNaN(h)) return h;
+    const mh = parseFloat((man.booking || {}).cancel_hours);
+    return isNaN(mh) ? 24 : mh;
+}
+function canModify(record, owner) {
+    if (['cancelled', 'declined', 'completed', 'no-show'].indexOf(record.status || '') !== -1) return false;
+    const start = bookingStart(record);
+    if (!start) return false;
+    return start.getTime() - Date.now() > cancelWindow(owner) * 3600e3;
+}
+
+router.get('/manage/:id', async (req, res) => {
+    try {
+        const ctx = await loadManaged(req, res); if (!ctx) return;
+        const rec = ctx.row.record || {};
+        const biz = (ctx.state.business) || {};
+        res.json({
+            business: { name: biz.name, slug: biz.slug, phone: biz.phone, accent: biz.accent, emoji: biz.emoji, logo: biz.logo, hero: biz.hero },
+            appId: ctx.owner ? ctx.owner.id : null,
+            mode: ctx.bc.mode,
+            slots: ctx.bc.slots,
+            seats: !!(ctx.bc.party && ctx.bc.party.seats),
+            booking: {
+                customer: rec.customer || rec.name || '', date: rec.date || null, end_date: rec.end_date || null,
+                time: rec.time || null, party: rec.party || rec.guests || null, resource: rec.resource || null,
+                addons: rec.addons || null, status: rec.status || 'pending', title: rec.service || rec.trip || rec.boat || rec.class || ''
+            },
+            canModify: canModify(rec, ctx.owner),
+            cancelHours: cancelWindow(ctx.owner)
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/manage/:id/cancel', async (req, res) => {
+    try {
+        const ctx = await loadManaged(req, res); if (!ctx) return;
+        const rec = ctx.row.record || {};
+        if (!canModify(rec, ctx.owner)) {
+            return res.status(409).json({ error: 'This booking can no longer be cancelled online (' + cancelWindow(ctx.owner) + 'h policy). Call the business instead.' });
+        }
+        rec.status = 'cancelled';
+        rec.cancelled_by = 'guest';
+        await supabase.from('app_records').update({ record: rec, updated_at: new Date().toISOString() }).eq('id', ctx.row.id);
+        calendarSync(ctx.row.site_id, ctx.row.data_key, ctx.row.id, rec).catch(function () {});
+        const biz = ctx.state.business || {};
+        try {
+            const { sendSms } = require('../utils/sms');
+            if (biz.phone) await sendSms(biz.phone, '[' + (biz.name || 'Your page') + '] ' + (rec.customer || rec.name || 'A guest') + ' cancelled ' + (rec.date || '') + (rec.time ? ' ' + rec.time : '') + ' — the spot is open again.', ctx.row.site_id, 'guest_cancel', ctx.row.id);
+            const gp = rec.phone || rec.customer_phone;
+            if (gp) await sendSms(gp, '[' + (biz.name || '') + '] Your booking' + (rec.date ? ' for ' + rec.date : '') + ' is cancelled. Book again any time: ' + publicBase() + '/p/' + (biz.slug || ''), ctx.row.site_id, 'guest_cancel_ack', ctx.row.id);
+        } catch (e) { console.error('cancel sms failed:', e.message); }
+        res.json({ success: true, status: 'cancelled' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/manage/:id/reschedule', async (req, res) => {
+    try {
+        const ctx = await loadManaged(req, res); if (!ctx) return;
+        const rec = ctx.row.record || {};
+        if (!canModify(rec, ctx.owner)) {
+            return res.status(409).json({ error: 'This booking can no longer be changed online (' + cancelWindow(ctx.owner) + 'h policy). Call the business instead.' });
+        }
+        const nd = String(req.body.date || '').match(/^\d{4}-\d{2}-\d{2}$/);
+        if (!nd) return res.status(400).json({ error: 'Pick a new date.' });
+        const bc = ctx.bc;
+        if (bc.mode === 'slots' && (!req.body.time || bc.slots.indexOf(req.body.time) === -1)) {
+            return res.status(400).json({ error: 'Pick a new time.' });
+        }
+        // the booking's own calendar entry must not block its own move
+        await calendarRemove(ctx.row.id);
+        const avail = await getAvailability(ctx.row.site_id, (ctx.state.installed) || {}, ctx.row.data_key, null, {
+            resource: rec.resource_id || null, date: nd[0],
+            slots: bc.slots, slotCap: bc.slotCap, cutoffHours: bc.cutoffHours
+        });
+        const need = (bc.party && bc.party.seats) ? (parseInt(rec.party, 10) || 1) : 1;
+        let conflict = null;
+        const newEnd = bc.mode === 'range' && req.body.end_date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.end_date) ? req.body.end_date : null;
+        const span = [];
+        {
+            const start = new Date(nd[0] + 'T00:00:00Z');
+            const end = newEnd ? new Date(newEnd + 'T00:00:00Z') : start;
+            for (let d = new Date(start), i = 0; d <= end && i < 60; d.setUTCDate(d.getUTCDate() + 1), i++) span.push(d.toISOString().slice(0, 10));
+        }
+        for (const ds of span) {
+            if (avail.blocked.indexOf(ds) !== -1) conflict = ds + ' is unavailable.';
+            else if (avail.full.indexOf(ds) !== -1) conflict = ds + ' is fully booked.';
+            if (conflict) break;
+        }
+        if (!conflict && bc.mode === 'slots') {
+            const slot = (avail.slots || []).filter(function (x) { return x.time === req.body.time; })[0];
+            if (!slot || slot.remaining < need) conflict = req.body.time + ' doesn\'t have room.';
+        }
+        if (conflict) {
+            calendarSync(ctx.row.site_id, ctx.row.data_key, ctx.row.id, rec).catch(function () {}); // restore
+            return res.status(409).json({ error: conflict + ' Pick something else.' });
+        }
+        const oldWhen = (rec.date || '') + (rec.time ? ' ' + rec.time : '');
+        rec.date = nd[0];
+        if (newEnd) rec.end_date = newEnd;
+        if (bc.mode === 'slots') rec.time = req.body.time;
+        rec.rescheduled = 'guest';
+        await supabase.from('app_records').update({ record: rec, updated_at: new Date().toISOString() }).eq('id', ctx.row.id);
+        calendarSync(ctx.row.site_id, ctx.row.data_key, ctx.row.id, rec).catch(function () {});
+        const biz = ctx.state.business || {};
+        try {
+            const { sendSms } = require('../utils/sms');
+            if (biz.phone) await sendSms(biz.phone, '[' + (biz.name || 'Your page') + '] ' + (rec.customer || 'A guest') + ' moved ' + oldWhen + ' → ' + rec.date + (rec.time ? ' ' + rec.time : ''), ctx.row.site_id, 'guest_reschedule', ctx.row.id);
+        } catch (e) { console.error('reschedule sms failed:', e.message); }
+        res.json({ success: true, date: rec.date, end_date: rec.end_date || null, time: rec.time || null });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// WAIVERS — signed from the SMS link, tied to the booking record
+// ============================================================
+router.get('/waiver-info/:slug', async (req, res) => {
+    try {
+        const { data: state } = await supabase.from('platform_state')
+            .select('site_id, business, installed').eq('business->>slug', req.params.slug).maybeSingle();
+        if (!state) return res.status(404).json({ error: 'Page not found' });
+        const wapp = waiverApp(state.installed || {});
+        if (!wapp) return res.status(404).json({ error: 'This business doesn\'t use digital waivers.' });
+        if (!req.query.b || !manageTokenOk(req.query.b, req.query.t)) return res.status(403).json({ error: 'Bad link' });
+        const { data: bk } = await supabase.from('app_records')
+            .select('record').eq('id', String(req.query.b)).eq('site_id', state.site_id).maybeSingle();
+        const rec = (bk && bk.record) || {};
+        const wKey = (wapp.manifest && wapp.manifest.dataKey) || 'waivers';
+        const { data: signed } = await supabase.from('app_records')
+            .select('id, record').eq('site_id', state.site_id).eq('data_key', wKey).limit(500);
+        const already = (signed || []).some(function (w) { return String((w.record || {}).booking_ref || '') === String(req.query.b); });
+        res.json({
+            business: { name: (state.business || {}).name, accent: (state.business || {}).accent },
+            text: (wapp.config || {}).text || ((wapp.manifest.setup || []).filter(function (s) { return s.key === 'text'; })[0] || {}).def || 'I acknowledge the risks involved and release the business from liability.',
+            booking: { customer: rec.customer || rec.name || '', date: rec.date || null, time: rec.time || null, title: rec.service || rec.trip || rec.boat || rec.class || '' },
+            signed: already
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/waiver-sign/:slug', async (req, res) => {
+    try {
+        const { data: state } = await supabase.from('platform_state')
+            .select('site_id, business, installed').eq('business->>slug', req.params.slug).maybeSingle();
+        if (!state) return res.status(404).json({ error: 'Page not found' });
+        const wapp = waiverApp(state.installed || {});
+        if (!wapp) return res.status(404).json({ error: 'No waivers here.' });
+        if (!req.body.b || !manageTokenOk(req.body.b, req.body.t)) return res.status(403).json({ error: 'Bad link' });
+        const name = String(req.body.name || '').trim().slice(0, 120);
+        if (!name) return res.status(400).json({ error: 'Type your full legal name to sign.' });
+        const { data: bk } = await supabase.from('app_records')
+            .select('record').eq('id', String(req.body.b)).eq('site_id', state.site_id).maybeSingle();
+        const rec = (bk && bk.record) || {};
+        const wKey = (wapp.manifest && wapp.manifest.dataKey) || 'waivers';
+        await supabase.from('app_records').insert({
+            site_id: state.site_id, data_key: wKey,
+            record: {
+                customer: name,
+                booking: [rec.service || rec.trip || rec.boat || rec.class, rec.date, rec.time].filter(Boolean).join(' · ') || 'Booking',
+                booking_ref: String(req.body.b),
+                date: new Date().toISOString().slice(0, 10),
+                status: 'signed', source: 'sms_link'
+            }
+        });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// TIMED REMINDERS — Vercel cron hits this hourly. Sends the
+// template of any installed automation app with trigger
+// 'before_start_24h' for tomorrow's active bookings, once each.
+// ============================================================
+router.get('/cron/reminders', async (req, res) => {
+    try {
+        if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
+            return res.status(401).json({ error: 'unauthorized' });
+        }
+        const tomorrow = new Date(Date.now() + 86400e3).toISOString().slice(0, 10);
+        const { data: entries } = await supabase.from('unified_calendar')
+            .select('id, site_id, date, start_time, title, ref_id, record')
+            .eq('date', tomorrow).eq('status', 'active').eq('kind', 'booking').limit(500);
+        let sent = 0;
+        const bySite = {};
+        (entries || []).forEach(function (e) { (bySite[e.site_id] = bySite[e.site_id] || []).push(e); });
+        for (const siteId of Object.keys(bySite)) {
+            const { data: st } = await supabase.from('platform_state')
+                .select('business, installed').eq('site_id', siteId).maybeSingle();
+            if (!st) continue;
+            // any installed automation app that fires before start
+            let template = null;
+            Object.keys(st.installed || {}).forEach(function (id) {
+                const inst = st.installed[id];
+                const man = inst && inst.manifest;
+                if (man && inst.enabled !== false && man.automation && man.automation.trigger === 'before_start_24h') {
+                    template = (inst.config && inst.config.template) || man.automation.template ||
+                        '[{business}] Reminder: {title} tomorrow{time}. See you then!';
+                }
+            });
+            if (!template) continue;
+            const biz = st.business || {};
+            const { sendSms } = require('../utils/sms');
+            for (const e of bySite[siteId]) {
+                const rec = e.record || {};
+                if (rec.reminded) continue;
+                const phone = rec.phone || rec.customer_phone;
+                if (!phone) continue;
+                if (['cancelled', 'declined', 'no-show'].indexOf(rec.status || '') !== -1) continue;
+                const msg = template
+                    .replace(/\{business\}/g, biz.name || 'Your booking')
+                    .replace(/\{name\}/g, rec.customer || rec.name || 'there')
+                    .replace(/\{title\}/g, e.title || 'your booking')
+                    .replace(/\{date\}/g, e.date)
+                    .replace(/\{time\}/g, e.start_time ? ' at ' + e.start_time : '')
+                    .replace(/\{manage\}/g, publicBase() + '/manage/' + e.ref_id + '?t=' + manageToken(e.ref_id));
+                try {
+                    await sendSms(phone, msg, siteId, 'reminder_24h', e.ref_id);
+                    rec.reminded = new Date().toISOString().slice(0, 10);
+                    await supabase.from('app_records').update({ record: rec, updated_at: new Date().toISOString() }).eq('id', e.ref_id);
+                    await supabase.from('unified_calendar').update({ record: rec }).eq('id', e.id);
+                    sent++;
+                    if (sent >= 200) break; // per-run safety cap
+                } catch (err2) { console.error('[reminders] send failed:', err2.message); }
+            }
+            if (sent >= 200) break;
+        }
+        res.json({ success: true, sent: sent, date: tomorrow });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;
