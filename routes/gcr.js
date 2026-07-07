@@ -1414,7 +1414,35 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
       .order('name');
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ children: data || [], total: (data || []).length });
+    const children = data || [];
+
+    // Rental details for unit children (condo units, beach houses): beds,
+    // baths, sleeps, nightly price from bookable_resources keyed by the
+    // unit's own slug — listing cards render these when present.
+    if (children.length) {
+      const slugs = children.map(c => c.slug);
+      const { data: resources } = await db
+        .from('bookable_resources')
+        .select('entity_slug,name,resource_type,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url')
+        .in('entity_slug', slugs)
+        .eq('is_active', true);
+      const bySlug = new Map();
+      for (const r of resources || []) {
+        // keep the richest row per slug (some slugs carry a placeholder row)
+        const score = ['nightly_price','bedrooms','bathrooms','capacity'].filter(k => r[k] != null).length;
+        const prev = bySlug.get(r.entity_slug);
+        if (!prev || score > prev._score) bySlug.set(r.entity_slug, { ...r, _score: score });
+      }
+      for (const c of children) {
+        const r = bySlug.get(c.slug);
+        if (r) {
+          const { _score, entity_slug, ...rental } = r;
+          c.rental = rental;
+        }
+      }
+    }
+
+    res.json({ children, total: children.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
