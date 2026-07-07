@@ -340,11 +340,24 @@ async function calendarBackfill(siteId) {
     const { data: recs } = await supabase.from('app_records')
         .select('id, data_key, record').eq('site_id', siteId)
         .neq('data_key', 'automation_log').limit(2000);
+    // manifest-driven skip list: content streams (publicData) and
+    // non-date-claiming products (booking.mode 'none') never claim dates.
+    // The named fallbacks cover data left behind by uninstalled apps.
+    const skip = { reward_offers: 1, redemptions: 1, ugc_videos: 1, reviews: 1, menu_items: 1, specials: 1 };
+    try {
+        const { data: st } = await supabase.from('platform_state')
+            .select('installed').eq('site_id', siteId).maybeSingle();
+        Object.keys((st && st.installed) || {}).forEach(function (id) {
+            const man = (st.installed[id] || {}).manifest || {};
+            if (!man.dataKey) return;
+            if ((man.booking && man.booking.mode === 'none') || (man.publicData && !man.checkout)) skip[man.dataKey] = 1;
+        });
+    } catch (e) { /* fall back to the named list */ }
     let n = 0;
     for (const r of (recs || [])) {
         const rec = r.record || {};
         if (!calDate(rec.date || rec.event_date || rec.start_date)) continue;
-        if (['reward_offers', 'redemptions', 'ugc_videos', 'reviews', 'menu_items', 'specials'].indexOf(r.data_key) !== -1) continue;
+        if (skip[r.data_key]) continue;
         await calendarSync(siteId, r.data_key, r.id, rec);
         n++;
     }
@@ -353,20 +366,56 @@ async function calendarBackfill(siteId) {
 
 // ── Availability: blocked dates + capacity, enforced server-side ──
 // Booking behavior is declared by the app's own manifest + install config:
-//   manifest.booking = { mode: 'date'|'slots'|'range', resource: '<dataKey>' }
-//   config.slot_times ("6:00 AM, 12:30 PM"), config.slot_capacity
+//   manifest.booking = { mode: 'date'|'slots'|'range'|'none', resource: '<dataKey>',
+//                        party: {tiers:[{key,label,cfgPrice,def}], seats:true},
+//                        addons: '<dataKey>', cutoff_hours, max_party }
+//   config: slot_times, slot_capacity, price_<tier>, cutoff_hours, max_party
 function bookingCfg(inst) {
     const man = (inst && inst.manifest) || {};
     const cfg = (inst && inst.config) || {};
     const b = man.booking || {};
     const slots = String(cfg.slot_times || b.slots || '')
         .split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    // per-person tiers: the manifest declares them, the business prices them
+    let party = null;
+    if (b.party && Array.isArray(b.party.tiers) && b.party.tiers.length) {
+        party = {
+            seats: b.party.seats !== false, // capacity counts people, not bookings
+            tiers: b.party.tiers.map(function (t) {
+                const cfgKey = t.cfgPrice || ('price_' + t.key);
+                const p = parseFloat(cfg[cfgKey]);
+                return { key: t.key, label: t.label || t.key, price: isNaN(p) ? (parseFloat(t.def) || 0) : p };
+            })
+        };
+    }
     return {
         mode: b.mode || 'date',
         slots: slots,
         slotCap: parseInt(cfg.slot_capacity, 10) || parseInt(b.slot_capacity, 10) || 1,
-        resourceKey: b.resource || null
+        resourceKey: b.resource || null,
+        party: party,
+        addonsKey: b.addons || null,
+        cutoffHours: parseFloat(cfg.cutoff_hours) || parseFloat(b.cutoff_hours) || 0,
+        maxParty: parseInt(cfg.max_party, 10) || parseInt(b.max_party, 10) || 0
     };
+}
+
+// "6:00 AM" / "12:30 pm" → minutes since midnight; null if not a clock time
+function slotMinutes(t) {
+    const m = String(t || '').match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10) % 12;
+    if (/pm/i.test(m[3])) h += 12;
+    return h * 60 + (parseInt(m[2], 10) || 0);
+}
+// earliest bookable instant given a cutoff (0 = book any time)
+function cutoffEarliest(hours) { return hours > 0 ? new Date(Date.now() + hours * 3600e3) : null; }
+function dateEndsBefore(ds, when) { return when && new Date(ds + 'T23:59:59Z') < when; }
+function slotPast(ds, t, when) {
+    if (!when) return false;
+    const mins = slotMinutes(t);
+    if (mins == null) return dateEndsBefore(ds, when);
+    return new Date(ds + 'T00:00:00Z').getTime() + mins * 60e3 < when.getTime();
 }
 
 async function getAvailability(siteId, installed, dataKey, month, opts) {
@@ -406,7 +455,9 @@ async function getAvailability(siteId, installed, dataKey, month, opts) {
         else eachDate(e, function (ds) {
             counts[ds] = (counts[ds] || 0) + 1;
             const t = e.start_time || rec.time;
-            if (t) slotCounts[ds + '|' + t] = (slotCounts[ds + '|' + t] || 0) + 1;
+            // slots fill by party size (record.party, set at submit) — a
+            // family of 4 takes 4 seats; plain bookings still count as 1
+            if (t) slotCounts[ds + '|' + t] = (slotCounts[ds + '|' + t] || 0) + (parseInt(e.party || rec.party, 10) || 1);
             if (rec.resource_id) {
                 if (!resourceBusy[ds]) resourceBusy[ds] = [];
                 if (resourceBusy[ds].indexOf(String(rec.resource_id)) === -1) resourceBusy[ds].push(String(rec.resource_id));
@@ -424,6 +475,7 @@ async function getAvailability(siteId, installed, dataKey, month, opts) {
     }
     // per-slot remaining for a specific date (slots mode)
     let slots = null;
+    const earliest = cutoffEarliest(opts.cutoffHours);
     if (opts.slots && opts.slots.length && opts.date) {
         slots = opts.slots.map(function (t) {
             let used = slotCounts[opts.date + '|' + t] || 0;
@@ -435,7 +487,17 @@ async function getAvailability(siteId, installed, dataKey, month, opts) {
                         (e.start_time || rec.time) === t && String(rec.resource_id || '') === String(opts.resource);
                 }) ? opts.slotCap : used;
             }
-            return { time: t, remaining: Math.max(0, (opts.slotCap || 1) - used) };
+            let remaining = Math.max(0, (opts.slotCap || 1) - used);
+            if (slotPast(opts.date, t, earliest)) remaining = 0; // inside the booking cutoff
+            return { time: t, remaining: remaining };
+        });
+    }
+    // dates already inside the cutoff window can't be booked at all
+    if (earliest) {
+        const todayIsh = new Date(Date.now() - 86400e3).toISOString().slice(0, 10);
+        [0, 1, 2, 3].forEach(function (i) {
+            const d = new Date(new Date(todayIsh + 'T00:00:00Z').getTime() + i * 86400e3).toISOString().slice(0, 10);
+            if (dateEndsBefore(d, earliest) && b.indexOf(d) === -1) b = b.concat([d]);
         });
     }
     if (month) {
@@ -515,7 +577,7 @@ router.get('/page/:slug/availability', async (req, res) => {
         const avail = await getAvailability(state.site_id, state.installed, dataKey, req.query.month, {
             resource: req.query.resource || null,
             date: req.query.date || null,
-            slots: bc.slots, slotCap: bc.slotCap
+            slots: bc.slots, slotCap: bc.slotCap, cutoffHours: bc.cutoffHours
         });
         avail.mode = bc.mode;
         res.json(avail);
@@ -1014,7 +1076,7 @@ router.get('/page/:slug', async (req, res) => {
                 dataKey: man.dataKey || null,
                 publicData: !!man.publicData,
                 checkout: !!man.checkout,
-                booking: man.checkout ? { mode: bc.mode, slots: bc.slots, resource: bc.resourceKey } : undefined,
+                booking: man.checkout ? { mode: bc.mode, slots: bc.slots, resource: bc.resourceKey, party: bc.party, maxParty: bc.maxParty || undefined } : undefined,
                 cart: man.cart || undefined,
                 fields: (man.fields || []).filter(function (f) { return f.key !== 'status'; })
                     .map(function (f) {
@@ -1032,6 +1094,16 @@ router.get('/page/:slug', async (req, res) => {
                         return out;
                     })
             };
+            // upsells: the add-ons stream this checkout offers
+            if (man.checkout && bc.addonsKey) {
+                const { data: ax } = await supabase.from('app_records')
+                    .select('id, record').eq('site_id', state.site_id).eq('data_key', bc.addonsKey).limit(30);
+                block.addons = (ax || []).map(function (a) {
+                    const rec = a.record || {};
+                    if (!rec.name || !(parseFloat(rec.price) > 0)) return null;
+                    return { id: a.id, name: rec.name, price: parseFloat(rec.price), per: rec.per || 'booking', desc: rec.desc || '', url: rec.url && /^https?:/i.test(rec.url) ? rec.url : null };
+                }).filter(Boolean);
+            }
             // resource-linked checkout: include the pickable resources
             if (man.checkout && bc.resourceKey) {
                 const { data: rs } = await supabase.from('app_records')
@@ -1058,7 +1130,8 @@ router.get('/page/:slug', async (req, res) => {
         Object.keys(installed).forEach(function (id) {
             const inst = installed[id];
             const man = inst && inst.manifest;
-            if (man && man.id === 'payments' && inst.enabled !== false) {
+            // any app can provide the payment config (stock Payments app does)
+            if (man && (man.provides === 'payments' || man.id === 'payments') && inst.enabled !== false) {
                 const cfg = inst.config || {};
                 if (cfg.mode && cfg.mode !== 'No payment (pay on site)') {
                     payment = { mode: cfg.mode, deposit: parseFloat(cfg.deposit) || 0 };
@@ -1076,6 +1149,51 @@ router.get('/page/:slug', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// ── promo codes: validated against whichever installed app PROVIDES
+// promos (manifest.provides === 'promos'; the stock Coupons app does).
+// Any community-built promo app works the same way — nothing hardwired. ──
+function promoKey(installed) {
+    let key = null;
+    Object.keys(installed || {}).forEach(function (id) {
+        const man = (installed[id] || {}).manifest || {};
+        if ((installed[id] || {}).enabled !== false && man.provides === 'promos' && man.dataKey) key = man.dataKey;
+    });
+    return key || 'coupons';
+}
+async function findPromo(siteId, code, installed) {
+    if (!code) return null;
+    const { data: recs } = await supabase.from('app_records')
+        .select('id, record').eq('site_id', siteId).eq('data_key', promoKey(installed)).limit(200);
+    const today = new Date().toISOString().slice(0, 10);
+    const hit = (recs || []).filter(function (r) {
+        const rec = r.record || {};
+        if (String(rec.code || '').trim().toLowerCase() !== String(code).trim().toLowerCase()) return false;
+        if (rec.until && rec.until < today) return false;
+        return true;
+    })[0];
+    if (!hit) return null;
+    const off = String((hit.record || {}).off || '').trim();
+    const pct = off.match(/^(\d+(?:\.\d+)?)\s*%$/);
+    const amt = off.match(/^\$?\s*(\d+(?:\.\d+)?)$/);
+    return {
+        code: (hit.record || {}).code,
+        off: off,
+        percent: pct ? parseFloat(pct[1]) : null,
+        amount: !pct && amt ? parseFloat(amt[1]) : null
+    };
+}
+// Checkout asks "is this code good?" before payment
+router.get('/page/:slug/promo/:code', async (req, res) => {
+    try {
+        const { data: state } = await supabase.from('platform_state')
+            .select('site_id, installed').eq('business->>slug', req.params.slug).maybeSingle();
+        if (!state) return res.status(404).json({ error: 'Page not found' });
+        const promo = await findPromo(state.site_id, req.params.code, state.installed);
+        if (!promo) return res.status(404).json({ valid: false, error: 'That code isn\'t valid.' });
+        res.json({ valid: true, code: promo.code, off: promo.off, percent: promo.percent, amount: promo.amount });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // Public form submission — a booking, lead, song request, etc.
@@ -1124,10 +1242,64 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
             if (ed) record.end_date = ed[0];
         }
 
+        // per-person tiers → seats: record.party drives capacity countdown
+        if (bc.party) {
+            let total = 0;
+            bc.party.tiers.forEach(function (t) {
+                const q = Math.max(0, Math.min(99, parseInt(req.body[t.key], 10) || 0));
+                if (q) record[t.key] = String(q);
+                total += q;
+            });
+            if (total < 1) return res.status(400).json({ error: 'Please add at least one person.' });
+            record.party = total;
+        }
+        const partySize = record.party || Math.max(0, parseInt(record.guests, 10) || 0) || 1;
+        if (bc.maxParty && partySize > bc.maxParty) {
+            return res.status(400).json({ error: 'Maximum party size is ' + bc.maxParty + '.' });
+        }
+
+        // add-ons: only real records from the app's own add-ons stream count
+        if (bc.addonsKey && Array.isArray(req.body.addons) && req.body.addons.length) {
+            const { data: ax } = await supabase.from('app_records')
+                .select('id, record').eq('site_id', state.site_id).eq('data_key', bc.addonsKey).limit(50);
+            const picked = (ax || []).filter(function (a) {
+                return req.body.addons.map(String).indexOf(String(a.id)) !== -1;
+            });
+            if (picked.length) {
+                let addonTotal = 0;
+                const names = picked.map(function (a) {
+                    const rec = a.record || {};
+                    const p = parseFloat(rec.price) || 0;
+                    const mult = rec.per === 'person' ? partySize
+                        : (rec.per === 'day' && record.end_date)
+                            ? Math.max(1, Math.round((new Date(record.end_date) - new Date(record.date)) / 86400e3))
+                            : 1;
+                    addonTotal += p * mult;
+                    return rec.name;
+                });
+                record.addons = names.join(', ');
+                record.addons_total = addonTotal.toFixed(2);
+            }
+        }
+
+        // promo: only stored if it's a real, unexpired code
+        if (req.body.promo) {
+            const promo = await findPromo(state.site_id, req.body.promo, state.installed);
+            if (promo) { record.promo = promo.code; record.promo_off = promo.off; }
+        }
+
         // availability enforcement: no bookings on blocked/full dates,
         // taken slots, or a resource that's already out. mode 'none'
         // means the date is informational (membership start, etc.)
         if (record.date && bc.mode !== 'none') {
+            // booking cutoff: too close to start time
+            const earliest = cutoffEarliest(bc.cutoffHours);
+            if (earliest) {
+                const tooLate = bc.mode === 'slots'
+                    ? slotPast(record.date, record.time || '', earliest)
+                    : dateEndsBefore(record.date, earliest);
+                if (tooLate) return res.status(409).json({ error: 'Online booking closes ' + bc.cutoffHours + ' hours before start — call the business to squeeze in.' });
+            }
             const avail = await getAvailability(state.site_id, state.installed, inst.manifest.dataKey, null, {
                 resource: record.resource_id || null,
                 date: record.date,
@@ -1154,9 +1326,29 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
                     return res.status(400).json({ error: 'Please pick a time.' });
                 }
                 const slot = (avail.slots || []).filter(function (x) { return x.time === record.time; })[0];
-                if (!slot || slot.remaining <= 0) {
-                    return res.status(409).json({ error: record.time + ' is fully booked — please pick another time.' });
+                const need = (bc.party && bc.party.seats) ? partySize : 1;
+                if (!slot || slot.remaining < need) {
+                    const left = slot ? slot.remaining : 0;
+                    return res.status(409).json({ error: left > 0
+                        ? 'Only ' + left + ' spot' + (left > 1 ? 's' : '') + ' left at ' + record.time + ' — reduce your party or pick another time.'
+                        : record.time + ' is fully booked — please pick another time.' });
                 }
+            }
+        }
+
+        // resource limits: capacity + minimum nights come from the unit itself
+        if (record.resource_id && bc.resourceKey) {
+            const { data: rr2 } = await supabase.from('app_records')
+                .select('record').eq('id', String(record.resource_id)).maybeSingle();
+            const rrec = (rr2 && rr2.record) || {};
+            const cap = parseInt(rrec.capacity, 10) || parseInt(rrec.sleeps, 10) || 0;
+            if (cap && partySize > cap) {
+                return res.status(400).json({ error: record.resource + ' fits up to ' + cap + ' — your party of ' + partySize + ' won\'t fit. Pick a bigger option.' });
+            }
+            const minN = parseInt(rrec.min_nights, 10) || 0;
+            if (minN && bc.mode === 'range' && record.end_date) {
+                const n = Math.max(1, Math.round((new Date(record.end_date) - new Date(record.date)) / 86400e3));
+                if (n < minN) return res.status(400).json({ error: record.resource + ' has a ' + minN + '-night minimum stay.' });
             }
         }
 
