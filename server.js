@@ -60,11 +60,11 @@ mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 
 // Apps & Modules
 mount('/api/apps', () => require('./routes/apps'));
-mount('/api/modules', () => require('./routes/modules'));
+//mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/platform', () => require('./routes/platform'));
 
 // Google Business
-mount('/api/google-business', () => require('./routes/google-business'));
+//mount('/api/google-business', () => require('./routes/google-business')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 // mount('/api/dashboard/google-business', () => require('./routes/google-business')); // dashboard disabled
 
 // SMS
@@ -86,10 +86,10 @@ mount('/api/webhooks', () => require('./routes/webhooks'));
 
 // Booking types
 mount('/api/availability', () => require('./routes/availability'));
-mount('/api/boat-rental', () => require('./routes/boat-rental'));
-mount('/api/charter', () => require('./routes/charter'));
-mount('/api/rides', () => require('./routes/rides'));
-mount('/api/photographer', () => require('./routes/photographer'));
+//mount('/api/boat-rental', () => require('./routes/boat-rental')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
+//mount('/api/charter', () => require('./routes/charter')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
+//mount('/api/rides', () => require('./routes/rides')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
+//mount('/api/photographer', () => require('./routes/photographer')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/integrations/fareharbor', () => require('./routes/fareharbor'));
 
 // Live photo
@@ -116,14 +116,14 @@ mount('/api/webhooks', () => require('./routes/email-webhook'));
 mount('/api/meta-webhook', () => require('./routes/meta-webhook'));
 
 // Messaging
-mount('/api/messaging', () => require('./routes/messaging'));
+//mount('/api/messaging', () => require('./routes/messaging')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 
 // Rentals & Bookings
 mount('/api/rentals', () => require('./routes/rentals'));
 mount('/api/services', () => require('./routes/services'));
 
 // WhatsApp, Voice Notes, OCR, DNS
-mount('/api/whatsapp', () => require('./routes/whatsapp'));
+//mount('/api/whatsapp', () => require('./routes/whatsapp')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/voice-notes', () => require('./routes/voice-notes'));
 mount('/api/email-parser', () => require('./routes/email-parser'));
 mount('/api/email-parser', () => require('./routes/email-parser'));

@@ -196,8 +196,41 @@ async function genericSection(slug, dataKey, displayable) {
 }
 const ENGINE_KEYS = { scheduled_sms: 1, automation_log: 1, redemptions: 1 };
 
+// ── RAG hook: content writes become ai_facts, so the concierge always
+// knows the business's current offerings/specials/hours-adjacent data.
+// Bookings (customer PII) and engine streams never become facts.
+const RAG_SKIP = { bookings: 1, waivers: 1, photos: 1, blocks: 1, scheduled_sms: 1, automation_log: 1, redemptions: 1, ugc_videos: 1, leads: 1, automations: 1 };
+async function ragFact(slug, dataKey, record) {
+    try {
+        if (RAG_SKIP[dataKey] || isBookingKey(dataKey)) return;
+        const name = record.name || record.title || record.q || record.question || record.item || null;
+        if (!name) return;
+        const bits = [];
+        if (record.price) bits.push('$' + String(record.price).replace(/^\$/, ''));
+        if (record.desc || record.description) bits.push(record.desc || record.description);
+        if (record.a || record.answer) bits.push(record.a || record.answer);
+        if (record.days) bits.push('(' + record.days + ')');
+        if (record.date) bits.push('on ' + record.date);
+        const value = bits.join(' — ').slice(0, 500);
+        const factKey = (dataKey + ':' + String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-')).slice(0, 120);
+        const row = {
+            entity_slug: slug,
+            fact_key: factKey,
+            fact_value: value || String(name),
+            source_module: 'platform',
+            module: dataKey,
+            content: String(name) + (value ? ' — ' + value : '')
+        };
+        const { data: existing } = await supabase.from('ai_facts')
+            .select('id').eq('entity_slug', slug).eq('fact_key', factKey).maybeSingle();
+        if (existing) await supabase.from('ai_facts').update(row).eq('id', existing.id);
+        else await supabase.from('ai_facts').insert(row);
+    } catch (e) { console.error('[rag] fact upsert failed:', e.message); }
+}
+
 // insert a record for a dataKey → { id }
 async function insertRecord(slug, dataKey, record) {
+    ragFact(slug, dataKey, record).catch(function () {});
     if (isBookingKey(dataKey)) {
         const { data, error } = await supabase.from('bookings').insert(toBookingRow(slug, record)).select('id').single();
         if (error) throw error;
@@ -367,6 +400,7 @@ async function readRecords(slug, dataKey, limit) {
 
 // update / delete a record by id within its stream
 async function updateRecord(slug, dataKey, id, record) {
+    ragFact(slug, dataKey, record).catch(function () {});
     if (isBookingKey(dataKey)) {
         const row = toBookingRow(slug, record); delete row.entity_slug;
         await supabase.from('bookings').update(row).eq('id', id).eq('entity_slug', slug);
