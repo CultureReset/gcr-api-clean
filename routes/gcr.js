@@ -134,6 +134,45 @@ async function buildFullEntity(slug) {
       .map(i => ({ ...i, tiers: sectionTiers.filter(t => t.section_item_id === i.id) })),
   }));
 
+  // Universal offerings (offerings + offering_prices) — trips, rentals, tours,
+  // storage tiers, ride tickets. Merged into the same sections shape the page
+  // already renders, grouped by offerings.section (fallback: kind).
+  const [offeringsRes, offeringPricesRes] = await Promise.all([
+    db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order').eq('entity_slug', slug).eq('active', true).order('sort_order'),
+    db.from('offering_prices').select('id,offering_id,label,price,age_min,age_max,season,duration_label,sort_order').eq('entity_slug', slug).order('sort_order'),
+  ]);
+  const offeringRows = offeringsRes.data || [];
+  const offeringPrices = offeringPricesRes.data || [];
+  if (offeringRows.length) {
+    const groups = new Map();
+    for (const o of offeringRows) {
+      const key = o.section || ({ trip: 'Trips & Charters', rental: 'Rentals', tour: 'Tours', service: 'Services', storage: 'Storage', ticket: 'Tickets' }[o.kind] || 'Offerings');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(o);
+    }
+    let synthId = -1;
+    for (const [name, items] of groups) {
+      flexSections.push({
+        id: synthId--, module_key: 'offerings', section_type: 'offerings',
+        section_name: name, subtitle: null, icon: null, layout: 'list',
+        sort_order: 900 + flexSections.length, is_active: true,
+        items: items.map(o => ({
+          id: o.id, section_id: null,
+          item_name: o.name, description: o.description,
+          duration: o.duration_minutes ? (o.duration_minutes % 60 === 0 ? `${o.duration_minutes / 60} hr` : `${o.duration_minutes} min`) : null,
+          price_from: o.price_from, price_to: null,
+          price_label: [o.unit, o.fee_note].filter(Boolean).join(' • ') || null,
+          icon: null, sort_order: o.sort_order ?? 0,
+          metadata: { kind: o.kind, capacity: o.capacity, event_date: o.event_date },
+          tiers: offeringPrices.filter(p => p.offering_id === o.id).map(p => ({
+            id: p.id, label: [p.label, p.duration_label, p.season && p.season !== 'regular' ? p.season : null].filter(Boolean).join(' — '),
+            price: p.price, age_min: p.age_min, age_max: p.age_max, sort_order: p.sort_order ?? 0,
+          })),
+        })),
+      });
+    }
+  }
+
   const modulesData = modulesRes.data || [];
   // Full module list for the response (control panel: enabled + order + settings)
   const modulesFull = modulesData
@@ -280,6 +319,7 @@ async function buildFullEntity(slug) {
     hero_image_url: normalizeImageUrl(entity.hero_image_url),
     // Flexible offerings (charters, rentals, tours, services) — universal
     sections: flexSections,
+    offerings: offeringRows.map(o => ({ ...o, prices: offeringPrices.filter(p => p.offering_id === o.id) })),
     // Core
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
