@@ -137,12 +137,37 @@ async function buildFullEntity(slug) {
   // Universal offerings (offerings + offering_prices) — trips, rentals, tours,
   // storage tiers, ride tickets. Merged into the same sections shape the page
   // already renders, grouped by offerings.section (fallback: kind).
-  const [offeringsRes, offeringPricesRes] = await Promise.all([
+  const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes] = await Promise.all([
     db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order').eq('entity_slug', slug).eq('active', true).order('sort_order'),
     db.from('offering_prices').select('id,offering_id,label,price,age_min,age_max,season,duration_label,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_amenities').select('id,amenity,category,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('marina_details').select('*').eq('entity_slug', slug).maybeSingle(),
   ]);
   const offeringRows = offeringsRes.data || [];
   const offeringPrices = offeringPricesRes.data || [];
+  const marinaDetails = marinaRes?.data || null;
+  if (marinaDetails) {
+    const md = marinaDetails;
+    const facts = [
+      md.total_slips && { name: 'Boat slips', desc: `${md.total_slips} slips${md.transient_slips ? ` (${md.transient_slips} transient)` : ''}` },
+      md.max_vessel_length_ft && { name: 'Max vessel length', desc: `${md.max_vessel_length_ft} ft` },
+      (md.has_gas || md.has_diesel) && { name: 'Fuel dock', desc: [md.has_gas && 'gas', md.has_diesel && 'diesel'].filter(Boolean).join(' + ') },
+      md.has_pump_out && { name: 'Pump-out', desc: 'available' },
+      md.has_dry_storage && { name: 'Dry storage', desc: 'available' },
+      (md.has_live_bait || md.has_frozen_bait || md.has_tackle) && { name: 'Bait & tackle', desc: [md.has_live_bait && 'live bait', md.has_frozen_bait && 'frozen bait', md.has_tackle && 'tackle'].filter(Boolean).join(', ') },
+      md.vhf_channel && { name: 'VHF channel', desc: String(md.vhf_channel) },
+      md.daily_rate_per_ft && { name: 'Daily rate', desc: `$${md.daily_rate_per_ft}/ft` },
+      md.notes && { name: 'Notes', desc: md.notes },
+    ].filter(Boolean);
+    if (facts.length) {
+      flexSections.push({
+        id: -1000, module_key: 'marina', section_type: 'marina',
+        section_name: 'Marina', subtitle: null, icon: null, layout: 'list',
+        sort_order: 950, is_active: true,
+        items: facts.map((f, i) => ({ id: -(1001 + i), section_id: null, item_name: f.name, description: f.desc, duration: null, price_from: null, price_to: null, price_label: null, icon: null, sort_order: i, metadata: {}, tiers: [] })),
+      });
+    }
+  }
   if (offeringRows.length) {
     const groups = new Map();
     for (const o of offeringRows) {
@@ -197,7 +222,7 @@ async function buildFullEntity(slug) {
   const [dataFood, dataActivity, dataStay, dataService, dataShop, dataPark] = await Promise.all([
     (isFood || modules.has('menu'))       ? false : anyRows('menu_sections', 'drink_sections', 'entity_specials'),
     (isActivity || modules.has('activity')) ? false : anyRows('activity_schedules', 'whats_included', 'what_to_bring'),
-    (isStay || modules.has('stay'))       ? false : anyRows('property_details', 'room_types'),
+    (isStay || modules.has('stay'))       ? false : anyRows('property_details', 'room_types', 'bookable_resources'),
     (isService || modules.has('services')) ? false : anyRows('service_menu', 'class_schedule'),
     (isShopping || modules.has('shop'))   ? false : anyRows('products'),
     (isPark || modules.has('park'))       ? false : anyRows('facilities', 'spot_rules'),
@@ -324,7 +349,18 @@ async function buildFullEntity(slug) {
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
     photos: normalizedPhotos,
-    tags: tags.data || [],
+    // entity_tags is canonical; entity_amenities rows (import strays) merge in
+    // so amenity data displays no matter which table it landed in
+    tags: (() => {
+      const base = tags.data || [];
+      const seen = new Set(base.map(t => `${(t.tag_category || '')}|${(t.tag_name || '').toLowerCase()}`));
+      for (const a of (amenityRowsRes?.data || [])) {
+        const key = `amenity|${(a.amenity || '').toLowerCase()}`;
+        if (a.amenity && !seen.has(key)) { seen.add(key); base.push({ id: `am-${a.id}`, entity_slug: slug, tag_name: a.amenity, tag_category: 'amenity' }); }
+      }
+      return base;
+    })(),
+    marina_details: marinaDetails,
     events: (events.data || []).map(ev => ({
       ...ev,
       artist_slug: ev.artist?.slug || null,
