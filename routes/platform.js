@@ -358,7 +358,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                     if (process.env.REVIEW_BASE_URL) {
                         link = process.env.REVIEW_BASE_URL.replace(/\/$/, '') + '/r/' + (biz.slug || '') + '?t=' + req.params.id;
                     } else {
-                        const base = process.env.PUBLIC_PAGE_BASE_URL || 'https://cybercheck-login.vercel.app';
+                        const base = process.env.PUBLIC_PAGE_BASE_URL || 'https://gulfcoastradar.com';
                         link = base + '/p/' + (biz.slug || '');
                     }
                     msg = '[' + bizName + '] Thanks for coming out' + (record.customer || record.name ? ', ' + (record.customer || record.name) : '') + '! How was it? Leave a quick review: ' + link + ' — it really helps us.';
