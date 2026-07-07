@@ -1182,15 +1182,22 @@ router.get('/page/:slug', async (req, res) => {
 
         // payment config comes from the installed payments app, if any
         let payment = null;
+        let seo = null;
         Object.keys(installed).forEach(function (id) {
             const inst = installed[id];
             const man = inst && inst.manifest;
+            if (!man || inst.enabled === false) return;
             // any app can provide the payment config (stock Payments app does)
-            if (man && (man.provides === 'payments' || man.id === 'payments') && inst.enabled !== false) {
+            if (man.provides === 'payments' || man.id === 'payments') {
                 const cfg = inst.config || {};
                 if (cfg.mode && cfg.mode !== 'No payment (pay on site)') {
                     payment = { mode: cfg.mode, deposit: parseFloat(cfg.deposit) || 0 };
                 }
+            }
+            // any app can provide SEO config (stock SEO app does) — the
+            // public page turns it into meta tags + structured data
+            if (man.provides === 'seo' || man.id === 'seo') {
+                seo = inst.config || {};
             }
         });
 
@@ -1198,6 +1205,7 @@ router.get('/page/:slug', async (req, res) => {
             business: state.business,
             site_id: state.site_id,
             payment: payment,
+            seo: seo,
             blocks: blocks,
             data: publicData
         });
