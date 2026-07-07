@@ -2874,6 +2874,144 @@ router.put('/ai-config/:task', authRequired, async (req, res) => {
   res.json({ success: true, config: data })
 })
 
+// ── PHOTO REPAIR — heal phantom entity_photos rows ────────────────────────────
+// Legacy import runs (June 3–6, predates this session) wrote entity_photos.url
+// pointing at predictable Supabase Storage paths (.../entity-photos/<slug>/photo_01.jpg)
+// for ~1,266 businesses without ever uploading the file — the row exists, the
+// URL looks real, but storage.objects has nothing there, so every image 404s
+// and profiles fall back to the emoji hero. 99% of those businesses already
+// carry real Google Places photo references in entity.google_places_data —
+// this endpoint fetches those (using the same GOOGLE_PLACES_API_KEY the
+// find-place-ids.js / fix-wolf-bay-full.js scripts already use) and uploads
+// them into storage at the EXACT path each phantom row already references, so
+// the existing URL heals with no other row changes. Idempotent + resumable:
+// repaired entities drop out of the phantom-detection query on their own, so
+// calling this repeatedly with no state tracking converges to zero remaining.
+// Storage paths follow <slug>/<filename> (one level), so per-entity existence
+// checks use the real Storage API (list() with a folder prefix) rather than
+// querying storage.objects directly — PostgREST doesn't expose the storage
+// schema, only the dedicated Storage endpoint does.
+async function candidateRowsBySlug(db, slugFilter) {
+  let q = db
+    .from('entity_photos')
+    .select('id,entity_slug,url,sort_order')
+    .like('url', '%/entity-photos/%')
+    .order('entity_slug').order('sort_order');
+  if (slugFilter) q = q.in('entity_slug', slugFilter);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+
+  const pathOf = (url) => decodeURIComponent(url.split('/entity-photos/')[1] || '');
+  const bySlug = new Map();
+  for (const p of data || []) {
+    const path = pathOf(p.url);
+    const filename = path.split('/').slice(1).join('/');
+    if (!path || !filename) continue;
+    if (!bySlug.has(p.entity_slug)) bySlug.set(p.entity_slug, []);
+    bySlug.get(p.entity_slug).push({ ...p, path, filename });
+  }
+  return bySlug;
+}
+
+// Confirms which candidate rows for ONE slug are actually phantom (storage
+// list() only checked for the slugs we're about to process, not all ~1,266 —
+// checking every slug up front would be 1,266 Storage API calls per status
+// call, too slow for a status probe).
+async function phantomRowsForSlug(db, slug, rows) {
+  const { data: existing, error } = await db.storage.from('entity-photos').list(slug, { limit: 1000 });
+  if (error) throw new Error(`storage.list(${slug}) failed: ` + error.message);
+  const realFilenames = new Set((existing || []).map(o => o.name));
+  return rows.filter(r => !realFilenames.has(r.filename));
+}
+
+router.get('/repair-photos/status', authRequired, async (req, res) => {
+  try {
+    const bySlug = await candidateRowsBySlug(getDb());
+    res.json({
+      note: 'These are pattern-matched candidates (URL points at our bucket) — not yet confirmed against Storage, which POST /api/admin/repair-photos checks per batch as it processes. Call POST repeatedly (default 8 entities/call) until it reports done:true.',
+      candidate_entities: bySlug.size,
+      candidate_photo_rows: [...bySlug.values()].reduce((s, a) => s + a.length, 0),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/repair-photos', authRequired, async (req, res) => {
+  const db = getDb();
+  const KEY = process.env.GOOGLE_PLACES_API_KEY;
+  if (!KEY) return res.status(500).json({ error: 'GOOGLE_PLACES_API_KEY not configured' });
+
+  const entityLimit = Math.min(parseInt(req.body?.limit) || 8, 20);
+  const startAfter = req.body?.after_slug || null; // pagination cursor for large runs
+
+  try {
+    const allCandidates = await candidateRowsBySlug(db);
+    let candidateSlugs = [...allCandidates.keys()].sort();
+    if (startAfter) candidateSlugs = candidateSlugs.filter(s => s > startAfter);
+    const batchSlugs = candidateSlugs.slice(0, entityLimit);
+
+    const { data: entities } = batchSlugs.length
+      ? await db.from('entity').select('slug,google_places_data').in('slug', batchSlugs)
+      : { data: [] };
+    const placesBySlug = new Map((entities || []).map(e => [e.slug, e.google_places_data]));
+
+    let repaired = 0, deleted = 0, alreadyOk = 0;
+    const errors = [];
+
+    for (const slug of batchSlugs) {
+      const candidateRows = allCandidates.get(slug);
+      let rows;
+      try {
+        rows = await phantomRowsForSlug(db, slug, candidateRows);
+      } catch (e) {
+        errors.push({ slug, reason: e.message });
+        continue;
+      }
+      alreadyOk += candidateRows.length - rows.length;
+      const photos = placesBySlug.get(slug)?.photos || [];
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const gphoto = photos[i];
+        if (!gphoto?.name) {
+          // No real photo available for this row — delete rather than leave a
+          // permanently-broken image tile on the profile.
+          const { error: delErr } = await db.from('entity_photos').delete().eq('id', row.id);
+          if (delErr) errors.push({ slug, id: row.id, reason: 'delete failed: ' + delErr.message });
+          else deleted++;
+          continue;
+        }
+        try {
+          const mediaUrl = `https://places.googleapis.com/v1/${gphoto.name}/media?maxWidthPx=1600&key=${KEY}`;
+          const r = await fetch(mediaUrl, { redirect: 'follow' });
+          if (!r.ok) { errors.push({ slug, id: row.id, reason: `places fetch ${r.status}` }); continue; }
+          const buf = Buffer.from(await r.arrayBuffer());
+          if (buf.length < 500) { errors.push({ slug, id: row.id, reason: 'empty response' }); continue; }
+          const contentType = r.headers.get('content-type') || 'image/jpeg';
+          const { error: upErr } = await db.storage.from('entity-photos').upload(row.path, buf, { contentType, upsert: true });
+          if (upErr) { errors.push({ slug, id: row.id, reason: 'upload failed: ' + upErr.message }); continue; }
+          repaired++;
+        } catch (e) {
+          errors.push({ slug, id: row.id, reason: String(e.message || e).slice(0, 150) });
+        }
+      }
+    }
+
+    res.json({
+      entities_processed: batchSlugs.length,
+      photos_repaired: repaired,
+      rows_already_had_real_file: alreadyOk,
+      unrecoverable_rows_deleted: deleted,
+      candidate_entities_remaining: candidateSlugs.length - batchSlugs.length,
+      next_after_slug: batchSlugs.length ? batchSlugs[batchSlugs.length - 1] : null,
+      errors: errors.slice(0, 30),
+      done: candidateSlugs.length <= entityLimit,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
 
 // ── SOCIAL POSTS — paste FB/IG URLs, each becomes a card ──────────────────────
