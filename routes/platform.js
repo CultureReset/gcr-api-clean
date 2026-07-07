@@ -267,6 +267,111 @@ router.delete('/records/:dataKey/:id', authRequired, async (req, res) => {
     }
 });
 
+// ── Availability: blocked dates + capacity, enforced server-side ──
+async function getAvailability(siteId, installed, dataKey, month) {
+    // blocked dates come from the availability app's own data stream
+    const { data: blockRecs } = await supabase.from('app_records')
+        .select('record').eq('site_id', siteId).eq('data_key', 'blocks').limit(1000);
+    const blocked = (blockRecs || [])
+        .map(function (r) { return r.record || {}; })
+        .filter(function (r) { return r.kind === 'blocked' && r.date; })
+        .map(function (r) { return r.date; });
+
+    // capacity per date comes from the availability app's config
+    let capacity = null;
+    Object.keys(installed || {}).forEach(function (id) {
+        const inst = installed[id];
+        if (inst && inst.manifest && inst.manifest.dataKey === 'blocks' && inst.config && inst.config.capacity) {
+            const c = parseInt(inst.config.capacity, 10);
+            if (c > 0) capacity = c;
+        }
+    });
+
+    let full = [];
+    if (capacity && dataKey) {
+        const { data: recs } = await supabase.from('app_records')
+            .select('record').eq('site_id', siteId).eq('data_key', dataKey).limit(2000);
+        const counts = {};
+        (recs || []).forEach(function (r) {
+            const rec = r.record || {};
+            if (!rec.date || rec.status === 'cancelled' || rec.status === 'declined') return;
+            counts[rec.date] = (counts[rec.date] || 0) + 1;
+        });
+        full = Object.keys(counts).filter(function (d) { return counts[d] >= capacity; });
+    }
+    if (month) {
+        blocked.filter(function (d) { return String(d).slice(0, 7) === month; });
+        full = full.filter(function (d) { return String(d).slice(0, 7) === month; });
+    }
+    return { blocked: blocked, full: full, capacity: capacity };
+}
+
+router.get('/page/:slug/availability', async (req, res) => {
+    try {
+        const { data: state } = await supabase.from('platform_state')
+            .select('site_id, installed').eq('business->>slug', req.params.slug).maybeSingle();
+        if (!state) return res.status(404).json({ error: 'Page not found' });
+        let dataKey = null;
+        const inst = (state.installed || {})[req.query.app];
+        if (inst && inst.manifest) dataKey = inst.manifest.dataKey;
+        const avail = await getAvailability(state.site_id, state.installed, dataKey, req.query.month);
+        res.json(avail);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── Owner one-tap status change: confirm / decline / complete ──
+// Texts the customer automatically; "completed" asks for a review
+// (the authentic-review loop: tied to a real transaction).
+router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
+    try {
+        const status = String(req.body.status || '');
+        if (!status) return res.status(400).json({ error: 'status required' });
+        const { data: row } = await supabase.from('app_records')
+            .select('record').eq('id', req.params.id).eq('site_id', req.siteId).maybeSingle();
+        if (!row) return res.status(404).json({ error: 'Not found' });
+
+        const record = row.record || {};
+        record.status = status;
+        await supabase.from('app_records')
+            .update({ record: record, updated_at: new Date().toISOString() })
+            .eq('id', req.params.id).eq('site_id', req.siteId);
+
+        // notify the customer
+        const phone = record.phone || record.customer_phone;
+        if (phone) {
+            try {
+                const { data: st } = await supabase.from('platform_state')
+                    .select('business').eq('site_id', req.siteId).maybeSingle();
+                const biz = (st && st.business) || {};
+                const bizName = biz.name || 'the business';
+                const { sendSms } = require('../utils/sms');
+                let msg = null;
+                if (status === 'confirmed') msg = '[' + bizName + '] You\'re confirmed' + (record.date ? ' for ' + record.date : '') + (record.time ? ' at ' + record.time : '') + '. See you then!';
+                else if (status === 'declined' || status === 'cancelled') msg = '[' + bizName + '] Sorry — we couldn\'t take your request' + (record.date ? ' for ' + record.date : '') + '. Reply here and we\'ll find another time.';
+                else if (status === 'completed') {
+                    // Authentic review: the link carries the transaction record id,
+                    // so the standalone reviews platform (CyberCheck Reviews) can
+                    // verify this review came from a real, completed purchase.
+                    let link;
+                    if (process.env.REVIEW_BASE_URL) {
+                        link = process.env.REVIEW_BASE_URL.replace(/\/$/, '') + '/r/' + (biz.slug || '') + '?t=' + req.params.id;
+                    } else {
+                        const base = process.env.PUBLIC_PAGE_BASE_URL || 'https://cybercheck-login.vercel.app';
+                        link = base + '/p/' + (biz.slug || '');
+                    }
+                    msg = '[' + bizName + '] Thanks for coming out' + (record.customer || record.name ? ', ' + (record.customer || record.name) : '') + '! How was it? Leave a quick review: ' + link + ' — it really helps us.';
+                }
+                if (msg) await sendSms(phone, msg, req.siteId, 'status_' + status, req.params.id);
+            } catch (e) { console.error('status sms failed:', e.message); }
+        }
+        res.json({ success: true, status: status });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ============================================================
 // PUBLIC PAGE — one URL per business, rendered from installed blocks
 // ============================================================
@@ -316,12 +421,28 @@ router.get('/page/:slug', async (req, res) => {
                 url: cfg.url || null,
                 dataKey: man.dataKey || null,
                 publicData: !!man.publicData,
+                checkout: !!man.checkout,
                 fields: (man.fields || []).filter(function (f) { return f.key !== 'status'; })
             };
         });
 
+        // payment config comes from the installed payments app, if any
+        let payment = null;
+        Object.keys(installed).forEach(function (id) {
+            const inst = installed[id];
+            const man = inst && inst.manifest;
+            if (man && man.id === 'payments' && inst.enabled !== false) {
+                const cfg = inst.config || {};
+                if (cfg.mode && cfg.mode !== 'No payment (pay on site)') {
+                    payment = { mode: cfg.mode, deposit: parseFloat(cfg.deposit) || 0 };
+                }
+            }
+        });
+
         res.json({
             business: state.business,
+            site_id: state.site_id,
+            payment: payment,
             blocks: blocks,
             data: publicData
         });
@@ -351,6 +472,19 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         });
         record.source = 'public_page';
         record.status = record.status || 'pending';
+        if (req.body.payment_intent_id) record.payment_id = String(req.body.payment_intent_id).slice(0, 100);
+        if (req.body.amount_paid) record.amount_paid = String(req.body.amount_paid).slice(0, 20);
+
+        // availability enforcement: no bookings on blocked or full dates
+        if (record.date) {
+            const avail = await getAvailability(state.site_id, state.installed, inst.manifest.dataKey, null);
+            if (avail.blocked.indexOf(record.date) !== -1) {
+                return res.status(409).json({ error: 'That date is unavailable — please pick another.' });
+            }
+            if (avail.full.indexOf(record.date) !== -1) {
+                return res.status(409).json({ error: 'That date is fully booked — please pick another.' });
+            }
+        }
 
         const dataKey = inst.manifest.dataKey;
         const { error } = await supabase.from('app_records')
