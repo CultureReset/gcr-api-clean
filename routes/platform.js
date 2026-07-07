@@ -355,13 +355,8 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                     // Authentic review: the link carries the transaction record id,
                     // so the standalone reviews platform (CyberCheck Reviews) can
                     // verify this review came from a real, completed purchase.
-                    let link;
-                    if (process.env.REVIEW_BASE_URL) {
-                        link = process.env.REVIEW_BASE_URL.replace(/\/$/, '') + '/r/' + (biz.slug || '') + '?t=' + req.params.id;
-                    } else {
-                        const base = process.env.PUBLIC_PAGE_BASE_URL || 'https://gulfcoastradar.com';
-                        link = base + '/p/' + (biz.slug || '');
-                    }
+                    const rbase = (process.env.REVIEW_BASE_URL || process.env.PUBLIC_PAGE_BASE_URL || 'https://gulfcoastradar.com').replace(/\/$/, '');
+                    const link = rbase + '/r/' + (biz.slug || '') + '?t=' + req.params.id;
                     msg = '[' + bizName + '] Thanks for coming out' + (record.customer || record.name ? ', ' + (record.customer || record.name) : '') + '! How was it? Leave a quick review: ' + link + ' — it really helps us.';
                 }
                 if (msg) await sendSms(phone, msg, req.siteId, 'status_' + status, req.params.id);
@@ -418,7 +413,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
 // bookings, converted referrals, approved videos. Redemptions are
 // business-funded offers. Points are credits, never cash.
 // ============================================================
-const POINT_DEFAULTS = { booking_completed: 100, referral: 200, video: 100 };
+const POINT_DEFAULTS = { booking_completed: 100, referral: 200, video: 100, review: 50 };
 
 async function platformAward(userId, reason, slug) {
     if (!userId || !reason) return 0;
@@ -645,6 +640,119 @@ router.get('/u/:code', async (req, res) => {
             }).filter(function (b) { return b.slug; });
         }
         res.json({ name: String(prof.name || 'A Gulf Coast local').split(' ')[0], ref_code: prof.ref_code, businesses: businesses });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============================================================
+// CYBERCHECK REVIEWS — the standalone verified review engine.
+// A review token IS a completed transaction record id: proof the
+// reviewer actually bought the thing. Reward honest feedback,
+// never positive sentiment — points issue for submitting at all.
+// Reviews land in the business's own 'reviews' stream, so they show
+// in their dashboard and on their smart page automatically.
+// ============================================================
+
+// Validate a token → what the review form needs (no private data)
+router.get('/review-token/:id', async (req, res) => {
+    try {
+        const { data: b } = await supabase.from('app_records')
+            .select('id, site_id, data_key, record').eq('id', req.params.id).maybeSingle();
+        if (!b || (b.record || {}).status !== 'completed') {
+            return res.status(404).json({ valid: false, error: 'This review link is not valid.' });
+        }
+        // one review per transaction
+        const { data: existing } = await supabase.from('app_records')
+            .select('id').eq('site_id', b.site_id).eq('data_key', 'reviews')
+            .eq('record->>booking_id', b.id).maybeSingle();
+        if (existing) return res.status(409).json({ valid: false, error: 'A review was already left for this booking — thank you!' });
+
+        const { data: st } = await supabase.from('platform_state')
+            .select('business').eq('site_id', b.site_id).maybeSingle();
+        const biz = (st && st.business) || {};
+        const rec = b.record || {};
+        res.json({
+            valid: true,
+            business: { name: biz.name || '', slug: biz.slug || '', emoji: biz.emoji || '🏪', accent: biz.accent || '#22c3a6' },
+            title: rec.service || rec.trip || rec.boat || rec.session || rec.item || 'your visit',
+            date: rec.date || null,
+            reviewer: String(rec.customer || rec.name || '').split(' ')[0] || '',
+            badge: 'Verified Booking'
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Submit a verified review
+router.post('/reviews', async (req, res) => {
+    try {
+        const { token, stars, text, name } = req.body;
+        const rating = parseInt(stars, 10);
+        if (!token || !rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ error: 'A rating between 1 and 5 is required.' });
+        }
+        const { data: b } = await supabase.from('app_records')
+            .select('id, site_id, record').eq('id', token).maybeSingle();
+        if (!b || (b.record || {}).status !== 'completed') {
+            return res.status(404).json({ error: 'This review link is not valid.' });
+        }
+        const { data: existing } = await supabase.from('app_records')
+            .select('id').eq('site_id', b.site_id).eq('data_key', 'reviews')
+            .eq('record->>booking_id', b.id).maybeSingle();
+        if (existing) return res.status(409).json({ error: 'A review was already left for this booking.' });
+
+        const rec = b.record || {};
+        const reviewerName = String(name || rec.customer || rec.name || 'Verified guest').slice(0, 80);
+        await supabase.from('app_records').insert({
+            site_id: b.site_id, data_key: 'reviews',
+            record: {
+                name: reviewerName,
+                stars: rating,
+                text: String(text || '').slice(0, 2000),
+                badge: 'Verified Booking',
+                booking_id: b.id,
+                source: 'cybercheck_reviews'
+            }
+        });
+
+        // honest feedback earns points — any star count, same reward
+        let pointsAwarded = 0;
+        const { data: st } = await supabase.from('platform_state')
+            .select('business').eq('site_id', b.site_id).maybeSingle();
+        const slug = (st && st.business && st.business.slug) || null;
+        const reviewer = await touristByPhone(rec.phone || rec.customer_phone);
+        if (reviewer) pointsAwarded = await platformAward(reviewer.user_id, 'review', slug);
+
+        res.json({ success: true, badge: 'Verified Booking', points: pointsAwarded });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Public review wall for a business (embeddable anywhere)
+router.get('/reviews/:slug', async (req, res) => {
+    try {
+        const { data: state } = await supabase.from('platform_state')
+            .select('site_id, business').eq('business->>slug', req.params.slug).maybeSingle();
+        if (!state) return res.status(404).json({ error: 'Not found' });
+        const { data: rows } = await supabase.from('app_records')
+            .select('record, created_at').eq('site_id', state.site_id).eq('data_key', 'reviews')
+            .order('created_at', { ascending: false }).limit(200);
+        const reviews = (rows || []).map(function (r) {
+            const rec = r.record || {};
+            return {
+                name: rec.name || 'Guest',
+                stars: parseInt(rec.stars, 10) || 0,
+                text: rec.text || '',
+                badge: rec.badge || (rec.booking_id ? 'Verified Booking' : 'Unverified Opinion'),
+                when: r.created_at
+            };
+        }).filter(function (r) { return r.stars > 0; });
+        const avg = reviews.length ? reviews.reduce(function (s, r) { return s + r.stars; }, 0) / reviews.length : 0;
+        const biz = state.business || {};
+        res.json({
+            business: { name: biz.name || '', slug: biz.slug || '', emoji: biz.emoji || '🏪', tagline: biz.tagline || '', accent: biz.accent || '#22c3a6' },
+            average: Math.round(avg * 10) / 10,
+            count: reviews.length,
+            verified_count: reviews.filter(function (r) { return r.badge === 'Verified Booking'; }).length,
+            reviews: reviews
+        });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
