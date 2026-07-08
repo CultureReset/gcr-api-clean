@@ -167,15 +167,18 @@ router.post('/login', async (req, res) => {
         }
 
         // Admin users don't have a business — skip business check
+        // (fixed: this used to select site_id/type/status/domain/subdomain/plan,
+        // none of which exist on the real `businesses` table — every non-admin
+        // login 500'd before reaching the token step)
         let business = null;
         if (user.role !== 'admin') {
             const { data: biz } = await supabase
                 .from('businesses')
-                .select('site_id, name, type, status, domain, subdomain, plan')
-                .eq('site_id', user.site_id)
+                .select('id, slug, name, category, is_active')
+                .eq('id', user.site_id)
                 .single();
 
-            if (!biz || biz.status === 'suspended') {
+            if (!biz || !biz.is_active) {
                 return res.status(403).json({ error: 'Account is suspended' });
             }
             business = biz;
@@ -191,12 +194,10 @@ router.post('/login', async (req, res) => {
             token,
             user: { id: user.id, name: user.name, email: user.email, role: user.role },
             business: business ? {
-                site_id: business.site_id,
+                site_id: business.id,
+                slug: business.slug,
                 name: business.name,
-                type: business.type,
-                domain: business.domain,
-                subdomain: business.subdomain,
-                plan: business.plan
+                type: business.category
             } : null
         });
     } catch (err) {
