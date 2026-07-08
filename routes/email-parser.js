@@ -1018,6 +1018,51 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
  *         party_size, activity_name, table_number, seated_time, left_time,
  *         status, notes }
  */
+// Fire-and-forget confirmation email + (consent-gated) SMS for a GCR-direct
+// booking — never throws into the caller, a send failure must not fail the
+// booking itself.
+async function sendBookingConfirmations(entitySlug, parsed, customerEmail, customerPhone, optInId) {
+  try {
+    const { data: entity } = await db.from('entity').select('name').eq('slug', entitySlug).maybeSingle();
+    const businessName = entity?.name || 'Gulf Coast Radar';
+
+    if (customerEmail) {
+      const { sendEmail, gcrReservationConfirmationHtml } = require('../utils/email');
+      await sendEmail({
+        to: customerEmail,
+        subject: `Reservation requested — ${businessName}`,
+        html: gcrReservationConfirmationHtml({
+          business_name: businessName,
+          customer_name: parsed.customer_name || 'there',
+          date: parsed.event_date,
+          time_slot: parsed.event_time,
+          guest_count: parsed.party_size,
+          notes: parsed.notes,
+        }),
+      });
+    }
+
+    // SMS only goes out if this phone number has an explicit sms_consent=true
+    // opt-in on file — required until A2P 10DLC approval lands. sendSms()
+    // itself also relays to the owner instead of the customer when
+    // OWNER_RELAY_MODE is set, as an extra pre-approval safety net.
+    if (customerPhone && optInId) {
+      const { data: optIn } = await db.from('booking_opt_ins').select('sms_consent').eq('id', optInId).maybeSingle();
+      if (optIn?.sms_consent) {
+        const { sendSms } = require('../utils/sms');
+        await sendSms(
+          customerPhone,
+          `${businessName}: We received your reservation request for ${parsed.event_date}${parsed.event_time ? ' at ' + parsed.event_time : ''}. We'll text you when it's confirmed. Reply STOP to opt out.`,
+          entitySlug,
+          'booking_confirmation'
+        );
+      }
+    }
+  } catch (err) {
+    console.error('sendBookingConfirmations failed:', err.message);
+  }
+}
+
 router.post('/manual', async (req, res) => {
   try {
     const {
@@ -1025,6 +1070,7 @@ router.post('/manual', async (req, res) => {
       event_date, event_time, end_time, party_size,
       customer_name, activity_name, table_number, seated_time,
       left_time, confirmation_no, status = 'confirmed', notes,
+      customer_email, customer_phone, opt_in_id,
     } = req.body;
 
     if (!entity_slug || !event_date) {
@@ -1048,6 +1094,10 @@ router.post('/manual', async (req, res) => {
       .select('id').single();
 
     await upsertAvailability(entity_slug, parsed, logRow?.id);
+
+    if (customer_email || opt_in_id) {
+      sendBookingConfirmations(entity_slug, parsed, customer_email, customer_phone, opt_in_id).catch(() => {});
+    }
 
     res.json({ success: true, parsed, log_id: logRow?.id });
   } catch (err) {

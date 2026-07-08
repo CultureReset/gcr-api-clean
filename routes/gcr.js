@@ -2205,4 +2205,31 @@ router.post('/artist/:slug/request', async (req, res) => {
   }
 })
 
+// POST /api/gcr/opt-in — captures name/phone/consent BEFORE a customer enters
+// a booking/checkout flow (used ahead of A2P 10DLC approval — SMS only ever
+// actually goes out via sendSms()'s owner-relay mode until that's approved).
+// Also lets a business recover an abandoned checkout: if the customer bails
+// before paying, this row already has their name + phone to follow up with.
+router.post('/opt-in', async (req, res) => {
+  try {
+    const { entity_slug, click_id, name, phone, email, sms_consent, consent_text } = req.body || {}
+    if (!entity_slug || !phone) return res.status(400).json({ error: 'entity_slug and phone required' })
+
+    const { data, error } = await db.from('booking_opt_ins').insert({
+      entity_slug,
+      click_id: click_id || null,
+      name: name || null,
+      phone,
+      email: email || null,
+      sms_consent: !!sms_consent,
+      consent_text: consent_text || null,
+    }).select('id').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ opt_in_id: data.id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router;
