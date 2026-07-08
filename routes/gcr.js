@@ -1154,20 +1154,45 @@ router.post('/search', async (req, res) => {
     const orFilter = (...fields) =>
       keywords.flatMap(k => fields.map(f => `${f}.ilike.%${k}%`)).join(',');
 
-    // Search all tables in parallel — events only matched if query hits event/artist name directly
-    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents] = await Promise.all([
+    // Search all tables in parallel — events only matched if query hits event/artist name directly.
+    // entity_tags + entity_amenities are included so amenity/feature queries ("hot tub",
+    // "sauna", "lazy river", "waterfront", "live music") resolve against structured tag data,
+    // not just free-text name/description.
+    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections] = await Promise.all([
       db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
       db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('happy_hour_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('entity_specials').select('entity_slug').eq('is_active', true).or(orFilter('special_name', 'description', 'discount_text')),
       db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'artist_name')),
+      db.from('entity_tags').select('entity_slug').or(orFilter('tag_name')),
+      db.from('entity_amenities').select('entity_slug').or(orFilter('amenity')),
+      // FAQs — the Q&A backbone ("is there parking?", "do you have gluten-free?").
+      db.from('faqs').select('entity_slug').or(orFilter('question', 'answer')),
+      // Offerings + flexible section items — charters, tours, rental packages, service
+      // menus. These are displayed on profiles but were previously unsearchable.
+      db.from('offerings').select('entity_slug').eq('active', true).or(orFilter('name', 'description', 'section')),
+      db.from('entity_section_items').select('section_id').or(orFilter('item_name', 'description')),
+      // Menu/drink/happy-hour SECTION names — dietary and category labels often live at the
+      // section level ("Gluten Free Menu", "Vegan & Keto", "Vegetarian"), not on each item.
+      db.from('menu_sections').select('entity_slug').or(orFilter('section_name')),
+      db.from('drink_sections').select('entity_slug').or(orFilter('section_name')),
+      db.from('happy_hour_sections').select('entity_slug').or(orFilter('section_name')),
     ]);
 
     (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
-    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents].forEach(res =>
+    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings,
+     byMenuSections, byDrinkSections, byHHSections].forEach(res =>
       (res.data || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug))
     );
+    // Section items reference their entity via section_id → entity_sections.entity_slug
+    if ((bySectionItems.data || []).length) {
+      const secIds = [...new Set(bySectionItems.data.map(r => r.section_id).filter(Boolean))];
+      if (secIds.length) {
+        const { data: secOwners } = await db.from('entity_sections').select('entity_slug').in('id', secIds);
+        (secOwners || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug));
+      }
+    }
 
     if (!matchedSlugs.size) return res.json({ query: q, results: [], total: 0 });
 
@@ -1192,14 +1217,19 @@ router.post('/search', async (req, res) => {
 
     const slugList = (entities || []).map(e => e.slug);
 
-    // Fetch matched content + photos
-    const [menuMatches, drinkMatches, hhMatches, specialMatches, eventMatches, photoRows] = await Promise.all([
+    // Fetch matched content + photos + all tags/amenities for matched entities.
+    // Tags/amenities are fetched in full (not just keyword-matched) so the caller — a UI
+    // chip row or the AI concierge — sees the entity's complete feature set, and so
+    // multi-amenity queries can be scored by how many requested features an entity has.
+    const [menuMatches, drinkMatches, hhMatches, specialMatches, eventMatches, photoRows, tagRows, amenityRows] = await Promise.all([
       db.from('menu_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('happy_hour_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('entity_specials').select('entity_slug, special_name, description, discount_text').in('entity_slug', slugList).eq('is_active', true),
       db.from('entity_events').select('entity_slug, event_name, event_date, artist_name').in('entity_slug', slugList).eq('is_active', true).or(orFilter('event_name', 'artist_name')),
       db.from('entity_photos').select('entity_slug, url, sort_order').in('entity_slug', slugList).order('sort_order'),
+      db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugList),
+      db.from('entity_amenities').select('entity_slug, amenity, category').in('entity_slug', slugList),
     ]);
 
     // Build match maps — deduplicate menu items by name within each entity
@@ -1219,6 +1249,17 @@ router.post('/search', async (req, res) => {
     (eventMatches.data || []).forEach(r => { if (!eventMap[r.entity_slug]) eventMap[r.entity_slug] = []; eventMap[r.entity_slug].push(r); });
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
 
+    // Unified feature list per entity: amenity-category tags + entity_amenities rows, deduped.
+    // This is the field an amenity query ("hot tub", "sauna") scores against.
+    const featureMap = {};
+    const addFeature = (slug, label) => {
+      if (!slug || !label) return;
+      if (!featureMap[slug]) featureMap[slug] = new Set();
+      featureMap[slug].add(label);
+    };
+    (tagRows.data || []).forEach(r => addFeature(r.entity_slug, r.tag_name));
+    (amenityRows.data || []).forEach(r => addFeature(r.entity_slug, r.amenity));
+
     const score = (name, desc) => {
       const n = (name || '').toLowerCase(), d = (desc || '').toLowerCase();
       if (n === term) return 100;
@@ -1237,9 +1278,19 @@ router.post('/search', async (req, res) => {
       const events = (eventMap[e.slug] || []).filter(ev =>
         keywords.some(k => (ev.event_name || '').toLowerCase().includes(k) || (ev.artist_name || '').toLowerCase().includes(k))
       );
+      const features = [...(featureMap[e.slug] || [])];
+      // Which of the query keywords are satisfied by this entity's features — lets a
+      // multi-amenity request ("hot tub sauna lazy river") rank places that have MORE
+      // of the requested features higher, and tells the AI exactly which ones matched.
+      const matchedFeatures = features.filter(f => {
+        const fl = f.toLowerCase();
+        return keywords.some(k => fl.includes(k));
+      });
       const nameScore = score(e.name, e.subtitle);
       const itemScore = menuItems.length ? score(menuItems[0].item_name, menuItems[0].description) : 0;
-      const relevance = Math.max(nameScore, itemScore) + (e.rating || 0);
+      // Each matched feature adds a strong, cumulative boost so amenity coverage drives ranking.
+      const featureScore = matchedFeatures.length * 40;
+      const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0);
       const distance_miles = (userLat && userLng && e.latitude && e.longitude)
         ? haversine(userLat, userLng, e.latitude, e.longitude)
         : null;
@@ -1250,6 +1301,8 @@ router.post('/search', async (req, res) => {
         matched_menu_items: menuItems,
         matched_specials: specials,
         matched_events: events,
+        features,
+        matched_features: matchedFeatures,
         _relevance: relevance,
         distance_miles,
       };
