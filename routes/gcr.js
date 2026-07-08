@@ -2271,4 +2271,31 @@ router.post('/waiver/:slug/sign', async (req, res) => {
   }
 })
 
+// GET /api/gcr/lodging-search?q=... — condo/hotel typeahead, used by pickup/delivery
+// style service bookings (e.g. Gulf Coast Luggo) so a guest can pick their real
+// stay off the platform instead of typing a free-text address.
+router.get('/lodging-search', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim()
+    if (q.length < 2) return res.json([])
+
+    const { data, error } = await db
+      .from('entity')
+      .select('slug, name, city, address_line_1')
+      .in('entity_type', ['hotel', 'condo', 'vacation-rental'])
+      .eq('is_active', true)
+      .ilike('name', `%${q}%`)
+      .limit(8)
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data || [])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// NOTE: pickup/delivery-style bookings (luggage, transportation, etc.) go
+// through the broker at /api/transportation/request instead of a one-off
+// route here — see routes/transportation.js for the real dispatch flow.
+
 module.exports = router;

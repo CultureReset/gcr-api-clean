@@ -88,7 +88,8 @@ mount('/api/webhooks', () => require('./routes/webhooks'));
 mount('/api/availability', () => require('./routes/availability'));
 //mount('/api/boat-rental', () => require('./routes/boat-rental')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 //mount('/api/charter', () => require('./routes/charter')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
-//mount('/api/rides', () => require('./routes/rides')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
+//mount('/api/rides', () => require('./routes/rides')); // UNMOUNTED: backing tables don't exist in the live DB, and this used the legacy site_id convention. Superseded by /api/transportation below (entity_slug-keyed, real tables).
+mount('/api/transportation', () => require('./routes/transportation'));
 //mount('/api/photographer', () => require('./routes/photographer')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/integrations/fareharbor', () => require('./routes/fareharbor'));
 
