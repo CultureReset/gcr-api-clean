@@ -337,6 +337,15 @@ router.delete('/providers/:id', async (req, res) => {
   res.json({ success: true })
 })
 
+// GET /api/transportation/company/settings — current on/off state for this business
+router.get('/company/settings', async (req, res) => {
+  const entity = await resolveEntity(req)
+  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+  const { data, error } = await db.from('entity').select('slug, name, offers_transportation').eq('slug', entity.slug).maybeSingle()
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data || { offers_transportation: false })
+})
+
 // PATCH /api/transportation/company/settings — turn transportation brokering on/off for this business
 router.patch('/company/settings', async (req, res) => {
   const entity = await resolveEntity(req)
