@@ -956,14 +956,18 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
 
     // Fetch menus, specials, pricing, happy hour items in parallel
     const [menuSectionsRes, menuItemsRes, drinkSectionsRes, drinkItemsRes, specialsRes, pricingRes, hhSectionsRes, hhItemsRes, whatsIncludedRes, amenityTagsRes, amenitiesRes, faqsRes, offeringsRes] = await Promise.all([
-        slugs.length ? gcrDb.from('menu_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
-        slugs.length ? gcrDb.from('menu_items').select('section_id, name, description, price, is_available').eq('is_available', true) : { data: [] },
-        slugs.length ? gcrDb.from('drink_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
-        slugs.length ? gcrDb.from('drink_items').select('section_id, name, description, price').limit(2000) : { data: [] },
-        slugs.length ? gcrDb.from('entity_specials').select('entity_slug, title, description, price, days_active, is_active').in('entity_slug', slugs).eq('is_active', true) : { data: [] },
+        // NOTE: real columns are section_name / item_name / special_name — aliased back to
+        // the names this handler's downstream code expects. Previously these selected
+        // non-existent columns (name/title/price/days_active), so PostgREST errored and the
+        // concierge silently had NO menu, drink, happy-hour, or specials data at all.
+        slugs.length ? gcrDb.from('menu_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('menu_items').select('section_id, name:item_name, description, price, is_available').eq('is_available', true) : { data: [] },
+        slugs.length ? gcrDb.from('drink_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('drink_items').select('section_id, name:item_name, description, price').limit(2000) : { data: [] },
+        slugs.length ? gcrDb.from('entity_specials').select('entity_slug, title:special_name, description, discount_text, days, is_active').in('entity_slug', slugs).eq('is_active', true) : { data: [] },
         slugs.length ? gcrDb.from('pricing_items').select('entity_id, item_name, price, description, capacity_min, capacity_max, duration_minutes').limit(2000) : { data: [] },
-        slugs.length ? gcrDb.from('happy_hour_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
-        slugs.length ? gcrDb.from('happy_hour_items').select('section_id, name, description, price').limit(1000) : { data: [] },
+        slugs.length ? gcrDb.from('happy_hour_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('happy_hour_items').select('section_id, name:item_name, description, price').limit(1000) : { data: [] },
         slugs.length ? gcrDb.from('whats_included').select('entity_id, item').limit(2000) : { data: [] },
         // Amenity/feature tags — the structured data behind queries like "condo with a hot
         // tub, sauna, and lazy river". Without these the concierge only sees boolean flags.
@@ -1100,7 +1104,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         // Specials
         const specials = specialsBySlug[e.slug] || [];
         if (specials.length) {
-            lines += `\n  Specials: ${specials.map(s => `${s.title}${s.price ? ` ($${s.price})` : ''}${s.description ? ` — ${s.description.slice(0, 60)}` : ''}${s.days_active ? ` [${s.days_active}]` : ''}`).join(' | ')}`;
+            lines += `\n  Specials: ${specials.map(s => `${s.title}${s.discount_text ? ` (${s.discount_text})` : ''}${s.description ? ` — ${s.description.slice(0, 60)}` : ''}${s.days ? ` [${s.days}]` : ''}`).join(' | ')}`;
         }
 
         // Pricing items (activities/tours) with capacity and duration

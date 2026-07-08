@@ -1158,7 +1158,7 @@ router.post('/search', async (req, res) => {
     // entity_tags + entity_amenities are included so amenity/feature queries ("hot tub",
     // "sauna", "lazy river", "waterfront", "live music") resolve against structured tag data,
     // not just free-text name/description.
-    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems] = await Promise.all([
+    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections] = await Promise.all([
       db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
       db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
@@ -1173,10 +1173,16 @@ router.post('/search', async (req, res) => {
       // menus. These are displayed on profiles but were previously unsearchable.
       db.from('offerings').select('entity_slug').eq('active', true).or(orFilter('name', 'description', 'section')),
       db.from('entity_section_items').select('section_id').or(orFilter('item_name', 'description')),
+      // Menu/drink/happy-hour SECTION names — dietary and category labels often live at the
+      // section level ("Gluten Free Menu", "Vegan & Keto", "Vegetarian"), not on each item.
+      db.from('menu_sections').select('entity_slug').or(orFilter('section_name')),
+      db.from('drink_sections').select('entity_slug').or(orFilter('section_name')),
+      db.from('happy_hour_sections').select('entity_slug').or(orFilter('section_name')),
     ]);
 
     (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
-    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings].forEach(res =>
+    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings,
+     byMenuSections, byDrinkSections, byHHSections].forEach(res =>
       (res.data || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug))
     );
     // Section items reference their entity via section_id → entity_sections.entity_slug
