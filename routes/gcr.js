@@ -1158,7 +1158,7 @@ router.post('/search', async (req, res) => {
     // entity_tags + entity_amenities are included so amenity/feature queries ("hot tub",
     // "sauna", "lazy river", "waterfront", "live music") resolve against structured tag data,
     // not just free-text name/description.
-    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities] = await Promise.all([
+    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems] = await Promise.all([
       db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
       db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
@@ -1167,12 +1167,26 @@ router.post('/search', async (req, res) => {
       db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'artist_name')),
       db.from('entity_tags').select('entity_slug').or(orFilter('tag_name')),
       db.from('entity_amenities').select('entity_slug').or(orFilter('amenity')),
+      // FAQs — the Q&A backbone ("is there parking?", "do you have gluten-free?").
+      db.from('faqs').select('entity_slug').or(orFilter('question', 'answer')),
+      // Offerings + flexible section items — charters, tours, rental packages, service
+      // menus. These are displayed on profiles but were previously unsearchable.
+      db.from('offerings').select('entity_slug').eq('active', true).or(orFilter('name', 'description', 'section')),
+      db.from('entity_section_items').select('section_id').or(orFilter('item_name', 'description')),
     ]);
 
     (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
-    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities].forEach(res =>
+    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings].forEach(res =>
       (res.data || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug))
     );
+    // Section items reference their entity via section_id → entity_sections.entity_slug
+    if ((bySectionItems.data || []).length) {
+      const secIds = [...new Set(bySectionItems.data.map(r => r.section_id).filter(Boolean))];
+      if (secIds.length) {
+        const { data: secOwners } = await db.from('entity_sections').select('entity_slug').in('id', secIds);
+        (secOwners || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug));
+      }
+    }
 
     if (!matchedSlugs.size) return res.json({ query: q, results: [], total: 0 });
 
