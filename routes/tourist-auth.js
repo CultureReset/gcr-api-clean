@@ -74,7 +74,17 @@ async function touristAuth(req, res, next) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Backfill: Link all pre-signup activity to the new user (fire-and-forget)
+//
+// visitorId doubles as the Trip Swipe guest id: touristAuthOptional (in
+// tourist.js) lets a signed-out visitor write tourist_swipe_events/
+// tourist_seen/tourist_saves/user_preference_scores keyed directly by this
+// same UUID (none of those tables have a foreign key to auth.users, so
+// that's a safe write). Once they actually sign up, everything they did as
+// a guest — every swipe, every save — needs to end up under their real
+// account instead of orphaned under a UUID nobody will ever see again.
 // ─────────────────────────────────────────────────────────────────────────────
+const { _recomputeAllPreferences } = require('./tourist');
+
 async function backfillAnonymousActivity(userId, visitorId) {
     try {
         // Update all tables where visitor_id matches with the new user_id
@@ -91,7 +101,42 @@ async function backfillAnonymousActivity(userId, visitorId) {
                 .update({ user_id: userId })
                 .eq('visitor_id', visitorId)
                 .is('user_id', null),
+            // Neither table has a unique constraint that a guest UUID's rows
+            // could collide with on the real account, so a plain reassign is safe.
+            mainDb.from('tourist_swipe_events')
+                .update({ tourist_id: userId })
+                .eq('tourist_id', visitorId),
+            mainDb.from('tourist_seen')
+                .update({ tourist_id: userId })
+                .eq('tourist_id', visitorId),
         ]);
+
+        // tourist_saves has a (user_id, entity_slug) unique constraint, so a
+        // bulk reassign could collide if the real account already saved the
+        // same place from another device — upsert each row individually
+        // instead of one bulk UPDATE (which Postgres would abort entirely on
+        // the first conflict).
+        const { data: guestSaves } = await mainDb.from('tourist_saves').select('*').eq('user_id', visitorId);
+        for (const s of (guestSaves || [])) {
+            const { id, user_id, ...rest } = s;
+            await mainDb.from('tourist_saves')
+                .upsert({ ...rest, user_id: userId }, { onConflict: 'user_id,entity_slug' })
+                .catch(err => console.warn('[Backfill] save upsert failed:', err.message));
+        }
+        if (guestSaves?.length) {
+            await mainDb.from('tourist_saves').delete().eq('user_id', visitorId).catch(() => {});
+        }
+
+        // Preference scores aren't safe to merge row-by-row (the guest and
+        // the real account could each have a score for the same tag — adding
+        // them risks double-counting). Now that the swipes/saves live under
+        // the real user id, wipe any stray guest-keyed scores and rebuild
+        // clean from the now-unified history instead of trying to combine
+        // two conflicting sets of numbers.
+        await mainDb.from('user_preference_scores').delete().eq('user_id', visitorId).catch(() => {});
+        await _recomputeAllPreferences(userId).catch(err =>
+            console.warn('[Backfill] preference recompute failed:', err.message));
+
         console.log('[Backfill] Linked anonymous activity for', userId, 'from visitor', visitorId);
     } catch (err) {
         console.error('[Backfill error]', err.message);
@@ -243,6 +288,16 @@ router.post('/signin', async (req, res) => {
                 : 'Invalid email or password';
             return res.status(401).json({ error: msg });
         }
+        // A returning user can still have picked up new guest activity this
+        // session (e.g. browsed a few cards before tapping sign in) — merge
+        // it into their existing account the same as a fresh signup would.
+        const anonymous_visitor_id = req.body?.anonymous_visitor_id || null;
+        if (anonymous_visitor_id && d.user?.id) {
+            backfillAnonymousActivity(d.user.id, anonymous_visitor_id).catch(err => {
+                console.warn('Backfill failed for', d.user.id, ':', err.message);
+            });
+        }
+
         res.json({
             session: {
                 access_token: d.session?.access_token,
@@ -436,7 +491,7 @@ router.post('/phone-verify', async (req, res) => {
         return res.status(400).json({ error: 'idToken or code required' });
     }
 
-    const result = await establishPhoneSession(phone);
+    const result = await establishPhoneSession(phone, req.body?.anonymous_visitor_id || null);
     if (result.error) return res.status(result.status || 500).json({ error: result.error });
     res.json(result.body);
 });
@@ -444,7 +499,11 @@ router.post('/phone-verify', async (req, res) => {
 // Shared: given a proven phone, find/create the auth user, link the profile,
 // clear any pending OTP/token, sign in, and return the session response body.
 // Used by both /phone-verify (code path) and /phone-token (magic-link path).
-async function establishPhoneSession(phone) {
+// Phone signup is the main path Trip Swipe users actually take (the SMS
+// opt-in flow), so this needs the same anonymous_visitor_id handling the
+// email path already had — without it, phone signups would never get their
+// guest-era swipes/saves merged in.
+async function establishPhoneSession(phone, anonymous_visitor_id) {
     const sb = admin();
     const fakeEmail = `${phone.replace(/\+/, '')}@gcr.tourist`;
     // stable password derived from phone — same every time so sign-in always works
@@ -452,6 +511,7 @@ async function establishPhoneSession(phone) {
 
     // Find or create Supabase auth user
     let authUser = await getUserByEmail(fakeEmail);
+    const isNewUser = !authUser;
 
     if (!authUser) {
         const { data: created, error: createErr } = await sb.auth.admin.createUser({
@@ -466,24 +526,37 @@ async function establishPhoneSession(phone) {
 
     if (!authUser) return { error: 'Could not create account' };
 
-    // Upsert tourist_profiles keyed by user_id, linking phone
+    // Upsert tourist_profiles keyed by user_id, linking phone. Only stamp
+    // anonymous_visitor_id on first creation — a returning user re-verifying
+    // shouldn't have their original guest id overwritten by whatever guest id
+    // happens to be sitting in this browser's localStorage right now.
+    const profileRow = {
+        user_id:     authUser.id,
+        phone,
+        otp_code:    null,
+        otp_expires: null,
+        sms_opt_in:  true,
+        last_active: new Date().toISOString(),
+        updated_at:  new Date().toISOString(),
+    };
+    if (isNewUser && anonymous_visitor_id) profileRow.anonymous_visitor_id = anonymous_visitor_id;
+
     const { data: profile, error: upsertErr } = await mainDb
         .from('tourist_profiles')
-        .upsert({
-            user_id:     authUser.id,
-            phone,
-            otp_code:    null,
-            otp_expires: null,
-            sms_opt_in:  true,
-            last_active: new Date().toISOString(),
-            updated_at:  new Date().toISOString(),
-        }, { onConflict: 'user_id' })
+        .upsert(profileRow, { onConflict: 'user_id' })
         .select('user_id, phone, name, setup_complete')
         .single();
 
     if (upsertErr) {
         console.error('tourist_profiles upsert error:', upsertErr.message);
         return { error: 'Could not save profile' };
+    }
+
+    // Fire-and-forget: link all pre-signup guest activity to this user
+    if (anonymous_visitor_id) {
+        backfillAnonymousActivity(authUser.id, anonymous_visitor_id).catch(err => {
+            console.warn('Backfill failed for', authUser.id, ':', err.message);
+        });
     }
 
     // Clear OTP/token from tourist_otps now that it's been used
@@ -539,7 +612,7 @@ router.post('/phone-token', async (req, res) => {
     if (!row?.phone) return res.status(400).json({ error: 'This sign-in link is invalid or already used. Text us again for a new one.' });
     if (new Date(row.otp_expires) < new Date()) return res.status(400).json({ error: 'This sign-in link expired. Text us again for a new one.' });
 
-    const result = await establishPhoneSession(row.phone);
+    const result = await establishPhoneSession(row.phone, req.body?.anonymous_visitor_id || null);
     if (result.error) return res.status(result.status || 500).json({ error: result.error });
     res.json(result.body);
 });
