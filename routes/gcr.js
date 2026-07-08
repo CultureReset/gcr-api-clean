@@ -2232,4 +2232,43 @@ router.post('/opt-in', async (req, res) => {
   }
 })
 
+// POST /api/gcr/waiver/:slug/sign — clickwrap consent capture: checkbox PLUS
+// a typed full-name confirmation (signature_typed_name) that must match the
+// customer's name — stronger than a bare checkbox for "I didn't see it"
+// disputes, short of a drawn/DocuSign e-signature. Returns a waiver_id the
+// caller attaches to the booking so it's traceable to this exact signature.
+router.post('/waiver/:slug/sign', async (req, res) => {
+  try {
+    const { slug } = req.params
+    const { customer_name, customer_email, customer_phone, waiver_text, signature_typed_name } = req.body || {}
+    if (!customer_name) return res.status(400).json({ error: 'customer_name required' })
+    if (!waiver_text) return res.status(400).json({ error: 'waiver_text required' })
+    if (!signature_typed_name) return res.status(400).json({ error: 'signature_typed_name required' })
+    if (signature_typed_name.trim().toLowerCase() !== customer_name.trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Typed name must match your name exactly' })
+    }
+
+    const crypto = require('crypto')
+    const token = crypto.randomBytes(16).toString('hex')
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim()
+
+    const { data, error } = await db.from('waivers').insert({
+      entity_slug: slug,
+      customer_name,
+      customer_email: customer_email || null,
+      customer_phone: customer_phone || null,
+      waiver_text,
+      signature_typed_name,
+      signed_at: new Date().toISOString(),
+      ip_address: ip || null,
+      token,
+    }).select('id, token').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ waiver_id: data.id, token: data.token })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 module.exports = router;
