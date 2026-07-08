@@ -57,32 +57,39 @@ router.post('/signup', async (req, res) => {
 
         const authId = authData.user.id;
 
-        // Step 2: Generate subdomain from business name
-        const subdomain = businessName
+        // Step 2: Generate a unique slug from the business name — this is
+        // CyberCheck's own account (businesses/users tables), separate from
+        // Gulf Coast Radar's `entity` table. Signing up here does NOT create
+        // a GCR listing — that's a separate, optional claim step. A business
+        // can have a CyberCheck dashboard without ever being on GCR.
+        const baseSlug = businessName
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
 
-        const { data: subExists } = await supabase
+        const { data: slugExists } = await supabase
             .from('businesses')
-            .select('site_id')
-            .eq('subdomain', subdomain)
-            .single();
+            .select('id')
+            .eq('slug', baseSlug)
+            .maybeSingle();
 
-        const finalSubdomain = subExists ? `${subdomain}-${Date.now().toString(36)}` : subdomain;
+        const finalSlug = slugExists ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug;
 
         // Step 3: Hash password (kept for backend JWT login fallback)
         const passwordHash = await bcrypt.hash(password, 12);
 
-        // Step 4: Create business record (service key bypasses RLS)
+        // Step 4: Create business record — real schema (id/slug/name/category/
+        // phone/is_active), not the legacy site_id/type/subdomain/plan/status
+        // shape this used to assume, which doesn't exist on the live table.
         const { data: business, error: bizError } = await supabase
             .from('businesses')
             .insert({
+                slug: finalSlug,
                 name: businessName,
-                type: businessType,
-                subdomain: finalSubdomain,
-                plan: 'free',
-                status: 'active'
+                category: businessType,
+                phone: phone,
+                email: email.toLowerCase(),
+                is_active: true,
             })
             .select()
             .single();
@@ -92,12 +99,13 @@ router.post('/signup', async (req, res) => {
             return res.status(500).json({ error: 'Failed to create business: ' + bizError.message });
         }
 
-        // Step 5: Create user record linking Supabase Auth to business
+        // Step 5: Create user record linking Supabase Auth to business.
+        // users.site_id stores businesses.id (naming is legacy, value is real).
         const { data: user, error: userError } = await supabase
             .from('users')
             .insert({
                 auth_id: authId,
-                site_id: business.site_id,
+                site_id: business.id,
                 email: email.toLowerCase(),
                 name: name || businessName,
                 password_hash: passwordHash,
@@ -107,19 +115,20 @@ router.post('/signup', async (req, res) => {
             .single();
 
         if (userError) {
-            await supabase.from('businesses').delete().eq('site_id', business.site_id);
+            await supabase.from('businesses').delete().eq('id', business.id);
             await supabase.auth.admin.deleteUser(authId);
             return res.status(500).json({ error: 'Failed to create user: ' + userError.message });
         }
 
-        // Step 6: Create empty site_content row
-        const contentRow = { site_id: business.site_id, contact_email: email.toLowerCase() };
+        // Step 6: Create empty site_content row — this table's schema was
+        // already correct, no fix needed here.
+        const contentRow = { site_id: business.id, contact_email: email.toLowerCase() };
         if (phone) contentRow.contact_phone = phone;
         await supabase.from('site_content').insert(contentRow);
 
         // Step 7: Generate JWT (for backend API usage)
         const token = jwt.sign(
-            { userId: user.id, siteId: business.site_id, role: 'owner' },
+            { userId: user.id, siteId: business.id, role: 'owner' },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -128,10 +137,10 @@ router.post('/signup', async (req, res) => {
             token,
             user: { id: user.id, name: user.name, email: user.email, role: user.role },
             business: {
-                site_id: business.site_id,
+                site_id: business.id,
+                slug: business.slug,
                 name: business.name,
-                type: business.type,
-                subdomain: business.subdomain
+                type: business.category
             }
         });
     } catch (err) {

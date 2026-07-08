@@ -1790,6 +1790,40 @@ router.delete('/documents/:kind', async (req, res) => {
 });
 
 // ============================================
+// MENU EDITOR BRIDGE — lets a logged-in dashboard user deep-link straight into
+// menu-editor.html without re-entering the entity's PIN. Mirrors the token
+// menu-editor.js itself issues (routes/menu-editor.js: makeToken), so the
+// returned token is accepted by the existing PIN-auth middleware as-is.
+// ============================================
+
+router.get('/menu-editor-link', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data: entity, error } = await supabase
+        .from('entity')
+        .select('slug, menu_pin')
+        .eq('slug', entitySlug)
+        .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    if (!entity.menu_pin) {
+        const pin = String(Math.floor(1000 + Math.random() * 9000));
+        const { error: pinErr } = await supabase.from('entity').update({ menu_pin: pin }).eq('slug', entitySlug);
+        if (pinErr) return res.status(500).json({ error: pinErr.message });
+        entity.menu_pin = pin;
+    }
+
+    const crypto = require('crypto');
+    const token = crypto.createHash('sha256')
+        .update(`${entity.slug}:${entity.menu_pin}:${process.env.GCR_SUPABASE_SERVICE_KEY}`)
+        .digest('hex').slice(0, 32);
+
+    res.json({ slug: entity.slug, token });
+});
+
+// ============================================
 // POLICIES — deposit + cancellation/refund terms shown to customers before
 // they book (Reserve.jsx, and any future checkout page). Lives on the
 // entity row like the waiver template above — one set of terms per business.
