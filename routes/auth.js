@@ -141,6 +141,113 @@ router.post('/signup', async (req, res) => {
 });
 
 // ============================================
+// GET /api/auth/invite/:token — preview an invite (claim page loads this
+// to show "You're setting up ENTITY_NAME's account")
+// ============================================
+router.get('/invite/:token', async (req, res) => {
+    try {
+        const { data: invite } = await supabase
+            .from('business_invites')
+            .select('email, status, expires_at, entity_slug, entity:entity_slug(name, icon)')
+            .eq('token', req.params.token)
+            .maybeSingle();
+
+        if (!invite) return res.status(404).json({ error: 'This invite link is invalid.' });
+        if (invite.status !== 'pending') return res.status(409).json({ error: 'This invite has already been used.' });
+        if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'This invite link has expired.' });
+
+        res.json({
+            email: invite.email,
+            entity_slug: invite.entity_slug,
+            business_name: invite.entity ? invite.entity.name : invite.entity_slug,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// POST /api/auth/accept-invite — { token, password } → real Supabase Auth
+// account (not a hand-inserted one), linked to the invited entity.
+// ============================================
+router.post('/accept-invite', async (req, res) => {
+    try {
+        const { token, password } = req.body || {};
+        if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+        if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+        const { data: invite } = await supabase
+            .from('business_invites')
+            .select('id, email, entity_slug, status, expires_at')
+            .eq('token', token)
+            .maybeSingle();
+
+        if (!invite) return res.status(404).json({ error: 'This invite link is invalid.' });
+        if (invite.status !== 'pending') return res.status(409).json({ error: 'This invite has already been used.' });
+        if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'This invite link has expired.' });
+
+        const { data: entity } = await supabase.from('entity').select('id, slug, name, phone, city').eq('slug', invite.entity_slug).maybeSingle();
+        if (!entity) return res.status(404).json({ error: 'The business for this invite no longer exists.' });
+
+        const { data: existingUser } = await supabase.from('users').select('id').eq('email', invite.email).maybeSingle();
+        if (existingUser) return res.status(409).json({ error: 'An account already exists for this email — log in instead.' });
+
+        // Real Supabase Auth account — the correct path, not a hand-inserted password_hash
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: invite.email,
+            password,
+            email_confirm: true,
+        });
+        if (authError) return res.status(400).json({ error: 'Account creation failed: ' + authError.message });
+
+        // businesses row — real schema (id/slug/name/category/is_active), not the
+        // legacy site_id/type/status/domain/subdomain/plan shape /signup assumes
+        const { data: business, error: bizError } = await supabase
+            .from('businesses')
+            .insert({ slug: entity.slug, name: entity.name, category: 'service', phone: entity.phone || null, city: entity.city || null, is_active: true })
+            .select('id')
+            .single();
+        if (bizError) {
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            return res.status(500).json({ error: 'Failed to create business record: ' + bizError.message });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .insert({
+                auth_id: authData.user.id,
+                site_id: business.id,
+                email: invite.email,
+                name: entity.name,
+                password_hash: passwordHash,
+                role: 'owner',
+                entity_slug: entity.slug,
+                entity_id: entity.id,
+            })
+            .select()
+            .single();
+        if (userError) {
+            await supabase.from('businesses').delete().eq('id', business.id);
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
+        }
+
+        await supabase.from('business_invites').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invite.id);
+
+        const jwtToken = jwt.sign({ userId: user.id, siteId: business.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+        res.status(201).json({
+            token: jwtToken,
+            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+            business: { site_id: business.id, slug: entity.slug, name: entity.name },
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to accept invite: ' + err.message });
+    }
+});
+
+// ============================================
 // POST /api/auth/login
 // ============================================
 router.post('/login', async (req, res) => {
