@@ -24,6 +24,14 @@
     {
       "path": "/api/gcr/deep-crawl/run",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/email-parser/ical-import/run",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/transportation/expire",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -2205,4 +2205,97 @@ router.post('/artist/:slug/request', async (req, res) => {
   }
 })
 
+// POST /api/gcr/opt-in — captures name/phone/consent BEFORE a customer enters
+// a booking/checkout flow (used ahead of A2P 10DLC approval — SMS only ever
+// actually goes out via sendSms()'s owner-relay mode until that's approved).
+// Also lets a business recover an abandoned checkout: if the customer bails
+// before paying, this row already has their name + phone to follow up with.
+router.post('/opt-in', async (req, res) => {
+  try {
+    const { entity_slug, click_id, name, phone, email, sms_consent, consent_text } = req.body || {}
+    if (!entity_slug || !phone) return res.status(400).json({ error: 'entity_slug and phone required' })
+
+    const { data, error } = await db.from('booking_opt_ins').insert({
+      entity_slug,
+      click_id: click_id || null,
+      name: name || null,
+      phone,
+      email: email || null,
+      sms_consent: !!sms_consent,
+      consent_text: consent_text || null,
+    }).select('id').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ opt_in_id: data.id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/gcr/waiver/:slug/sign — clickwrap consent capture: checkbox PLUS
+// a typed full-name confirmation (signature_typed_name) that must match the
+// customer's name — stronger than a bare checkbox for "I didn't see it"
+// disputes, short of a drawn/DocuSign e-signature. Returns a waiver_id the
+// caller attaches to the booking so it's traceable to this exact signature.
+router.post('/waiver/:slug/sign', async (req, res) => {
+  try {
+    const { slug } = req.params
+    const { customer_name, customer_email, customer_phone, waiver_text, signature_typed_name } = req.body || {}
+    if (!customer_name) return res.status(400).json({ error: 'customer_name required' })
+    if (!waiver_text) return res.status(400).json({ error: 'waiver_text required' })
+    if (!signature_typed_name) return res.status(400).json({ error: 'signature_typed_name required' })
+    if (signature_typed_name.trim().toLowerCase() !== customer_name.trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Typed name must match your name exactly' })
+    }
+
+    const crypto = require('crypto')
+    const token = crypto.randomBytes(16).toString('hex')
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim()
+
+    const { data, error } = await db.from('waivers').insert({
+      entity_slug: slug,
+      customer_name,
+      customer_email: customer_email || null,
+      customer_phone: customer_phone || null,
+      waiver_text,
+      signature_typed_name,
+      signed_at: new Date().toISOString(),
+      ip_address: ip || null,
+      token,
+    }).select('id, token').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ waiver_id: data.id, token: data.token })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/gcr/lodging-search?q=... — condo/hotel typeahead, used by pickup/delivery
+// style service bookings (e.g. Gulf Coast Luggo) so a guest can pick their real
+// stay off the platform instead of typing a free-text address.
+router.get('/lodging-search', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim()
+    if (q.length < 2) return res.json([])
+
+    const { data, error } = await db
+      .from('entity')
+      .select('slug, name, city, address_line_1')
+      .in('entity_type', ['hotel', 'condo', 'vacation-rental'])
+      .eq('is_active', true)
+      .ilike('name', `%${q}%`)
+      .limit(8)
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data || [])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// NOTE: pickup/delivery-style bookings (luggage, transportation, etc.) go
+// through the broker at /api/transportation/request instead of a one-off
+// route here — see routes/transportation.js for the real dispatch flow.
+
 module.exports = router;

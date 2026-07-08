@@ -2501,6 +2501,55 @@ router.post('/link-user', authRequired, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/invite-business  { entity_slug, email }
+// Sends a real invite email with a claim link — the recipient sets their own
+// password on the claim page, which creates a real Supabase Auth account
+// (not a manually-inserted one) and links it to the entity.
+router.post('/invite-business', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { entity_slug, email } = req.body || {};
+    if (!entity_slug || !email) return res.status(400).json({ error: 'entity_slug and email required' });
+
+    const { data: entity, error: entErr } = await db.from('entity').select('slug, name').eq('slug', entity_slug).maybeSingle();
+    if (entErr || !entity) return res.status(404).json({ error: `Entity not found: ${entity_slug}` });
+
+    const crypto = require('crypto');
+    const token = crypto.randomBytes(24).toString('hex');
+
+    const { error: inviteErr } = await db.from('business_invites').insert({
+      entity_slug,
+      email: email.toLowerCase(),
+      token,
+      invited_by: req.admin ? req.admin.userId || req.admin.email || null : null,
+    });
+    if (inviteErr) return res.status(500).json({ error: inviteErr.message });
+
+    const baseUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://app.cybercheckinc.com';
+    const claimUrl = `${baseUrl}/claim-business.html?token=${token}`;
+
+    const { sendEmail } = require('../utils/email');
+    const result = await sendEmail({
+      to: email,
+      subject: `You've been invited to manage ${entity.name} on Gulf Coast Radar`,
+      html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6f8;padding:32px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+          <tr><td style="background:#0b7a75;padding:28px 32px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:22px;">You're invited</h1>
+          </td></tr>
+          <tr><td style="padding:32px;">
+            <p style="margin:0 0 20px;color:#374151;font-size:15px;">You've been invited to manage <strong>${entity.name}</strong>'s listing on Gulf Coast Radar — bookings, calendar sync, waivers, and more.</p>
+            <a href="${claimUrl}" style="display:inline-block;background:#f7941d;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:8px;">Set Up Your Account →</a>
+            <p style="margin:20px 0 0;color:#9ca3af;font-size:12px;">This link expires in 14 days. If you weren't expecting this, you can ignore this email.</p>
+          </td></tr>
+        </table>
+      </body></html>`,
+    });
+
+    res.json({ success: true, sent: !!(result && result.success !== false), claim_url: claimUrl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/admin/link-user?entity_slug=xxx  — see who is linked to an entity
 router.get('/link-user', authRequired, async (req, res) => {
   try {

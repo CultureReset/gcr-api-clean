@@ -57,32 +57,39 @@ router.post('/signup', async (req, res) => {
 
         const authId = authData.user.id;
 
-        // Step 2: Generate subdomain from business name
-        const subdomain = businessName
+        // Step 2: Generate a unique slug from the business name — this is
+        // CyberCheck's own account (businesses/users tables), separate from
+        // Gulf Coast Radar's `entity` table. Signing up here does NOT create
+        // a GCR listing — that's a separate, optional claim step. A business
+        // can have a CyberCheck dashboard without ever being on GCR.
+        const baseSlug = businessName
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-|-$/g, '');
 
-        const { data: subExists } = await supabase
+        const { data: slugExists } = await supabase
             .from('businesses')
-            .select('site_id')
-            .eq('subdomain', subdomain)
-            .single();
+            .select('id')
+            .eq('slug', baseSlug)
+            .maybeSingle();
 
-        const finalSubdomain = subExists ? `${subdomain}-${Date.now().toString(36)}` : subdomain;
+        const finalSlug = slugExists ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug;
 
         // Step 3: Hash password (kept for backend JWT login fallback)
         const passwordHash = await bcrypt.hash(password, 12);
 
-        // Step 4: Create business record (service key bypasses RLS)
+        // Step 4: Create business record — real schema (id/slug/name/category/
+        // phone/is_active), not the legacy site_id/type/subdomain/plan/status
+        // shape this used to assume, which doesn't exist on the live table.
         const { data: business, error: bizError } = await supabase
             .from('businesses')
             .insert({
+                slug: finalSlug,
                 name: businessName,
-                type: businessType,
-                subdomain: finalSubdomain,
-                plan: 'free',
-                status: 'active'
+                category: businessType,
+                phone: phone,
+                email: email.toLowerCase(),
+                is_active: true,
             })
             .select()
             .single();
@@ -92,12 +99,13 @@ router.post('/signup', async (req, res) => {
             return res.status(500).json({ error: 'Failed to create business: ' + bizError.message });
         }
 
-        // Step 5: Create user record linking Supabase Auth to business
+        // Step 5: Create user record linking Supabase Auth to business.
+        // users.site_id stores businesses.id (naming is legacy, value is real).
         const { data: user, error: userError } = await supabase
             .from('users')
             .insert({
                 auth_id: authId,
-                site_id: business.site_id,
+                site_id: business.id,
                 email: email.toLowerCase(),
                 name: name || businessName,
                 password_hash: passwordHash,
@@ -107,19 +115,20 @@ router.post('/signup', async (req, res) => {
             .single();
 
         if (userError) {
-            await supabase.from('businesses').delete().eq('site_id', business.site_id);
+            await supabase.from('businesses').delete().eq('id', business.id);
             await supabase.auth.admin.deleteUser(authId);
             return res.status(500).json({ error: 'Failed to create user: ' + userError.message });
         }
 
-        // Step 6: Create empty site_content row
-        const contentRow = { site_id: business.site_id, contact_email: email.toLowerCase() };
+        // Step 6: Create empty site_content row — this table's schema was
+        // already correct, no fix needed here.
+        const contentRow = { site_id: business.id, contact_email: email.toLowerCase() };
         if (phone) contentRow.contact_phone = phone;
         await supabase.from('site_content').insert(contentRow);
 
         // Step 7: Generate JWT (for backend API usage)
         const token = jwt.sign(
-            { userId: user.id, siteId: business.site_id, role: 'owner' },
+            { userId: user.id, siteId: business.id, role: 'owner' },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -128,15 +137,122 @@ router.post('/signup', async (req, res) => {
             token,
             user: { id: user.id, name: user.name, email: user.email, role: user.role },
             business: {
-                site_id: business.site_id,
+                site_id: business.id,
+                slug: business.slug,
                 name: business.name,
-                type: business.type,
-                subdomain: business.subdomain
+                type: business.category
             }
         });
     } catch (err) {
         console.error('Signup error:', err);
         res.status(500).json({ error: 'Signup failed: ' + err.message });
+    }
+});
+
+// ============================================
+// GET /api/auth/invite/:token — preview an invite (claim page loads this
+// to show "You're setting up ENTITY_NAME's account")
+// ============================================
+router.get('/invite/:token', async (req, res) => {
+    try {
+        const { data: invite } = await supabase
+            .from('business_invites')
+            .select('email, status, expires_at, entity_slug, entity:entity_slug(name, icon)')
+            .eq('token', req.params.token)
+            .maybeSingle();
+
+        if (!invite) return res.status(404).json({ error: 'This invite link is invalid.' });
+        if (invite.status !== 'pending') return res.status(409).json({ error: 'This invite has already been used.' });
+        if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'This invite link has expired.' });
+
+        res.json({
+            email: invite.email,
+            entity_slug: invite.entity_slug,
+            business_name: invite.entity ? invite.entity.name : invite.entity_slug,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// POST /api/auth/accept-invite — { token, password } → real Supabase Auth
+// account (not a hand-inserted one), linked to the invited entity.
+// ============================================
+router.post('/accept-invite', async (req, res) => {
+    try {
+        const { token, password } = req.body || {};
+        if (!token || !password) return res.status(400).json({ error: 'token and password required' });
+        if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+        const { data: invite } = await supabase
+            .from('business_invites')
+            .select('id, email, entity_slug, status, expires_at')
+            .eq('token', token)
+            .maybeSingle();
+
+        if (!invite) return res.status(404).json({ error: 'This invite link is invalid.' });
+        if (invite.status !== 'pending') return res.status(409).json({ error: 'This invite has already been used.' });
+        if (new Date(invite.expires_at) < new Date()) return res.status(410).json({ error: 'This invite link has expired.' });
+
+        const { data: entity } = await supabase.from('entity').select('id, slug, name, phone, city').eq('slug', invite.entity_slug).maybeSingle();
+        if (!entity) return res.status(404).json({ error: 'The business for this invite no longer exists.' });
+
+        const { data: existingUser } = await supabase.from('users').select('id').eq('email', invite.email).maybeSingle();
+        if (existingUser) return res.status(409).json({ error: 'An account already exists for this email — log in instead.' });
+
+        // Real Supabase Auth account — the correct path, not a hand-inserted password_hash
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email: invite.email,
+            password,
+            email_confirm: true,
+        });
+        if (authError) return res.status(400).json({ error: 'Account creation failed: ' + authError.message });
+
+        // businesses row — real schema (id/slug/name/category/is_active), not the
+        // legacy site_id/type/status/domain/subdomain/plan shape /signup assumes
+        const { data: business, error: bizError } = await supabase
+            .from('businesses')
+            .insert({ slug: entity.slug, name: entity.name, category: 'service', phone: entity.phone || null, city: entity.city || null, is_active: true })
+            .select('id')
+            .single();
+        if (bizError) {
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            return res.status(500).json({ error: 'Failed to create business record: ' + bizError.message });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 12);
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .insert({
+                auth_id: authData.user.id,
+                site_id: business.id,
+                email: invite.email,
+                name: entity.name,
+                password_hash: passwordHash,
+                role: 'owner',
+                entity_slug: entity.slug,
+                entity_id: entity.id,
+            })
+            .select()
+            .single();
+        if (userError) {
+            await supabase.from('businesses').delete().eq('id', business.id);
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
+        }
+
+        await supabase.from('business_invites').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invite.id);
+
+        const jwtToken = jwt.sign({ userId: user.id, siteId: business.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+        res.status(201).json({
+            token: jwtToken,
+            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+            business: { site_id: business.id, slug: entity.slug, name: entity.name },
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to accept invite: ' + err.message });
     }
 });
 
@@ -167,15 +283,18 @@ router.post('/login', async (req, res) => {
         }
 
         // Admin users don't have a business — skip business check
+        // (fixed: this used to select site_id/type/status/domain/subdomain/plan,
+        // none of which exist on the real `businesses` table — every non-admin
+        // login 500'd before reaching the token step)
         let business = null;
         if (user.role !== 'admin') {
             const { data: biz } = await supabase
                 .from('businesses')
-                .select('site_id, name, type, status, domain, subdomain, plan')
-                .eq('site_id', user.site_id)
+                .select('id, slug, name, category, is_active')
+                .eq('id', user.site_id)
                 .single();
 
-            if (!biz || biz.status === 'suspended') {
+            if (!biz || !biz.is_active) {
                 return res.status(403).json({ error: 'Account is suspended' });
             }
             business = biz;
@@ -191,12 +310,10 @@ router.post('/login', async (req, res) => {
             token,
             user: { id: user.id, name: user.name, email: user.email, role: user.role },
             business: business ? {
-                site_id: business.site_id,
+                site_id: business.id,
+                slug: business.slug,
                 name: business.name,
-                type: business.type,
-                domain: business.domain,
-                subdomain: business.subdomain,
-                plan: business.plan
+                type: business.category
             } : null
         });
     } catch (err) {
