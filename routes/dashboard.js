@@ -3155,6 +3155,70 @@ router.post('/ical/regenerate', async (req, res) => {
     res.json({ feed_url: `${base}/api/public/ical/${entitySlug}/${token}.ics`, entity_slug: entitySlug });
 });
 
+// GET /api/dashboard/ical/external — list this business's connected external calendars (Airbnb, VRBO, ...)
+router.get('/ical/external', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req.siteId);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data, error } = await supabase
+        .from('entity_external_calendars')
+        .select('id, source_label, ical_url, last_synced_at, last_sync_status, created_at')
+        .eq('entity_slug', entitySlug)
+        .order('created_at');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
+// POST /api/dashboard/ical/external — connect an external calendar (Airbnb/VRBO .ics export URL)
+router.post('/ical/external', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req.siteId);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { source_label, ical_url } = req.body;
+    if (!ical_url) return res.status(400).json({ error: 'ical_url required' });
+
+    const { data, error } = await supabase
+        .from('entity_external_calendars')
+        .insert({ entity_slug: entitySlug, source_label: source_label || 'External Calendar', ical_url })
+        .select()
+        .single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+});
+
+// DELETE /api/dashboard/ical/external/:id
+router.delete('/ical/external/:id', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req.siteId);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { error } = await supabase
+        .from('entity_external_calendars')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// POST /api/dashboard/ical/external/:id/sync-now — manual sync trigger, proxies to email-parser
+router.post('/ical/external/:id/sync-now', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req.siteId);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data: row } = await supabase
+        .from('entity_external_calendars')
+        .select('id')
+        .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug)
+        .maybeSingle();
+    if (!row) return res.status(404).json({ error: 'Not found' });
+
+    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+    const r = await fetch(`${base}/api/email-parser/ical-import/sync-now/${row.id}`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    res.json(d);
+});
+
 // ============================================
 // AI TRAINING — business_details, logistics, atmosphere, qa_pairs
 // ============================================

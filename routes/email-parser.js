@@ -1281,5 +1281,88 @@ router.get('/setup/:slug', async (req, res) => {
   }
 });
 
+// ─── EXTERNAL CALENDAR IMPORT (iCal) ──────────────────────────────────────
+// Reverse of the export feed (/api/public/ical/:slug/:token.ics): a business
+// pastes their Airbnb/VRBO .ics export URL, we poll it on a cron and mirror
+// its blocked date ranges into business_availability — so a booking made on
+// Airbnb also blocks that date on GCR, closing the loop on the unified
+// calendar.
+const { parseIcsEvents, datesInRange } = require('../utils/ical-parse');
+
+async function blockDateOnCalendar(entitySlug, date, sourceLabel) {
+  const { data: existing } = await db.from('business_availability')
+    .select('id')
+    .eq('entity_slug', entitySlug)
+    .eq('availability_date', date)
+    .eq('time_slot', '00:00')
+    .maybeSingle();
+
+  if (existing) {
+    await db.from('business_availability').update({
+      status: 'blocked',
+      remaining_spots: 0,
+      source_platform: sourceLabel,
+      last_updated: new Date().toISOString(),
+    }).eq('id', existing.id);
+  } else {
+    await db.from('business_availability').insert({
+      entity_slug: entitySlug,
+      availability_date: date,
+      time_slot: '00:00',
+      status: 'blocked',
+      remaining_spots: 0,
+      booked_count: 0,
+      source_platform: sourceLabel,
+    });
+  }
+}
+
+async function syncExternalCalendar(row) {
+  try {
+    const res = await fetch(row.ical_url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const events = parseIcsEvents(text);
+
+    let blockedCount = 0;
+    for (const ev of events) {
+      for (const d of datesInRange(ev.start, ev.end)) {
+        await blockDateOnCalendar(row.entity_slug, d, row.source_label || 'external-ical');
+        blockedCount++;
+      }
+    }
+
+    await db.from('entity_external_calendars').update({
+      last_synced_at: new Date().toISOString(),
+      last_sync_status: `ok (${blockedCount} dates blocked)`,
+    }).eq('id', row.id);
+  } catch (err) {
+    await db.from('entity_external_calendars').update({
+      last_synced_at: new Date().toISOString(),
+      last_sync_status: 'error: ' + err.message,
+    }).eq('id', row.id);
+  }
+}
+
+// GET /api/email-parser/ical-import/run — Vercel cron hits this hourly
+router.get('/ical-import/run', async (req, res) => {
+  if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { data: rows } = await db.from('entity_external_calendars').select('*');
+  for (const row of (rows || [])) {
+    await syncExternalCalendar(row);
+  }
+  res.json({ success: true, synced: (rows || []).length });
+});
+
+// POST /api/email-parser/ical-import/sync-now/:id — manual "sync now" trigger from the dashboard
+router.post('/ical-import/sync-now/:id', async (req, res) => {
+  const { data: row } = await db.from('entity_external_calendars').select('*').eq('id', req.params.id).maybeSingle();
+  if (!row) return res.status(404).json({ error: 'Not found' });
+  await syncExternalCalendar(row);
+  res.json({ success: true });
+});
+
 module.exports = router;
 module.exports.EXTRACTORS = EXTRACTORS;
