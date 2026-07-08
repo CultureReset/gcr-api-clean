@@ -3162,6 +3162,63 @@ router.get('/gcr-stats', async (req, res) => {
     }
 });
 
+// GET /api/public/ical/:slug/:tokenFile — a business's GCR availability feed (.ics).
+// Paste this URL into Airbnb/VRBO/Google Calendar's "import calendar" field so
+// GCR-blocked/booked dates auto-block those platforms too. No auth — the token
+// in the URL path is the secret (see /api/dashboard/ical/feed-url to mint one).
+router.get('/ical/:slug/:tokenFile', async (req, res) => {
+    const { slug } = req.params;
+    const token = String(req.params.tokenFile || '').replace(/\.ics$/i, '');
+    if (!token) return res.status(400).send('Invalid feed token');
+
+    const { data: entity } = await supabase.from('entity').select('slug, name, ical_token').eq('slug', slug).maybeSingle();
+    if (!entity || !entity.ical_token || entity.ical_token !== token) {
+        return res.status(404).send('Calendar feed not found');
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const horizon = new Date(Date.now() + 545 * 86400000).toISOString().slice(0, 10); // ~18 months out
+
+    const { data: rows } = await supabase
+        .from('business_availability')
+        .select('availability_date, status, remaining_spots, booked_count')
+        .eq('entity_slug', slug)
+        .gte('availability_date', today)
+        .lte('availability_date', horizon)
+        .order('availability_date');
+
+    const blockedDates = Array.from(new Set(
+        (rows || [])
+            .filter(r => r.status === 'full' || r.status === 'blocked' || (r.remaining_spots === 0 && (r.booked_count || 0) > 0))
+            .map(r => r.availability_date)
+    )).sort();
+
+    // Merge consecutive blocked days into single ranges for a cleaner feed
+    const ranges = [];
+    blockedDates.forEach(d => {
+        const last = ranges[ranges.length - 1];
+        if (last) {
+            const nextDay = new Date(last.to + 'T12:00:00Z');
+            nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+            if (nextDay.toISOString().slice(0, 10) === d) { last.to = d; return; }
+        }
+        ranges.push({ from: d, to: d });
+    });
+
+    const { generateAvailabilityIcs } = require('../utils/ical-feed');
+    const events = ranges.map((r, i) => ({
+        uid: `gcr-${slug}-${r.from}-${i}`,
+        date_from: r.from,
+        date_to: r.to,
+        summary: 'Unavailable (Gulf Coast Radar)',
+    }));
+
+    const ics = generateAvailabilityIcs(`${entity.name || 'Gulf Coast Radar'} — Availability`, events);
+    res.set('Content-Type', 'text/calendar; charset=utf-8');
+    res.set('Content-Disposition', 'inline; filename="gcr-availability.ics"');
+    res.send(ics);
+});
+
 // POST /api/public/business-lead — no auth required, anyone can submit
 router.post('/business-lead', async (req, res) => {
     const { business_name, category, contact_name, phone, email, website, notes, plan } = req.body;

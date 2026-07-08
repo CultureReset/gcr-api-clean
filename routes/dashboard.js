@@ -3111,6 +3111,51 @@ router.delete('/availability/blocks', async (req, res) => {
 });
 
 // ============================================
+// ICAL SYNC — export GCR's unified calendar as a feed URL a business can
+// paste into Airbnb/VRBO/Google Calendar's "import calendar" field so
+// those platforms auto-block whatever GCR already has booked. Reads from
+// business_availability (entity_slug-keyed), the same unified calendar
+// used by the GCR reservation flow — not the legacy site_id availability
+// tables above, so this works regardless of business type.
+// ============================================
+
+async function resolveOwnedEntitySlug(siteId) {
+    const { data } = await supabase.from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle();
+    return data?.entity_slug || null;
+}
+
+// GET /api/dashboard/ical/feed-url — get (or lazily create) this business's calendar feed URL
+router.get('/ical/feed-url', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req.siteId);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data: entity, error } = await supabase.from('entity').select('ical_token').eq('slug', entitySlug).maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+
+    let token = entity?.ical_token;
+    if (!token) {
+        token = require('crypto').randomBytes(20).toString('hex');
+        await supabase.from('entity').update({ ical_token: token }).eq('slug', entitySlug);
+    }
+
+    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+    res.json({ feed_url: `${base}/api/public/ical/${entitySlug}/${token}.ics`, entity_slug: entitySlug });
+});
+
+// POST /api/dashboard/ical/regenerate — rotate the token, invalidating the old URL
+router.post('/ical/regenerate', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req.siteId);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const token = require('crypto').randomBytes(20).toString('hex');
+    const { error } = await supabase.from('entity').update({ ical_token: token }).eq('slug', entitySlug);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+    res.json({ feed_url: `${base}/api/public/ical/${entitySlug}/${token}.ics`, entity_slug: entitySlug });
+});
+
+// ============================================
 // AI TRAINING — business_details, logistics, atmosphere, qa_pairs
 // ============================================
 
