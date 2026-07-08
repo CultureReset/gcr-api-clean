@@ -597,7 +597,7 @@ router.get('/recommendations', touristAuth, async (req, res) => {
                 .eq('tourist_id', req.touristId),
             mainDb.from('tourist_profiles')
                 .select('interests, seen_slugs:answers->seen_slugs')
-                .eq('user_id', req.touristId)
+                .eq('tourist_id', req.touristId)
                 .maybeSingle(),
         ]);
 
@@ -622,7 +622,7 @@ router.get('/recommendations', touristAuth, async (req, res) => {
         // Build query for recommended businesses
         // Prefer categories they've shown interest in, exclude seen
         let query = mainDb.from('entity')
-            .select('slug, name, icon, subtitle, category, hero_image_url, rating, price_range')
+            .select('slug, name, icon, subtitle, entity_type, hero_image_url, rating, price_range')
             .eq('is_active', true)
             .limit(limit * 2); // Fetch 2x to filter
 
@@ -645,9 +645,9 @@ router.get('/recommendations', touristAuth, async (req, res) => {
         // If no recommendations (new user), return featured businesses
         if (recommendations.length === 0) {
             const { data: featured } = await mainDb.from('entity')
-                .select('slug, name, icon, subtitle, category, hero_image_url, rating, price_range')
+                .select('slug, name, icon, subtitle, entity_type, hero_image_url, rating, price_range')
                 .eq('is_active', true)
-                .eq('is_featured', true)
+                .eq('featured', true)
                 .limit(limit);
             return res.json({ recommendations: featured || [], based_on: { saves: saves?.length || 0, swipes: swipes?.length || 0 } });
         }
@@ -1004,7 +1004,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     const hasUserLoc = userLat != null && userLng != null;
     const { data: gcrEntitiesRaw } = await gcrDb
         .from('entity')
-        .select('name, slug, entity_type, entity_subtype, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active, latitude, longitude')
+        .select('name, slug, entity_type, entity_subtype, parent_entity_slug, bedrooms, bathrooms, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active, latitude, longitude')
         .eq('is_active', true)
         .order('rating', { ascending: false, nullsFirst: false })
         .limit(400);
@@ -1026,16 +1026,28 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     const slugs = (gcrEntities || []).map(e => e.slug);
 
     // Fetch menus, specials, pricing, happy hour items in parallel
-    const [menuSectionsRes, menuItemsRes, drinkSectionsRes, drinkItemsRes, specialsRes, pricingRes, hhSectionsRes, hhItemsRes, whatsIncludedRes] = await Promise.all([
-        slugs.length ? gcrDb.from('menu_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
-        slugs.length ? gcrDb.from('menu_items').select('section_id, name, description, price, is_available').eq('is_available', true) : { data: [] },
-        slugs.length ? gcrDb.from('drink_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
-        slugs.length ? gcrDb.from('drink_items').select('section_id, name, description, price').limit(2000) : { data: [] },
-        slugs.length ? gcrDb.from('entity_specials').select('entity_slug, title, description, price, days_active, is_active').in('entity_slug', slugs).eq('is_active', true) : { data: [] },
+    const [menuSectionsRes, menuItemsRes, drinkSectionsRes, drinkItemsRes, specialsRes, pricingRes, hhSectionsRes, hhItemsRes, whatsIncludedRes, amenityTagsRes, amenitiesRes, faqsRes, offeringsRes] = await Promise.all([
+        // NOTE: real columns are section_name / item_name / special_name — aliased back to
+        // the names this handler's downstream code expects. Previously these selected
+        // non-existent columns (name/title/price/days_active), so PostgREST errored and the
+        // concierge silently had NO menu, drink, happy-hour, or specials data at all.
+        slugs.length ? gcrDb.from('menu_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('menu_items').select('section_id, name:item_name, description, price, is_available').eq('is_available', true) : { data: [] },
+        slugs.length ? gcrDb.from('drink_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('drink_items').select('section_id, name:item_name, description, price').limit(2000) : { data: [] },
+        slugs.length ? gcrDb.from('entity_specials').select('entity_slug, title:special_name, description, discount_text, days, is_active').in('entity_slug', slugs).eq('is_active', true) : { data: [] },
         slugs.length ? gcrDb.from('pricing_items').select('entity_id, item_name, price, description, capacity_min, capacity_max, duration_minutes').limit(2000) : { data: [] },
-        slugs.length ? gcrDb.from('happy_hour_sections').select('id, entity_slug, name').in('entity_slug', slugs) : { data: [] },
-        slugs.length ? gcrDb.from('happy_hour_items').select('section_id, name, description, price').limit(1000) : { data: [] },
+        slugs.length ? gcrDb.from('happy_hour_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
+        slugs.length ? gcrDb.from('happy_hour_items').select('section_id, name:item_name, description, price').limit(1000) : { data: [] },
         slugs.length ? gcrDb.from('whats_included').select('entity_id, item').limit(2000) : { data: [] },
+        // Amenity/feature tags — the structured data behind queries like "condo with a hot
+        // tub, sauna, and lazy river". Without these the concierge only sees boolean flags.
+        slugs.length ? gcrDb.from('entity_tags').select('entity_slug, tag_name').in('entity_slug', slugs).eq('tag_category', 'amenity') : { data: [] },
+        slugs.length ? gcrDb.from('entity_amenities').select('entity_slug, amenity').in('entity_slug', slugs) : { data: [] },
+        // FAQs — direct Q&A the agent can quote (parking, policies, dietary, check-in…).
+        slugs.length ? gcrDb.from('faqs').select('entity_slug, question, answer').in('entity_slug', slugs) : { data: [] },
+        // Offerings — charters, tours, rental packages, service items with prices.
+        slugs.length ? gcrDb.from('offerings').select('entity_slug, name, description, price_from, unit').in('entity_slug', slugs).eq('active', true) : { data: [] },
     ]);
 
     // Build lookup maps
@@ -1092,6 +1104,26 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         hhItemsBySlug[sec.slug].push({ section: sec.name, name: item.name, desc: item.description, price: item.price });
     });
 
+    // Amenity/feature tags per entity (dedupe tag_name + entity_amenities into one set)
+    const amenityBySlug = {};
+    const addAmenity = (slug, label) => {
+        if (!slug || !label) return;
+        if (!amenityBySlug[slug]) amenityBySlug[slug] = new Set();
+        amenityBySlug[slug].add(label);
+    };
+    (amenityTagsRes.data || []).forEach(r => addAmenity(r.entity_slug, r.tag_name));
+    (amenitiesRes.data || []).forEach(r => addAmenity(r.entity_slug, r.amenity));
+
+    const faqsBySlug = {};
+    (faqsRes.data || []).forEach(r => { (faqsBySlug[r.entity_slug] = faqsBySlug[r.entity_slug] || []).push(r); });
+    const offeringsBySlug = {};
+    (offeringsRes.data || []).forEach(r => { (offeringsBySlug[r.entity_slug] = offeringsBySlug[r.entity_slug] || []).push(r); });
+
+    // Parent name lookup so the concierge can say "X is at The Wharf" and answer
+    // "what's at <hub>" questions from the hierarchy, not guesswork.
+    const nameBySlug = {};
+    (gcrEntities || []).forEach(e => { nameBySlug[e.slug] = e.name; });
+
     const gcrContext = (gcrEntities || []).map(e => {
         const type = [e.entity_type, e.entity_subtype].filter(Boolean).join('/');
         const priceLevel = e.price_level ? '💰'.repeat(Math.min(e.price_level, 4)) : '';
@@ -1116,13 +1148,22 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
             e.serves_vegetarian && 'vegetarian options',
         ].filter(Boolean).join(', ');
 
+        // Structured amenity tags (Hot Tub, Sauna, Lazy River, Gulf Front, WiFi, …) merged
+        // with the boolean feature flags so the concierge can filter on any of them.
+        const amenities = [...(amenityBySlug[e.slug] || [])];
+        const allFeatures = [features, ...amenities].filter(Boolean).join(', ');
+
         let lines = `• ${e.name} [${type}] ${e.city || ''} ${e.rating ? `⭐${e.rating} (${e.review_count || 0} reviews)` : ''} ${priceLevel}${priceRange}`;
         if (e.distance_mi != null) lines += ` · 📍${e.distance_mi.toFixed(1)}mi from user`;
+        // Hierarchy: name the parent hub so "what's at The Wharf" and "the condo this unit
+        // belongs to" are answerable directly from the data.
+        if (e.parent_entity_slug) lines += `\n  🏛 Part of: ${nameBySlug[e.parent_entity_slug] || e.parent_entity_slug}`;
+        if (e.bedrooms || e.bathrooms) lines += `\n  🛏 ${e.bedrooms || '?'} bed / ${e.bathrooms || '?'} bath`;
         if (e.address_line_1) lines += `\n  📍 ${e.address_line_1}, ${e.city || ''}`;
         if (e.phone) lines += ` · 📞 ${e.phone}`;
         const blurb = e.description || e.editorial_summary;
         if (blurb) lines += `\n  ${blurb.slice(0, 120)}`;
-        if (features) lines += `\n  Features: ${features}`;
+        if (allFeatures) lines += `\n  Features: ${allFeatures}`;
 
         // Activity pricing
         if (e.price_from != null) lines += `\n  Price: ${e.price_from === 0 ? 'Free' : `From $${e.price_from}${e.price_unit ? `/${e.price_unit}` : ''}`}`;
@@ -1134,7 +1175,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         // Specials
         const specials = specialsBySlug[e.slug] || [];
         if (specials.length) {
-            lines += `\n  Specials: ${specials.map(s => `${s.title}${s.price ? ` ($${s.price})` : ''}${s.description ? ` — ${s.description.slice(0, 60)}` : ''}${s.days_active ? ` [${s.days_active}]` : ''}`).join(' | ')}`;
+            lines += `\n  Specials: ${specials.map(s => `${s.title}${s.discount_text ? ` (${s.discount_text})` : ''}${s.description ? ` — ${s.description.slice(0, 60)}` : ''}${s.days ? ` [${s.days}]` : ''}`).join(' | ')}`;
         }
 
         // Pricing items (activities/tours) with capacity and duration
@@ -1170,6 +1211,18 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         const hhItems = hhItemsBySlug[e.slug] || [];
         if (hhItems.length) {
             lines += `\n  HH deals: ${hhItems.slice(0, 6).map(i => `${i.name}${i.price ? ` $${i.price}` : ''}`).join(' | ')}`;
+        }
+
+        // Offerings (charters/tours/rental packages/service items)
+        const offerings = offeringsBySlug[e.slug] || [];
+        if (offerings.length) {
+            lines += `\n  Offerings: ${offerings.slice(0, 10).map(o => `${o.name}${o.price_from != null ? ` from $${o.price_from}${o.unit ? `/${o.unit}` : ''}` : ''}${o.description ? ` — ${o.description.slice(0, 50)}` : ''}`).join(' | ')}`;
+        }
+
+        // FAQs — quotable Q&A (parking, policies, dietary, check-in, etc.)
+        const faqs = faqsBySlug[e.slug] || [];
+        if (faqs.length) {
+            lines += `\n  FAQ: ${faqs.slice(0, 6).map(f => `Q:${f.question} A:${(f.answer || '').slice(0, 90)}`).join(' | ')}`;
         }
 
         lines += `\n  (slug: ${e.slug})`;

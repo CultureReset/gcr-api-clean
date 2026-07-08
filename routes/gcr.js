@@ -82,7 +82,9 @@ async function buildFullEntity(slug) {
   // ── CORE queries — every business ──────────────────────────────────────────
   const corePromises = [
     db.from('entity_hours').select('day_of_week,opens_at,closes_at,is_closed').eq('entity_slug', slug).order('day_of_week'),
-    db.from('entity_photos').select('id,url,image_url,caption,alt_text,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
+    // entity_photos has url/caption (NOT image_url/alt_text — selecting missing
+    // columns errors the whole query and silently blanked photos platform-wide)
+    db.from('entity_photos').select('id,url,image_path,caption,photo_type,sort_order,is_cover').eq('entity_slug', slug).order('sort_order').limit(50),
     db.from('entity_tags').select('tag_name,tag_category').eq('entity_slug', slug),
     db.from('entity_events').select('id,event_name,description,event_date,start_time,end_time,cover_charge,image_url,artist_name,artist_id,day_of_week,recurring, artist:artists!entity_events_artist_id_fkey(id,slug,name,genre,image_url,social_instagram,social_facebook,spotify_url)').eq('entity_slug', slug).eq('is_active', true).order('event_date').limit(20),
     db.from('entity_reviews').select('id,reviewer_name,rating,title,body,verified_purchase,created_at').eq('entity_slug', slug).eq('approved', true).order('created_at', { ascending: false }).limit(20),
@@ -134,6 +136,90 @@ async function buildFullEntity(slug) {
       .map(i => ({ ...i, tiers: sectionTiers.filter(t => t.section_item_id === i.id) })),
   }));
 
+  // Universal offerings (offerings + offering_prices) — trips, rentals, tours,
+  // storage tiers, ride tickets. Merged into the same sections shape the page
+  // already renders, grouped by offerings.section (fallback: kind).
+  const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes] = await Promise.all([
+    db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order,image_url').eq('entity_slug', slug).eq('active', true).order('sort_order'),
+    db.from('offering_prices').select('id,offering_id,label,price,age_min,age_max,season,duration_label,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_amenities').select('id,amenity,category,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('marina_details').select('*').eq('entity_slug', slug).maybeSingle(),
+  ]);
+  const offeringRows = offeringsRes.data || [];
+  const offeringPrices = offeringPricesRes.data || [];
+  const marinaDetails = marinaRes?.data || null;
+  // Connected parent (marina/complex/condo hub) — child pages link back to it,
+  // and unit pages show the complex's amenities alongside their own
+  let parentInfo = null;
+  let parentAmenities = [];
+  if (entity.parent_entity_slug) {
+    const [pRes, paRes] = await Promise.all([
+      db.from('entity').select('slug,name,entity_type,entity_subtype,hero_image_url').eq('slug', entity.parent_entity_slug).eq('is_active', true).maybeSingle(),
+      db.from('entity_tags').select('tag_name').eq('entity_slug', entity.parent_entity_slug).eq('tag_category', 'amenity'),
+    ]);
+    parentInfo = pRes.data || null;
+    parentAmenities = [...new Set((paRes.data || []).map(t => t.tag_name).filter(Boolean))];
+  }
+  if (marinaDetails) {
+    const md = marinaDetails;
+    const facts = [
+      md.total_slips && { name: 'Boat slips', desc: `${md.total_slips} slips${md.transient_slips ? ` (${md.transient_slips} transient)` : ''}` },
+      md.max_vessel_length_ft && { name: 'Max vessel length', desc: `${md.max_vessel_length_ft} ft` },
+      (md.has_gas || md.has_diesel) && { name: 'Fuel dock', desc: [md.has_gas && 'gas', md.has_diesel && 'diesel'].filter(Boolean).join(' + ') },
+      md.has_pump_out && { name: 'Pump-out', desc: 'available' },
+      md.has_dry_storage && { name: 'Dry storage', desc: 'available' },
+      (md.has_live_bait || md.has_frozen_bait || md.has_tackle) && { name: 'Bait & tackle', desc: [md.has_live_bait && 'live bait', md.has_frozen_bait && 'frozen bait', md.has_tackle && 'tackle'].filter(Boolean).join(', ') },
+      md.vhf_channel && { name: 'VHF channel', desc: String(md.vhf_channel) },
+      md.daily_rate_per_ft && { name: 'Daily rate', desc: `$${md.daily_rate_per_ft}/ft` },
+      md.transient_rate_per_ft && { name: 'Transient slip rate', desc: `$${md.transient_rate_per_ft}/ft` },
+      md.parking_available && { name: 'Trailer / vehicle parking', desc: md.parking_fee_text || 'available' },
+      md.shore_power_amps && { name: 'Shore power', desc: md.shore_power_amps },
+      md.power_fee_text && { name: 'Commercial power', desc: md.power_fee_text },
+      md.store_items?.length && { name: 'Dock store carries', desc: md.store_items.join(', ') },
+      md.tackle_notes && { name: 'Tackle notes', desc: md.tackle_notes },
+      md.notes && { name: 'Notes', desc: md.notes },
+    ].filter(Boolean);
+    if (facts.length) {
+      flexSections.push({
+        id: -1000, module_key: 'marina', section_type: 'marina',
+        section_name: 'Marina', subtitle: null, icon: null, layout: 'list',
+        sort_order: 950, is_active: true,
+        items: facts.map((f, i) => ({ id: -(1001 + i), section_id: null, item_name: f.name, description: f.desc, duration: null, price_from: null, price_to: null, price_label: null, icon: null, sort_order: i, metadata: {}, tiers: [] })),
+      });
+    }
+  }
+  if (offeringRows.length) {
+    const groups = new Map();
+    for (const o of offeringRows) {
+      const key = o.section || ({ trip: 'Trips & Charters', rental: 'Rentals', tour: 'Tours', service: 'Services', storage: 'Storage', ticket: 'Tickets' }[o.kind] || 'Offerings');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(o);
+    }
+    let synthId = -1;
+    for (const [name, items] of groups) {
+      flexSections.push({
+        id: synthId--, module_key: 'offerings', section_type: 'offerings',
+        section_name: name, subtitle: null, icon: null, layout: 'list',
+        sort_order: 900 + flexSections.length, is_active: true,
+        items: items.map(o => ({
+          id: o.id, section_id: null,
+          item_name: o.name,
+          description: [o.description, o.fee_note].filter(Boolean).join(' — '),
+          duration: o.duration_minutes ? (o.duration_minutes % 60 === 0 ? `${o.duration_minutes / 60} hr` : `${o.duration_minutes} min`) : null,
+          price_from: o.price_from, price_to: null,
+          price_label: o.unit ? String(o.unit).replace(/_/g, ' ') : null,
+          icon: null, sort_order: o.sort_order ?? 0,
+          image_url: o.image_url || null,
+          metadata: { kind: o.kind, capacity: o.capacity, event_date: o.event_date },
+          tiers: offeringPrices.filter(p => p.offering_id === o.id).map(p => ({
+            id: p.id, label: [p.label, p.duration_label, p.season && p.season !== 'regular' ? p.season : null].filter(Boolean).join(' — '),
+            price: p.price, age_min: p.age_min, age_max: p.age_max, sort_order: p.sort_order ?? 0,
+          })),
+        })),
+      });
+    }
+  }
+
   const modulesData = modulesRes.data || [];
   // Full module list for the response (control panel: enabled + order + settings)
   const modulesFull = modulesData
@@ -142,11 +228,33 @@ async function buildFullEntity(slug) {
   // Set of enabled module keys — preserves existing conditional-fetch logic below
   const modules = new Set(modulesData.filter(m => m.enabled !== false).map(m => m.module_key));
 
-  // ── CONDITIONAL queries — only run if module is enabled ───────────────────
+  // ── Data present ⇒ data displays ───────────────────────────────────────────
+  // A pack also loads when its tables actually hold rows for this slug, no
+  // matter the entity_type or module switches (a caterer with a menu, a golf
+  // course with drinks, a park listing with room data — it all shows).
+  // Probes only run for packs whose gate is still false; head-count = cheap,
+  // and the endpoint is edge-cached.
+  const hasRows = async (table) => {
+    try {
+      const { count } = await db.from(table).select('id', { count: 'exact', head: true }).eq('entity_slug', slug);
+      return (count || 0) > 0;
+    } catch (e) { return false; }
+  };
+  const anyRows = async (...tables) => (await Promise.all(tables.map(hasRows))).some(Boolean);
+  const [dataFood, dataActivity, dataStay, dataService, dataShop, dataPark] = await Promise.all([
+    (isFood || modules.has('menu'))       ? false : anyRows('menu_sections', 'drink_sections', 'entity_specials'),
+    (isActivity || modules.has('activity')) ? false : anyRows('activity_schedules', 'whats_included', 'what_to_bring'),
+    (isStay || modules.has('stay'))       ? false : anyRows('property_details', 'room_types', 'bookable_resources'),
+    (isService || modules.has('services')) ? false : anyRows('service_menu', 'class_schedule'),
+    (isShopping || modules.has('shop'))   ? false : anyRows('products'),
+    (isPark || modules.has('park'))       ? false : anyRows('facilities', 'spot_rules'),
+  ]);
+
+  // ── CONDITIONAL queries — module enabled, matching type, OR data present ──
   const conditionalPromises = [];
   const conditionalKeys = [];
 
-  if (isFood || modules.has('menu')) {
+  if (isFood || modules.has('menu') || dataFood) {
     conditionalPromises.push(
       db.from('menu_sections').select('id,section_name,sort_order,time_range,available_days').eq('entity_slug', slug).order('sort_order'),
       db.from('drink_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
@@ -159,7 +267,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('menuSections','drinkSections','hhSections','specials','sides','dailyFeatures','orderLinks');
   }
 
-  if (isActivity || modules.has('activity')) {
+  if (isActivity || modules.has('activity') || dataActivity) {
     conditionalPromises.push(
       db.from('pricing_items').select('*').eq('entity_slug', slug).order('sort_order'),
       db.from('whats_included').select('id,item_name,included_item,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
@@ -174,7 +282,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('pricing','whatsIncluded','requirements','schedules','meetingPoints','activityOptions','fishSpecies','whatToBring','activityDetails');
   }
 
-  if (isStay || modules.has('stay')) {
+  if (isStay || modules.has('stay') || dataStay) {
     conditionalPromises.push(
       db.from('property_details').select('*').eq('entity_slug', slug).maybeSingle(),
       db.from('room_types').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -187,7 +295,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('propertyDetails','roomTypes','amenities','propertyFees','stayLinks','availability','bookableResources');
   }
 
-  if (isService || modules.has('services')) {
+  if (isService || modules.has('services') || dataService) {
     conditionalPromises.push(
       db.from('service_categories').select('id,name,sort_order').eq('entity_slug', slug).order('sort_order'),
       db.from('service_menu').select('id,category_id,name,description,price,duration_minutes,sort_order').eq('entity_slug', slug).order('sort_order'),
@@ -197,7 +305,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('serviceCategories','serviceMenu','servicePackages','classSchedule');
   }
 
-  if (isShopping || modules.has('shop')) {
+  if (isShopping || modules.has('shop') || dataShop) {
     conditionalPromises.push(
       db.from('product_categories').select('id,name,sort_order').eq('entity_slug', slug).order('sort_order'),
       db.from('products').select('id,category_id,name,description,price,in_stock,sort_order').eq('entity_slug', slug).eq('in_stock', true).order('sort_order'),
@@ -205,7 +313,7 @@ async function buildFullEntity(slug) {
     conditionalKeys.push('productCategories','products');
   }
 
-  if (isPark || modules.has('park')) {
+  if (isPark || modules.has('park') || dataPark) {
     conditionalPromises.push(
       db.from('facilities').select('id,name,available').eq('entity_slug', slug),
       db.from('spot_rules').select('id,rule').eq('entity_slug', slug),
@@ -251,18 +359,30 @@ async function buildFullEntity(slug) {
       ...sec, items: (itemList || []).filter(i => i.section_id === sec.id),
     }));
 
-  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.image_url) }));
+  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.url), alt_text: p.caption || null }));
 
   return {
     ...entity,
     hero_image_url: normalizeImageUrl(entity.hero_image_url),
     // Flexible offerings (charters, rentals, tours, services) — universal
     sections: flexSections,
+    offerings: offeringRows.map(o => ({ ...o, prices: offeringPrices.filter(p => p.offering_id === o.id) })),
     // Core
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
     photos: normalizedPhotos,
-    tags: tags.data || [],
+    // entity_tags is canonical; entity_amenities rows (import strays) merge in
+    // so amenity data displays no matter which table it landed in
+    tags: (() => {
+      const base = tags.data || [];
+      const seen = new Set(base.map(t => `${(t.tag_category || '')}|${(t.tag_name || '').toLowerCase()}`));
+      for (const a of (amenityRowsRes?.data || [])) {
+        const key = `amenity|${(a.amenity || '').toLowerCase()}`;
+        if (a.amenity && !seen.has(key)) { seen.add(key); base.push({ id: `am-${a.id}`, entity_slug: slug, tag_name: a.amenity, tag_category: 'amenity' }); }
+      }
+      return base;
+    })(),
+    marina_details: marinaDetails,
     events: (events.data || []).map(ev => ({
       ...ev,
       artist_slug: ev.artist?.slug || null,
@@ -281,6 +401,8 @@ async function buildFullEntity(slug) {
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
     child_count: childCountRes?.count || 0,
+    parent: parentInfo,
+    parent_amenities: parentAmenities,
     is_hub: (childCountRes?.count || 0) > 0,
     good_for_children: entity.good_for_children ?? entity.good_for_kids ?? null,
     modules: modulesFull,
@@ -1032,20 +1154,45 @@ router.post('/search', async (req, res) => {
     const orFilter = (...fields) =>
       keywords.flatMap(k => fields.map(f => `${f}.ilike.%${k}%`)).join(',');
 
-    // Search all tables in parallel — events only matched if query hits event/artist name directly
-    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents] = await Promise.all([
+    // Search all tables in parallel — events only matched if query hits event/artist name directly.
+    // entity_tags + entity_amenities are included so amenity/feature queries ("hot tub",
+    // "sauna", "lazy river", "waterfront", "live music") resolve against structured tag data,
+    // not just free-text name/description.
+    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections] = await Promise.all([
       db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
       db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('happy_hour_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('entity_specials').select('entity_slug').eq('is_active', true).or(orFilter('special_name', 'description', 'discount_text')),
       db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'artist_name')),
+      db.from('entity_tags').select('entity_slug').or(orFilter('tag_name')),
+      db.from('entity_amenities').select('entity_slug').or(orFilter('amenity')),
+      // FAQs — the Q&A backbone ("is there parking?", "do you have gluten-free?").
+      db.from('faqs').select('entity_slug').or(orFilter('question', 'answer')),
+      // Offerings + flexible section items — charters, tours, rental packages, service
+      // menus. These are displayed on profiles but were previously unsearchable.
+      db.from('offerings').select('entity_slug').eq('active', true).or(orFilter('name', 'description', 'section')),
+      db.from('entity_section_items').select('section_id').or(orFilter('item_name', 'description')),
+      // Menu/drink/happy-hour SECTION names — dietary and category labels often live at the
+      // section level ("Gluten Free Menu", "Vegan & Keto", "Vegetarian"), not on each item.
+      db.from('menu_sections').select('entity_slug').or(orFilter('section_name')),
+      db.from('drink_sections').select('entity_slug').or(orFilter('section_name')),
+      db.from('happy_hour_sections').select('entity_slug').or(orFilter('section_name')),
     ]);
 
     (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
-    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents].forEach(res =>
+    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings,
+     byMenuSections, byDrinkSections, byHHSections].forEach(res =>
       (res.data || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug))
     );
+    // Section items reference their entity via section_id → entity_sections.entity_slug
+    if ((bySectionItems.data || []).length) {
+      const secIds = [...new Set(bySectionItems.data.map(r => r.section_id).filter(Boolean))];
+      if (secIds.length) {
+        const { data: secOwners } = await db.from('entity_sections').select('entity_slug').in('id', secIds);
+        (secOwners || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug));
+      }
+    }
 
     if (!matchedSlugs.size) return res.json({ query: q, results: [], total: 0 });
 
@@ -1070,14 +1217,19 @@ router.post('/search', async (req, res) => {
 
     const slugList = (entities || []).map(e => e.slug);
 
-    // Fetch matched content + photos
-    const [menuMatches, drinkMatches, hhMatches, specialMatches, eventMatches, photoRows] = await Promise.all([
+    // Fetch matched content + photos + all tags/amenities for matched entities.
+    // Tags/amenities are fetched in full (not just keyword-matched) so the caller — a UI
+    // chip row or the AI concierge — sees the entity's complete feature set, and so
+    // multi-amenity queries can be scored by how many requested features an entity has.
+    const [menuMatches, drinkMatches, hhMatches, specialMatches, eventMatches, photoRows, tagRows, amenityRows] = await Promise.all([
       db.from('menu_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('happy_hour_items').select('entity_slug, item_name, description, price').in('entity_slug', slugList).or(orFilter('item_name', 'description')),
       db.from('entity_specials').select('entity_slug, special_name, description, discount_text').in('entity_slug', slugList).eq('is_active', true),
       db.from('entity_events').select('entity_slug, event_name, event_date, artist_name').in('entity_slug', slugList).eq('is_active', true).or(orFilter('event_name', 'artist_name')),
       db.from('entity_photos').select('entity_slug, url, sort_order').in('entity_slug', slugList).order('sort_order'),
+      db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugList),
+      db.from('entity_amenities').select('entity_slug, amenity, category').in('entity_slug', slugList),
     ]);
 
     // Build match maps — deduplicate menu items by name within each entity
@@ -1097,6 +1249,17 @@ router.post('/search', async (req, res) => {
     (eventMatches.data || []).forEach(r => { if (!eventMap[r.entity_slug]) eventMap[r.entity_slug] = []; eventMap[r.entity_slug].push(r); });
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
 
+    // Unified feature list per entity: amenity-category tags + entity_amenities rows, deduped.
+    // This is the field an amenity query ("hot tub", "sauna") scores against.
+    const featureMap = {};
+    const addFeature = (slug, label) => {
+      if (!slug || !label) return;
+      if (!featureMap[slug]) featureMap[slug] = new Set();
+      featureMap[slug].add(label);
+    };
+    (tagRows.data || []).forEach(r => addFeature(r.entity_slug, r.tag_name));
+    (amenityRows.data || []).forEach(r => addFeature(r.entity_slug, r.amenity));
+
     const score = (name, desc) => {
       const n = (name || '').toLowerCase(), d = (desc || '').toLowerCase();
       if (n === term) return 100;
@@ -1115,9 +1278,19 @@ router.post('/search', async (req, res) => {
       const events = (eventMap[e.slug] || []).filter(ev =>
         keywords.some(k => (ev.event_name || '').toLowerCase().includes(k) || (ev.artist_name || '').toLowerCase().includes(k))
       );
+      const features = [...(featureMap[e.slug] || [])];
+      // Which of the query keywords are satisfied by this entity's features — lets a
+      // multi-amenity request ("hot tub sauna lazy river") rank places that have MORE
+      // of the requested features higher, and tells the AI exactly which ones matched.
+      const matchedFeatures = features.filter(f => {
+        const fl = f.toLowerCase();
+        return keywords.some(k => fl.includes(k));
+      });
       const nameScore = score(e.name, e.subtitle);
       const itemScore = menuItems.length ? score(menuItems[0].item_name, menuItems[0].description) : 0;
-      const relevance = Math.max(nameScore, itemScore) + (e.rating || 0);
+      // Each matched feature adds a strong, cumulative boost so amenity coverage drives ranking.
+      const featureScore = matchedFeatures.length * 40;
+      const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0);
       const distance_miles = (userLat && userLng && e.latitude && e.longitude)
         ? haversine(userLat, userLng, e.latitude, e.longitude)
         : null;
@@ -1128,6 +1301,8 @@ router.post('/search', async (req, res) => {
         matched_menu_items: menuItems,
         matched_specials: specials,
         matched_events: events,
+        features,
+        matched_features: matchedFeatures,
         _relevance: relevance,
         distance_miles,
       };
@@ -1310,7 +1485,130 @@ router.get('/entities/:parentSlug/children', async (req, res) => {
       .order('name');
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ children: data || [], total: (data || []).length });
+    const children = data || [];
+
+    // Rental details for unit children (condo units, beach houses): beds,
+    // baths, sleeps, nightly price from bookable_resources keyed by the
+    // unit's own slug — listing cards render these when present.
+    if (children.length) {
+      const slugs = children.map(c => c.slug);
+      const { data: resources } = await db
+        .from('bookable_resources')
+        .select('entity_slug,name,resource_type,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url,amenities')
+        .in('entity_slug', slugs)
+        .eq('is_active', true);
+      const bySlug = new Map();
+      for (const r of resources || []) {
+        // keep the richest row per slug (some slugs carry a placeholder row)
+        const score = ['nightly_price','bedrooms','bathrooms','capacity'].filter(k => r[k] != null).length;
+        const prev = bySlug.get(r.entity_slug);
+        if (!prev || score > prev._score) bySlug.set(r.entity_slug, { ...r, _score: score });
+      }
+      for (const c of children) {
+        const r = bySlug.get(c.slug);
+        if (r) {
+          const { _score, entity_slug, ...rental } = r;
+          c.rental = rental;
+        }
+      }
+    }
+
+    res.json({ children, total: children.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gcr/stay-units ──────────────────────────────────────────────────
+// Booking-platform data for the staying page: every unit under a stay-type
+// complex (with rental specs), plus a per-complex summary for listing cards
+// (unit count, available count, from-price, bedroom range).
+router.get('/stay-units', async (req, res) => {
+  try {
+    const { data: parents, error: pErr } = await db
+      .from('entity')
+      .select('slug,name,city,hero_image_url')
+      .in('entity_type', ['condo', 'hotel', 'vacation-rental'])
+      .eq('is_active', true);
+    if (pErr) return res.status(500).json({ error: pErr.message });
+
+    const parentSlugs = (parents || []).map(p => p.slug);
+    const parentName = new Map((parents || []).map(p => [p.slug, p.name]));
+
+    // Units = child entities of stay complexes (chunked .in to stay under URL limits)
+    const units = [];
+    for (let i = 0; i < parentSlugs.length; i += 150) {
+      const chunk = parentSlugs.slice(i, i + 150);
+      const { data } = await db
+        .from('entity')
+        .select('id,slug,name,entity_type,entity_subtype,parent_entity_slug,city,state,hero_image_url,unit_number,building,unit_floor,view_type,rating,review_count,is_active')
+        .in('parent_entity_slug', chunk)
+        .eq('is_active', true);
+      units.push(...(data || []));
+    }
+
+    // Rental specs from bookable_resources keyed by unit slug (richest row wins)
+    const unitSlugs = units.map(u => u.slug);
+    const bySlug = new Map();
+    for (let i = 0; i < unitSlugs.length; i += 200) {
+      const chunk = unitSlugs.slice(i, i + 200);
+      const { data: resources } = await db
+        .from('bookable_resources')
+        .select('entity_slug,nightly_price,cleaning_fee,bedrooms,bathrooms,sqft,capacity,min_nights,booking_url,amenities')
+        .in('entity_slug', chunk)
+        .eq('is_active', true);
+      for (const r of resources || []) {
+        const score = ['nightly_price', 'bedrooms', 'bathrooms', 'capacity'].filter(k => r[k] != null).length;
+        const prev = bySlug.get(r.entity_slug);
+        if (!prev || score > prev._score) bySlug.set(r.entity_slug, { ...r, _score: score });
+      }
+    }
+
+    const summary = {};
+    for (const u of units) {
+      const r = bySlug.get(u.slug);
+      if (r) {
+        const { _score, entity_slug, ...rental } = r;
+        u.rental = rental;
+      }
+      u.parent_name = parentName.get(u.parent_entity_slug) || null;
+      const s = summary[u.parent_entity_slug] || (summary[u.parent_entity_slug] = {
+        unit_count: 0, available_units: 0, price_min: null, beds_min: null, beds_max: null,
+      });
+      s.unit_count += 1;
+      // "available" = actively listed & bookable today; live calendar
+      // availability can tighten this later via booking_calendar
+      s.available_units += 1;
+      if (u.rental?.nightly_price != null) s.price_min = s.price_min == null ? u.rental.nightly_price : Math.min(s.price_min, u.rental.nightly_price);
+      if (u.rental?.bedrooms != null) {
+        s.beds_min = s.beds_min == null ? u.rental.bedrooms : Math.min(s.beds_min, u.rental.bedrooms);
+        s.beds_max = s.beds_max == null ? u.rental.bedrooms : Math.max(s.beds_max, u.rental.bedrooms);
+      }
+    }
+
+    // Complex amenities for listing cards — the card sells the whole condo
+    // (pools, splash pad, tennis, fitness), not just the unit counts. All
+    // stay complexes get amenities, units or not.
+    for (let i = 0; i < parentSlugs.length; i += 150) {
+      const chunk = parentSlugs.slice(i, i + 150);
+      const { data: amenityTags } = await db
+        .from('entity_tags')
+        .select('entity_slug,tag_name')
+        .in('entity_slug', chunk)
+        .eq('tag_category', 'amenity');
+      for (const t of amenityTags || []) {
+        const s = summary[t.entity_slug] || (summary[t.entity_slug] = {
+          unit_count: 0, available_units: 0, price_min: null, beds_min: null, beds_max: null,
+        });
+        if (!s.amenities) s.amenities = [];
+        if (s.amenities.length < 12 && t.tag_name && !s.amenities.some(a => a.toLowerCase() === t.tag_name.toLowerCase())) {
+          s.amenities.push(t.tag_name);
+        }
+      }
+    }
+
+    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+    res.json({ units, summary, total_units: units.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1906,5 +2204,98 @@ router.post('/artist/:slug/request', async (req, res) => {
     res.json({ success: true })
   }
 })
+
+// POST /api/gcr/opt-in — captures name/phone/consent BEFORE a customer enters
+// a booking/checkout flow (used ahead of A2P 10DLC approval — SMS only ever
+// actually goes out via sendSms()'s owner-relay mode until that's approved).
+// Also lets a business recover an abandoned checkout: if the customer bails
+// before paying, this row already has their name + phone to follow up with.
+router.post('/opt-in', async (req, res) => {
+  try {
+    const { entity_slug, click_id, name, phone, email, sms_consent, consent_text } = req.body || {}
+    if (!entity_slug || !phone) return res.status(400).json({ error: 'entity_slug and phone required' })
+
+    const { data, error } = await db.from('booking_opt_ins').insert({
+      entity_slug,
+      click_id: click_id || null,
+      name: name || null,
+      phone,
+      email: email || null,
+      sms_consent: !!sms_consent,
+      consent_text: consent_text || null,
+    }).select('id').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ opt_in_id: data.id })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /api/gcr/waiver/:slug/sign — clickwrap consent capture: checkbox PLUS
+// a typed full-name confirmation (signature_typed_name) that must match the
+// customer's name — stronger than a bare checkbox for "I didn't see it"
+// disputes, short of a drawn/DocuSign e-signature. Returns a waiver_id the
+// caller attaches to the booking so it's traceable to this exact signature.
+router.post('/waiver/:slug/sign', async (req, res) => {
+  try {
+    const { slug } = req.params
+    const { customer_name, customer_email, customer_phone, waiver_text, signature_typed_name } = req.body || {}
+    if (!customer_name) return res.status(400).json({ error: 'customer_name required' })
+    if (!waiver_text) return res.status(400).json({ error: 'waiver_text required' })
+    if (!signature_typed_name) return res.status(400).json({ error: 'signature_typed_name required' })
+    if (signature_typed_name.trim().toLowerCase() !== customer_name.trim().toLowerCase()) {
+      return res.status(400).json({ error: 'Typed name must match your name exactly' })
+    }
+
+    const crypto = require('crypto')
+    const token = crypto.randomBytes(16).toString('hex')
+    const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').toString().split(',')[0].trim()
+
+    const { data, error } = await db.from('waivers').insert({
+      entity_slug: slug,
+      customer_name,
+      customer_email: customer_email || null,
+      customer_phone: customer_phone || null,
+      waiver_text,
+      signature_typed_name,
+      signed_at: new Date().toISOString(),
+      ip_address: ip || null,
+      token,
+    }).select('id, token').single()
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json({ waiver_id: data.id, token: data.token })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// GET /api/gcr/lodging-search?q=... — condo/hotel typeahead, used by pickup/delivery
+// style service bookings (e.g. Gulf Coast Luggo) so a guest can pick their real
+// stay off the platform instead of typing a free-text address.
+router.get('/lodging-search', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim()
+    if (q.length < 2) return res.json([])
+
+    const { data, error } = await db
+      .from('entity')
+      .select('slug, name, city, address_line_1')
+      .in('entity_type', ['hotel', 'condo', 'vacation-rental'])
+      .eq('is_active', true)
+      .ilike('name', `%${q}%`)
+      .limit(8)
+
+    if (error) return res.status(500).json({ error: error.message })
+    res.json(data || [])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// NOTE: pickup/delivery-style bookings (luggage, transportation, etc.) go
+// through the broker at /api/transportation/request instead of a one-off
+// route here — see routes/transportation.js for the real dispatch flow.
 
 module.exports = router;

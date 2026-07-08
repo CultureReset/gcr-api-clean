@@ -23,41 +23,43 @@ async function uploadEntityMedia(base64, mime) {
 
 // ── GCR write-through ────────────────────────────────────────────────────────
 // When data is saved to the main DB via site_id, also mirror it to the GCR
-// entity if one exists with a matching legacy_site_id. Fire-and-forget.
+// entity claimed by this owner (entity_owners). Fire-and-forget.
 async function syncToGcr(siteId, type, data) {
     const gcrDb = gcr();
-    const { data: entity } = await gcrDb.from('entity')
-        .select('id').eq('legacy_site_id', siteId).maybeSingle();
-    if (!entity) return;
-    const eid = entity.id;
+    // resolve the owner's entity through entity_owners (the claim table) —
+    // entity.legacy_site_id never existed; the slug is the business key
+    const { data: owner } = await gcrDb.from('entity_owners')
+        .select('entity_slug').eq('user_id', siteId).maybeSingle();
+    if (!owner || !owner.entity_slug) return;
+    const eid = owner.entity_slug;
 
     if (type === 'menu_item') {
         const itemType = data.item_type || 'food';
         if (itemType === 'drink') {
             // Drinks go to GCR drink_sections + drink_items
             const secName = data.category || 'Drinks';
-            let { data: sec } = await gcrDb.from('drink_sections').select('id').eq('entity_id', eid).eq('section_name', secName).maybeSingle();
+            let { data: sec } = await gcrDb.from('drink_sections').select('id').eq('entity_slug', eid).eq('section_name', secName).maybeSingle();
             if (!sec) {
-                const ins = await gcrDb.from('drink_sections').insert({ entity_id: eid, section_name: secName }).select('id').single();
+                const ins = await gcrDb.from('drink_sections').insert({ entity_slug: eid, section_name: secName }).select('id').single();
                 sec = ins.data;
             }
-            if (sec) await gcrDb.from('drink_items').insert({ entity_id: eid, drink_section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null, tags: data.tags || [], modifiers: data.modifiers || [], is_available: true });
+            if (sec) await gcrDb.from('drink_items').insert({ entity_slug: eid, section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null, tags: data.tags || [], is_available: true });
         } else if (itemType === 'happy_hour') {
             // Happy hour items go to GCR happy_hour_sections + happy_hour_items
             const secName = data.category || 'Happy Hour';
-            let { data: sec } = await gcrDb.from('happy_hour_sections').select('id').eq('entity_id', eid).maybeSingle();
+            let { data: sec } = await gcrDb.from('happy_hour_sections').select('id').eq('entity_slug', eid).maybeSingle();
             if (!sec) {
-                const ins = await gcrDb.from('happy_hour_sections').insert({ entity_id: eid, section_name: secName }).select('id').single();
+                const ins = await gcrDb.from('happy_hour_sections').insert({ entity_slug: eid, section_name: secName }).select('id').single();
                 sec = ins.data;
             }
-            if (sec) await gcrDb.from('happy_hour_items').insert({ entity_id: eid, item_name: data.name, hh_price: data.price || null, description: data.description || null });
+            if (sec) await gcrDb.from('happy_hour_items').insert({ entity_slug: eid, section_id: sec.id, item_name: data.name, price: data.price || null, description: data.description || null });
         } else {
             // Food goes to GCR menu_items
-            await gcrDb.from('menu_items').insert({ entity_id: eid, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
+            await gcrDb.from('menu_items').insert({ entity_slug: eid, item_name: data.name, price: data.price || null, description: data.description || null, is_available: true });
         }
     } else if (type === 'special') {
         await gcrDb.from('entity_specials').insert({
-            entity_id: eid,
+            entity_slug: eid,
             special_name: data.special_name || data.name,
             discount_text: data.discount_text || '',
             description: data.description || null,
@@ -68,7 +70,7 @@ async function syncToGcr(siteId, type, data) {
         });
     } else if (type === 'event') {
         await gcrDb.from('entity_events').insert({
-            entity_id: eid,
+            entity_slug: eid,
             event_name: data.name || data.event_name,
             description: data.description || null,
             event_date: data.event_date || null,
@@ -186,7 +188,7 @@ function _gcrEntityToAdminProfile(e) {
     if (!e) return { business: null, content: null };
     return {
         business: {
-            site_id: e.legacy_site_id || null,
+            site_id: e.slug || null, // the slug IS the business key
             name: e.name || '',
             type: e.entity_subtype || e.entity_type || '',
             logo_url: e.hero_image_url || '',
@@ -1681,63 +1683,183 @@ router.delete('/review-questions/:id', async (req, res) => {
 // WAIVERS
 // ============================================
 
+// GET /api/dashboard/waivers — signed waivers for this business's GCR listing
+// (waivers is entity_slug-keyed — the site_id filter this used to have
+// referenced a column that doesn't exist on that table, so this endpoint
+// always 500'd before this fix)
 router.get('/waivers', async (req, res) => {
-    const { data } = await supabase
-        .from('waivers')
-        .select('*')
-        .eq('site_id', req.siteId)
-        .order('signed_at', { ascending: false });
-
-    res.json(data || []);
-});
-
-// GET /api/dashboard/waivers/template — get the waiver template
-router.get('/waivers/template', async (req, res) => {
-    const { data } = await supabase
-        .from('waivers')
-        .select('*')
-        .eq('site_id', req.siteId)
-        .is('booking_id', null)
-        .order('signed_at', { ascending: false })
-        .limit(1)
-        .single();
-
-    if (!data) return res.status(404).json({ error: 'No waiver template found' });
-    res.json(data);
-});
-
-// PUT /api/dashboard/waivers/template — create or replace the waiver template text
-router.put('/waivers/template', async (req, res) => {
-    const { waiver_text, title } = req.body;
-    if (!waiver_text) return res.status(400).json({ error: 'waiver_text required' });
-
-    // Fetch existing template row (booking_id IS NULL = master template)
-    const { data: existing } = await supabase
-        .from('waivers')
-        .select('id')
-        .eq('site_id', req.siteId)
-        .is('booking_id', null)
-        .limit(1)
-        .single();
-
-    if (existing) {
-        const { data, error } = await supabase
-            .from('waivers')
-            .update({ waiver_text, customer_name: title || null })
-            .eq('id', existing.id)
-            .select()
-            .single();
-        if (error) return res.status(500).json({ error: error.message });
-        return res.json(data);
-    }
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.json([]);
 
     const { data, error } = await supabase
         .from('waivers')
-        .insert({ site_id: req.siteId, waiver_text, customer_name: title || null })
-        .select()
+        .select('*')
+        .eq('entity_slug', entitySlug)
+        .not('signed_at', 'is', null)
+        .order('signed_at', { ascending: false });
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
+// GET /api/dashboard/waivers/template — the waiver text + on/off flag for this business
+// Lives directly on the entity row (one template per business) rather than
+// as a row in the waivers table, which is for *signed* instances.
+router.get('/waivers/template', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data, error } = await supabase
+        .from('entity')
+        .select('waiver_required, waiver_text, waiver_document_url')
+        .eq('slug', entitySlug)
+        .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || { waiver_required: false, waiver_text: '', waiver_document_url: null });
+});
+
+// PUT /api/dashboard/waivers/template — save the waiver text and whether it's required
+// (waiver_document_url is managed separately via /documents/upload + /documents/:kind)
+router.put('/waivers/template', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { waiver_text, waiver_required } = req.body;
+    const { data, error } = await supabase
+        .from('entity')
+        .update({ waiver_text: waiver_text ?? null, waiver_required: !!waiver_required })
+        .eq('slug', entitySlug)
+        .select('waiver_required, waiver_text, waiver_document_url')
         .single();
     if (error) return res.status(500).json({ error: error.message });
-    res.status(201).json(data);
+    res.json(data);
+});
+
+// Document uploads shared by waivers + policies — a business's own PDF/doc
+// for their waiver, cancellation policy, or refund policy, stored on the
+// entity row so it can be linked from the customer-facing booking flow.
+const DOCUMENT_KIND_COLUMNS = {
+    waiver: 'waiver_document_url',
+    cancellation_policy: 'cancellation_policy_doc_url',
+    refund_policy: 'refund_policy_doc_url',
+};
+
+// POST /api/dashboard/documents/upload — body: { kind, file_base64, mime }
+router.post('/documents/upload', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { kind, file_base64, mime } = req.body;
+    const column = DOCUMENT_KIND_COLUMNS[kind];
+    if (!column) return res.status(400).json({ error: 'Invalid document kind' });
+    if (!file_base64) return res.status(400).json({ error: 'file_base64 required' });
+
+    try {
+        const ext = (mime || 'application/pdf').split('/')[1]?.replace('vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx') || 'pdf';
+        const fileName = `documents/${entitySlug}/${kind}-${Date.now()}.${ext}`;
+        const buffer = Buffer.from(file_base64, 'base64');
+        const gcrDb = gcr();
+        const { error: uploadError } = await gcrDb.storage.from('entity-media').upload(fileName, buffer, { contentType: mime || 'application/pdf', upsert: false });
+        if (uploadError) throw new Error(uploadError.message);
+        const { data: urlData } = gcrDb.storage.from('entity-media').getPublicUrl(fileName);
+
+        const { data, error } = await supabase
+            .from('entity')
+            .update({ [column]: urlData.publicUrl })
+            .eq('slug', entitySlug)
+            .select(`${column}`)
+            .single();
+        if (error) return res.status(500).json({ error: error.message });
+        res.json({ url: urlData.publicUrl, ...data });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE /api/dashboard/documents/:kind — remove a business's uploaded document link
+router.delete('/documents/:kind', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const column = DOCUMENT_KIND_COLUMNS[req.params.kind];
+    if (!column) return res.status(400).json({ error: 'Invalid document kind' });
+
+    const { error } = await supabase.from('entity').update({ [column]: null }).eq('slug', entitySlug);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// ============================================
+// MENU EDITOR BRIDGE — lets a logged-in dashboard user deep-link straight into
+// menu-editor.html without re-entering the entity's PIN. Mirrors the token
+// menu-editor.js itself issues (routes/menu-editor.js: makeToken), so the
+// returned token is accepted by the existing PIN-auth middleware as-is.
+// ============================================
+
+router.get('/menu-editor-link', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data: entity, error } = await supabase
+        .from('entity')
+        .select('slug, menu_pin')
+        .eq('slug', entitySlug)
+        .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    if (!entity.menu_pin) {
+        const pin = String(Math.floor(1000 + Math.random() * 9000));
+        const { error: pinErr } = await supabase.from('entity').update({ menu_pin: pin }).eq('slug', entitySlug);
+        if (pinErr) return res.status(500).json({ error: pinErr.message });
+        entity.menu_pin = pin;
+    }
+
+    const crypto = require('crypto');
+    const token = crypto.createHash('sha256')
+        .update(`${entity.slug}:${entity.menu_pin}:${process.env.GCR_SUPABASE_SERVICE_KEY}`)
+        .digest('hex').slice(0, 32);
+
+    res.json({ slug: entity.slug, token });
+});
+
+// ============================================
+// POLICIES — deposit + cancellation/refund terms shown to customers before
+// they book (Reserve.jsx, and any future checkout page). Lives on the
+// entity row like the waiver template above — one set of terms per business.
+// ============================================
+
+router.get('/policies', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data, error } = await supabase
+        .from('entity')
+        .select('deposit_amount, deposit_type, cancellation_policy, refund_policy, cancellation_policy_doc_url, refund_policy_doc_url')
+        .eq('slug', entitySlug)
+        .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || {});
+});
+
+router.put('/policies', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { deposit_amount, deposit_type, cancellation_policy, refund_policy } = req.body;
+    const { data, error } = await supabase
+        .from('entity')
+        .update({
+            deposit_amount: deposit_amount === '' || deposit_amount == null ? null : Number(deposit_amount),
+            deposit_type: deposit_type || null,
+            cancellation_policy: cancellation_policy || null,
+            refund_policy: refund_policy || null,
+        })
+        .eq('slug', entitySlug)
+        .select('deposit_amount, deposit_type, cancellation_policy, refund_policy, cancellation_policy_doc_url, refund_policy_doc_url')
+        .single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
 });
 
 // GET /api/dashboard/waivers/booking/:booking_id — get signed waiver for a booking
@@ -3109,6 +3231,119 @@ router.delete('/availability/blocks', async (req, res) => {
 });
 
 // ============================================
+// ICAL SYNC — export GCR's unified calendar as a feed URL a business can
+// paste into Airbnb/VRBO/Google Calendar's "import calendar" field so
+// those platforms auto-block whatever GCR already has booked. Reads from
+// business_availability (entity_slug-keyed), the same unified calendar
+// used by the GCR reservation flow — not the legacy site_id availability
+// tables above, so this works regardless of business type.
+// ============================================
+
+// Delegates to the canonical resolver (lib/entity-resolver.js) — checks
+// entity_owners by req.userId first, then users.entity_slug, then
+// entity.legacy_site_id as a last resort. Fixes an earlier version of this
+// helper that incorrectly queried entity_owners.user_id by req.siteId.
+async function resolveOwnedEntitySlug(req) {
+    const entity = await resolveEntity(req);
+    return entity?.slug || null;
+}
+
+// GET /api/dashboard/ical/feed-url — get (or lazily create) this business's calendar feed URL
+router.get('/ical/feed-url', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data: entity, error } = await supabase.from('entity').select('ical_token').eq('slug', entitySlug).maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+
+    let token = entity?.ical_token;
+    if (!token) {
+        token = require('crypto').randomBytes(20).toString('hex');
+        await supabase.from('entity').update({ ical_token: token }).eq('slug', entitySlug);
+    }
+
+    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+    res.json({ feed_url: `${base}/api/public/ical/${entitySlug}/${token}.ics`, entity_slug: entitySlug });
+});
+
+// POST /api/dashboard/ical/regenerate — rotate the token, invalidating the old URL
+router.post('/ical/regenerate', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const token = require('crypto').randomBytes(20).toString('hex');
+    const { error } = await supabase.from('entity').update({ ical_token: token }).eq('slug', entitySlug);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+    res.json({ feed_url: `${base}/api/public/ical/${entitySlug}/${token}.ics`, entity_slug: entitySlug });
+});
+
+// GET /api/dashboard/ical/external — list this business's connected external calendars (Airbnb, VRBO, ...)
+router.get('/ical/external', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data, error } = await supabase
+        .from('entity_external_calendars')
+        .select('id, source_label, ical_url, last_synced_at, last_sync_status, created_at')
+        .eq('entity_slug', entitySlug)
+        .order('created_at');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
+// POST /api/dashboard/ical/external — connect an external calendar (Airbnb/VRBO .ics export URL)
+router.post('/ical/external', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { source_label, ical_url } = req.body;
+    if (!ical_url) return res.status(400).json({ error: 'ical_url required' });
+
+    const { data, error } = await supabase
+        .from('entity_external_calendars')
+        .insert({ entity_slug: entitySlug, source_label: source_label || 'External Calendar', ical_url })
+        .select()
+        .single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+});
+
+// DELETE /api/dashboard/ical/external/:id
+router.delete('/ical/external/:id', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { error } = await supabase
+        .from('entity_external_calendars')
+        .delete()
+        .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// POST /api/dashboard/ical/external/:id/sync-now — manual sync trigger, proxies to email-parser
+router.post('/ical/external/:id/sync-now', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data: row } = await supabase
+        .from('entity_external_calendars')
+        .select('id')
+        .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug)
+        .maybeSingle();
+    if (!row) return res.status(404).json({ error: 'Not found' });
+
+    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+    const r = await fetch(`${base}/api/email-parser/ical-import/sync-now/${row.id}`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    res.json(d);
+});
+
+// ============================================
 // AI TRAINING — business_details, logistics, atmosphere, qa_pairs
 // ============================================
 
@@ -3211,7 +3446,10 @@ router.post('/ai-chat', async (req, res) => {
 
     // Look up GCR entity early so executeTool and context can use it
     const _gcrDb = gcr();
-    const { data: _gcrEntity } = await _gcrDb.from('entity').select('id,slug').eq('legacy_site_id', siteId).maybeSingle();
+    const { data: _own } = await _gcrDb.from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle();
+    const { data: _gcrEntity } = _own && _own.entity_slug
+        ? await _gcrDb.from('entity').select('id,slug').eq('slug', _own.entity_slug).maybeSingle()
+        : { data: null };
     const gcrEntityId = _gcrEntity?.id || null;
     const gcrEntitySlug = _gcrEntity?.slug || null;
 

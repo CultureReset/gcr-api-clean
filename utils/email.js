@@ -170,6 +170,54 @@ function customerConfirmationHtml(d) {
 }
 
 /**
+ * Build a lightweight confirmation email for a GCR-direct reservation
+ * request (Reserve.jsx) — status is "pending", not paid/confirmed, so this
+ * intentionally reads differently from customerConfirmationHtml above.
+ */
+function gcrReservationConfirmationHtml(d) {
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+        <tr><td style="background:#667eea;padding:32px 32px 24px;text-align:center;">
+          <h1 style="margin:0;color:#fff;font-size:22px;">Reservation Requested</h1>
+          <p style="margin:8px 0 0;color:#e0e7ff;font-size:15px;">${esc(d.business_name)} will confirm your requested time</p>
+        </td></tr>
+
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 20px;color:#374151;font-size:15px;">Hi <strong>${esc(d.customer_name)}</strong>, here's what you requested:</p>
+
+          <table width="100%" style="background:#f9fafb;border-radius:10px;padding:20px;border:1px solid #e5e7eb;margin-bottom:20px;" cellpadding="0" cellspacing="0">
+            ${row('📅 Date', d.date)}
+            ${row('⏰ Time', d.time_slot)}
+            ${row('👥 Party Size', d.guest_count)}
+          </table>
+
+          ${d.notes ? `<p style="margin:0 0 20px;color:#6b7280;font-size:13px;"><strong>Notes:</strong> ${esc(d.notes)}</p>` : ''}
+
+          <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:16px;margin-bottom:20px;">
+            <p style="margin:0;color:#92400e;font-size:13px;">This is a request, not a confirmed reservation — no payment was collected. ${esc(d.business_name)} may adjust the exact time based on availability.</p>
+          </div>
+
+          <p style="margin:0;color:#374151;font-size:15px;">Questions? Contact ${esc(d.business_name)} directly.</p>
+        </td></tr>
+
+        <tr><td style="background:#f9fafb;padding:20px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:12px;">Sent automatically by Gulf Coast Radar.</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
  * Build owner new-booking notification email HTML
  */
 function ownerNotificationHtml(d) {
@@ -320,4 +368,4 @@ function generateIcsContent(d) {
     ].join('\r\n');
 }
 
-module.exports = { sendEmail, customerConfirmationHtml, ownerNotificationHtml, generateIcsContent };
+module.exports = { sendEmail, customerConfirmationHtml, gcrReservationConfirmationHtml, ownerNotificationHtml, generateIcsContent };

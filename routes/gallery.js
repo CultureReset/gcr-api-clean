@@ -22,22 +22,24 @@ router.get('/:slug', async (req, res) => {
     const offset = (page - 1) * limit;
     const category = req.query.category;
 
+    // Photos live in entity_photos — entity_gallery is an empty legacy table,
+    // which left every profile gallery showing "No photos available"
     let query = db
-      .from('entity_gallery')
-      .select('*', { count: 'exact' })
+      .from('entity_photos')
+      .select('id,url,caption,photo_type,sort_order,is_cover', { count: 'exact' })
       .eq('entity_slug', req.params.slug)
-      .order('is_featured', { ascending: false })
+      .order('is_cover', { ascending: false })
       .order('sort_order');
 
     if (category) {
-      query = query.eq('category', category);
+      query = query.eq('photo_type', category);
     }
 
     const { data: photos, count, error } = await query.range(offset, offset + limit - 1);
 
     if (error) return res.status(500).json({ error: error.message });
     res.json({
-      photos: photos || [],
+      photos: (photos || []).map(p => ({ ...p, photo_url: p.url, category: p.photo_type || null })),
       pagination: { page, limit, total: count }
     });
   } catch (err) {
@@ -50,13 +52,12 @@ router.get('/:slug', async (req, res) => {
 router.get('/:slug/categories', async (req, res) => {
   try {
     const { data, error } = await db
-      .from('entity_gallery')
-      .select('category')
-      .eq('entity_slug', req.params.slug)
-      .distinct();
+      .from('entity_photos')
+      .select('photo_type')
+      .eq('entity_slug', req.params.slug);
 
     if (error) return res.status(500).json({ error: error.message });
-    const categories = [...new Set((data || []).map(d => d.category))];
+    const categories = [...new Set((data || []).map(d => d.photo_type).filter(Boolean))];
     res.json({ categories });
   } catch (err) {
     res.status(500).json({ error: err.message });

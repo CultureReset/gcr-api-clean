@@ -87,20 +87,13 @@ const { _recomputeAllPreferences } = require('./tourist');
 
 async function backfillAnonymousActivity(userId, visitorId) {
     try {
-        // Update all tables where visitor_id matches with the new user_id
+        // gcr_page_views/session_events/qr_scans backfill intentionally omitted:
+        // none of those tables carry the user_id/visitor_id columns this used to
+        // assume (gcr_page_views keys on entity_id, qr_scans on entity_slug/
+        // qr_code_id, session_events doesn't exist) — confirmed by a separate,
+        // dedicated data-structure assessment. Re-add only once a real identity
+        // column exists on one of those tables.
         await Promise.all([
-            mainDb.from('gcr_page_views')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-            mainDb.from('session_events')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
-            mainDb.from('qr_scans')
-                .update({ user_id: userId })
-                .eq('visitor_id', visitorId)
-                .is('user_id', null),
             // Neither table has a unique constraint that a guest UUID's rows
             // could collide with on the real account, so a plain reassign is safe.
             mainDb.from('tourist_swipe_events')
