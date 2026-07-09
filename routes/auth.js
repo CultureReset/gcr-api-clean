@@ -7,6 +7,34 @@ const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Map the free-form signup businessType to entity.entity_type, which has a
+// CHECK constraint allowing only NULL or a fixed set. The raw businessType is
+// preserved separately in entity_subtype so specificity isn't lost.
+function mapEntityType(bt) {
+    const t = String(bt || '').toLowerCase();
+    if (/coffee|espresso|cafe/.test(t)) return 'coffee';
+    if (/dessert|ice cream|gelato/.test(t)) return 'dessert';
+    if (/bakery|bake/.test(t)) return 'bakery';
+    if (/restaurant|food|bar|dining|grill|pub|eatery/.test(t)) return 'restaurant';
+    if (/hotel|motel|inn|resort|lodge/.test(t)) return 'hotel';
+    if (/condo/.test(t)) return 'condo';
+    if (/vacation|airbnb|vrbo|rental-home|short-term/.test(t)) return 'vacation-rental';
+    if (/shop|retail|store|boutique|market/.test(t)) return 'shopping';
+    if (/park|beach|trail|nature/.test(t)) return 'park';
+    if (/salon|spa|barber|photograph|hair|nail|massage|service|repair|clean|detail|consult/.test(t)) return 'service';
+    if (/charter|tour|boat|rental|activity|cruise|fishing|parasail|jet|kayak|dolphin|excursion|ticket/.test(t)) return 'activity';
+    return null; // unknown → NULL is valid per the CHECK constraint
+}
+
+// Generate a slug that's unique within the GCR entity table (separate from the
+// businesses table). Falls back to a base36 timestamp suffix on collision.
+async function uniqueEntitySlug(supabase, name) {
+    const base = String(name || 'business')
+        .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'business';
+    const { data: taken } = await supabase.from('entity').select('id').eq('slug', base).maybeSingle();
+    return taken ? `${base}-${Date.now().toString(36)}` : base;
+}
+
 // ============================================
 // POST /api/auth/signup — Create account + business
 // Creates BOTH a Supabase Auth user (for frontend RLS/login)
@@ -126,9 +154,53 @@ router.post('/signup', async (req, res) => {
         if (phone) contentRow.contact_phone = phone;
         await supabase.from('site_content').insert(contentRow);
 
-        // Step 7: Generate JWT (for backend API usage)
+        // Step 7: Create the REAL GCR entity — from zero. This is the profile
+        // every modular tool (booking, offerings, reviews, AI concierge, QR,
+        // deals) actually attaches to, all keyed by entity_slug. Without it a
+        // brand-new signup has a login but nothing to install a module onto.
+        // A business already on GCR comes in through the invite/claim flow
+        // instead (which links an EXISTING entity); this path is for the
+        // net-new business that isn't on GCR yet.
+        const entitySlug = await uniqueEntitySlug(supabase, businessName);
+        const { data: entity, error: entityErr } = await supabase
+            .from('entity')
+            .insert({
+                slug: entitySlug,
+                name: businessName,
+                entity_type: mapEntityType(businessType),
+                entity_subtype: businessType || null,
+                phone: phone,
+                is_active: true,
+            })
+            .select('id, slug')
+            .single();
+
+        if (entityErr) {
+            // Roll back everything so we never leave a half-linked account.
+            await supabase.from('site_content').delete().eq('site_id', business.id);
+            await supabase.from('users').delete().eq('id', user.id);
+            await supabase.from('businesses').delete().eq('id', business.id);
+            await supabase.auth.admin.deleteUser(authId);
+            return res.status(500).json({ error: 'Failed to create business profile: ' + entityErr.message });
+        }
+
+        // Step 8: Link the user to the entity — the same wiring the admin
+        // claim-approval flow uses (entity_owners + users quick-lookup cols).
+        // lib/entity-resolver.js reads these to resolve the owner's entity on
+        // every dashboard call, so this is what makes the profile "theirs".
+        await supabase.from('entity_owners').upsert({
+            user_id: user.id,
+            entity_id: entity.id,
+            entity_slug: entity.slug,
+            role: 'owner',
+        }, { onConflict: 'user_id,entity_id' });
+        await supabase.from('users')
+            .update({ entity_id: entity.id, entity_slug: entity.slug })
+            .eq('id', user.id);
+
+        // Step 9: Generate JWT (for backend API usage)
         const token = jwt.sign(
-            { userId: user.id, siteId: business.id, role: 'owner' },
+            { userId: user.id, siteId: business.id, role: 'owner', entitySlug: entity.slug },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -141,6 +213,13 @@ router.post('/signup', async (req, res) => {
                 slug: business.slug,
                 name: business.name,
                 type: business.category
+            },
+            // The entity is the profile the modular tools attach to — the
+            // frontend routes here to pick modules (booking, reviews, etc.).
+            entity: {
+                id: entity.id,
+                slug: entity.slug,
+                name: businessName,
             }
         });
     } catch (err) {
