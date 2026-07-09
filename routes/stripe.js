@@ -302,7 +302,28 @@ router.delete('/delete-key', authRequired, async (req, res) => {
 // Creates PaymentIntent with connected account destination + platform fee
 // ============================================
 router.post('/create-payment-intent', async (req, res) => {
-    const { booking_id, amount, description, payment_method_id, site_id } = req.body;
+    const { booking_id, description, payment_method_id, site_id } = req.body;
+    let { amount } = req.body;
+
+    // A booking tied to a real GCR booking_id is NEVER charged the client's
+    // submitted amount — that number is display-only and can be tampered
+    // with in the browser. The real total_price was computed server-side in
+    // routes/platform.js's /submit handler (computeCheckoutTotal) at booking
+    // creation time; that stored value is the only thing we trust here.
+    if (booking_id) {
+        const { data: bookingRow } = await supabase
+            .from('bookings')
+            .select('id, entity_slug, total_price, status')
+            .eq('id', booking_id)
+            .maybeSingle();
+        if (!bookingRow) {
+            return res.status(404).json({ error: 'Booking not found' });
+        }
+        if (bookingRow.total_price == null) {
+            return res.status(409).json({ error: 'This booking has no priced total yet — it cannot be charged.' });
+        }
+        amount = bookingRow.total_price;
+    }
 
     if (!amount) {
         return res.status(400).json({ error: 'amount required' });
@@ -376,16 +397,27 @@ router.post('/create-payment-intent', async (req, res) => {
 
         const paymentIntent = await stripe.paymentIntents.create(params);
 
-        // Update booking with payment info
+        // Update booking with payment info. The real bookings table has no
+        // payment_id/payment_provider/payment_status columns — those live in
+        // the details jsonb blob alongside the rest of the submitted record;
+        // status/deposit_paid are the real columns that reflect payment state.
         if (booking_id) {
-            await supabase
+            const { data: existingBooking } = await supabase
                 .from('bookings')
-                .update({
-                    payment_id: paymentIntent.id,
-                    payment_provider: 'stripe',
-                    payment_status: paymentIntent.status === 'succeeded' ? 'paid' : 'pending'
-                })
-                .eq('id', booking_id);
+                .select('details')
+                .eq('id', booking_id)
+                .maybeSingle();
+            const mergedDetails = Object.assign({}, (existingBooking && existingBooking.details) || {}, {
+                payment_id: paymentIntent.id,
+                payment_provider: 'stripe',
+                payment_status: paymentIntent.status === 'succeeded' ? 'paid' : 'pending',
+            });
+            const bookingUpdate = { details: mergedDetails };
+            if (paymentIntent.status === 'succeeded') {
+                bookingUpdate.status = 'confirmed';
+                bookingUpdate.deposit_paid = amount;
+            }
+            await supabase.from('bookings').update(bookingUpdate).eq('id', booking_id);
         }
 
         // Send customer SMS + email after confirmed payment (fire-and-forget)

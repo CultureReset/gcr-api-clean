@@ -105,7 +105,7 @@ mount('/api/team', () => require('./routes/team'));
 mount('/api/gallery', () => require('./routes/gallery'));
 mount('/api/faqs', () => require('./routes/faqs'));
 mount('/api/blog', () => require('./routes/blog'));
-mount('/api/bookings', () => require('./routes/bookings'));
+//mount('/api/bookings', () => require('./routes/bookings')); // UNMOUNTED: wrote to the isolated entity_bookings silo, never reconciled with the real bookings/booking_calendar engine. Its only caller (gcr-unified BookingCalendar.jsx) was removed in favor of /reserve/:slug → /api/platform/page/:slug/submit/:appId — the one universal booking path.
 mount('/api/analytics', () => require('./routes/analytics'));
 
 // Artists & Live Music

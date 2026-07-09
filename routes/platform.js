@@ -145,7 +145,10 @@ function toBookingRow(slug, record) {
         party_size: parseInt(record.party, 10) || parseInt(record.guests, 10) || null,
         adults: parseInt(record.adults, 10) || null,
         children: parseInt(record.children || record.kids, 10) || null,
-        total_price: parseFloat(record.amount_paid) || null,
+        // total_price is the amount OWED — server-computed by computeCheckoutTotal()
+        // for checkout apps (see /submit below), never taken from the client.
+        // amount_paid is only ever set after Stripe confirms an actual charge.
+        total_price: record.total_price != null ? parseFloat(record.total_price) : null,
         deposit_paid: parseFloat(record.deposit_paid) || null,
         status: record.status || 'pending',
         source: record.source || 'dashboard',
@@ -160,6 +163,51 @@ function fromBookingRow(row) {
     rec.status = row.status || rec.status;
     if (!rec.date && row.date) rec.date = row.date;
     return rec;
+}
+
+// Authoritative checkout price. Built ONLY from server-known values — owner-
+// configured tier prices (bc.party.tiers), a fetched offering's real rates,
+// and a validated promo — never from anything the client submitted in the
+// request body. This is what /create-payment-intent charges; the client's
+// own idea of the total is display-only and must never be trusted for money.
+function computeCheckoutTotal(bc, record, resourceRow, nightCount, addonsTotal, promo) {
+    let subtotal = 0;
+    let priced = false;
+
+    if (bc.party && Array.isArray(bc.party.tiers) && bc.party.tiers.length) {
+        bc.party.tiers.forEach(function (t) {
+            const qty = parseInt(record[t.key], 10) || 0;
+            if (qty && t.price) { subtotal += qty * t.price; priced = true; }
+        });
+    }
+
+    if (!priced && resourceRow) {
+        const d = resourceRow.details || {};
+        const rateNight = parseFloat(d.rate_night);
+        const rateHourly = parseFloat(d.rate_hourly);
+        const rateFull = parseFloat(d.rate_full) || parseFloat(resourceRow.price_from);
+        const hours = parseFloat(record.hours);
+        if (nightCount > 0 && !isNaN(rateNight)) {
+            subtotal = rateNight * nightCount;
+            priced = true;
+        } else if (hours > 0 && !isNaN(rateHourly)) {
+            subtotal = rateHourly * hours;
+            priced = true;
+        } else if (!isNaN(rateFull)) {
+            subtotal = rateFull;
+            priced = true;
+        }
+    }
+
+    if (addonsTotal) { subtotal += addonsTotal; priced = true; }
+    if (!priced) return null;
+
+    if (promo) {
+        if (promo.percent) subtotal = subtotal * (1 - promo.percent / 100);
+        else if (promo.amount) subtotal = Math.max(0, subtotal - promo.amount);
+    }
+
+    return Math.max(0, Math.round(subtotal * 100) / 100);
 }
 function toOfferingRow(slug, dataKey, record, unit) {
     return {
@@ -1530,15 +1578,18 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
             if (refT) record.ref = code;
         }
         if (req.body.payment_intent_id) record.payment_id = String(req.body.payment_intent_id).slice(0, 100);
+        // informational only — NEVER used as the authoritative price, see computeCheckoutTotal() below
         if (req.body.amount_paid) record.amount_paid = String(req.body.amount_paid).slice(0, 20);
 
         const bc = bookingCfg(inst);
         // resource = an offering row
+        let resourceRow = null;
         if (req.body.resource_id && bc.resourceKey) {
             const { data: rr } = await supabase.from('offerings')
-                .select('id, name, capacity, details').eq('id', String(req.body.resource_id))
+                .select('id, name, capacity, details, price_from').eq('id', String(req.body.resource_id))
                 .eq('entity_slug', ent.slug).maybeSingle();
             if (rr) {
+                resourceRow = rr;
                 record.resource_id = rr.id;
                 record.resource = rr.name || (rr.details || {}).name || '';
             }
@@ -1588,12 +1639,14 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         }
 
         // promo: only stored if it's a real, unexpired code
+        let appliedPromo = null;
         if (req.body.promo) {
-            const promo = await findPromo(ent.slug, req.body.promo);
-            if (promo) { record.promo = promo.code; record.promo_off = promo.off; }
+            appliedPromo = await findPromo(ent.slug, req.body.promo);
+            if (appliedPromo) { record.promo = appliedPromo.code; record.promo_off = appliedPromo.off; }
         }
 
         // availability enforcement
+        let nightCount = 0;
         if (record.date && bc.mode !== 'none') {
             const earliest = cutoffEarliest(bc.cutoffHours);
             if (earliest) {
@@ -1615,6 +1668,7 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
                     nights.push(d.toISOString().slice(0, 10));
                 }
             }
+            nightCount = Math.max(0, nights.length - (record.end_date ? 1 : 0));
             for (const ds of nights) {
                 if (avail.blocked.indexOf(ds) !== -1) {
                     return res.status(409).json({ error: (record.resource ? record.resource + ' is' : 'That date is') + ' unavailable on ' + ds + ' — please pick different dates.' });
@@ -1639,11 +1693,9 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         }
 
         // resource limits: capacity + minimum nights from the offering itself
-        if (record.resource_id && bc.resourceKey) {
-            const { data: rr2 } = await supabase.from('offerings')
-                .select('capacity, details').eq('id', String(record.resource_id)).maybeSingle();
-            const rrec = (rr2 && rr2.details) || {};
-            const cap = (rr2 && rr2.capacity) || parseInt(rrec.capacity, 10) || parseInt(rrec.sleeps, 10) || 0;
+        if (resourceRow && bc.resourceKey) {
+            const rrec = resourceRow.details || {};
+            const cap = resourceRow.capacity || parseInt(rrec.capacity, 10) || parseInt(rrec.sleeps, 10) || 0;
             if (cap && partySize > cap) {
                 return res.status(400).json({ error: record.resource + ' fits up to ' + cap + ' — your party of ' + partySize + ' won\'t fit. Pick a bigger option.' });
             }
@@ -1652,6 +1704,14 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
                 const n = Math.max(1, Math.round((new Date(record.end_date) - new Date(record.date)) / 86400e3));
                 if (n < minN) return res.status(400).json({ error: record.resource + ' has a ' + minN + '-night minimum stay.' });
             }
+        }
+
+        // Authoritative price. Built server-side ONLY — see computeCheckoutTotal().
+        // This, not anything the client sent, is what /create-payment-intent charges.
+        if (inst.manifest.checkout) {
+            const addonsTotal = parseFloat(record.addons_total) || 0;
+            const computed = computeCheckoutTotal(bc, record, resourceRow, nightCount, addonsTotal, appliedPromo);
+            if (computed != null) record.total_price = computed.toFixed(2);
         }
 
         // checkout submissions land in the ONE bookings table; content
@@ -1676,7 +1736,9 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
             }
         } catch (e) { console.error('owner sms failed:', e.message); }
 
-        res.json({ success: true });
+        // id is required by callers that proceed to payment
+        // (POST /api/stripe/create-payment-intent expects booking_id).
+        res.json({ success: true, id: inserted.id, total_price: record.total_price || null });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

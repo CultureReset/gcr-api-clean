@@ -103,15 +103,11 @@ async function getEntity(req) {
 function flattenBooking(b) {
     if (!b) return b;
     const out = { ...b };
-    if (b.fleet_types) {
-        out.fleet_type_name = b.fleet_types.name || null;
-        delete out.fleet_types;
-    }
-    if (b.rental_time_slots) {
-        out.time_slot_name = b.rental_time_slots.name || null;
-        out.time_slot_start = b.rental_time_slots.start_time || null;
-        out.time_slot_end   = b.rental_time_slots.end_time   || null;
-        delete out.rental_time_slots;
+    if (b.offerings) {
+        out.offering_name = b.offerings.name || null;
+        out.offering_kind = b.offerings.kind || null;
+        out.offering_unit = b.offerings.unit || null;
+        delete out.offerings;
     }
     return out;
 }
@@ -1192,23 +1188,26 @@ router.delete('/group-rates/:id', async (req, res) => {
 // BOOKINGS
 // ============================================
 
+// The real, live `bookings` table (see lib/entity-resolver.js) is keyed by
+// entity_slug/entity_id — NOT the legacy CyberCheck site_id, and it has no
+// fleet_types/rental_time_slots FK or payment_status column. Every booking
+// type (charter, dolphin cruise, salon appointment, rental) resolves the
+// "what did they pick" question through offering_id → offerings, so that's
+// the one join that actually exists.
 router.get('/bookings', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(404).json({ error: 'No business linked to this account' });
+
     let query = supabase
         .from('bookings')
-        .select('*, fleet_types(name), rental_time_slots(name, start_time, end_time)')
-        .eq('site_id', req.siteId)
-        .order('booking_date', { ascending: true });
-
-    // Hide payment-failed rows by default — surfaced separately via /declined-bookings.
-    // Pass ?include_failed=1 to see everything.
-    if (req.query.include_failed !== '1') {
-        query = query.not('payment_status', 'eq', 'failed');
-    }
+        .select('*, offerings(name, kind, unit)')
+        .eq('entity_slug', entity.slug)
+        .order('date', { ascending: true });
 
     if (req.query.status) query = query.eq('status', req.query.status);
-    if (req.query.date) query = query.eq('booking_date', req.query.date);
-    if (req.query.from) query = query.gte('booking_date', req.query.from);
-    if (req.query.to) query = query.lte('booking_date', req.query.to);
+    if (req.query.date) query = query.eq('date', req.query.date);
+    if (req.query.from) query = query.gte('date', req.query.from);
+    if (req.query.to) query = query.lte('date', req.query.to);
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
@@ -1218,11 +1217,14 @@ router.get('/bookings', async (req, res) => {
 
 // GET /api/dashboard/bookings/:id — single booking by ID
 router.get('/bookings/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(404).json({ error: 'No business linked to this account' });
+
     const { data, error } = await supabase
         .from('bookings')
-        .select('*, fleet_types(name), rental_time_slots(name, start_time, end_time)')
+        .select('*, offerings(name, kind, unit)')
         .eq('id', req.params.id)
-        .eq('site_id', req.siteId)
+        .eq('entity_slug', entity.slug)
         .single();
 
     if (error) return res.status(404).json({ error: 'Booking not found' });
@@ -1315,15 +1317,30 @@ router.post('/bookings', async (req, res) => {
 });
 
 router.put('/bookings/:id', async (req, res) => {
-    const updates = { ...req.body, updated_at: new Date().toISOString() };
+    const entity = await getEntity(req);
+    if (!entity) return res.status(404).json({ error: 'No business linked to this account' });
+
+    const updates = { ...req.body };
     delete updates.site_id;
     delete updates.id;
+    delete updates.updated_at; // not a real column on the live bookings table
+
+    // payment_status/payment_provider/payment_id aren't real columns either —
+    // they live in details (see routes/stripe.js's payment-confirmation write).
+    const paymentFields = {};
+    ['payment_status', 'payment_provider', 'payment_id'].forEach(function (k) {
+        if (updates[k] !== undefined) { paymentFields[k] = updates[k]; delete updates[k]; }
+    });
+    if (Object.keys(paymentFields).length) {
+        const { data: existing } = await supabase.from('bookings').select('details').eq('id', req.params.id).eq('entity_slug', entity.slug).maybeSingle();
+        updates.details = Object.assign({}, (existing && existing.details) || {}, paymentFields);
+    }
 
     const { data, error } = await supabase
         .from('bookings')
         .update(updates)
         .eq('id', req.params.id)
-        .eq('site_id', req.siteId)
+        .eq('entity_slug', entity.slug)
         .select()
         .single();
 
@@ -1349,11 +1366,14 @@ router.put('/bookings/:id', async (req, res) => {
 });
 
 router.delete('/bookings/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(404).json({ error: 'No business linked to this account' });
+
     const { error } = await supabase
         .from('bookings')
         .delete()
         .eq('id', req.params.id)
-        .eq('site_id', req.siteId);
+        .eq('entity_slug', entity.slug);
 
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
