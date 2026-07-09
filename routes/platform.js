@@ -219,6 +219,9 @@ function toOfferingRow(slug, dataKey, record, unit) {
         unit: unit || record.per || record.unit || 'flat',
         price_from: parseFloat(record.price || record.rate_full || record.rate_night || record.rate_hourly) || null,
         capacity: parseInt(record.capacity || record.sleeps, 10) || null,
+        // uploaded photos land in the record's url/image field — mirror to the
+        // real image_url column so offering images actually display publicly
+        image_url: (record.url && /^https?:/i.test(record.url) ? record.url : null) || record.image_url || record.image || null,
         active: !record.status || ['retired', 'maintenance', 'inactive'].indexOf(record.status) === -1,
         details: record
     };

@@ -440,7 +440,9 @@ router.post('/gallery', async (req, res) => {
     const entity = await getEntity(req);
     if (!entity) return res.status(400).json({ error: 'No entity linked.' });
     const { url, image_url, caption, alt_text, sort_order } = req.body;
-    const photo = { entity_slug: entity.slug, image_url: url || image_url, caption: caption || null, alt_text: alt_text || null, sort_order: sort_order || 0 };
+    // Real entity_photos columns are url/caption/title — there is no
+    // image_url or alt_text column (the old insert failed on every call).
+    const photo = { entity_slug: entity.slug, url: url || image_url, caption: caption || null, title: alt_text || null, sort_order: sort_order || 0, photo_type: 'gallery' };
     const { data, error } = await gcr().from('entity_photos').insert(photo).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.status(201).json(data);
@@ -449,7 +451,8 @@ router.post('/gallery', async (req, res) => {
 router.put('/gallery/:id', async (req, res) => {
     const entity = await getEntity(req);
     if (!entity) return res.status(400).json({ error: 'No entity linked.' });
-    const updates = {}; ['caption','alt_text','sort_order'].forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    const updates = {}; ['caption','sort_order','is_cover','photo_type'].forEach(k => { if (req.body[k] !== undefined) updates[k] = req.body[k]; });
+    if (req.body.alt_text !== undefined) updates.title = req.body.alt_text; // no alt_text column — title is the real one
     const { data, error } = await gcr().from('entity_photos').update(updates).eq('id', req.params.id).eq('entity_slug', entity.slug).select().single();
     if (error) return res.status(500).json({ error: error.message });
     res.json(data);
@@ -3750,19 +3753,26 @@ router.post('/ai-chat', async (req, res) => {
         upcomingRes.data.forEach(b => { context += `\n• ${b.booking_date} — ${b.customer_name || 'Unknown'} ($${b.total || 0}) [${b.status}]`; });
     }
 
-    // Load GCR live listing data so AI knows what's on the live site
+    // Load GCR live listing data so AI knows what's on the live site.
+    // Every satellite table keys by entity_slug (none has an entity_id
+    // column) — the old .eq('entity_id', …) queries all silently failed,
+    // so the AI never actually saw the live listing.
     let gcrBlock = '';
     if (gcrEntityId) {
         try {
-            const [gcrEnt, gcrHours, gcrTags, gcrMenu, gcrPhotos, gcrSpecials, gcrEvents] = await Promise.all([
-                _gcrDb.from('entity').select('description,hh_days,hh_start,hh_end,hh_description,phone,website_url,address_line_1,city,state,rating,review_count').eq('id', gcrEntityId).single(),
-                _gcrDb.from('entity_hours').select('day_of_week,open_time,close_time,is_closed').eq('entity_id', gcrEntityId),
-                _gcrDb.from('entity_tags').select('tag,tag_category').eq('entity_id', gcrEntityId),
-                _gcrDb.from('menu_items').select('item_name,price,description,category').eq('entity_id', gcrEntityId).limit(50),
-                _gcrDb.from('entity_photos').select('image_url,caption').eq('entity_id', gcrEntityId).order('sort_order').limit(20),
-                _gcrDb.from('entity_specials').select('special_name,discount_text,description,days').eq('entity_id', gcrEntityId).eq('is_active', true).limit(10),
-                _gcrDb.from('entity_events').select('event_name,description,event_date,start_time').eq('entity_id', gcrEntityId).eq('is_active', true).limit(10),
+            const { data: gcrEntRow } = await _gcrDb.from('entity')
+                .select('slug,description,hh_days,hh_start,hh_end,hh_description,phone,website_url,address_line_1,city,state,rating,review_count')
+                .eq('id', gcrEntityId).single();
+            const gcrSlug = gcrEntRow ? gcrEntRow.slug : null;
+            const [gcrHours, gcrTags, gcrMenu, gcrPhotos, gcrSpecials, gcrEvents] = await Promise.all([
+                _gcrDb.from('entity_hours').select('day_of_week,open_time,close_time,is_closed').eq('entity_slug', gcrSlug),
+                _gcrDb.from('entity_tags').select('tag,tag_category').eq('entity_slug', gcrSlug),
+                _gcrDb.from('menu_items').select('item_name,price,description').eq('entity_slug', gcrSlug).limit(50),
+                _gcrDb.from('entity_photos').select('url,caption').eq('entity_slug', gcrSlug).order('sort_order').limit(20),
+                _gcrDb.from('entity_specials').select('special_name,discount_text,description,days').eq('entity_slug', gcrSlug).eq('is_active', true).limit(10),
+                _gcrDb.from('entity_events').select('event_name,description,event_date,start_time').eq('entity_slug', gcrSlug).eq('is_active', true).limit(10),
             ]);
+            const gcrEnt = { data: gcrEntRow };
             const ge = gcrEnt.data || {};
             gcrBlock = `\n\nLIVE GCR LISTING DATA (what visitors see on gulfcoastradar.com):`;
             if (ge.description) gcrBlock += `\nDescription: ${ge.description}`;
@@ -4527,15 +4537,20 @@ STYLE:
             return { error: 'action must be add, update, or delete' };
         }
         if (name === 'add_photo') {
-            let targetEntityId = gcrEntityId;
+            // entity_photos keys by entity_slug (no entity_id column) — the
+            // old insert used entity_id/image_url and failed on every call.
+            let targetEntitySlug = null;
             if (req.role === 'admin' && input.business_slug) {
                 const q = input.business_slug;
                 const isUuid = /^[0-9a-f-]{36}$/i.test(q);
                 const { data: found } = isUuid
-                    ? await _gcrDb.from('entity').select('id').eq('id', q).maybeSingle()
-                    : await _gcrDb.from('entity').select('id').eq('slug', q).maybeSingle();
+                    ? await _gcrDb.from('entity').select('slug').eq('id', q).maybeSingle()
+                    : await _gcrDb.from('entity').select('slug').eq('slug', q).maybeSingle();
                 if (!found) return { error: `Business "${q}" not found` };
-                targetEntityId = found.id;
+                targetEntitySlug = found.slug;
+            } else if (gcrEntityId) {
+                const { data: own } = await _gcrDb.from('entity').select('slug').eq('id', gcrEntityId).maybeSingle();
+                targetEntitySlug = own ? own.slug : null;
             }
             // Resolve image URL: prefer explicit URL, fall back to uploading attached image
             let photoUrl = input.image_url || null;
@@ -4547,10 +4562,10 @@ STYLE:
                 }
             }
             if (!photoUrl) return { error: 'Provide an image_url or attach an image to upload' };
-            if (targetEntityId) {
-                const { data: existing } = await _gcrDb.from('entity_photos').select('sort_order').eq('entity_id', targetEntityId).order('sort_order', { ascending: false }).limit(1).maybeSingle();
+            if (targetEntitySlug) {
+                const { data: existing } = await _gcrDb.from('entity_photos').select('sort_order').eq('entity_slug', targetEntitySlug).order('sort_order', { ascending: false }).limit(1).maybeSingle();
                 const sort_order = ((existing?.sort_order) || 0) + 1;
-                const { error } = await _gcrDb.from('entity_photos').insert({ entity_id: targetEntityId, image_url: photoUrl, caption: input.caption || null, sort_order });
+                const { error } = await _gcrDb.from('entity_photos').insert({ entity_slug: targetEntitySlug, url: photoUrl, caption: input.caption || null, sort_order, photo_type: 'gallery' });
                 if (error) return { error: error.message };
                 return { success: true, added_url: photoUrl };
             }
