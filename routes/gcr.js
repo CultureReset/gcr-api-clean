@@ -401,6 +401,7 @@ async function buildFullEntity(slug) {
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
     child_count: childCountRes?.count || 0,
+    entity_amenities: (amenityRowsRes?.data || []),
     parent: parentInfo,
     parent_amenities: parentAmenities,
     is_hub: (childCountRes?.count || 0) > 0,
