@@ -224,6 +224,8 @@ function _gcrEntityToAdminProfile(e) {
             site_id: e.slug || null, // the slug IS the business key
             name: e.name || '',
             type: e.entity_subtype || e.entity_type || '',
+            entity_type: e.entity_type || null,
+            entity_subtype: e.entity_subtype || null,
             logo_url: e.hero_image_url || '',
             cover_url: e.hero_image_url || '',
             hero_image_url: e.hero_image_url || '',

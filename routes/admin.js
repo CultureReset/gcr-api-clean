@@ -2584,6 +2584,48 @@ router.post('/invite-business', authRequired, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/admin/provision-modules  { entity_slug?, entity_slugs?, all_active?, limit?, dry_run? }
+// Completes an entity's entity_modules rows per its industry (core keys +
+// preset keys from lib/industry-presets.js). Idempotent: only inserts keys
+// the entity doesn't already have; never disables or removes anything.
+router.post('/provision-modules', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { moduleKeysFor } = require('../lib/industry-presets');
+    const { entity_slug, entity_slugs, all_active, limit = 100, dry_run = false } = req.body || {};
+
+    let targets = [];
+    if (entity_slug) {
+      const { data } = await db.from('entity').select('slug, entity_type, entity_subtype').eq('slug', entity_slug).limit(1);
+      targets = data || [];
+    } else if (Array.isArray(entity_slugs) && entity_slugs.length) {
+      const { data } = await db.from('entity').select('slug, entity_type, entity_subtype').in('slug', entity_slugs.slice(0, 500));
+      targets = data || [];
+    } else if (all_active) {
+      const { data } = await db.from('entity').select('slug, entity_type, entity_subtype').eq('is_active', true).limit(Math.min(parseInt(limit, 10) || 100, 3000));
+      targets = data || [];
+    } else {
+      return res.status(400).json({ error: 'Pass entity_slug, entity_slugs[] or all_active:true' });
+    }
+
+    const results = [];
+    for (const t of targets) {
+      const { preset, keys } = moduleKeysFor(t.entity_type, t.entity_subtype);
+      const { data: existing } = await db.from('entity_modules').select('module_key').eq('entity_slug', t.slug);
+      const have = new Set((existing || []).map(r => r.module_key));
+      const missing = keys.filter(k => !have.has(k));
+      if (!dry_run && missing.length) {
+        const rows = missing.map((k, i) => ({ entity_slug: t.slug, module_key: k, enabled: true, sort_order: have.size + i }));
+        const { error } = await db.from('entity_modules').insert(rows);
+        if (error) { results.push({ slug: t.slug, preset, error: error.message }); continue; }
+      }
+      results.push({ slug: t.slug, preset, added: dry_run ? 0 : missing.length, missing: dry_run ? missing : undefined });
+    }
+
+    res.json({ dry_run: !!dry_run, processed: results.length, results });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // POST /api/admin/view-as  { entity_slug }
 // Mints a short-lived owner-scoped JWT for ANY entity so the admin can open
 // that business's actual live dashboard (app-dashboard.html works unmodified —
