@@ -1491,6 +1491,24 @@ router.get('/page/:slug', async (req, res) => {
                         rate_night: parseFloat(rec.rate_night) || null
                     };
                 }).filter(Boolean);
+                // owner-defined per-offering price tiers (offering_prices —
+                // adult/kid/senior/under-2-free, seasonal, age-ranged) override
+                // the manifest's fixed tiers for that offering at checkout
+                if (block.resources.length) {
+                    const ids = block.resources.map(function (r) { return r.id; });
+                    const { data: tierRows } = await supabase.from('offering_prices')
+                        .select('id, offering_id, label, price, age_min, age_max, season, duration_label, sort_order')
+                        .eq('entity_slug', ent.slug).in('offering_id', ids).order('sort_order');
+                    const byOffering = {};
+                    (tierRows || []).forEach(function (t) {
+                        (byOffering[t.offering_id] = byOffering[t.offering_id] || []).push({
+                            id: t.id, label: t.label, price: parseFloat(t.price) || 0,
+                            age_min: t.age_min, age_max: t.age_max, season: t.season || null,
+                            duration_label: t.duration_label || null
+                        });
+                    });
+                    block.resources.forEach(function (r) { if (byOffering[r.id]) r.tiers = byOffering[r.id]; });
+                }
             }
             blocks.push(block);
         }
@@ -1603,8 +1621,45 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         }
         if (bc.mode === 'slots' && req.body.time) record.time = String(req.body.time).slice(0, 40);
 
-        // per-person tiers → seats
-        if (bc.party) {
+        // owner-defined offering_prices tiers (adult/kid/senior/under-2-free…)
+        // — quantities arrive as tier_qty: { <offering_price_id>: qty }. Each
+        // id is validated against the DB scoped to this entity (and to the
+        // selected offering when there is one); prices come from the DB rows,
+        // never the client. When present these take priority over the
+        // manifest's fixed party tiers.
+        let dbTierTotal = null;
+        if (req.body.tier_qty && typeof req.body.tier_qty === 'object') {
+            const ids = Object.keys(req.body.tier_qty).slice(0, 20);
+            if (ids.length) {
+                let tq = supabase.from('offering_prices')
+                    .select('id, label, price, offering_id')
+                    .eq('entity_slug', ent.slug).in('id', ids);
+                const { data: tierRows } = await tq;
+                const valid = (tierRows || []).filter(function (t) {
+                    return !record.resource_id || String(t.offering_id) === String(record.resource_id);
+                });
+                if (valid.length) {
+                    let people = 0, money = 0;
+                    const parts = [];
+                    valid.forEach(function (t) {
+                        const q = Math.max(0, Math.min(99, parseInt(req.body.tier_qty[t.id], 10) || 0));
+                        if (!q) return;
+                        people += q;
+                        money += q * (parseFloat(t.price) || 0);
+                        parts.push(q + '× ' + (t.label || 'Guest'));
+                    });
+                    if (people > 0) {
+                        record.party = people;
+                        record.tier_breakdown = parts.join(', ');
+                        dbTierTotal = Math.round(money * 100) / 100;
+                    }
+                }
+            }
+        }
+
+        // per-person tiers → seats (manifest-config tiers; skipped when
+        // owner-defined DB tiers already set the party above)
+        if (bc.party && !record.party) {
             let total = 0;
             bc.party.tiers.forEach(function (t) {
                 const q = Math.max(0, Math.min(99, parseInt(req.body[t.key], 10) || 0));
@@ -1711,9 +1766,21 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
 
         // Authoritative price. Built server-side ONLY — see computeCheckoutTotal().
         // This, not anything the client sent, is what /create-payment-intent charges.
+        // Owner-defined offering_prices tiers (dbTierTotal) take priority over the
+        // manifest's fixed tier prices; add-ons and promo apply on top either way.
         if (inst.manifest.checkout) {
             const addonsTotal = parseFloat(record.addons_total) || 0;
-            const computed = computeCheckoutTotal(bc, record, resourceRow, nightCount, addonsTotal, appliedPromo);
+            let computed;
+            if (dbTierTotal != null) {
+                let subtotal = dbTierTotal + addonsTotal;
+                if (appliedPromo) {
+                    if (appliedPromo.percent) subtotal = subtotal * (1 - appliedPromo.percent / 100);
+                    else if (appliedPromo.amount) subtotal = Math.max(0, subtotal - appliedPromo.amount);
+                }
+                computed = Math.max(0, Math.round(subtotal * 100) / 100);
+            } else {
+                computed = computeCheckoutTotal(bc, record, resourceRow, nightCount, addonsTotal, appliedPromo);
+            }
             if (computed != null) record.total_price = computed.toFixed(2);
         }
 

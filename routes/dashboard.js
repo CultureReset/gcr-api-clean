@@ -5650,4 +5650,188 @@ Generate the JSON design config now.`;
     }
 });
 
+// ============================================
+// OWNER SECTION DATA — generic slug-scoped CRUD over every table the public
+// entity page displays (gcr.js buildFullEntity), so anything GCR shows is
+// owner-editable. One handler, a strict whitelist, entity_slug forced
+// server-side on every write — the client never supplies the slug.
+// GET/POST  /api/dashboard/section-data/:table
+// PUT/DELETE /api/dashboard/section-data/:table/:id
+// ============================================
+
+const OWNER_SECTION_TABLES = new Set([
+    // catalog & pricing (the booking/reservation backbone)
+    'offerings', 'offering_prices',
+    // charter / activity
+    'whats_included', 'requirements', 'what_to_bring', 'meeting_points',
+    'fish_species', 'activity_schedules', 'activity_details', 'activity_options',
+    'marina_details',
+    // stay / lodging
+    'room_types', 'property_fees', 'property_details', 'stay_links',
+    'bookable_resources', 'amenities', 'availability',
+    // restaurant extras
+    'entity_sides', 'entity_daily_features', 'order_links',
+    // service / fitness
+    'class_schedule',
+    // shop
+    'product_categories', 'products',
+    // park
+    'facilities', 'spot_rules', 'access_info',
+    // profile & content
+    'announcements', 'entity_about_bullets', 'entity_perfect_for',
+    'entity_amenities', 'entity_tags', 'entity_secondary_hours',
+    'entity_blog_posts', 'entity_social_posts', 'entity_sections',
+    'entity_section_items', 'loyalty_programs',
+]);
+
+function cleanSectionBody(body) {
+    const row = { ...body };
+    // never client-controlled
+    delete row.id; delete row.entity_slug; delete row.entity_id;
+    delete row.created_at; delete row.updated_at; delete row.site_id;
+    return row;
+}
+
+router.get('/section-data/:table', async (req, res) => {
+    if (!OWNER_SECTION_TABLES.has(req.params.table)) return res.status(404).json({ error: 'Unknown section' });
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { data, error } = await gcr().from(req.params.table).select('*').eq('entity_slug', entity.slug);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
+router.post('/section-data/:table', async (req, res) => {
+    if (!OWNER_SECTION_TABLES.has(req.params.table)) return res.status(404).json({ error: 'Unknown section' });
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const row = { ...cleanSectionBody(req.body), entity_slug: entity.slug };
+    const { data, error } = await gcr().from(req.params.table).insert(row).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+});
+
+router.put('/section-data/:table/:id', async (req, res) => {
+    if (!OWNER_SECTION_TABLES.has(req.params.table)) return res.status(404).json({ error: 'Unknown section' });
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { data, error } = await gcr().from(req.params.table)
+        .update(cleanSectionBody(req.body))
+        .eq('id', req.params.id).eq('entity_slug', entity.slug)
+        .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+router.delete('/section-data/:table/:id', async (req, res) => {
+    if (!OWNER_SECTION_TABLES.has(req.params.table)) return res.status(404).json({ error: 'Unknown section' });
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { error } = await gcr().from(req.params.table)
+        .delete().eq('id', req.params.id).eq('entity_slug', entity.slug);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// ── Parent-keyed tables (no entity_slug column): ownership verifies through
+//    the parent row before any read/write. ──
+
+// price_tiers — audience/age-range tiered pricing (adult, kid, seniors,
+// under-2-free, per-hour) hanging off pricing_items (price_item_id) or
+// entity_section_items (section_item_id).
+async function priceTierParentOk(slug, body, existingTier) {
+    const priceItemId = body.price_item_id || (existingTier && existingTier.price_item_id);
+    const sectionItemId = body.section_item_id || (existingTier && existingTier.section_item_id);
+    if (priceItemId) {
+        const { data } = await gcr().from('pricing_items').select('id').eq('id', priceItemId).eq('entity_slug', slug).maybeSingle();
+        return !!data;
+    }
+    if (sectionItemId) {
+        const { data } = await gcr().from('entity_section_items').select('id').eq('id', sectionItemId).eq('entity_slug', slug).maybeSingle();
+        return !!data;
+    }
+    return false;
+}
+
+router.get('/price-tiers', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { price_item_id, section_item_id } = req.query;
+    if (!price_item_id && !section_item_id) return res.status(400).json({ error: 'price_item_id or section_item_id required' });
+    if (!(await priceTierParentOk(entity.slug, req.query))) return res.status(404).json({ error: 'Parent item not found' });
+    let q = gcr().from('price_tiers').select('*').order('sort_order');
+    if (price_item_id) q = q.eq('price_item_id', price_item_id);
+    if (section_item_id) q = q.eq('section_item_id', section_item_id);
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
+router.post('/price-tiers', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    if (!(await priceTierParentOk(entity.slug, req.body))) return res.status(404).json({ error: 'Parent item not found' });
+    const row = { ...req.body }; delete row.id;
+    const { data, error } = await gcr().from('price_tiers').insert(row).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+});
+
+router.put('/price-tiers/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { data: tier } = await gcr().from('price_tiers').select('*').eq('id', req.params.id).maybeSingle();
+    if (!tier || !(await priceTierParentOk(entity.slug, {}, tier))) return res.status(404).json({ error: 'Tier not found' });
+    const patch = { ...req.body }; delete patch.id; delete patch.price_item_id; delete patch.section_item_id;
+    const { data, error } = await gcr().from('price_tiers').update(patch).eq('id', req.params.id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+router.delete('/price-tiers/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { data: tier } = await gcr().from('price_tiers').select('*').eq('id', req.params.id).maybeSingle();
+    if (!tier || !(await priceTierParentOk(entity.slug, {}, tier))) return res.status(404).json({ error: 'Tier not found' });
+    const { error } = await gcr().from('price_tiers').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// room_amenities — hangs off room_types(room_type_id)
+async function roomParentOk(slug, roomTypeId) {
+    if (!roomTypeId) return false;
+    const { data } = await gcr().from('room_types').select('id').eq('id', roomTypeId).eq('entity_slug', slug).maybeSingle();
+    return !!data;
+}
+
+router.get('/room-amenities', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    if (!(await roomParentOk(entity.slug, req.query.room_type_id))) return res.status(404).json({ error: 'Room not found' });
+    const { data, error } = await gcr().from('room_amenities').select('*').eq('room_type_id', req.query.room_type_id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
+router.post('/room-amenities', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    if (!(await roomParentOk(entity.slug, req.body.room_type_id))) return res.status(404).json({ error: 'Room not found' });
+    const { data, error } = await gcr().from('room_amenities')
+        .insert({ room_type_id: req.body.room_type_id, name: req.body.name }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+});
+
+router.delete('/room-amenities/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (!entity) return res.status(400).json({ error: 'No entity linked.' });
+    const { data: row } = await gcr().from('room_amenities').select('id, room_type_id').eq('id', req.params.id).maybeSingle();
+    if (!row || !(await roomParentOk(entity.slug, row.room_type_id))) return res.status(404).json({ error: 'Not found' });
+    const { error } = await gcr().from('room_amenities').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
 module.exports = router;
