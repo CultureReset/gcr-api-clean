@@ -122,6 +122,43 @@ function flattenBooking(b) {
 router.get('/overview', async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
 
+    // GCR entities: the real bookings table keys by entity_slug and has
+    // date/total_price columns (payment state lives in details jsonb).
+    // The legacy site_id branch below only serves pre-GCR accounts.
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        const { data: rows, error } = await supabase
+            .from('bookings')
+            .select('id, customer_name, phone, email, date, total_price, status, details, created_at')
+            .eq('entity_slug', entity.slug)
+            .order('created_at', { ascending: false })
+            .limit(2000);
+        if (error) return res.status(500).json({ error: error.message });
+
+        const all = (rows || []).filter(b => b.status !== 'cancelled' && b.status !== 'declined');
+        const paid = all.filter(b => ((b.details || {}).payment_status) === 'paid' && b.status !== 'refunded');
+        const totalRevenue = paid.reduce((sum, b) => sum + (parseFloat(b.total_price) || 0), 0);
+        const uniqueCustomers = new Set(
+            all.map(b => (b.phone || b.email || b.customer_name || '').toLowerCase()).filter(Boolean)
+        );
+
+        return res.json({
+            total_bookings: all.length,
+            bookings_today: all.filter(b => b.date === today).length,
+            total_revenue: Math.round(totalRevenue * 100) / 100,
+            total_customers: uniqueCustomers.size,
+            recent_bookings: (rows || []).slice(0, 5).map(b => ({
+                id: b.id,
+                customer_name: b.customer_name,
+                booking_date: b.date,
+                total: b.total_price,
+                status: b.status,
+                payment_status: (b.details || {}).payment_status || null,
+                created_at: b.created_at,
+            })),
+        });
+    }
+
     const [bookingsRes, todayRes, revenueRes, customersRes] = await Promise.all([
         supabase.from('bookings').select('id', { count: 'exact', head: true })
             .eq('site_id', req.siteId)
@@ -513,10 +550,13 @@ router.delete('/team/:id', async (req, res) => {
     res.json({ success: true });
 });
 
+// Menu items: GCR entities key by entity_slug (the tables the public page
+// reads — menu_sections(entity_slug) → menu_items(section_id)). The legacy
+// site_id path below only serves pre-GCR accounts with no linked entity.
 router.get('/menu-items', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        try { return res.json(await menuGcr.listAllMenuItems(entityId)); }
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { return res.json(await menuGcr.listAllMenuItems(entity.slug)); }
         catch (err) { return res.status(500).json({ error: err.message }); }
     }
     const { data, error } = await supabase
@@ -527,9 +567,9 @@ router.get('/menu-items', async (req, res) => {
 });
 
 router.post('/menu-items', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        try { return res.status(201).json(await menuGcr.createMenuItem(entityId, req.body)); }
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { return res.status(201).json(await menuGcr.createMenuItem(entity.slug, req.body)); }
         catch (err) { return res.status(500).json({ error: err.message }); }
     }
     const siteId = req.siteId || req.body.site_id;
@@ -542,9 +582,9 @@ router.post('/menu-items', async (req, res) => {
 });
 
 router.put('/menu-items/:id', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        try { return res.json(await menuGcr.updateMenuItem(entityId, req.params.id, req.body)); }
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { return res.json(await menuGcr.updateMenuItem(entity.slug, req.params.id, req.body)); }
         catch (err) { return res.status(500).json({ error: err.message }); }
     }
     const updates = { ...req.body, updated_at: new Date().toISOString() };
@@ -557,9 +597,9 @@ router.put('/menu-items/:id', async (req, res) => {
 });
 
 router.delete('/menu-items/:id', async (req, res) => {
-    const entityId = await resolveEntityId(req);
-    if (entityId) {
-        try { await menuGcr.deleteMenuItem(entityId, req.params.id); return res.json({ success: true }); }
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { await menuGcr.deleteMenuItem(entity.slug, req.params.id); return res.json({ success: true }); }
         catch (err) { return res.status(500).json({ error: err.message }); }
     }
     const { error } = await supabase
@@ -572,7 +612,15 @@ router.delete('/menu-items/:id', async (req, res) => {
 // MENU CATEGORIES (Breakfast, Lunch, Dinner, etc.)
 // ============================================
 
+// Menu categories: for GCR entities these are menu_sections — the exact table
+// the public menu reads. The legacy menu_categories(site_id) table is invisible
+// to GCR, so writes there never displayed; it remains only for pre-GCR accounts.
 router.get('/menu-categories', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { return res.json(await menuGcr.listCategories(entity.slug)); }
+        catch (err) { return res.status(500).json({ error: err.message }); }
+    }
     const { data, error } = await supabase
         .from('menu_categories')
         .select('*, menu_subcategories(id, name, sort_order, active)')
@@ -584,6 +632,11 @@ router.get('/menu-categories', async (req, res) => {
 });
 
 router.post('/menu-categories', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { return res.status(201).json(await menuGcr.createCategory(entity.slug, req.body)); }
+        catch (err) { return res.status(500).json({ error: err.message }); }
+    }
     const cat = { ...req.body, site_id: req.siteId };
     delete cat.id;
     delete cat.menu_subcategories;
@@ -599,6 +652,11 @@ router.post('/menu-categories', async (req, res) => {
 });
 
 router.put('/menu-categories/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { return res.json(await menuGcr.updateCategory(entity.slug, req.params.id, req.body)); }
+        catch (err) { return res.status(500).json({ error: err.message }); }
+    }
     const updates = { ...req.body, updated_at: new Date().toISOString() };
     delete updates.site_id;
     delete updates.id;
@@ -617,6 +675,11 @@ router.put('/menu-categories/:id', async (req, res) => {
 });
 
 router.delete('/menu-categories/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        try { await menuGcr.deleteCategory(entity.slug, req.params.id); return res.json({ success: true }); }
+        catch (err) { return res.status(500).json({ error: err.message }); }
+    }
     const { error } = await supabase
         .from('menu_categories')
         .delete()
@@ -632,6 +695,11 @@ router.delete('/menu-categories/:id', async (req, res) => {
 // ============================================
 
 router.get('/menu-subcategories', async (req, res) => {
+    // GCR menus have no subcategory level — items attach directly to sections.
+    // Return an empty list for entity owners so the UI renders cleanly.
+    const entity = await getEntity(req);
+    if (entity && entity.slug) return res.json([]);
+
     let query = supabase
         .from('menu_subcategories')
         .select('*, menu_categories(name)')
@@ -968,7 +1036,28 @@ router.delete('/time-slots/:id', async (req, res) => {
 // RENTAL PRICING
 // ============================================
 
+// Pricing: GCR entities use pricing_items — the table the public page
+// displays (gcr.js reads pricing_items + price_tiers). rental_pricing is the
+// legacy boat-rental table, invisible to GCR; it remains for pre-GCR accounts.
+const PRICING_ITEM_COLS = ['item_name', 'description', 'price', 'sort_order', 'tier_name', 'price_from', 'price_to', 'price_label', 'duration', 'minimum_age'];
+function pickPricingItem(body) {
+    const row = {};
+    PRICING_ITEM_COLS.forEach(k => { if (body[k] !== undefined) row[k] = body[k]; });
+    if (body.name !== undefined && row.item_name === undefined) row.item_name = body.name;
+    return row;
+}
+
 router.get('/pricing', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        const { data, error } = await supabase
+            .from('pricing_items')
+            .select('*')
+            .eq('entity_slug', entity.slug)
+            .order('sort_order');
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data || []);
+    }
     const { data } = await supabase
         .from('rental_pricing')
         .select('*, fleet_types(name), rental_time_slots(name)')
@@ -978,6 +1067,14 @@ router.get('/pricing', async (req, res) => {
 });
 
 router.post('/pricing', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        const row = { ...pickPricingItem(req.body), entity_slug: entity.slug, entity_id: entity.id };
+        if (!row.item_name) return res.status(400).json({ error: 'item_name required' });
+        const { data, error } = await supabase.from('pricing_items').insert(row).select().single();
+        if (error) return res.status(500).json({ error: error.message });
+        return res.status(201).json(data);
+    }
     const pricing = { ...req.body, site_id: req.siteId };
     delete pricing.id;
 
@@ -994,6 +1091,18 @@ router.post('/pricing', async (req, res) => {
 
 // PUT /api/dashboard/pricing/:id — update a pricing entry
 router.put('/pricing/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        const { data, error } = await supabase
+            .from('pricing_items')
+            .update(pickPricingItem(req.body))
+            .eq('id', req.params.id)
+            .eq('entity_slug', entity.slug)
+            .select()
+            .single();
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json(data);
+    }
     const updates = { ...req.body };
     delete updates.site_id;
     delete updates.id;
@@ -1011,6 +1120,16 @@ router.put('/pricing/:id', async (req, res) => {
 });
 
 router.delete('/pricing/:id', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        const { error } = await supabase
+            .from('pricing_items')
+            .delete()
+            .eq('id', req.params.id)
+            .eq('entity_slug', entity.slug);
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json({ success: true });
+    }
     const { error } = await supabase
         .from('rental_pricing')
         .delete()
@@ -1862,23 +1981,61 @@ router.get('/policies', async (req, res) => {
     res.json(data || {});
 });
 
+// Upsert one policy row in entity_policies (no unique constraint on
+// entity_slug+policy_type, so select-then-write).
+async function upsertEntityPolicy(entitySlug, policyType, title, text) {
+    const { data: existing } = await supabase
+        .from('entity_policies')
+        .select('id')
+        .eq('entity_slug', entitySlug)
+        .eq('policy_type', policyType)
+        .maybeSingle();
+    if (text == null || text === '') {
+        if (existing) await supabase.from('entity_policies').delete().eq('id', existing.id);
+        return;
+    }
+    const row = { policy_type: policyType, type: policyType, title, body: text, content: text, updated_at: new Date().toISOString() };
+    if (existing) {
+        await supabase.from('entity_policies').update(row).eq('id', existing.id);
+    } else {
+        await supabase.from('entity_policies').insert({ entity_slug: entitySlug, ...row });
+    }
+}
+
 router.put('/policies', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
     if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
 
-    const { deposit_amount, deposit_type, cancellation_policy, refund_policy } = req.body;
+    const { deposit_amount, deposit_type, cancellation_policy, refund_policy, cancellation_policy_doc_url, refund_policy_doc_url } = req.body;
+
+    // DUAL-WRITE. The checkout flow (gcr-unified Reserve.jsx) reads these
+    // entity columns; the public profile page reads entity_policies rows
+    // (gcr.js buildFullEntity). Both must stay in sync or the policy shows in
+    // one place and not the other.
+    const entityPatch = {
+        deposit_amount: deposit_amount === '' || deposit_amount == null ? null : Number(deposit_amount),
+        deposit_type: deposit_type || null,
+        cancellation_policy: cancellation_policy || null,
+        refund_policy: refund_policy || null,
+    };
+    if (cancellation_policy_doc_url !== undefined) entityPatch.cancellation_policy_doc_url = cancellation_policy_doc_url || null;
+    if (refund_policy_doc_url !== undefined) entityPatch.refund_policy_doc_url = refund_policy_doc_url || null;
+
     const { data, error } = await supabase
         .from('entity')
-        .update({
-            deposit_amount: deposit_amount === '' || deposit_amount == null ? null : Number(deposit_amount),
-            deposit_type: deposit_type || null,
-            cancellation_policy: cancellation_policy || null,
-            refund_policy: refund_policy || null,
-        })
+        .update(entityPatch)
         .eq('slug', entitySlug)
         .select('deposit_amount, deposit_type, cancellation_policy, refund_policy, cancellation_policy_doc_url, refund_policy_doc_url')
         .single();
     if (error) return res.status(500).json({ error: error.message });
+
+    try {
+        await upsertEntityPolicy(entitySlug, 'cancellation', 'Cancellation Policy', cancellation_policy);
+        await upsertEntityPolicy(entitySlug, 'refund', 'Refund Policy', refund_policy);
+    } catch (e) {
+        console.error('entity_policies mirror failed:', e.message);
+    }
+
     res.json(data);
 });
 
@@ -4808,7 +4965,20 @@ router.put('/website-content', async (req, res) => {
 // MODULES — GET/PUT /api/dashboard/modules
 // ============================================
 
+// Modules: GCR entities read/write entity_modules — the table platform.js and
+// the public page actually honor. site_content.modules is the legacy store
+// nothing on GCR reads; it remains only for pre-GCR accounts.
 router.get('/modules', async (req, res) => {
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        const { data, error } = await supabase
+            .from('entity_modules')
+            .select('module_key, enabled, settings, sort_order')
+            .eq('entity_slug', entity.slug)
+            .order('sort_order');
+        if (error) return res.status(500).json({ error: error.message });
+        return res.json({ modules: data || [] });
+    }
     const { data, error } = await supabase
         .from('site_content')
         .select('modules')
@@ -4823,6 +4993,38 @@ router.put('/modules', async (req, res) => {
     const { modules } = req.body;
     if (!Array.isArray(modules)) return res.status(400).json({ error: 'modules must be an array' });
 
+    const entity = await getEntity(req);
+    if (entity && entity.slug) {
+        // Accepts [{module_key, enabled, settings?, sort_order?}] or plain
+        // ["menu","stay"] (treated as enable-these). Upserts per key; keys not
+        // mentioned are left untouched — this is a toggle API, not a replace.
+        try {
+            for (let i = 0; i < modules.length; i++) {
+                const m = typeof modules[i] === 'string' ? { module_key: modules[i], enabled: true } : modules[i];
+                if (!m || !m.module_key) continue;
+                const { data: existing } = await supabase
+                    .from('entity_modules')
+                    .select('id')
+                    .eq('entity_slug', entity.slug)
+                    .eq('module_key', m.module_key)
+                    .maybeSingle();
+                const row = {
+                    enabled: m.enabled !== false,
+                    ...(m.settings !== undefined ? { settings: m.settings } : {}),
+                    ...(m.sort_order !== undefined ? { sort_order: m.sort_order } : {}),
+                };
+                if (existing) {
+                    await supabase.from('entity_modules').update(row).eq('id', existing.id);
+                } else {
+                    await supabase.from('entity_modules').insert({ entity_slug: entity.slug, module_key: m.module_key, sort_order: i, ...row });
+                }
+            }
+            return res.json({ success: true });
+        } catch (e) {
+            return res.status(500).json({ error: e.message });
+        }
+    }
+
     const { error } = await supabase
         .from('site_content')
         .upsert({ site_id: req.siteId, modules, updated_at: new Date().toISOString() });
@@ -4832,73 +5034,11 @@ router.put('/modules', async (req, res) => {
 });
 
 // ============================================
-// FAQ — CRUD /api/dashboard/faqs
+// FAQ — the /faqs CRUD lives near the top of this file (entity-scoped,
+// writes faqs(entity_slug), the table GCR displays). A second site_id-keyed
+// /faqs family used to sit here — it was 100% shadowed dead code (Express
+// first-match) whose writes GCR could never display, so it was removed.
 // ============================================
-
-router.get('/faqs', async (req, res) => {
-    const { data, error } = await supabase
-        .from('faqs')
-        .select('*')
-        .eq('site_id', req.siteId)
-        .order('sort_order', { ascending: true });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data || []);
-});
-
-router.post('/faqs', async (req, res) => {
-    const { question, answer } = req.body;
-    if (!question || !answer) return res.status(400).json({ error: 'question and answer required' });
-
-    const { data: existing } = await supabase
-        .from('faqs')
-        .select('sort_order')
-        .eq('site_id', req.siteId)
-        .order('sort_order', { ascending: false })
-        .limit(1)
-        .single();
-
-    const nextSort = (existing?.sort_order || 0) + 1;
-
-    const { data, error } = await supabase
-        .from('faqs')
-        .insert({ site_id: req.siteId, question, answer, sort_order: nextSort })
-        .select()
-        .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.status(201).json(data);
-});
-
-router.put('/faqs/:id', async (req, res) => {
-    const { question, answer, sort_order } = req.body;
-    const updates = {};
-    if (question !== undefined) updates.question = question;
-    if (answer !== undefined) updates.answer = answer;
-    if (sort_order !== undefined) updates.sort_order = sort_order;
-
-    const { data, error } = await supabase
-        .from('faqs')
-        .update(updates)
-        .eq('id', req.params.id)
-        .eq('site_id', req.siteId)
-        .select()
-        .single();
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json(data);
-});
-
-router.delete('/faqs/:id', async (req, res) => {
-    const { error } = await supabase
-        .from('faqs')
-        .delete()
-        .eq('id', req.params.id)
-        .eq('site_id', req.siteId);
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true });
-});
 
 // ============================================
 // ONBOARDING PROGRESS — GET/PUT /api/dashboard/onboarding
