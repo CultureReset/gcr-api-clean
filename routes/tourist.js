@@ -56,6 +56,42 @@ async function touristAuth(req, res, next) {
     }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ── Guest-tolerant variant: a real Supabase Bearer token still resolves to
+// the real touristId exactly as touristAuth does, but a signed-out visitor
+// can instead identify with an X-Guest-Id header (a UUID the client
+// generates once and keeps in localStorage). None of tourist_swipe_events/
+// tourist_seen/tourist_saves/user_preference_scores have a foreign key back
+// to auth.users, so writing rows keyed by that guest UUID is safe — it just
+// means a visitor's swipes/saves/preference signals get recorded from their
+// very first interaction instead of only after they create an account.
+// backfillAnonymousActivity() (tourist-auth.js) reassigns those rows to the
+// real user id once they do sign up, using the same guest id as
+// anonymous_visitor_id.
+async function touristAuthOptional(req, res, next) {
+    const header = req.headers.authorization;
+    if (header && header.startsWith('Bearer ')) {
+        const token = header.split(' ')[1];
+        try {
+            const { data, error } = await mainDb.auth.getUser(token);
+            if (!error && data?.user) {
+                req.touristId = data.user.id;
+                req.touristEmail = data.user.email;
+                req.isGuest = false;
+                return next();
+            }
+        } catch (e) { /* fall through to guest id */ }
+    }
+    const guestId = req.headers['x-guest-id'];
+    if (guestId && UUID_RE.test(guestId)) {
+        req.touristId = guestId;
+        req.isGuest = true;
+        return next();
+    }
+    return res.status(401).json({ error: 'No token or guest id provided' });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Backfill anonymous activity to user (explicit endpoint for frontend)
 // ═══════════════════════════════════════════════════════════════════════════
@@ -142,16 +178,43 @@ router.get('/me', touristAuth, async (req, res) => {
 });
 
 // DELETE /api/tourist/seen — clear all seen slugs (reset swipe deck)
-router.delete('/seen', touristAuth, async (req, res) => {
+// DELETE /api/tourist/seen — clear all seen slugs (reset swipe deck)
+router.delete('/seen', touristAuthOptional, async (req, res) => {
+    const { error } = await mainDb.from('tourist_seen').delete().eq('tourist_id', req.touristId);
+    if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });
 });
 
-// POST /api/tourist/seen — record swiped (seen) slugs so they don't reappear
-router.post('/seen', touristAuth, async (req, res) => {
+// POST /api/tourist/seen — record swiped (seen) slugs so they don't reappear.
+// Was previously a no-op stub (returned {ok:true} without touching the DB at
+// all) despite tourist_seen already existing as a real table — every "seen"
+// slug the frontend has ever sent has silently gone nowhere. Dedupes against
+// what's already recorded so re-sending the same slug list doesn't pile up
+// duplicate rows (tourist_seen has no unique constraint of its own).
+router.post('/seen', touristAuthOptional, async (req, res) => {
     const { slugs } = req.body || {};
-    res.json({ ok: true, count: Array.isArray(slugs) ? slugs.length : 0 });
+    if (!Array.isArray(slugs) || slugs.length === 0) return res.json({ ok: true, count: 0 });
+
+    const { data: existing } = await mainDb.from('tourist_seen')
+        .select('entity_slug').eq('tourist_id', req.touristId).in('entity_slug', slugs);
+    const already = new Set((existing || []).map(r => r.entity_slug));
+    const rows = [...new Set(slugs)].filter(s => !already.has(s)).map(entity_slug => ({
+        tourist_id: req.touristId,
+        entity_slug,
+    }));
+    if (rows.length === 0) return res.json({ ok: true, count: 0 });
+
+    const { error } = await mainDb.from('tourist_seen').insert(rows);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ ok: true, count: rows.length });
 });
 
+// tourist_saves.user_id has a real foreign key to auth.users (confirmed
+// against the live DB — unlike tourist_swipe_events/tourist_seen/
+// user_preference_scores, which don't) — a guest UUID with no matching
+// auth.users row would fail every insert with a FK violation, so this one
+// stays real-login-only. Saves still work fine locally (same browser) for
+// a guest via localStorage; they just don't reach the server pre-signup.
 router.get('/saves', touristAuth, async (req, res) => {
     const { data, error } = await mainDb.from('tourist_saves')
         .select('*').eq('user_id', req.touristId).order('saved_at', { ascending: false });
@@ -160,7 +223,7 @@ router.get('/saves', touristAuth, async (req, res) => {
 });
 
 router.post('/saves', touristAuth, async (req, res) => {
-    const { entity_slug, entity_id, business_name, hero_image_url, subtitle, category, rating, price_range, is_super_like, source_app } = req.body || {};
+    const { entity_slug, entity_id, business_name, hero_image_url, subtitle, category, rating, price_range, is_super_like } = req.body || {};
     if (!entity_slug) return res.status(400).json({ error: 'entity_slug required' });
     const row = {
         user_id: req.touristId,
@@ -173,7 +236,6 @@ router.post('/saves', touristAuth, async (req, res) => {
         rating: rating ?? null,
         price_range: price_range || null,
         is_super_like: !!is_super_like,
-        source_app: source_app && ['gcr', 'trip_swipe'].includes(source_app) ? source_app : 'trip_swipe',
     };
     let { data, error } = await mainDb.from('tourist_saves')
         .upsert(row, { onConflict: 'user_id,entity_slug' })
@@ -200,7 +262,12 @@ router.delete('/super-likes/:slug', touristAuth, async (req, res) => {
 });
 
 // POST /api/tourist/swipes — record swipe direction per business for analytics
-router.post('/swipes', touristAuth, async (req, res) => {
+// POST /api/tourist/swipes — record swipe direction per business for analytics.
+// The live tourist_swipe_events table is keyed by tourist_id/entity_name, not
+// user_id/business_name — this insert was silently failing on every call
+// (confirmed: the table had zero rows despite real signed-up tourists having
+// used the app). Fixed to match the actual schema.
+router.post('/swipes', touristAuthOptional, async (req, res) => {
     const { events } = req.body || {};
     if (!Array.isArray(events) || events.length === 0) return res.status(400).json({ error: 'events array required' });
     const rows = events
@@ -216,19 +283,21 @@ router.post('/swipes', touristAuth, async (req, res) => {
     try {
         const { error } = await mainDb.from('tourist_swipe_events').insert(rows);
         if (error) {
-            // Auto-create table if missing
+            // Auto-create table if missing (shouldn't fire against the live
+            // DB — the table already exists there — but keeps this endpoint
+            // self-healing against a fresh/local DB with no migrations run).
             if (error.code === '42P01') {
                 await mainDb.rpc('exec_sql', { sql: `
                     CREATE TABLE IF NOT EXISTS tourist_swipe_events (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                        user_id UUID NOT NULL,
+                        tourist_id UUID NOT NULL,
                         entity_slug TEXT NOT NULL,
-                        business_name TEXT,
+                        entity_name TEXT,
                         category TEXT,
                         direction TEXT NOT NULL,
-                        swiped_at TIMESTAMPTZ DEFAULT NOW()
+                        created_at TIMESTAMPTZ DEFAULT NOW()
                     );
-                    CREATE INDEX IF NOT EXISTS idx_tse_user ON tourist_swipe_events(user_id);
+                    CREATE INDEX IF NOT EXISTS idx_tse_tourist ON tourist_swipe_events(tourist_id);
                     CREATE INDEX IF NOT EXISTS idx_tse_slug ON tourist_swipe_events(entity_slug);
                     CREATE INDEX IF NOT EXISTS idx_tse_dir ON tourist_swipe_events(direction);
                 ` }).catch(() => {});
@@ -379,7 +448,7 @@ async function recomputeAllPreferences(touristId) {
         if (!baseWeight) continue;
 
         // Time decay
-        const ageDays = (now - new Date(ev.swiped_at).getTime()) / (1000 * 60 * 60 * 24);
+        const ageDays = (now - new Date(ev.created_at).getTime()) / (1000 * 60 * 60 * 24);
         const decay = ageDays > 90 ? 0.5 : ageDays > 30 ? 0.8 : 1.0;
         const weight = Math.round(baseWeight * decay);
         if (!weight) continue;
@@ -412,8 +481,10 @@ async function recomputeAllPreferences(touristId) {
     if (scoreUpdates.length) await applyScoreDeltas(touristId, scoreUpdates);
 }
 
-// GET /api/tourist/preferences — full preference profile for this user
-router.get('/preferences', touristAuth, async (req, res) => {
+// GET /api/tourist/preferences — full preference profile for this user.
+// touristAuthOptional so a guest's live deck can personalize from their own
+// in-session swipes/saves too, not just after they create an account.
+router.get('/preferences', touristAuthOptional, async (req, res) => {
     const touristId = req.touristId;
 
     const { data: scores } = await mainDb
@@ -479,7 +550,7 @@ router.get('/analytics', touristAuth, async (req, res) => {
             directionCounts[ev.direction] = (directionCounts[ev.direction] || 0) + 1;
             categoryCounts[ev.category] = (categoryCounts[ev.category] || 0) + 1;
 
-            const date = new Date(ev.swiped_at).toISOString().split('T')[0];
+            const date = new Date(ev.created_at).toISOString().split('T')[0];
             dailySwipes[date] = (dailySwipes[date] || 0) + 1;
         }
 
@@ -501,8 +572,8 @@ router.get('/analytics', touristAuth, async (req, res) => {
             category_saves: saveCounts,
             daily_swipes: dailySwipes,
             avg_swipes_per_day: parseFloat(avgSwipesPerDay),
-            first_swipe: events?.[events.length - 1]?.swiped_at || null,
-            last_swipe: events?.[0]?.swiped_at || null,
+            first_swipe: events?.[events.length - 1]?.created_at || null,
+            last_swipe: events?.[0]?.created_at || null,
         });
     } catch (e) {
         console.error('[analytics] Error:', e?.message);
