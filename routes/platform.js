@@ -71,6 +71,13 @@ async function entityBySlug(slug) {
     return data || null;
 }
 async function ownedSlug(req) {
+    // The shared resolver handles every ownership path — admin view-as token,
+    // entity_owners (by userId, not the old siteId mis-key), users quick-lookup
+    // columns, and the legacy_site_id fallback.
+    const { resolveEntity } = require('../lib/entity-resolver');
+    const ent = await resolveEntity(req);
+    if (ent && ent.slug) return ent.slug;
+    // legacy behavior preserved for pre-GCR rows keyed by siteId
     const { data } = await supabase.from('entity_owners')
         .select('entity_slug').eq('user_id', req.siteId).maybeSingle();
     return (data && data.entity_slug) || null;
