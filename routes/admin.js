@@ -1184,7 +1184,7 @@ router.get('/tourists', authRequired, async (req, res) => {
     const tourists = await Promise.all((profiles || []).map(async (p) => {
       const [saves, swipes, itinerary] = await Promise.all([
         getDb().from('tourist_saves').select('id', { count: 'exact', head: true }).eq('user_id', p.user_id),
-        getDb().from('tourist_swipe_events').select('id', { count: 'exact', head: true }).eq('user_id', p.user_id),
+        getDb().from('tourist_swipe_events').select('id', { count: 'exact', head: true }).eq('tourist_id', p.user_id),
         getDb().from('tourist_itineraries').select('id').eq('user_id', p.user_id).limit(1).maybeSingle()
       ]);
 
@@ -1220,10 +1220,10 @@ router.get('/tourists/:user_id', authRequired, async (req, res) => {
       getDb().from('tourist_profiles').select('*').eq('user_id', uid).maybeSingle(),
       getDb().from('tourist_saves').select('*').eq('user_id', uid).order('saved_at', { ascending: false }),
       getDb().from('tourist_itineraries').select('*').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
-      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }),
-      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'left').order('swiped_at', { ascending: false }),
-      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'super').order('swiped_at', { ascending: false }),
-      getDb().from('tourist_seen').select('entity_slug, seen_at').eq('user_id', uid).order('seen_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, created_at').eq('tourist_id', uid).eq('direction', 'like').order('created_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, created_at').eq('tourist_id', uid).eq('direction', 'nope').order('created_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, created_at').eq('tourist_id', uid).eq('direction', 'super').order('created_at', { ascending: false }),
+      getDb().from('tourist_seen').select('entity_slug, seen_at:created_at').eq('tourist_id', uid).order('created_at', { ascending: false }),
     ]);
 
     const rightData  = swipesRight.data  || [];
@@ -1263,9 +1263,9 @@ router.get('/tourists/:user_id/preferences', authRequired, async (req, res) => {
 
     const [{ data: prefs }, { data: swipeStats }, { data: saves }, { data: swipedRight }] = await Promise.all([
       getDb().from('user_preference_scores').select('tag, score').eq('user_id', uid).order('score', { ascending: false }),
-      getDb().from('tourist_swipe_events').select('direction').eq('user_id', uid),
+      getDb().from('tourist_swipe_events').select('direction').eq('tourist_id', uid),
       getDb().from('tourist_saves').select('entity_slug, business_name, category, hero_image_url, is_super_like, saved_at').eq('user_id', uid).order('saved_at', { ascending: false }),
-      getDb().from('tourist_swipe_events').select('entity_slug, category, swiped_at').eq('user_id', uid).eq('direction', 'right').order('swiped_at', { ascending: false }),
+      getDb().from('tourist_swipe_events').select('entity_slug, category, created_at').eq('tourist_id', uid).eq('direction', 'like').order('created_at', { ascending: false }),
     ]);
 
     const scores = prefs || [];
@@ -1275,8 +1275,8 @@ router.get('/tourists/:user_id/preferences', authRequired, async (req, res) => {
 
     const swipeArr = swipeStats || [];
     const swipe_counts = {
-      like:  swipeArr.filter(s => s.direction === 'right').length,
-      nope:  swipeArr.filter(s => s.direction === 'left').length,
+      like:  swipeArr.filter(s => s.direction === 'like').length,
+      nope:  swipeArr.filter(s => s.direction === 'nope').length,
       super: swipeArr.filter(s => s.direction === 'super').length,
     };
 
@@ -1301,7 +1301,7 @@ router.delete('/tourists/:user_id', authRequired, async (req, res) => {
     // Delete cascading records
     await Promise.all([
       getDb().from('tourist_saves').delete().eq('user_id', uid),
-      getDb().from('tourist_swipe_events').delete().eq('user_id', uid),
+      getDb().from('tourist_swipe_events').delete().eq('tourist_id', uid),
       getDb().from('tourist_itineraries').delete().eq('user_id', uid),
       getDb().from('user_preference_scores').delete().eq('user_id', uid),
       getDb().from('tourist_profiles').delete().eq('user_id', uid)
@@ -1895,9 +1895,9 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     if (swiped_right.length > 0) {
       const { data: swipes } = await db
         .from('tourist_swipe_events')
-        .select('user_id, entity_slug')
+        .select('user_id:tourist_id, entity_slug')
         .in('entity_slug', swiped_right)
-        .eq('direction', 'right');
+        .eq('direction', 'like');
 
       const swipers = new Set((swipes || []).map(s => s.user_id));
       eligible = new Set([...eligible].filter(id => swipers.has(id)));
@@ -1917,7 +1917,7 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     // Step 5 — filter by category engagement (swiped right OR saved in this category)
     if (category) {
       const [{ data: catSwipes }, { data: catSaves }] = await Promise.all([
-        db.from('tourist_swipe_events').select('user_id').eq('category', category).eq('direction', 'right'),
+        db.from('tourist_swipe_events').select('user_id:tourist_id').eq('category', category).eq('direction', 'like'),
         db.from('tourist_saves').select('user_id').eq('category', category),
       ]);
       const catEngaged = new Set([
@@ -2025,7 +2025,7 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
     }
 
     if (swiped_right.length > 0) {
-      const { data: swipes } = await db.from('tourist_swipe_events').select('user_id').in('entity_slug', swiped_right).eq('direction', 'right');
+      const { data: swipes } = await db.from('tourist_swipe_events').select('user_id:tourist_id').in('entity_slug', swiped_right).eq('direction', 'like');
       const s = new Set((swipes || []).map(s => s.user_id));
       eligible = new Set([...eligible].filter(id => s.has(id)));
     }
@@ -2038,7 +2038,7 @@ router.post('/sms-blast/preview', authRequired, async (req, res) => {
 
     if (category) {
       const [{ data: cs }, { data: cv }] = await Promise.all([
-        db.from('tourist_swipe_events').select('user_id').eq('category', category).eq('direction', 'right'),
+        db.from('tourist_swipe_events').select('user_id:tourist_id').eq('category', category).eq('direction', 'like'),
         db.from('tourist_saves').select('user_id').eq('category', category),
       ]);
       const ce = new Set([...(cs||[]).map(s=>s.user_id), ...(cv||[]).map(s=>s.user_id)]);
