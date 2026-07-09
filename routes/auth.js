@@ -321,6 +321,17 @@ router.post('/accept-invite', async (req, res) => {
             return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
         }
 
+        // entity_owners is the primary linkage the resolver checks first —
+        // users.entity_id/entity_slug above are the quick-lookup fallback.
+        // Both must be written or ownership resolution depends on which path
+        // created the account.
+        await supabase.from('entity_owners').upsert({
+            user_id: user.id,
+            entity_id: entity.id,
+            entity_slug: entity.slug,
+            role: 'owner',
+        }, { onConflict: 'user_id,entity_id' });
+
         await supabase.from('business_invites').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invite.id);
 
         const jwtToken = jwt.sign({ userId: user.id, siteId: business.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -426,27 +437,52 @@ router.post('/refresh', authRequired, async (req, res) => {
 router.get('/session', authRequired, async (req, res) => {
     const { data: user } = await supabase
         .from('users')
-        .select('id, name, email, role, avatar_url')
+        .select('id, name, email, role, avatar_url, entity_slug, entity_id')
         .eq('id', req.userId)
         .single();
 
-    const { data: business } = await supabase
-        .from('businesses')
-        .select('site_id, name, type, status, domain, subdomain, plan, logo_url')
-        .eq('site_id', req.siteId)
-        .single();
-
-    if (!user || !business) {
+    if (!user) {
         return res.status(401).json({ error: 'Session invalid' });
     }
 
-    const { data: apps } = await supabase
-        .from('site_apps')
-        .select('app_id, enabled, apps(name, icon, category)')
-        .eq('site_id', req.siteId)
-        .eq('enabled', true);
+    // The real businesses table is keyed by id (there is no site_id column)
+    // and its real columns are slug/name/category/is_active — the old select
+    // (site_id/type/status/domain/subdomain/plan) 500'd every session check.
+    let business = null;
+    if (req.siteId) {
+        const { data: biz } = await supabase
+            .from('businesses')
+            .select('id, slug, name, category, is_active, logo_url')
+            .eq('id', req.siteId)
+            .maybeSingle();
+        if (biz) business = { site_id: biz.id, slug: biz.slug, name: biz.name, type: biz.category, status: biz.is_active ? 'active' : 'inactive', logo_url: biz.logo_url || null };
+    }
 
-    res.json({ user, business, apps: apps || [] });
+    // The GCR entity is what the dashboard actually operates on — surface it.
+    let entity = null;
+    if (user.entity_slug) {
+        const { data: ent } = await supabase
+            .from('entity')
+            .select('id, slug, name, entity_type, entity_subtype')
+            .eq('slug', user.entity_slug)
+            .maybeSingle();
+        entity = ent || null;
+    }
+
+    // entity_modules is the live per-business module store (site_apps is the
+    // dead legacy registry — 0 rows, nothing reads it).
+    let apps = [];
+    if (entity) {
+        const { data: mods } = await supabase
+            .from('entity_modules')
+            .select('module_key, enabled, sort_order')
+            .eq('entity_slug', entity.slug)
+            .eq('enabled', true)
+            .order('sort_order');
+        apps = mods || [];
+    }
+
+    res.json({ user, business, entity, apps });
 });
 
 // ============================================
@@ -574,32 +610,35 @@ router.post('/create-profile', async (req, res) => {
         // If user record already exists, just return a JWT
         const { data: existingUser } = await supabase
             .from('users')
-            .select('id, site_id, role')
+            .select('id, site_id, role, name, email, entity_slug')
             .eq('auth_id', authId)
             .maybeSingle();
 
         if (existingUser) {
             const { data: biz } = await supabase
                 .from('businesses')
-                .select('site_id, name, type, subdomain, plan')
-                .eq('site_id', existingUser.site_id)
-                .single();
+                .select('id, slug, name, category, is_active')
+                .eq('id', existingUser.site_id)
+                .maybeSingle();
             const token = jwt.sign(
-                { userId: existingUser.id, siteId: existingUser.site_id, role: existingUser.role },
+                { userId: existingUser.id, siteId: existingUser.site_id, role: existingUser.role, entitySlug: existingUser.entity_slug || undefined },
                 process.env.JWT_SECRET,
                 { expiresIn: '7d' }
             );
-            return res.json({ token, user: existingUser, business: biz });
+            return res.json({ token, user: existingUser, business: biz ? { site_id: biz.id, slug: biz.slug, name: biz.name, type: biz.category } : null });
         }
 
-        // New user — create business + user records
-        const subdomain = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        const { data: subExists } = await supabase.from('businesses').select('site_id').eq('subdomain', subdomain).single();
-        const finalSubdomain = subExists ? `${subdomain}-${Date.now().toString(36)}` : subdomain;
+        // New user — same chain as email /signup: businesses row (real schema:
+        // slug/category/is_active — the old insert used type/subdomain/plan/
+        // status, none of which exist), users row, a real GCR entity from
+        // zero, and the entity_owners link.
+        const bizSlugBase = businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'business';
+        const { data: slugExists } = await supabase.from('businesses').select('id').eq('slug', bizSlugBase).maybeSingle();
+        const bizSlug = slugExists ? `${bizSlugBase}-${Date.now().toString(36)}` : bizSlugBase;
 
         const { data: business, error: bizError } = await supabase
             .from('businesses')
-            .insert({ name: businessName, type: businessType || 'service', subdomain: finalSubdomain, plan: 'free', status: 'active' })
+            .insert({ name: businessName, slug: bizSlug, category: businessType || 'service', is_active: true })
             .select().single();
 
         if (bizError) return res.status(500).json({ error: 'Failed to create business: ' + bizError.message });
@@ -608,18 +647,47 @@ router.post('/create-profile', async (req, res) => {
 
         const { data: user, error: userError } = await supabase
             .from('users')
-            .insert({ auth_id: authId, site_id: business.site_id, email: email.toLowerCase(), name: googleName, role: 'owner' })
+            .insert({ auth_id: authId, site_id: business.id, email: email.toLowerCase(), name: googleName, role: 'owner' })
             .select().single();
 
         if (userError) {
-            await supabase.from('businesses').delete().eq('site_id', business.site_id);
+            await supabase.from('businesses').delete().eq('id', business.id);
             return res.status(500).json({ error: 'Failed to create user: ' + userError.message });
         }
 
-        await supabase.from('site_content').insert({ site_id: business.site_id, contact_email: email.toLowerCase() });
+        await supabase.from('site_content').insert({ site_id: business.id, contact_email: email.toLowerCase() });
+
+        // Real GCR entity from zero + linkage — same as email signup, so a
+        // Google-signup owner also gets a profile the modular tools attach to.
+        const entitySlug = await uniqueEntitySlug(supabase, businessName);
+        const { data: entity, error: entityErr } = await supabase
+            .from('entity')
+            .insert({
+                slug: entitySlug,
+                name: businessName,
+                entity_type: mapEntityType(businessType),
+                entity_subtype: businessType || null,
+                is_active: true,
+            })
+            .select('id, slug')
+            .single();
+
+        if (!entityErr && entity) {
+            await supabase.from('entity_owners').upsert({
+                user_id: user.id,
+                entity_id: entity.id,
+                entity_slug: entity.slug,
+                role: 'owner',
+            }, { onConflict: 'user_id,entity_id' });
+            await supabase.from('users')
+                .update({ entity_id: entity.id, entity_slug: entity.slug })
+                .eq('id', user.id);
+        } else if (entityErr) {
+            console.error('create-profile entity creation failed:', entityErr.message);
+        }
 
         const newToken = jwt.sign(
-            { userId: user.id, siteId: business.site_id, role: 'owner' },
+            { userId: user.id, siteId: business.id, role: 'owner', entitySlug: entity ? entity.slug : undefined },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -627,7 +695,8 @@ router.post('/create-profile', async (req, res) => {
         res.status(201).json({
             token: newToken,
             user: { id: user.id, name: user.name, email: user.email, role: user.role },
-            business: { site_id: business.site_id, name: business.name, type: business.type, subdomain: business.subdomain }
+            business: { site_id: business.id, slug: business.slug, name: business.name, type: business.category },
+            entity: entity ? { id: entity.id, slug: entity.slug, name: businessName } : null
         });
     } catch (err) {
         console.error('Create profile error:', err);

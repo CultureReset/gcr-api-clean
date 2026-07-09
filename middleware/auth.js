@@ -17,6 +17,12 @@ function authRequired(req, res, next) {
         req.userId = decoded.userId;
         req.siteId = decoded.siteId;
         req.role = decoded.role;
+        // Admin-minted view-as token: scopes the request to a specific entity
+        // (lib/entity-resolver.js checks this before any ownership lookup).
+        // Only POST /api/admin/view-as mints these, so it can't be forged.
+        if (decoded.viewAs === true && decoded.viewAsEntitySlug) {
+            req.viewAsEntitySlug = decoded.viewAsEntitySlug;
+        }
         return next();
     } catch (err) {
         // Not an Express JWT — try Supabase JWT

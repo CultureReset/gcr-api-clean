@@ -2067,14 +2067,41 @@ router.get('/gcr/claims', authRequired, async (req, res) => {
   }
 });
 
+// Approving a claim actually links the business: pass entity_slug with
+// status:'approved' and the invite email fires to the claimant (they set a
+// password on the claim page → real account → entity_owners link). Without an
+// entity_slug the status still updates, but the response includes candidate
+// entities matched by name so the admin can approve again with one picked —
+// deliberately NO auto-link (claims are public input; auto-matching by
+// name/phone would let anyone claim any business).
 router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
   try {
-    const { status, notes } = req.body || {};
+    const { status, notes, entity_slug } = req.body || {};
     const updates = { updated_at: new Date().toISOString() };
     if (status) updates.status = status;
     if (notes !== undefined) updates.notes = notes;
-    const { error } = await db.from('business_claims').update(updates).eq('id', req.params.id);
+    const { data: claim, error } = await db.from('business_claims').update(updates).eq('id', req.params.id).select('*').maybeSingle();
     if (error) throw error;
+
+    if (status === 'approved' && claim && claim.email) {
+      if (entity_slug) {
+        const invite = await sendBusinessInvite(db, entity_slug, claim.email, req.admin ? req.admin.userId || req.admin.email || null : null);
+        if (invite.error) return res.status(invite.status || 500).json({ ok: false, error: invite.error });
+        return res.json({ ok: true, invite_sent: !!invite.sent, claim_url: invite.claim_url, entity_slug });
+      }
+      // No entity picked — suggest matches so the admin can re-approve with one.
+      const { data: candidates } = await db.from('entity')
+        .select('slug, name, entity_type, city')
+        .ilike('name', `%${(claim.business_name || '').slice(0, 60)}%`)
+        .limit(5);
+      return res.json({
+        ok: true,
+        invite_sent: false,
+        reason: 'Pass entity_slug with status:"approved" to send the claim invite.',
+        suggestions: candidates || [],
+      });
+    }
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -2501,52 +2528,149 @@ router.post('/link-user', authRequired, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Shared invite machinery: creates a business_invites row + emails a claim
+// link. The recipient sets their own password on the claim page, which
+// creates a real Supabase Auth account and links it to the entity.
+// Used by POST /invite-business AND by claim approval (PATCH /gcr/claims/:id).
+async function sendBusinessInvite(db, entitySlug, email, invitedBy) {
+  const { data: entity, error: entErr } = await db.from('entity').select('slug, name').eq('slug', entitySlug).maybeSingle();
+  if (entErr || !entity) return { error: `Entity not found: ${entitySlug}`, status: 404 };
+
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(24).toString('hex');
+
+  const { error: inviteErr } = await db.from('business_invites').insert({
+    entity_slug: entitySlug,
+    email: email.toLowerCase(),
+    token,
+    invited_by: invitedBy || null,
+  });
+  if (inviteErr) return { error: inviteErr.message, status: 500 };
+
+  const baseUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://app.cybercheckinc.com';
+  const claimUrl = `${baseUrl}/claim-business.html?token=${token}`;
+
+  const { sendEmail } = require('../utils/email');
+  const result = await sendEmail({
+    to: email,
+    subject: `You've been invited to manage ${entity.name} on Gulf Coast Radar`,
+    html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6f8;padding:32px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+        <tr><td style="background:#0b7a75;padding:28px 32px;text-align:center;">
+          <h1 style="margin:0;color:#fff;font-size:22px;">You're invited</h1>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 20px;color:#374151;font-size:15px;">You've been invited to manage <strong>${entity.name}</strong>'s listing on Gulf Coast Radar — bookings, calendar sync, waivers, and more.</p>
+          <a href="${claimUrl}" style="display:inline-block;background:#f7941d;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:8px;">Set Up Your Account →</a>
+          <p style="margin:20px 0 0;color:#9ca3af;font-size:12px;">This link expires in 14 days. If you weren't expecting this, you can ignore this email.</p>
+        </td></tr>
+      </table>
+    </body></html>`,
+  });
+
+  return { success: true, sent: !!(result && result.success !== false), claim_url: claimUrl };
+}
+
 // POST /api/admin/invite-business  { entity_slug, email }
-// Sends a real invite email with a claim link — the recipient sets their own
-// password on the claim page, which creates a real Supabase Auth account
-// (not a manually-inserted one) and links it to the entity.
 router.post('/invite-business', authRequired, async (req, res) => {
   try {
     const db = getDb();
     const { entity_slug, email } = req.body || {};
     if (!entity_slug || !email) return res.status(400).json({ error: 'entity_slug and email required' });
 
-    const { data: entity, error: entErr } = await db.from('entity').select('slug, name').eq('slug', entity_slug).maybeSingle();
-    if (entErr || !entity) return res.status(404).json({ error: `Entity not found: ${entity_slug}` });
+    const result = await sendBusinessInvite(db, entity_slug, email, req.admin ? req.admin.userId || req.admin.email || null : null);
+    if (result.error) return res.status(result.status || 500).json({ error: result.error });
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    const crypto = require('crypto');
-    const token = crypto.randomBytes(24).toString('hex');
+// POST /api/admin/view-as  { entity_slug }
+// Mints a short-lived owner-scoped JWT for ANY entity so the admin can open
+// that business's actual live dashboard (app-dashboard.html works unmodified —
+// lib/entity-resolver.js honors the viewAsEntitySlug claim before any
+// ownership lookup). Owner role only — the token never grants admin.
+router.post('/view-as', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { entity_slug } = req.body || {};
+    if (!entity_slug) return res.status(400).json({ error: 'entity_slug required' });
 
-    const { error: inviteErr } = await db.from('business_invites').insert({
-      entity_slug,
-      email: email.toLowerCase(),
-      token,
-      invited_by: req.admin ? req.admin.userId || req.admin.email || null : null,
-    });
-    if (inviteErr) return res.status(500).json({ error: inviteErr.message });
+    const { data: entity } = await db.from('entity').select('id, slug, name').eq('slug', entity_slug).maybeSingle();
+    if (!entity) return res.status(404).json({ error: `Entity not found: ${entity_slug}` });
+
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      {
+        viewAs: true,
+        viewAsEntitySlug: entity.slug,
+        role: 'owner',
+        userId: `admin-view:${(req.admin && (req.admin.userId || req.admin.email)) || req.userId || 'admin'}`,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
 
     const baseUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://app.cybercheckinc.com';
-    const claimUrl = `${baseUrl}/claim-business.html?token=${token}`;
-
-    const { sendEmail } = require('../utils/email');
-    const result = await sendEmail({
-      to: email,
-      subject: `You've been invited to manage ${entity.name} on Gulf Coast Radar`,
-      html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6f8;padding:32px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
-          <tr><td style="background:#0b7a75;padding:28px 32px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:22px;">You're invited</h1>
-          </td></tr>
-          <tr><td style="padding:32px;">
-            <p style="margin:0 0 20px;color:#374151;font-size:15px;">You've been invited to manage <strong>${entity.name}</strong>'s listing on Gulf Coast Radar — bookings, calendar sync, waivers, and more.</p>
-            <a href="${claimUrl}" style="display:inline-block;background:#f7941d;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:8px;">Set Up Your Account →</a>
-            <p style="margin:20px 0 0;color:#9ca3af;font-size:12px;">This link expires in 14 days. If you weren't expecting this, you can ignore this email.</p>
-          </td></tr>
-        </table>
-      </body></html>`,
+    res.json({
+      token,
+      entity: { slug: entity.slug, name: entity.name },
+      dashboard_url: `${baseUrl}/app-dashboard.html`,
+      expires_in: '2h',
     });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-    res.json({ success: true, sent: !!(result && result.success !== false), claim_url: claimUrl });
+// POST /api/admin/bulk-invite  { entity_slugs?: [...], all_active_with_email?: true, limit?: 50, dry_run?: true }
+// Provisions owner access at scale via the SAME invite flow used one-off:
+// each entity that has an email on file gets a claim link. No accounts are
+// pre-created — the owner sets a password on the claim page, which creates
+// the account and the entity_owners link. dry_run returns who WOULD be
+// invited without sending anything.
+router.post('/bulk-invite', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { entity_slugs, all_active_with_email, limit = 50, dry_run = false } = req.body || {};
+
+    let targets = [];
+    if (Array.isArray(entity_slugs) && entity_slugs.length) {
+      const { data } = await db.from('entity').select('slug, name, email').in('slug', entity_slugs.slice(0, 500));
+      targets = data || [];
+    } else if (all_active_with_email) {
+      const { data } = await db.from('entity')
+        .select('slug, name, email')
+        .eq('is_active', true)
+        .not('email', 'is', null)
+        .neq('email', '')
+        .limit(Math.min(parseInt(limit, 10) || 50, 500));
+      targets = data || [];
+    } else {
+      return res.status(400).json({ error: 'Pass entity_slugs[] or all_active_with_email:true' });
+    }
+
+    // Skip entities already linked or already invited (pending invite)
+    const slugs = targets.map(t => t.slug);
+    const [{ data: linked }, { data: invited }] = await Promise.all([
+      db.from('entity_owners').select('entity_slug').in('entity_slug', slugs),
+      db.from('business_invites').select('entity_slug, status').in('entity_slug', slugs),
+    ]);
+    const linkedSet = new Set((linked || []).map(r => r.entity_slug));
+    const invitedSet = new Set((invited || []).filter(r => r.status !== 'accepted').map(r => r.entity_slug));
+
+    const toInvite = targets.filter(t => t.email && !linkedSet.has(t.slug) && !invitedSet.has(t.slug));
+    const skipped = targets.filter(t => !t.email || linkedSet.has(t.slug) || invitedSet.has(t.slug))
+      .map(t => ({ slug: t.slug, reason: !t.email ? 'no email' : linkedSet.has(t.slug) ? 'already linked' : 'invite pending' }));
+
+    if (dry_run) {
+      return res.json({ dry_run: true, would_invite: toInvite.map(t => ({ slug: t.slug, email: t.email })), skipped });
+    }
+
+    const results = [];
+    for (const t of toInvite) {
+      const r = await sendBusinessInvite(db, t.slug, t.email, 'bulk-invite');
+      results.push({ slug: t.slug, email: t.email, sent: !r.error && !!r.sent, error: r.error || null });
+    }
+
+    res.json({ invited: results.filter(r => r.sent).length, failed: results.filter(r => r.error).length, skipped, results });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
