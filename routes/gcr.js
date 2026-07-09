@@ -99,6 +99,7 @@ async function buildFullEntity(slug) {
     db.from('entity_about_bullets').select('id,text,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_perfect_for').select('id,label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_social_posts').select('id,platform,post_url,caption,media_url,thumbnail_url,posted_at,likes_count').eq('entity_slug', slug).order('posted_at', { ascending: false }).limit(12),
+    db.from('gcr_deals').select('id,entity_slug,entity_name,entity_type,entity_subtype,deal_type,headline,description,image_url,original_price,deal_price,price_unit,price_label,discount_pct,valid_date,valid_start_time,valid_end_time,expires_at,is_today_only,spots_total,spots_remaining,claim_type,claim_url,claim_phone,claim_text,is_featured,created_at').eq('entity_slug', slug).eq('is_active', true).order('created_at', { ascending: false }).limit(10),
     // Hub detection: does anything list this entity as its parent? (marinas,
     // condo towers, multi-venue complexes — see entity.parent_entity_slug,
     // NOT parent_slug — that column doesn't exist and silently made this
@@ -109,7 +110,7 @@ async function buildFullEntity(slug) {
 
   const [
     hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
-    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes
+    aboutBulletsRes, perfectForRes, socialPostsRes, dealsRes, childCountRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -398,6 +399,7 @@ async function buildFullEntity(slug) {
     blog_posts: blogPosts.data || [],
     announcements: announcements.data || [],
     social_posts: socialPostsRes.data || [],
+    deals: dealsRes.data || [],
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
     child_count: childCountRes?.count || 0,
