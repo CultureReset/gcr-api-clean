@@ -1089,19 +1089,24 @@ router.get('/specials', async (req, res) => {
 // ─── GET /api/gcr/happy-hours ─────────────────────────────────────────────────
 router.get('/happy-hours', async (req, res) => {
   try {
-    // Get all entities that have happy hour data
-    const { data: entities, error } = await db
-      .from('entity')
-      .select(`
-        id, slug, name, icon, hero_image_url, entity_subtype, city,
-        address_line_1, phone, directions_url, call_url, booking_url,
-        reservation_url, rating, hh_days, hh_start, hh_end, hh_description
-      `)
-      .eq('is_active', true)
-      .not('hh_days', 'is', null)
-      .order('name');
+    // Entities with a summary hh_days flag, OR real happy_hour_sections content --
+    // hh_days alone missed every business whose happy hour was entered as real
+    // menu sections/items but never got the summary field filled in.
+    const [entitiesRes, hhEntitySlugsRes] = await Promise.all([
+      db.from('entity')
+        .select(`
+          id, slug, name, icon, hero_image_url, entity_subtype, city,
+          address_line_1, phone, directions_url, call_url, booking_url,
+          reservation_url, rating, hh_days, hh_start, hh_end, hh_description
+        `)
+        .eq('is_active', true)
+        .order('name'),
+      db.from('happy_hour_sections').select('entity_slug'),
+    ]);
+    if (entitiesRes.error) return res.status(500).json({ error: entitiesRes.error.message });
 
-    if (error) return res.status(500).json({ error: error.message });
+    const hhContentSlugs = new Set((hhEntitySlugsRes.data || []).map(r => r.entity_slug));
+    const entities = (entitiesRes.data || []).filter(e => e.hh_days != null || hhContentSlugs.has(e.slug));
 
     const slugs = (entities || []).map(e => e.slug);
 
