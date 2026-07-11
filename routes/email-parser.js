@@ -1339,13 +1339,17 @@ router.get('/setup/:slug', async (req, res) => {
 // calendar.
 const { parseIcsEvents, datesInRange } = require('../utils/ical-parse');
 
-async function blockDateOnCalendar(entitySlug, date, sourceLabel) {
-  const { data: existing } = await db.from('business_availability')
+async function blockDateOnCalendar(entitySlug, date, sourceLabel, resourceId = null) {
+  // Match the existing row for this specific unit, or the entity-wide row when the
+  // feed isn't tied to a unit (resourceId null). Per-unit feeds let a multi-unit
+  // building block one unit's dates without touching its siblings.
+  let q = db.from('business_availability')
     .select('id')
     .eq('entity_slug', entitySlug)
     .eq('availability_date', date)
-    .eq('time_slot', '00:00')
-    .maybeSingle();
+    .eq('time_slot', '00:00');
+  q = resourceId ? q.eq('resource_id', resourceId) : q.is('resource_id', null);
+  const { data: existing } = await q.maybeSingle();
 
   if (existing) {
     await db.from('business_availability').update({
@@ -1357,6 +1361,7 @@ async function blockDateOnCalendar(entitySlug, date, sourceLabel) {
   } else {
     await db.from('business_availability').insert({
       entity_slug: entitySlug,
+      resource_id: resourceId,
       availability_date: date,
       time_slot: '00:00',
       status: 'blocked',
@@ -1377,7 +1382,7 @@ async function syncExternalCalendar(row) {
     let blockedCount = 0;
     for (const ev of events) {
       for (const d of datesInRange(ev.start, ev.end)) {
-        await blockDateOnCalendar(row.entity_slug, d, row.source_label || 'external-ical');
+        await blockDateOnCalendar(row.entity_slug, d, row.source_label || 'external-ical', row.resource_id || null);
         blockedCount++;
       }
     }

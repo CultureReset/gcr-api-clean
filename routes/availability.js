@@ -174,6 +174,100 @@ router.get('/calendar/:site_id/:item_id', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// PER-UNIT AVAILABILITY (condos / bookable_resources) — Layer 2
+// Feeds the date-picker on a rental listing page. Reads the resolver
+// functions that union external iCal blocks (business_availability) with
+// native GCR bookings, resolved per unit.
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/availability/resource/:id?from=YYYY-MM-DD&to=YYYY-MM-DD
+// Blocked nights for a unit across a window + the booking rules the picker needs.
+router.get('/resource/:id', async (req, res) => {
+  const { id } = req.params;
+  const from = req.query.from || new Date().toISOString().slice(0, 10);
+  const to   = req.query.to   || new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10);
+  try {
+    const { data: unit, error: uErr } = await supabase
+      .from('bookable_resources')
+      .select('id, name, entity_slug, nightly_price, cleaning_fee, service_fee, min_nights, capacity, check_in_time, check_out_time')
+      .eq('id', id)
+      .maybeSingle();
+    if (uErr) throw uErr;
+    if (!unit) return res.status(404).json({ error: 'Unit not found' });
+
+    const { data: blocked, error: bErr } = await supabase
+      .rpc('resource_blocked_dates', { p_resource_id: id, p_from: from, p_to: to });
+    if (bErr) throw bErr;
+
+    res.json({
+      resource_id: id,
+      name: unit.name,
+      entity_slug: unit.entity_slug,
+      min_nights: unit.min_nights || 1,
+      capacity: unit.capacity,
+      nightly_price: unit.nightly_price,
+      cleaning_fee: unit.cleaning_fee || 0,
+      service_fee: unit.service_fee || 0,
+      check_in_time: unit.check_in_time,
+      check_out_time: unit.check_out_time,
+      blocked_dates: (blocked || []).map(r => r.d).sort(),
+      window: { from, to },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/availability/resource/:id/quote?checkin=&checkout=&guests=
+// Confirms a specific stay is bookable and returns the price breakdown.
+router.get('/resource/:id/quote', async (req, res) => {
+  const { id } = req.params;
+  const { checkin, checkout } = req.query;
+  const guests = parseInt(req.query.guests) || null;
+  if (!checkin || !checkout) return res.status(400).json({ error: 'checkin and checkout required' });
+  try {
+    const { data: unit, error: uErr } = await supabase
+      .from('bookable_resources')
+      .select('id, name, capacity, nightly_price, cleaning_fee, service_fee, min_nights')
+      .eq('id', id)
+      .maybeSingle();
+    if (uErr) throw uErr;
+    if (!unit) return res.status(404).json({ error: 'Unit not found' });
+
+    const nights = Math.round(
+      (new Date(checkout + 'T12:00:00Z') - new Date(checkin + 'T12:00:00Z')) / 86400000
+    );
+    if (!(nights > 0)) return res.status(400).json({ error: 'checkout must be after checkin' });
+
+    const { data: avail, error: aErr } = await supabase
+      .rpc('resource_is_available', { p_resource_id: id, p_checkin: checkin, p_checkout: checkout });
+    if (aErr) throw aErr;
+
+    const minNights = unit.min_nights || 1;
+    const reasons = [];
+    if (!avail) reasons.push('dates_unavailable');
+    if (nights < minNights) reasons.push(`min_nights_${minNights}`);
+    if (guests && unit.capacity && guests > unit.capacity) reasons.push(`over_capacity_${unit.capacity}`);
+
+    const nightly  = Number(unit.nightly_price || 0);
+    const cleaning = Number(unit.cleaning_fee || 0);
+    const service  = Number(unit.service_fee || 0);
+    const lodging  = +(nightly * nights).toFixed(2);
+    const total    = +(lodging + cleaning + service).toFixed(2);
+
+    res.json({
+      resource_id: id,
+      bookable: reasons.length === 0,
+      reasons,
+      checkin, checkout, nights,
+      breakdown: { nightly, nights, lodging, cleaning_fee: cleaning, service_fee: service, total },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
 // HELPER
 // ─────────────────────────────────────────────────────────────
 function getDaysInRange(from, to) {
