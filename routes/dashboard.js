@@ -3263,6 +3263,79 @@ router.get('/units', async (req, res) => {
     res.json(data || []);
 });
 
+// POST /api/dashboard/units — create a new bookable unit under this business's entity
+router.post('/units', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { name, bedrooms, bathrooms, capacity, nightly_price, min_nights, resource_type } = req.body;
+    if (!name) return res.status(400).json({ error: 'name required' });
+
+    const slug = String(name).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
+
+    const { data, error } = await supabase
+        .from('bookable_resources')
+        .insert({
+            entity_slug: entitySlug,
+            slug,
+            name,
+            resource_type: resource_type || 'condo',
+            bedrooms: bedrooms ?? null,
+            bathrooms: bathrooms ?? null,
+            capacity: capacity ?? null,
+            nightly_price: nightly_price ?? null,
+            min_nights: min_nights || 1,
+            is_active: true,
+        })
+        .select('id, slug, name, resource_type, bedrooms, bathrooms, capacity, nightly_price, min_nights, is_active')
+        .single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+});
+
+// PUT /api/dashboard/units/:id — edit a unit (scoped to this business's entity — can't edit someone else's unit)
+router.put('/units/:id', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { name, bedrooms, bathrooms, capacity, nightly_price, min_nights } = req.body;
+    const patch = {};
+    if (name !== undefined) patch.name = name;
+    if (bedrooms !== undefined) patch.bedrooms = bedrooms;
+    if (bathrooms !== undefined) patch.bathrooms = bathrooms;
+    if (capacity !== undefined) patch.capacity = capacity;
+    if (nightly_price !== undefined) patch.nightly_price = nightly_price;
+    if (min_nights !== undefined) patch.min_nights = min_nights;
+
+    const { data, error } = await supabase
+        .from('bookable_resources')
+        .update(patch)
+        .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug)
+        .select('id, slug, name, resource_type, bedrooms, bathrooms, capacity, nightly_price, min_nights, is_active')
+        .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Unit not found' });
+    res.json(data);
+});
+
+// DELETE /api/dashboard/units/:id — deactivate a unit (never hard-delete; same convention as the rest of GCR)
+router.delete('/units/:id', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data, error } = await supabase
+        .from('bookable_resources')
+        .update({ is_active: false })
+        .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug)
+        .select('id')
+        .maybeSingle();
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Unit not found' });
+    res.json({ success: true });
+});
+
 // GET /api/dashboard/ical/feed-url — get (or lazily create) this business's calendar feed URL
 router.get('/ical/feed-url', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
