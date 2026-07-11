@@ -39,6 +39,24 @@ function sendTwilioText(to, body) {
 const touristUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ── Tourist middleware: verify Supabase JWT, attach tourist user id ─────────
+// tourist_groups.creator_id (and any future tourist_users-referencing FK)
+// requires a real row in tourist_users -- but nothing has ever inserted one
+// for anyone, so it's sat empty since the table was created. Self-heal it
+// here, on every authenticated request, rather than in each route that
+// happens to need it.
+async function ensureTouristUser(id, email) {
+    if (!id) return;
+    try {
+        // name is NOT NULL on tourist_users -- fall back to the email's
+        // local part, same convention used elsewhere for a display name.
+        const name = (email || '').split('@')[0] || 'Guest';
+        await mainDb.from('tourist_users')
+            .upsert({ id, email: email || null, name }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch (e) {
+        console.warn('[touristAuth] ensureTouristUser failed:', e.message);
+    }
+}
+
 async function touristAuth(req, res, next) {
     const header = req.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) {
@@ -50,6 +68,7 @@ async function touristAuth(req, res, next) {
         if (error || !data?.user) return res.status(401).json({ error: 'Invalid token' });
         req.touristId = data.user.id;
         req.touristEmail = data.user.email;
+        await ensureTouristUser(req.touristId, req.touristEmail);
         return next();
     } catch (e) {
         return res.status(401).json({ error: 'Invalid token' });
@@ -79,6 +98,7 @@ async function touristAuthOptional(req, res, next) {
                 req.touristId = data.user.id;
                 req.touristEmail = data.user.email;
                 req.isGuest = false;
+                await ensureTouristUser(req.touristId, req.touristEmail);
                 return next();
             }
         } catch (e) { /* fall through to guest id */ }
