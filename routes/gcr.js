@@ -580,7 +580,11 @@ router.get('/entities', async (req, res) => {
         // this naturally falls back to a rating/distance blend (score ~= 0 + ratingScore*0.6 + distanceScore*0.4)
         row._score = affinityScore * 0.5 + ratingScore * 0.3 + distanceScore * 0.2;
       });
-      results.sort((a, b) => b._score - a._score);
+      // Featured businesses are pinned ahead of the score-ranked results (still
+      // ordered amongst themselves by score), same as "sponsored first" on any
+      // marketplace listing page. Only ~1 entity platform-wide has featured=true
+      // today, so this does not reshuffle any existing category page.
+      results.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0) || b._score - a._score);
       results.forEach(row => { delete row._score; });
     }
 
