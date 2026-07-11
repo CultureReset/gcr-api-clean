@@ -105,11 +105,18 @@ async function buildFullEntity(slug) {
     // query fail/return 0 for every entity). head:true + count:'exact'
     // means Postgres only returns the count, not the rows.
     db.from('entity').select('id', { count: 'exact', head: true }).eq('parent_entity_slug', slug).eq('is_active', true),
+    // Specials/discounts are universal, NOT a restaurant-only concept (a
+    // last-minute condo rate cut, a discounted dolphin cruise seat, are just
+    // as much a "special" as a food deal) — this used to only be fetched
+    // inside the isFood conditional block below, so every non-food business
+    // silently had its entity_specials rows ignored no matter what was in
+    // the table.
+    db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
   ];
 
   const [
     hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
-    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes
+    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes, specialsRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -261,12 +268,11 @@ async function buildFullEntity(slug) {
       db.from('menu_sections').select('id,section_name,sort_order,time_range,available_days').eq('entity_slug', slug).order('sort_order'),
       db.from('drink_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
       db.from('happy_hour_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
-      db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
       db.from('entity_sides').select('id,item_name,side_name,description,price,sort_order').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
       db.from('entity_daily_features').select('id,label,feature_name,value,description,price,sort_order').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
       db.from('order_links').select('id,label,url,type').eq('entity_slug', slug),
     );
-    conditionalKeys.push('menuSections','drinkSections','hhSections','specials','sides','dailyFeatures','orderLinks');
+    conditionalKeys.push('menuSections','drinkSections','hhSections','sides','dailyFeatures','orderLinks');
   }
 
   if (isActivity || modules.has('activity') || dataActivity) {
@@ -415,7 +421,7 @@ async function buildFullEntity(slug) {
     menu_sections: nest(cond.menuSections?.data, items.menuItems),
     drink_sections: nest(cond.drinkSections?.data, items.drinkItems),
     happy_hour_sections: nest(cond.hhSections?.data, items.hhItems),
-    specials: cond.specials?.data || [],
+    specials: specialsRes?.data || [],
     sides: cond.sides?.data || [],
     daily_features: cond.dailyFeatures?.data || [],
     order_links: cond.orderLinks?.data || [],

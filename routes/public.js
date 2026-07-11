@@ -17,7 +17,7 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         gcrDb.from('happy_hour_sections').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
         gcrDb.from('happy_hour_items').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
         gcrDb.from('entity_events').select('*').eq('entity_slug', entitySlug).order('event_date', { ascending: true }),
-        gcrDb.from('entity_specials').select('*').eq('entity_slug', entitySlug),
+        gcrDb.from('entity_specials').select('*').eq('entity_slug', entitySlug).eq('is_active', true),
         gcrDb.from('entity_photos').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
         gcrDb.from('entity_hours').select('*').eq('entity_slug', entitySlug),
         Promise.resolve({ data: [] }), // social_media_accounts is legacy/site_id-keyed OAuth data, not applicable here — modern social links come straight off entity.social_instagram/facebook/tiktok below
