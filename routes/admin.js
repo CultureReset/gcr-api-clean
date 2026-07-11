@@ -3157,6 +3157,61 @@ router.post('/repair-photos', authRequired, async (req, res) => {
   }
 });
 
+// ── REHOST EXTERNAL PHOTOS — permanently save third-party CDN images ─────────
+// Instagram/Facebook CDN URLs (scontent-*.cdninstagram.com etc.) are signed
+// and expire — any entity_photos row pointing straight at one will eventually
+// 404. This downloads each given URL once and re-uploads it into our own
+// entity-photos storage bucket (same bucket/convention repair-photos above
+// uses), then writes an entity_photos row pointing at the new, permanent
+// Supabase URL. Source URL is fetched server-side (this API has normal
+// internet egress, unlike a sandboxed dev session), so this is meant to be
+// called soon after the source URLs are collected, before they expire.
+router.post('/gcr/rehost-photos', authRequired, async (req, res) => {
+  const db = getDb();
+  const { entity_slug, urls } = req.body || {};
+  if (!entity_slug || !Array.isArray(urls) || !urls.length) {
+    return res.status(400).json({ error: 'entity_slug and a non-empty urls[] are required' });
+  }
+
+  const { data: existing } = await db.storage.from('entity-photos').list(entity_slug, { limit: 1000 });
+  const existingNums = (existing || [])
+    .map(o => parseInt((o.name.match(/photo_(\d+)\./) || [])[1], 10))
+    .filter(n => !isNaN(n));
+  let nextNum = (existingNums.length ? Math.max(...existingNums) : 0) + 1;
+
+  const { data: existingRows } = await db.from('entity_photos').select('sort_order').eq('entity_slug', entity_slug);
+  let nextSort = (existingRows || []).reduce((m, r) => Math.max(m, r.sort_order || 0), 0) + 1;
+
+  const results = [];
+  for (const sourceUrl of urls) {
+    try {
+      const r = await fetch(sourceUrl, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (!r.ok) { results.push({ sourceUrl, ok: false, reason: `fetch ${r.status}` }); continue; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 500) { results.push({ sourceUrl, ok: false, reason: 'empty response' }); continue; }
+      const contentType = r.headers.get('content-type') || 'image/jpeg';
+      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+      const filename = `photo_${String(nextNum).padStart(2, '0')}.${ext}`;
+      const path = `${entity_slug}/${filename}`;
+
+      const { error: upErr } = await db.storage.from('entity-photos').upload(path, buf, { contentType, upsert: true });
+      if (upErr) { results.push({ sourceUrl, ok: false, reason: 'upload failed: ' + upErr.message }); continue; }
+
+      const { data: { publicUrl } } = db.storage.from('entity-photos').getPublicUrl(path);
+      const { error: insErr } = await db.from('entity_photos').insert({ entity_slug, url: publicUrl, sort_order: nextSort });
+      if (insErr) { results.push({ sourceUrl, ok: false, reason: 'row insert failed: ' + insErr.message }); continue; }
+
+      results.push({ sourceUrl, ok: true, storedUrl: publicUrl });
+      nextNum++; nextSort++;
+    } catch (e) {
+      results.push({ sourceUrl, ok: false, reason: String(e.message || e).slice(0, 150) });
+    }
+  }
+
+  const stored = results.filter(r => r.ok).length;
+  res.json({ entity_slug, requested: urls.length, stored, failed: urls.length - stored, results });
+});
+
 module.exports = router;
 
 // ── SOCIAL POSTS — paste FB/IG URLs, each becomes a card ──────────────────────
