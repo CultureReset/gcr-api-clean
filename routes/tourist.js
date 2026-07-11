@@ -278,6 +278,12 @@ router.post('/swipes', touristAuthOptional, async (req, res) => {
             entity_name: e.business_name || null,
             category: e.category || null,
             direction: e.direction, // 'like' | 'nope' | 'super'
+            // Which specific photo was on screen at swipe time (not just which
+            // business) -- lets "why did they like this" analytics distinguish
+            // e.g. the dolphin in the photo from the boat itself.
+            photo_id: e.photo_id || null,
+            photo_url: e.photo_url || null,
+            photo_tags: e.photo_tags || null,
         }));
     if (rows.length === 0) return res.json({ ok: true, count: 0 });
     try {
@@ -295,6 +301,9 @@ router.post('/swipes', touristAuthOptional, async (req, res) => {
                         entity_name TEXT,
                         category TEXT,
                         direction TEXT NOT NULL,
+                        photo_id UUID,
+                        photo_url TEXT,
+                        photo_tags JSONB,
                         created_at TIMESTAMPTZ DEFAULT NOW()
                     );
                     CREATE INDEX IF NOT EXISTS idx_tse_tourist ON tourist_swipe_events(tourist_id);

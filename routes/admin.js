@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { findExistingEntity, possibleFuzzyDuplicate } = require('../lib/find-existing-entity');
+const { analyzePhoto } = require('../lib/analyze-photo');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -1879,7 +1880,22 @@ router.post('/gcr/upload-image', authRequired, upload.single('image'), async (re
   if (entity_slug) {
     const { data: existing } = await getDb().from('entity_photos').select('id').eq('entity_slug', entity_slug).order('sort_order', { ascending: false }).limit(1);
     const nextOrder = existing?.length ? (existing[0].sort_order || 0) + 1 : 0;
-    await getDb().from('entity_photos').insert({ entity_slug, url: publicUrl, image_path: fileName, is_cover: is_cover === 'true', sort_order: nextOrder });
+    const { data: inserted } = await getDb().from('entity_photos')
+      .insert({ entity_slug, url: publicUrl, image_path: fileName, is_cover: is_cover === 'true', sort_order: nextOrder })
+      .select('id').single();
+    // Don't make the upload wait on vision analysis -- fill in what the photo
+    // actually shows a moment later, same fire-and-forget pattern used for
+    // calendar mirroring elsewhere in this API.
+    if (inserted?.id) {
+      analyzePhoto(publicUrl).then(result => {
+        if (!result) return;
+        return getDb().from('entity_photos').update({
+          ai_description: result.description,
+          ai_tags: result.tags,
+          ai_analyzed_at: new Date().toISOString(),
+        }).eq('id', inserted.id);
+      }).catch(() => {});
+    }
   }
   res.json({ url: publicUrl, path: fileName });
 });
