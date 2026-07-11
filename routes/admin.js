@@ -1247,7 +1247,7 @@ router.post('/entities/:slug/sections', authRequired, async (req, res) => {
     for (const [i, sec] of sections.entries()) {
       const { data: s, error: secErr } = await getDb()
         .from('entity_sections')
-        .insert({ entity_slug: slug, section_type: sec.section_type, section_name: sec.section_name || sec.name, sort_order: sec.sort_order ?? i })
+        .insert({ entity_slug: slug, section_type: sec.section_type, section_name: sec.section_name || sec.name, subtitle: sec.subtitle || null, image_url: sec.image_url || null, image_path: sec.image_path || null, sort_order: sec.sort_order ?? i })
         .select('id').single();
       if (secErr || !s) continue;
       if (sec.items?.length) {
@@ -1260,12 +1260,41 @@ router.post('/entities/:slug/sections', authRequired, async (req, res) => {
           price_label: item.price_label || null,
           duration: item.duration || null,
           icon: item.icon || null,
+          image_url: item.image_url || null,
+          image_path: item.image_path || null,
           metadata: item.metadata || {},
           sort_order: item.sort_order ?? j,
         })));
       }
     }
     res.json({ success: true, slug, count: sections.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/gcr/sections/:id/image — set/clear one section's banner
+// photo without re-saving the whole sections list (used by the "Upload
+// Photo" button in the entity editor's Sections tab). Pass {image_url,
+// image_path} to set, or {image_url:null} to remove.
+router.patch('/gcr/sections/:id/image', authRequired, async (req, res) => {
+  try {
+    const { image_url, image_path } = req.body;
+    const { error } = await getDb().from('entity_sections')
+      .update({ image_url: image_url || null, image_path: image_path || null })
+      .eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/admin/gcr/section-items/:id/image — same, for one item within a section.
+router.patch('/gcr/section-items/:id/image', authRequired, async (req, res) => {
+  try {
+    const { image_url, image_path } = req.body;
+    const { error } = await getDb().from('entity_section_items')
+      .update({ image_url: image_url || null, image_path: image_path || null })
+      .eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
