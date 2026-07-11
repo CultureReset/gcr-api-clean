@@ -2307,4 +2307,9 @@ router.get('/lodging-search', async (req, res) => {
 // through the broker at /api/transportation/request instead of a one-off
 // route here — see routes/transportation.js for the real dispatch flow.
 
+// Exposed so other routes (e.g. the AI concierge chat's get_business_details
+// tool) can reuse the same full-profile assembler that powers a business's
+// own page, instead of duplicating ~60 tables' worth of query logic.
+router.buildFullEntity = buildFullEntity;
+
 module.exports = router;

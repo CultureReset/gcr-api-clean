@@ -1286,8 +1286,9 @@ MEMORY (you remember across chats):
 - If memory is outdated, update_memory or delete_memory
 
 SEARCHING BEYOND THE LIST ABOVE:
-- LIVE GULF COAST DATA above is only the top ~200 places by rating/proximity — it does NOT cover everything. If someone names a specific business that isn't in that list, or asks a "who has X" / "which places do Y" question (e.g. "who has dolphin cruises", "where does the Black Flag depart from"), call search_businesses instead of guessing or saying you don't know.
+- LIVE GULF COAST DATA above is only the top ~200 places by rating/proximity, and each entry there is a summary — it does NOT cover everything or every detail. If someone names a specific business that isn't in that list, or asks a "who has X" / "which places do Y" question (e.g. "who has dolphin cruises", "where does the Black Flag depart from"), call search_businesses instead of guessing or saying you don't know.
 - search_businesses returns each match's parent hub (e.g. the marina a charter boat operates out of), so use it directly to answer "where does X depart from" style questions.
+- Once you know which business the traveler means (from the list above, or from search_businesses), call get_business_details(slug) to read that business's FULL page — menu/drinks/happy hour items, reviews, FAQs, policies, team, hours, offerings/pricing tiers, amenities, parent hub, everything that shows on its real page. Use this whenever a question needs more depth than the one-line summary above gives you (e.g. "what's actually in their spicy tuna roll", "do they have a kids menu", "what does their weekday happy hour include").
 
 HARD RULES:
 - Only recommend real places — either from the LIVE GULF COAST DATA above, or from search_businesses results. Never invent a business that isn't returned by one of these.
@@ -1308,6 +1309,17 @@ HARD RULES:
                     tag: { type: 'string', description: 'Substring match against this business\'s tags, e.g. "dolphin" or "kayak" — broader than entity_subtype since tags catch secondary offerings' },
                     limit: { type: 'integer', description: 'Max results, default 15, max 30' }
                 }
+            }
+        },
+        {
+            name: 'get_business_details',
+            description: 'Read a specific business\'s FULL page — the same data shown on its real profile page: menu/drink/happy-hour items, offerings & pricing tiers, hours, reviews, FAQs, policies, team, amenities/tags, and its parent hub. Use this after search_businesses or the LIVE GULF COAST DATA list points you to a slug and the traveler needs more depth than the one-line summary.',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    slug: { type: 'string', description: 'The business\'s slug, e.g. "black-flag" or "gulf-coast-luggo"' }
+                },
+                required: ['slug']
             }
         },
         {
@@ -1353,6 +1365,51 @@ HARD RULES:
     ];
 
     async function executeTool(name, input) {
+        if (name === 'get_business_details') {
+            try {
+                const { buildFullEntity } = require('./gcr');
+                const e = await buildFullEntity(input.slug);
+                if (!e) return { error: `No business found for slug "${input.slug}"` };
+
+                const lines = [];
+                lines.push(`${e.name} [${[e.entity_type, e.entity_subtype].filter(Boolean).join('/')}] — ${e.city || ''}, ${e.state || ''}`);
+                if (e.parent) lines.push(`Part of: ${e.parent.name}`);
+                if (e.is_hub) lines.push(`This is a hub with ${e.child_count} businesses under it — use search_businesses with entity_subtype or tag filters, or the "parent_hub" field from a search_businesses result, to find them.`);
+                if (e.description || e.editorial_summary) lines.push(`About: ${(e.description || e.editorial_summary).slice(0, 400)}`);
+                if (e.phone) lines.push(`Phone: ${e.phone}`);
+                if (e.price_from != null) lines.push(`Price: ${e.price_from === 0 ? 'Free' : `From $${e.price_from}${e.price_unit ? `/${e.price_unit}` : ''}`}`);
+                if (e.rating) lines.push(`Rating: ⭐${e.rating} (${e.review_count || 0} reviews)`);
+
+                const tagNames = [...new Set((e.tags || []).map(t => t.tag_name).filter(Boolean))];
+                if (tagNames.length) lines.push(`Tags: ${tagNames.slice(0, 20).join(', ')}`);
+
+                if ((e.hours || []).length) {
+                    lines.push(`Hours: ${e.hours.map(h => `${h.day_of_week}: ${h.is_closed ? 'closed' : `${h.opens_at}-${h.closes_at}`}`).join(' | ')}`);
+                }
+
+                const fmtItems = (items, n = 15) => (items || []).slice(0, n).map(i => `${i.item_name}${i.price ? ` $${i.price}` : ''}${i.description ? ` — ${i.description.slice(0, 60)}` : ''}`).join(' | ');
+                (e.menu_sections || []).forEach(s => { if (s.items?.length) lines.push(`Menu — ${s.section_name}: ${fmtItems(s.items)}`); });
+                (e.drink_sections || []).forEach(s => { if (s.items?.length) lines.push(`Drinks — ${s.section_name}: ${fmtItems(s.items)}`); });
+                (e.happy_hour_sections || []).forEach(s => { if (s.items?.length) lines.push(`Happy Hour — ${s.section_name} (${(s.days_of_week || []).join(',')} ${s.start_time || ''}-${s.end_time || ''}): ${fmtItems(s.items)}`); });
+                if ((e.specials || []).length) lines.push(`Specials: ${e.specials.slice(0, 10).map(s => `${s.special_name}${s.discount_value ? ` (${s.discount_type === 'percent' ? `${s.discount_value}% off` : `$${s.discount_value} off`})` : ''}`).join(' | ')}`);
+
+                (e.sections || []).forEach(s => {
+                    if (s.items?.length) lines.push(`${s.section_name}: ${s.items.slice(0, 10).map(i => `${i.item_name}${i.price_from != null ? ` from $${i.price_from}` : ''}${i.description ? ` — ${i.description.slice(0, 60)}` : ''}`).join(' | ')}`);
+                });
+
+                if ((e.pricing || []).length) lines.push(`Pricing: ${e.pricing.slice(0, 10).map(p => `${p.item_name || p.name} $${p.price}`).join(' | ')}`);
+                if ((e.whats_included || []).length) lines.push(`Includes: ${e.whats_included.map(w => w.item_name || w.included_item).filter(Boolean).join(', ')}`);
+                if ((e.faqs || []).length) lines.push(`FAQ: ${e.faqs.slice(0, 8).map(f => `Q:${f.question} A:${(f.answer || '').slice(0, 100)}`).join(' | ')}`);
+                if ((e.policies || []).length) lines.push(`Policies: ${e.policies.slice(0, 6).map(p => `${p.title || p.policy_type}: ${(p.body || p.content || '').slice(0, 100)}`).join(' | ')}`);
+                if ((e.team || []).length) lines.push(`Team: ${e.team.slice(0, 8).map(t => `${t.name}${t.title ? ` (${t.title})` : ''}`).join(', ')}`);
+                if ((e.reviews || []).length) lines.push(`Recent reviews: ${e.reviews.slice(0, 5).map(r => `"${(r.body || '').slice(0, 80)}" — ${r.reviewer_name || 'guest'} (${r.rating}★)`).join(' | ')}`);
+                if ((e.bookable_resources || []).length) lines.push(`Units/resources: ${e.bookable_resources.slice(0, 10).map(r => `${r.name}${r.nightly_price ? ` $${r.nightly_price}/night` : ''}${r.bedrooms ? ` ${r.bedrooms}bd` : ''}`).join(' | ')}`);
+
+                return { slug: e.slug, details: lines.join('\n') };
+            } catch (err) {
+                return { error: err.message };
+            }
+        }
         if (name === 'search_businesses') {
             const limit = Math.min(parseInt(input.limit, 10) || 15, 30);
             let matchSlugs = null;
