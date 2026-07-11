@@ -1285,13 +1285,31 @@ MEMORY (you remember across chats):
 - Keep memories concise and tagged. Don't save trivia.
 - If memory is outdated, update_memory or delete_memory
 
+SEARCHING BEYOND THE LIST ABOVE:
+- LIVE GULF COAST DATA above is only the top ~200 places by rating/proximity — it does NOT cover everything. If someone names a specific business that isn't in that list, or asks a "who has X" / "which places do Y" question (e.g. "who has dolphin cruises", "where does the Black Flag depart from"), call search_businesses instead of guessing or saying you don't know.
+- search_businesses returns each match's parent hub (e.g. the marina a charter boat operates out of), so use it directly to answer "where does X depart from" style questions.
+
 HARD RULES:
-- Only recommend places from the LIVE GULF COAST DATA above
+- Only recommend real places — either from the LIVE GULF COAST DATA above, or from search_businesses results. Never invent a business that isn't returned by one of these.
 - Keep replies under 100 words unless they ask for a full plan
 - No phone numbers — they're chatting with you, not calling the place`;
 
     // ── Tools ──
     const tools = [
+        {
+            name: 'search_businesses',
+            description: 'Search ALL active Gulf Coast businesses (not just the top ~200 already listed in LIVE GULF COAST DATA) by name, type/subtype, or tag. Use this for "who has X" questions, or when a named business might not be in the pre-loaded list. Returns each match\'s parent hub (e.g. the marina it operates from) so you can answer "where does X depart from" directly.',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Name substring to search for, e.g. "Black Flag"' },
+                    entity_subtype: { type: 'string', description: 'Exact subtype to filter on, e.g. "dolphin_cruise", "kayak_rental", "fishing_charter", "marina"' },
+                    entity_type: { type: 'string', description: 'Exact type to filter on, e.g. "activity", "restaurant", "service"' },
+                    tag: { type: 'string', description: 'Substring match against this business\'s tags, e.g. "dolphin" or "kayak" — broader than entity_subtype since tags catch secondary offerings' },
+                    limit: { type: 'integer', description: 'Max results, default 15, max 30' }
+                }
+            }
+        },
         {
             name: 'save_memory',
             description: 'Remember a durable fact, preference, or pattern about this traveler. Auto-upserts on (category, key).',
@@ -1335,6 +1353,45 @@ HARD RULES:
     ];
 
     async function executeTool(name, input) {
+        if (name === 'search_businesses') {
+            const limit = Math.min(parseInt(input.limit, 10) || 15, 30);
+            let matchSlugs = null;
+            if (input.tag) {
+                const { data: tagRows, error: tagErr } = await gcrDb.from('entity_tags').select('entity_slug').ilike('tag_name', `%${input.tag}%`).limit(500);
+                if (tagErr) return { error: tagErr.message };
+                matchSlugs = [...new Set((tagRows || []).map(r => r.entity_slug))];
+                if (!matchSlugs.length) return { count: 0, results: [] };
+            }
+            let q = gcrDb.from('entity')
+                .select('name, slug, entity_type, entity_subtype, parent_entity_slug, city, rating, review_count, description, price_from, price_unit')
+                .eq('is_active', true);
+            if (input.query) q = q.ilike('name', `%${input.query}%`);
+            if (input.entity_subtype) q = q.eq('entity_subtype', input.entity_subtype);
+            if (input.entity_type) q = q.eq('entity_type', input.entity_type);
+            if (matchSlugs) q = q.in('slug', matchSlugs);
+            q = q.order('rating', { ascending: false, nullsFirst: false }).limit(limit);
+            const { data, error } = await q;
+            if (error) return { error: error.message };
+
+            const parentSlugs = [...new Set((data || []).map(e => e.parent_entity_slug).filter(Boolean))];
+            const parentNames = {};
+            if (parentSlugs.length) {
+                const { data: parents } = await gcrDb.from('entity').select('slug, name').in('slug', parentSlugs);
+                (parents || []).forEach(p => { parentNames[p.slug] = p.name; });
+            }
+            const results = (data || []).map(e => ({
+                name: e.name,
+                slug: e.slug,
+                type: [e.entity_type, e.entity_subtype].filter(Boolean).join('/'),
+                city: e.city,
+                rating: e.rating,
+                review_count: e.review_count,
+                parent_hub: e.parent_entity_slug ? (parentNames[e.parent_entity_slug] || e.parent_entity_slug) : null,
+                price: e.price_from != null ? (e.price_from === 0 ? 'Free' : `From $${e.price_from}${e.price_unit ? `/${e.price_unit}` : ''}`) : null,
+                description: e.description ? e.description.slice(0, 150) : null,
+            }));
+            return { count: results.length, results };
+        }
         if (name === 'save_memory') {
             const row = { user_id: touristId, category: input.category, key: input.key, value: input.value, tags: input.tags || [], confidence: input.confidence || 'medium', source_message: (message || '').slice(0, 500), updated_at: new Date().toISOString() };
             const { error } = await mainDb.from('tourist_memories').upsert(row, { onConflict: 'user_id,category,key' });
