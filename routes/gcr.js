@@ -95,7 +95,7 @@ async function buildFullEntity(slug) {
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug),
     db.from('announcements').select('id,message,type,starts_at,ends_at').eq('entity_slug', slug).eq('active', true),
     db.from('entity_modules').select('module_key,enabled,sort_order,settings').eq('entity_slug', slug),
-    db.from('entity_sections').select('id,module_key,section_type,section_name,subtitle,icon,layout,sort_order,is_active').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
+    db.from('entity_sections').select('id,module_key,section_type,section_name,subtitle,icon,image_url,image_path,layout,sort_order,is_active').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
     db.from('entity_about_bullets').select('id,text,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_perfect_for').select('id,label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_social_posts').select('id,platform,post_url,caption,media_url,thumbnail_url,posted_at,likes_count').eq('entity_slug', slug).order('posted_at', { ascending: false }).limit(12),
@@ -124,7 +124,7 @@ async function buildFullEntity(slug) {
   const sectionIds = sectionRows.map(s => s.id);
   const sectionItemsRes = sectionIds.length
     ? await db.from('entity_section_items')
-        .select('id,section_id,item_name,description,duration,price_from,price_to,price_label,icon,sort_order,metadata')
+        .select('id,section_id,item_name,description,duration,price_from,price_to,price_label,icon,image_url,image_path,sort_order,metadata')
         .in('section_id', sectionIds).order('sort_order')
     : { data: [] };
   const sectionItems = sectionItemsRes.data || [];
