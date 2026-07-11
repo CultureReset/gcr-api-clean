@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const { authRequired } = require('../middleware/auth');
 
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
@@ -148,8 +149,8 @@ router.post('/:slug', async (req, res) => {
 });
 
 // ─── GET /api/bookings/:slug/:id ───────────────────────────────────────────
-// Get booking details
-router.get('/:slug/:id', async (req, res) => {
+// Get booking details — business-owner only (contains the guest's name/email/phone)
+router.get('/:slug/:id', authRequired, async (req, res) => {
   try {
     const { data, error } = await db
       .from('entity_bookings')
@@ -166,8 +167,8 @@ router.get('/:slug/:id', async (req, res) => {
 });
 
 // ─── PUT /api/bookings/:slug/:id ───────────────────────────────────────────
-// Modify a booking
-router.put('/:slug/:id', async (req, res) => {
+// Modify a booking — business-owner only
+router.put('/:slug/:id', authRequired, async (req, res) => {
   try {
     const { status, special_requests } = req.body;
 
@@ -191,8 +192,8 @@ router.put('/:slug/:id', async (req, res) => {
 });
 
 // ─── DELETE /api/bookings/:slug/:id ────────────────────────────────────────
-// Cancel a booking
-router.delete('/:slug/:id', async (req, res) => {
+// Cancel a booking — business-owner only
+router.delete('/:slug/:id', authRequired, async (req, res) => {
   try {
     const { data: booking } = await db
       .from('entity_bookings')
