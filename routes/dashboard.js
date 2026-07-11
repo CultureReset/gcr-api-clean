@@ -3248,6 +3248,21 @@ async function resolveOwnedEntitySlug(req) {
     return entity?.slug || null;
 }
 
+// GET /api/dashboard/units — the bookable units (bookable_resources) for this business,
+// so the owner can manage availability per unit rather than for the whole building.
+router.get('/units', async (req, res) => {
+    const entitySlug = await resolveOwnedEntitySlug(req);
+    if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
+
+    const { data, error } = await supabase
+        .from('bookable_resources')
+        .select('id, slug, name, resource_type, bedrooms, bathrooms, capacity, nightly_price, min_nights, is_active')
+        .eq('entity_slug', entitySlug)
+        .order('name');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+});
+
 // GET /api/dashboard/ical/feed-url — get (or lazily create) this business's calendar feed URL
 router.get('/ical/feed-url', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
@@ -3286,7 +3301,7 @@ router.get('/ical/external', async (req, res) => {
 
     const { data, error } = await supabase
         .from('entity_external_calendars')
-        .select('id, source_label, ical_url, last_synced_at, last_sync_status, created_at')
+        .select('id, source_label, provider, resource_id, ical_url, last_synced_at, last_sync_status, created_at')
         .eq('entity_slug', entitySlug)
         .order('created_at');
     if (error) return res.status(500).json({ error: error.message });
@@ -3298,12 +3313,16 @@ router.post('/ical/external', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
     if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
 
-    const { source_label, ical_url } = req.body;
+    const { source_label, ical_url, resource_id, provider } = req.body;
     if (!ical_url) return res.status(400).json({ error: 'ical_url required' });
+
+    const row = { entity_slug: entitySlug, source_label: source_label || 'External Calendar', ical_url };
+    if (resource_id) row.resource_id = resource_id;   // optional: tie the feed to one unit
+    if (provider) row.provider = provider;
 
     const { data, error } = await supabase
         .from('entity_external_calendars')
-        .insert({ entity_slug: entitySlug, source_label: source_label || 'External Calendar', ical_url })
+        .insert(row)
         .select()
         .single();
     if (error) return res.status(500).json({ error: error.message });
