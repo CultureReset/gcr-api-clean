@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const { createClient } = require('@supabase/supabase-js')
 const Anthropic = require('@anthropic-ai/sdk')
+const { findExistingEntity, possibleFuzzyDuplicate } = require('../../lib/find-existing-entity')
 
 const db = createClient(
   process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL,
@@ -159,7 +160,10 @@ async function writeToEntity(job, extracted) {
     job.categories_seen
   )
 
-  // Check if entity already exists (by name)
+  // Check if this business already exists. Exact name match first (cheapest,
+  // catches literal re-runs of the same job), then phone number — the name
+  // string varies by source ("The Hangout" vs "The Hangout Gulf Shores"), so
+  // an exact-name-only check silently created a duplicate row per source.
   const { data: existing } = await db
     .from('entity')
     .select('slug, id')
@@ -167,7 +171,17 @@ async function writeToEntity(job, extracted) {
     .limit(1)
     .maybeSingle()
 
-  const slug = existing?.slug || slugify(job.business_name)
+  const phoneMatch = !existing ? await findExistingEntity(db, { phone: extracted.phone }) : null
+  const matchedSlug = existing?.slug || phoneMatch?.slug
+
+  if (!matchedSlug) {
+    const fuzzy = await possibleFuzzyDuplicate(db, job.business_name)
+    if (fuzzy) {
+      console.warn(`[deep-crawl] "${job.business_name}" has no phone/name match but is ${Math.round(fuzzy.similarity * 100)}% similar to existing "${fuzzy.slug}" — creating a new row anyway; review manually if this is really the same business.`)
+    }
+  }
+
+  const slug = matchedSlug || slugify(job.business_name)
 
   const payload = {
     slug,

@@ -29,6 +29,7 @@
 const express = require('express');
 const { authRequired } = require('../middleware/auth');
 const supabase = require('../db');
+const { findExistingEntity } = require('../lib/find-existing-entity');
 
 const router = express.Router();
 
@@ -518,6 +519,24 @@ router.post('/state', authRequired, async (req, res) => {
             slug = slugify(biz.slug || biz.name);
             if (!slug) return res.status(400).json({ error: 'Business name required' });
             let ent = await entityBySlug(slug);
+
+            // A slug lookup misses a business that already exists under a
+            // different slug (e.g. imported earlier via a scrape that spelled
+            // the name differently). Check by phone before assuming this is
+            // brand new — claiming the real, already-populated profile beats
+            // creating an empty duplicate, as long as nobody already owns it.
+            if (!ent && biz.phone) {
+                const phoneMatch = await findExistingEntity(supabase, { phone: biz.phone });
+                if (phoneMatch) {
+                    const { data: alreadyOwned } = await supabase.from('entity_owners')
+                        .select('user_id').eq('entity_slug', phoneMatch.slug).maybeSingle();
+                    if (!alreadyOwned) {
+                        slug = phoneMatch.slug;
+                        ent = await entityBySlug(slug);
+                    }
+                }
+            }
+
             if (ent) {
                 // slug taken: claimed by someone else → disambiguate; unclaimed → attach
                 const { data: owner } = await supabase.from('entity_owners')

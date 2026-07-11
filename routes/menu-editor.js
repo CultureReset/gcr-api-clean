@@ -65,6 +65,16 @@ router.post('/create', async (req, res) => {
       .replace(/^-|-$/g, '');
     if (!baseSlug) return res.status(400).json({ error: 'Could not derive a valid slug' });
 
+    // This form only collects a name (no phone/place id), so the strongest
+    // duplicate check available is an exact name match. Block it outright
+    // rather than silently minting a "-2" slug for what's likely the same
+    // restaurant signing up twice, or a name collision with an
+    // already-imported business — surface it so a human decides.
+    const { data: nameMatch } = await db.from('entity').select('slug').ilike('name', String(name).trim()).limit(1).maybeSingle();
+    if (nameMatch) {
+      return res.status(409).json({ error: `A business named "${name}" already exists (slug: ${nameMatch.slug}). Contact support to get access to that profile instead of creating a duplicate.` });
+    }
+
     // Ensure slug is unique — append -2, -3, etc. if taken
     let slug = baseSlug;
     let suffix = 2;

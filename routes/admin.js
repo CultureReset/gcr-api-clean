@@ -3,6 +3,7 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { findExistingEntity, possibleFuzzyDuplicate } = require('../lib/find-existing-entity');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
@@ -862,15 +863,27 @@ router.post('/gcr/import-section-based', authRequired, async (req, res) => {
     const cacheKey = name.toLowerCase() + '|' + address.toLowerCase();
     if (entityCache.has(cacheKey)) return entityCache.get(cacheKey);
 
-    // Try to find an existing entity by name (case-insensitive) first
+    // Try to find an existing entity by name (case-insensitive) + address first
     const { data: matches } = await db.from('entity').select('slug, address_line_1').ilike('name', name);
     let match = (matches || []).find(m => !address || (m.address_line_1 || '').toLowerCase().trim() === address.toLowerCase());
     if (!match && matches?.length === 1 && !address) match = matches[0];
+
+    // Name+address didn't find it (CSV rows often spell the name slightly
+    // differently than however the business first got imported) — fall back
+    // to an exact phone match before assuming this is a new business.
+    if (!match && row.phone) {
+      const phoneMatch = await findExistingEntity(db, { phone: row.phone });
+      if (phoneMatch) match = { slug: phoneMatch.slug };
+    }
 
     let slug;
     if (match) {
       slug = match.slug;
     } else {
+      if (row.phone) {
+        const fuzzy = await possibleFuzzyDuplicate(db, name);
+        if (fuzzy) console.warn(`[csv-import] "${name}" has no name/address/phone match but is ${Math.round(fuzzy.similarity * 100)}% similar to existing "${fuzzy.slug}" — creating a new row anyway; review manually if this is really the same business.`);
+      }
       // Create a new minimal entity so this row (and following rows for the same
       // restaurant) has somewhere to attach
       const baseSlug = slugify(name);
