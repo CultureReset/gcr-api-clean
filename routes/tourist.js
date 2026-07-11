@@ -597,7 +597,7 @@ router.get('/recommendations', touristAuth, async (req, res) => {
                 .eq('tourist_id', req.touristId),
             mainDb.from('tourist_profiles')
                 .select('interests, seen_slugs:answers->seen_slugs')
-                .eq('tourist_id', req.touristId)
+                .eq('user_id', req.touristId)
                 .maybeSingle(),
         ]);
 
@@ -1004,7 +1004,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     const hasUserLoc = userLat != null && userLng != null;
     const { data: gcrEntitiesRaw } = await gcrDb
         .from('entity')
-        .select('name, slug, entity_type, entity_subtype, parent_entity_slug, bedrooms, bathrooms, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active, latitude, longitude')
+        .select('id, name, slug, entity_type, entity_subtype, parent_entity_slug, bedrooms, bathrooms, city, address_line_1, phone, website_url, rating, review_count, price_level, price_range_low, price_range_high, delivery, dine_in, takeout, curbside_pickup, reservable, outdoor_seating, live_music, serves_beer, serves_wine, serves_cocktails, serves_breakfast, serves_brunch, serves_lunch, serves_dinner, serves_vegetarian, serves_dessert, serves_coffee, good_for_groups, good_for_children, allows_dogs, editorial_summary, description, duration_text, price_from, price_unit, hh_days, hh_start, hh_end, hh_description, is_active, latitude, longitude')
         .eq('is_active', true)
         .order('rating', { ascending: false, nullsFirst: false })
         .limit(400);
@@ -1289,6 +1289,7 @@ SEARCHING BEYOND THE LIST ABOVE:
 - LIVE GULF COAST DATA above is only the top ~200 places by rating/proximity, and each entry there is a summary — it does NOT cover everything or every detail. If someone names a specific business that isn't in that list, or asks a "who has X" / "which places do Y" question (e.g. "who has dolphin cruises", "where does the Black Flag depart from"), call search_businesses instead of guessing or saying you don't know.
 - search_businesses returns each match's parent hub (e.g. the marina a charter boat operates out of), so use it directly to answer "where does X depart from" style questions.
 - Once you know which business the traveler means (from the list above, or from search_businesses), call get_business_details(slug) to read that business's FULL page — menu/drinks/happy hour items, reviews, FAQs, policies, team, hours, offerings/pricing tiers, amenities, parent hub, everything that shows on its real page. Use this whenever a question needs more depth than the one-line summary above gives you (e.g. "what's actually in their spicy tuna roll", "do they have a kids menu", "what does their weekday happy hour include").
+- For "do they have spots/kayaks/units left today" or "any last-minute deals" questions, call check_availability(slug) — never invent a number. Most businesses don't have live availability tracked yet, and the tool will tell you that plainly; pass that along honestly instead of guessing.
 
 HARD RULES:
 - Only recommend real places — either from the LIVE GULF COAST DATA above, or from search_businesses results. Never invent a business that isn't returned by one of these.
@@ -1318,6 +1319,17 @@ HARD RULES:
                 type: 'object',
                 properties: {
                     slug: { type: 'string', description: 'The business\'s slug, e.g. "black-flag" or "gulf-coast-luggo"' }
+                },
+                required: ['slug']
+            }
+        },
+        {
+            name: 'check_availability',
+            description: 'Check a specific business\'s real-time availability for today (spots/units remaining, capacity, whether it\'s a last-minute deal, and how recently that number was updated). Only businesses whose owner has enabled availability display will have data — if none exists, say you don\'t have live availability for that one rather than guessing.',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    slug: { type: 'string', description: 'The business\'s slug' }
                 },
                 required: ['slug']
             }
@@ -1365,6 +1377,15 @@ HARD RULES:
     ];
 
     async function executeTool(name, input) {
+        if (name === 'check_availability') {
+            const today = new Date().toISOString().split('T')[0];
+            const { data, error } = await gcrDb.from('business_availability')
+                .select('total_capacity, remaining_spots, status, source_platform, last_minute_deal, last_minute_price, original_price, last_updated')
+                .eq('entity_slug', input.slug).eq('availability_date', today).eq('visible_on_profile', true).maybeSingle();
+            if (error) return { error: error.message };
+            if (!data) return { available: false, note: 'No live availability data for this business today — do not guess a number, just say availability isn\'t tracked for them.' };
+            return { available: true, ...data };
+        }
         if (name === 'get_business_details') {
             try {
                 const { buildFullEntity } = require('./gcr');

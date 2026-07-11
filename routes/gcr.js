@@ -139,15 +139,17 @@ async function buildFullEntity(slug) {
   // Universal offerings (offerings + offering_prices) — trips, rentals, tours,
   // storage tiers, ride tickets. Merged into the same sections shape the page
   // already renders, grouped by offerings.section (fallback: kind).
-  const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes] = await Promise.all([
+  const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes, availTodayRes] = await Promise.all([
     db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order,image_url').eq('entity_slug', slug).eq('active', true).order('sort_order'),
     db.from('offering_prices').select('id,offering_id,label,price,age_min,age_max,season,duration_label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_amenities').select('id,amenity,category,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('marina_details').select('*').eq('entity_slug', slug).maybeSingle(),
+    db.from('business_availability').select('total_capacity,remaining_spots,status,source_platform,last_updated').eq('entity_slug', slug).eq('availability_date', new Date().toISOString().split('T')[0]).eq('visible_on_profile', true).maybeSingle(),
   ]);
   const offeringRows = offeringsRes.data || [];
   const offeringPrices = offeringPricesRes.data || [];
   const marinaDetails = marinaRes?.data || null;
+  const availabilityToday = availTodayRes?.data || null;
   // Connected parent (marina/complex/condo hub) — child pages link back to it,
   // and unit pages show the complex's amenities alongside their own
   let parentInfo = null;
@@ -404,6 +406,8 @@ async function buildFullEntity(slug) {
     parent: parentInfo,
     parent_amenities: parentAmenities,
     is_hub: (childCountRes?.count || 0) > 0,
+    availability_today: availabilityToday,
+    spots_remaining: availabilityToday ? availabilityToday.remaining_spots : null,
     good_for_children: entity.good_for_children ?? entity.good_for_kids ?? null,
     modules: modulesFull,
     module_keys: [...modules],
@@ -520,17 +524,20 @@ router.get('/entities', async (req, res) => {
 
     const slugs = (entities || []).map(e => e.slug);
 
-    // Batch fetch tags, photos, hours for all entities
-    const [tagRows, photoRows, hourRows] = await Promise.all([
+    // Batch fetch tags, photos, hours, today's availability for all entities
+    const today = new Date().toISOString().split('T')[0];
+    const [tagRows, photoRows, hourRows, availRows] = await Promise.all([
       slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
       slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
       slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
+      slugs.length ? db.from('business_availability').select('entity_slug, total_capacity, remaining_spots, status, source_platform, last_updated, last_minute_deal, last_minute_price, original_price').in('entity_slug', slugs).eq('availability_date', today).eq('visible_on_profile', true) : { data: [] },
     ]);
 
-    const tagMap = {}, photoMap = {}, hourMap = {};
+    const tagMap = {}, photoMap = {}, hourMap = {}, availMap = {};
     (tagRows.data || []).forEach(r => { if (!tagMap[r.entity_slug]) tagMap[r.entity_slug] = []; tagMap[r.entity_slug].push(r); });
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
     (hourRows.data || []).forEach(r => { if (!hourMap[r.entity_slug]) hourMap[r.entity_slug] = []; hourMap[r.entity_slug].push(r); });
+    (availRows.data || []).forEach(r => { availMap[r.entity_slug] = r; });
 
     const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
@@ -550,7 +557,14 @@ router.get('/entities', async (req, res) => {
 
     const results = (entities || []).map(e => {
       const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
-      const row = { ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url) };
+      const avail = availMap[e.slug] || null;
+      const row = {
+        ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url),
+        // Flat field so GCRCard's existing (previously dead — the column
+        // never existed) "🔴 Last spot!" badge logic just works.
+        spots_remaining: avail ? avail.remaining_spots : null,
+        availability_today: avail,
+      };
       if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
         row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
       }

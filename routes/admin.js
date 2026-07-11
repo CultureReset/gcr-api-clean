@@ -382,6 +382,102 @@ router.put('/gcr/entities/:slug/hours', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── AVAILABILITY (manual today's-spots entry; live platform scraping is a
+// separate, per-business follow-up — this is the foundation it plugs into) ──
+
+// GET current + upcoming rows so the admin editor can show what's on file.
+router.get('/gcr/entities/:slug/availability', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const { data, error } = await getDb()
+    .from('business_availability')
+    .select('*')
+    .eq('entity_slug', slug)
+    .gte('availability_date', new Date().toISOString().split('T')[0])
+    .order('availability_date')
+    .limit(30);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ availability: data || [] });
+});
+
+// PUT upserts a single date's row (defaults to today) — this is the manual
+// toggle-and-number flow; source_platform stays null for hand-entered rows
+// so a later scraper can tell its own rows apart from manual ones.
+router.put('/gcr/entities/:slug/availability', authRequired, async (req, res) => {
+  const slug = req.params.slug;
+  const {
+    availability_date, total_capacity, remaining_spots, status,
+    visible_on_profile, source_platform, booking_type,
+    last_minute_deal, last_minute_price, original_price,
+  } = req.body;
+  const date = availability_date || new Date().toISOString().split('T')[0];
+
+  const row = {
+    entity_slug: slug,
+    availability_date: date,
+    total_capacity: total_capacity ?? null,
+    remaining_spots: remaining_spots ?? null,
+    status: status || 'unknown',
+    visible_on_profile: visible_on_profile !== false,
+    source_platform: source_platform || null,
+    booking_type: booking_type || null,
+    last_minute_deal: last_minute_deal || null,
+    last_minute_price: last_minute_price ?? null,
+    original_price: original_price ?? null,
+    last_updated: new Date().toISOString(),
+  };
+
+  const { data: existing } = await getDb().from('business_availability')
+    .select('id').eq('entity_slug', slug).eq('availability_date', date).maybeSingle();
+
+  const { error } = existing
+    ? await getDb().from('business_availability').update(row).eq('id', existing.id)
+    : await getDb().from('business_availability').insert(row);
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Low-spots or an explicit last-minute price surfaces on the already-live
+  // /deals page (deal_type='last_minute') automatically — no separate manual
+  // deal submission needed. Upsert-by-slug+date so repeated PUTs (e.g. an
+  // admin decrementing spots through the day) update one row instead of
+  // spawning duplicates.
+  const isLastMinute = row.visible_on_profile && (
+    (row.remaining_spots != null && row.remaining_spots <= 5) || row.last_minute_deal
+  );
+  if (isLastMinute) {
+    try {
+      const { data: ent } = await getDb().from('entity')
+        .select('name, entity_type, entity_subtype, hero_image_url, phone, booking_url').eq('slug', slug).maybeSingle();
+      const headline = row.last_minute_deal || `${row.remaining_spots} spot${row.remaining_spots === 1 ? '' : 's'} left today`;
+      const discount_pct = (row.original_price && row.last_minute_price)
+        ? Math.round((1 - parseFloat(row.last_minute_price) / parseFloat(row.original_price)) * 100) : null;
+      const dealRow = {
+        entity_slug: slug, entity_name: ent?.name || null,
+        entity_type: ent?.entity_type || null, entity_subtype: ent?.entity_subtype || null,
+        posted_by: 'auto', deal_type: 'last_minute', headline,
+        image_url: ent?.hero_image_url || null,
+        original_price: row.original_price ?? null, deal_price: row.last_minute_price ?? null,
+        discount_pct,
+        valid_date: date, is_today_only: date === new Date().toISOString().split('T')[0],
+        spots_total: row.total_capacity, spots_remaining: row.remaining_spots,
+        claim_type: ent?.booking_url ? 'link' : 'phone', claim_url: ent?.booking_url || null, claim_phone: ent?.phone || null,
+        is_active: true, promoted_feed: true, swipe_card: true, source: 'availability_sync',
+      };
+      const { data: existingDeal } = await getDb().from('gcr_deals')
+        .select('id').eq('entity_slug', slug).eq('valid_date', date).eq('source', 'availability_sync').maybeSingle();
+      if (existingDeal) await getDb().from('gcr_deals').update(dealRow).eq('id', existingDeal.id);
+      else await getDb().from('gcr_deals').insert({ ...dealRow, created_at: new Date().toISOString() });
+    } catch (e) { /* deal sync is a bonus surface, never block the availability write */ }
+  } else {
+    // Spots refilled back above the low-inventory threshold, or visibility
+    // turned off — deactivate any deal this sync created so it stops
+    // showing a stale "spots left" claim.
+    await getDb().from('gcr_deals').update({ is_active: false })
+      .eq('entity_slug', slug).eq('valid_date', date).eq('source', 'availability_sync');
+  }
+
+  invalidateCache(res, slug);
+  res.json({ success: true });
+});
+
 // ─── MENU SECTIONS + ITEMS ────────────────────────────────────────────────────
 
 router.post('/gcr/entities/:slug/menu-sections', authRequired, async (req, res) => {
