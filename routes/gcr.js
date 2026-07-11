@@ -1173,7 +1173,7 @@ router.get('/happy-hours', async (req, res) => {
 // ─── POST /api/gcr/search ─────────────────────────────────────────────────────
 router.post('/search', async (req, res) => {
   try {
-    const { query: q, city, limit = 50, lat, lng } = req.body;
+    const { query: q, city, limit = 50, lat, lng, radius } = req.body;
     if (!q || !q.trim()) return res.status(400).json({ error: 'Query required' });
 
     const term = q.toLowerCase().trim();
@@ -1223,7 +1223,18 @@ router.post('/search', async (req, res) => {
       }
     }
 
-    if (!matchedSlugs.size) return res.json({ query: q, results: [], total: 0 });
+    // No exact substring hit anywhere — don't just come back empty on a typo or a
+    // slightly-off name ("villagio grill" for Villaggio Grille). Fall back to
+    // trigram similarity on the business name via the fuzzy_entity_search()
+    // Postgres function (pg_trgm) and mark these results as fuzzy so the UI can
+    // say "did you mean" instead of presenting them as exact hits.
+    let fuzzyMatch = false;
+    if (!matchedSlugs.size) {
+      const { data: fuzzyRows } = await db.rpc('fuzzy_entity_search', { search_term: term, match_limit: 20 });
+      (fuzzyRows || []).forEach(r => matchedSlugs.add(r.slug));
+      if (matchedSlugs.size) fuzzyMatch = true;
+      else return res.json({ query: q, results: [], total: 0 });
+    }
 
     // Fetch full entity data for matches
     let entityQuery = db
@@ -1319,10 +1330,15 @@ router.post('/search', async (req, res) => {
       const itemScore = menuItems.length ? score(menuItems[0].item_name, menuItems[0].description) : 0;
       // Each matched feature adds a strong, cumulative boost so amenity coverage drives ranking.
       const featureScore = matchedFeatures.length * 40;
-      const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0);
       const distance_miles = (userLat && userLng && e.latitude && e.longitude)
         ? haversine(userLat, userLng, e.latitude, e.longitude)
         : null;
+      // Proximity nudges rank without overriding a real name/feature match — worth at
+      // most +20 (right next to the user), decaying to 0 by 20 miles out. A strong
+      // keyword match (60-100) or feature match (40 each) still dominates; this only
+      // breaks ties and gives "closer" a real, bounded say in "smart" ranking.
+      const proximityScore = distance_miles != null ? Math.max(0, 20 - distance_miles) : 0;
+      const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0) + proximityScore;
 
       return {
         ...e,
@@ -1335,7 +1351,12 @@ router.post('/search', async (req, res) => {
         _relevance: relevance,
         distance_miles,
       };
-    }).sort((a, b) => b._relevance - a._relevance);
+    })
+      // Radius filter: only meaningful with a user location; entities with no
+      // lat/lng of their own (distance_miles null) are kept rather than silently
+      // dropped, since "no location on file" isn't the same as "too far away".
+      .filter(e => !(radius && userLat != null && userLng != null && e.distance_miles != null && e.distance_miles > parseFloat(radius)))
+      .sort((a, b) => b._relevance - a._relevance);
 
     // Build flattened items list (all items across all restaurants)
     const flattenedItems = [];
@@ -1386,7 +1407,8 @@ router.post('/search', async (req, res) => {
       results,
       items: flattenedItems,
       total: results.length,
-      total_items: flattenedItems.length
+      total_items: flattenedItems.length,
+      fuzzy_match: fuzzyMatch,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
