@@ -232,8 +232,10 @@ async function buildTemplateData(booking, siteId) {
 
     return {
         customer_name: booking.customer_name || '',
-        customer_phone: booking.customer_phone || '',
-        customer_email: booking.customer_email || '',
+        // The universal booking engine (routes/platform.js) writes phone/email,
+        // not customer_phone/customer_email -- fall back to those real columns.
+        customer_phone: booking.customer_phone || booking.phone || '',
+        customer_email: booking.customer_email || booking.email || '',
         business_name: business?.name || '',
         date: dateStr,
         time_slot: timeSlot,
@@ -241,7 +243,7 @@ async function buildTemplateData(booking, siteId) {
         boat_type: boatType,
         addons: addons,
         guest_count: String(booking.party_size || booking.qty || 1),
-        total: booking.total ? Number(booking.total).toFixed(2) : '0.00',
+        total: (booking.total ?? booking.total_price) ? Number(booking.total ?? booking.total_price).toFixed(2) : '0.00',
         location: location,
         payment_status: booking.payment_status === 'paid' ? 'Paid' : 'Pending',
         confirmation_number: booking.id ? 'BCB-' + String(booking.id).replace(/-/g, '').substring(0, 8).toUpperCase() : '',

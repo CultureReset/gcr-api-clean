@@ -216,13 +216,15 @@ router.post('/create-payment', async (req, res) => {
 
         // Update booking
         if (booking_id) {
-            await supabase.from('bookings').update({
+            const { error: bookingUpdateErr } = await supabase.from('bookings').update({
                 payment_id: payment.id,
                 payment_provider: 'square',
                 payment_status: payment.status === 'COMPLETED' ? 'paid' : 'pending',
                 receipt_number: payment.receipt_number || null,
-                receipt_url: payment.receipt_url || null
+                receipt_url: payment.receipt_url || null,
+                site_id: targetSiteId || null
             }).eq('id', booking_id);
+            if (bookingUpdateErr) console.error('Failed to mark booking paid:', booking_id, bookingUpdateErr.message);
         }
 
         // Fire emails/SMS after payment (same pattern as Stripe)
@@ -231,53 +233,57 @@ router.post('/create-payment', async (req, res) => {
                 try {
                     const { sendSms, fillTemplate, buildTemplateData } = require('../utils/sms');
                     const { sendEmail, customerConfirmationHtml, generateIcsContent } = require('../utils/email');
-                    const [{ data: bookingData }, { data: msgSettingsData }, { data: business }] = await Promise.all([
+                    const [{ data: bookingData }, { data: business }] = await Promise.all([
                         supabase.from('bookings').select('*').eq('id', booking_id).single(),
-                        supabase.from('messaging_settings').select('*').eq('site_id', targetSiteId).maybeSingle(),
                         supabase.from('businesses').select('name, phone').eq('site_id', targetSiteId).single()
                     ]);
                     if (!bookingData) return;
-                    const msgSettings = msgSettingsData || {};
+                    // No messaging_settings table exists -- always defaults on, same as stripe.js.
+                    const msgSettings = {};
                     const templateData = await buildTemplateData(bookingData, targetSiteId);
+                    const customerPhone = bookingData.customer_phone || bookingData.phone;
+                    const customerEmail = bookingData.customer_email || bookingData.email;
 
-                    // Fetch or create waiver record and build waiver URL
+                    // Waivers aren't linked to individual bookings in the current schema
+                    // (waivers is keyed by entity_slug + customer identity, no booking_id,
+                    // no site_id) -- best-effort match, never insert a blank placeholder row.
                     try {
-                        const { data: biz } = await supabase.from('businesses').select('subdomain, custom_domain').eq('site_id', targetSiteId).maybeSingle();
-                        let { data: waiverRecord } = await supabase.from('waivers').select('id').eq('booking_id', booking_id).is('signed_at', null).maybeSingle();
-                        if (!waiverRecord) {
-                            const { data: created } = await supabase.from('waivers').insert({
-                                site_id: targetSiteId,
-                                booking_id,
-                                customer_name: bookingData.customer_name
-                            }).select('id').single();
-                            waiverRecord = created;
-                        }
-                        if (waiverRecord?.id && biz) {
-                            const domain = biz.custom_domain
-                                || (biz.subdomain ? `https://${biz.subdomain}.cybercheck.com` : 'https://circle-boats-main.vercel.app');
-                            templateData.waiver_url = `${((process.env.PUBLIC_SITE_BASE_URL || domain).trim())}/waiver-form.html?token=${waiverRecord.id}`;
+                        if (bookingData.entity_slug) {
+                            const [{ data: waiverRecord }, { data: biz }] = await Promise.all([
+                                supabase.from('waivers').select('token').eq('entity_slug', bookingData.entity_slug).is('signed_at', null).order('created_at', { ascending: false }).maybeSingle(),
+                                supabase.from('businesses').select('subdomain, custom_domain').eq('site_id', targetSiteId).maybeSingle()
+                            ]);
+                            if (waiverRecord?.token && biz) {
+                                const domain = biz.custom_domain
+                                    || (biz.subdomain ? `https://${biz.subdomain}.cybercheck.com` : 'https://circle-boats-main.vercel.app');
+                                templateData.waiver_url = `${((process.env.PUBLIC_SITE_BASE_URL || domain).trim())}/waiver-form.html?token=${waiverRecord.token}`;
+                            }
                         }
                     } catch (waiverErr) {
-                        console.warn('Waiver create/fetch failed (continuing with email):', waiverErr.message);
+                        console.warn('Waiver fetch failed (continuing with email):', waiverErr.message);
                     }
 
-                    if (bookingData.customer_email) {
+                    if (customerEmail) {
                         const ics = [{ filename: 'booking.ics', content: Buffer.from(generateIcsContent(templateData)).toString('base64') }];
-                        const emailResult = await sendEmail({ to: bookingData.customer_email, subject: 'Booking Confirmed — ' + (templateData.business_name || 'Your Reservation'), html: customerConfirmationHtml(templateData), attachments: ics });
+                        const emailResult = await sendEmail({ to: customerEmail, subject: 'Booking Confirmed — ' + (templateData.business_name || 'Your Reservation'), html: customerConfirmationHtml(templateData), attachments: ics });
                         if (emailResult.success) {
-                            console.log('Customer confirmation email sent to:', bookingData.customer_email);
+                            console.log('Customer confirmation email sent to:', customerEmail);
                         } else {
-                            console.error('Customer email failed:', bookingData.customer_email, emailResult.reason);
+                            console.error('Customer email failed:', customerEmail, emailResult.reason);
                         }
                     } else {
-                        console.warn('No customer_email on booking:', booking_id);
+                        console.warn('No customer email on booking:', booking_id);
                     }
 
-                    // Customer SMS — gated on per-booking TCPA consent
-                    if (bookingData.sms_consent === true && bookingData.customer_phone && msgSettings.notify_customer_on_booking !== false) {
+                    // Customer SMS — this is a transactional receipt for a booking the
+                    // customer just made with their own number, not marketing; there is
+                    // no sms_consent column/capture step in this flow (that's tracked
+                    // separately as a compliance task), so gate on phone presence only,
+                    // matching stripe.js's existing behavior for the same notification.
+                    if (customerPhone && msgSettings.notify_customer_on_booking !== false) {
                         const defaultCustTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nReply STOP to opt out. Msg/data rates may apply.';
                         const custMsg = fillTemplate(msgSettings.customer_booking_template || defaultCustTpl, templateData);
-                        sendSms(bookingData.customer_phone, custMsg, targetSiteId, 'booking_confirmation', booking_id)
+                        sendSms(customerPhone, custMsg, targetSiteId, 'booking_confirmation', booking_id)
                             .catch(err => console.error('Customer SMS failed:', err));
                     }
 
@@ -290,8 +296,8 @@ router.post('/create-payment', async (req, res) => {
                             `Ref: ${templateData.confirmation_number}`,
                             ``,
                             `${bookingData.customer_name}`,
-                            `Ph: ${bookingData.customer_phone || 'N/A'}`,
-                            `Em: ${bookingData.customer_email || 'N/A'}`,
+                            `Ph: ${customerPhone || 'N/A'}`,
+                            `Em: ${customerEmail || 'N/A'}`,
                             ``,
                             `${templateData.date}`,
                             `${templateData.time_slot}`,

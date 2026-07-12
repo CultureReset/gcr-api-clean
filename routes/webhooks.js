@@ -40,7 +40,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
             const orderId = data.metadata?.order_id;
 
             if (bookingId) {
-                await supabase
+                const { error } = await supabase
                     .from('bookings')
                     .update({
                         payment_status: 'paid',
@@ -49,10 +49,15 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
                         status: 'confirmed'
                     })
                     .eq('id', bookingId);
+                if (error) console.error('[webhooks/stripe] failed to mark booking paid:', bookingId, error.message);
             }
 
+            // Note: 'orders' table referenced here doesn't exist in the live DB (same
+            // gap as public.js/dashboard.js/site.js's own 'orders' reads) -- and nothing
+            // in this codebase ever sets metadata.order_id on a real payment intent, so
+            // this branch cannot currently fire. Left as-is pending a real orders feature.
             if (orderId) {
-                await supabase
+                const { error } = await supabase
                     .from('orders')
                     .update({
                         payment_id: data.id,
@@ -60,6 +65,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
                         status: 'received'
                     })
                     .eq('id', orderId);
+                if (error) console.error('[webhooks/stripe] failed to mark order received:', orderId, error.message);
             }
             break;
         }
@@ -67,10 +73,11 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         case 'payment_intent.payment_failed': {
             const bookingId = data.metadata?.booking_id;
             if (bookingId) {
-                await supabase
+                const { error } = await supabase
                     .from('bookings')
                     .update({ payment_status: 'failed' })
                     .eq('id', bookingId);
+                if (error) console.error('[webhooks/stripe] failed to mark booking failed:', bookingId, error.message);
             }
             // TODO: Emit event: payment.failed → notify owner
             break;
@@ -79,10 +86,11 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         case 'charge.refunded': {
             const bookingId = data.metadata?.booking_id;
             if (bookingId) {
-                await supabase
+                const { error } = await supabase
                     .from('bookings')
                     .update({ payment_status: 'refunded', status: 'cancelled' })
                     .eq('id', bookingId);
+                if (error) console.error('[webhooks/stripe] failed to mark booking refunded:', bookingId, error.message);
             }
             break;
         }

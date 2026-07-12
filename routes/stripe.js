@@ -378,14 +378,16 @@ router.post('/create-payment-intent', async (req, res) => {
 
         // Update booking with payment info
         if (booking_id) {
-            await supabase
+            const { error: bookingUpdateErr } = await supabase
                 .from('bookings')
                 .update({
                     payment_id: paymentIntent.id,
                     payment_provider: 'stripe',
-                    payment_status: paymentIntent.status === 'succeeded' ? 'paid' : 'pending'
+                    payment_status: paymentIntent.status === 'succeeded' ? 'paid' : 'pending',
+                    site_id: targetSiteId || null
                 })
                 .eq('id', booking_id);
+            if (bookingUpdateErr) console.error('Failed to mark booking paid:', booking_id, bookingUpdateErr.message);
         }
 
         // Send customer SMS + email after confirmed payment (fire-and-forget)
@@ -395,47 +397,52 @@ router.post('/create-payment-intent', async (req, res) => {
                     const { sendSms, fillTemplate, buildTemplateData } = require('../utils/sms');
                     const { sendEmail, customerConfirmationHtml, generateIcsContent } = require('../utils/email');
 
-                    const [{ data: bookingData }, { data: siteContentData }, { data: siteContent }, { data: business }] = await Promise.all([
+                    const [{ data: bookingData }, { data: siteContent }, { data: business }] = await Promise.all([
                         supabase.from('bookings').select('*').eq('id', booking_id).single(),
-                        supabase.from('site_content').select('messaging_settings').eq('site_id', targetSiteId).single(),
                         supabase.from('site_content').select('contact_email').eq('site_id', targetSiteId).single(),
                         supabase.from('businesses').select('name, email').eq('site_id', targetSiteId).single()
                     ]);
 
                     if (!bookingData) return;
-                    const msgSettings = siteContentData?.messaging_settings || {};
-                    const settings = msgSettings || {};
+                    // site_content has no messaging_settings column -- always defaults on.
+                    const settings = {};
                     const templateData = await buildTemplateData(bookingData, targetSiteId);
                     templateData.notes = bookingData.notes || '';
+                    const customerPhone = bookingData.customer_phone || bookingData.phone;
+                    const customerEmail = bookingData.customer_email || bookingData.email;
 
-                    // Fetch waiver token and build waiver URL for this booking
+                    // Waivers aren't linked to individual bookings in the current schema
+                    // (waivers is keyed by entity_slug + customer identity, no booking_id) --
+                    // best-effort match on entity_slug + unsigned, skip cleanly if not found.
                     try {
-                        const [{ data: waiverRecord }, { data: biz }] = await Promise.all([
-                            supabase.from('waivers').select('token').eq('booking_id', booking_id).eq('signed', false).maybeSingle(),
-                            supabase.from('businesses').select('subdomain, custom_domain').eq('site_id', targetSiteId).maybeSingle()
-                        ]);
-                        if (waiverRecord?.token && biz) {
-                            const domain = biz.custom_domain
-                                || (biz.subdomain ? `https://${biz.subdomain}.cybercheck.com` : 'https://circle-boats-main-.vercel.app');
-                            templateData.waiver_url = `${process.env.PUBLIC_SITE_BASE_URL || domain}/waiver-form.html?token=${waiverRecord.token}`;
+                        if (bookingData.entity_slug) {
+                            const [{ data: waiverRecord }, { data: biz }] = await Promise.all([
+                                supabase.from('waivers').select('token').eq('entity_slug', bookingData.entity_slug).is('signed_at', null).order('created_at', { ascending: false }).maybeSingle(),
+                                supabase.from('businesses').select('subdomain, custom_domain').eq('site_id', targetSiteId).maybeSingle()
+                            ]);
+                            if (waiverRecord?.token && biz) {
+                                const domain = biz.custom_domain
+                                    || (biz.subdomain ? `https://${biz.subdomain}.cybercheck.com` : 'https://circle-boats-main-.vercel.app');
+                                templateData.waiver_url = `${process.env.PUBLIC_SITE_BASE_URL || domain}/waiver-form.html?token=${waiverRecord.token}`;
+                            }
                         }
                     } catch (waiverErr) {
                         console.warn('Waiver fetch failed (continuing with email):', waiverErr.message);
                     }
 
                     // Customer SMS
-                    if (settings.booking_confirmation_enabled !== false && bookingData.customer_phone) {
+                    if (settings.booking_confirmation_enabled !== false && customerPhone) {
                         const defaultTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!\n\n🏖️ Get exclusive deals & rewards while you\'re in town!\ngulfcoastradar.com/trip-pass';
                         const msg = fillTemplate(settings.booking_confirmation_template || defaultTpl, templateData);
-                        sendSms(bookingData.customer_phone, msg, targetSiteId, 'booking_confirmation', booking_id)
+                        sendSms(customerPhone, msg, targetSiteId, 'booking_confirmation', booking_id)
                             .catch(err => console.error('Customer SMS failed:', err));
                     }
 
                     // Customer Email
-                    if (bookingData.customer_email) {
+                    if (customerEmail) {
                         const icsAttachment = [{ filename: 'booking.ics', content: Buffer.from(generateIcsContent(templateData)).toString('base64') }];
                         sendEmail({
-                            to: bookingData.customer_email,
+                            to: customerEmail,
                             subject: 'Booking Confirmed — ' + (templateData.business_name || 'Your Reservation'),
                             html: customerConfirmationHtml(templateData),
                             replyTo: siteContent?.contact_email || business?.email || undefined,
@@ -791,11 +798,13 @@ router.post("/refund", authRequired, async (req, res) => {
 
         if (booking_id) {
             const status = amount ? "partially_refunded" : "refunded";
-            await supabase
+            const { error: refundUpdateErr, count } = await supabase
                 .from("bookings")
-                .update({ payment_status: status, updated_at: new Date().toISOString() })
+                .update({ payment_status: status }, { count: 'exact' })
                 .eq("id", booking_id)
                 .eq("site_id", req.siteId);
+            if (refundUpdateErr) console.error('Failed to mark booking refunded:', booking_id, refundUpdateErr.message);
+            else if (!count) console.warn('Refund: booking', booking_id, 'not found for site', req.siteId, '(not owned by caller, or was never stamped with site_id)');
         }
 
         res.json({
@@ -840,22 +849,25 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     if (type === 'payment_intent.succeeded') {
         const bookingId = data.metadata?.booking_id;
         if (bookingId) {
-            await supabase.from('bookings').update({
+            const { error } = await supabase.from('bookings').update({
                 payment_status: 'paid',
                 payment_id: data.id,
                 payment_provider: 'stripe',
                 status: 'confirmed'
             }).eq('id', bookingId);
+            if (error) console.error('[stripe webhook] failed to mark booking paid:', bookingId, error.message);
         }
     } else if (type === 'payment_intent.payment_failed') {
         const bookingId = data.metadata?.booking_id;
         if (bookingId) {
-            await supabase.from('bookings').update({ payment_status: 'failed' }).eq('id', bookingId);
+            const { error } = await supabase.from('bookings').update({ payment_status: 'failed' }).eq('id', bookingId);
+            if (error) console.error('[stripe webhook] failed to mark booking failed:', bookingId, error.message);
         }
     } else if (type === 'charge.refunded') {
         const bookingId = data.metadata?.booking_id;
         if (bookingId) {
-            await supabase.from('bookings').update({ payment_status: 'refunded', status: 'cancelled' }).eq('id', bookingId);
+            const { error } = await supabase.from('bookings').update({ payment_status: 'refunded', status: 'cancelled' }).eq('id', bookingId);
+            if (error) console.error('[stripe webhook] failed to mark booking refunded:', bookingId, error.message);
         }
     }
 
