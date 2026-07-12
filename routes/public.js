@@ -478,6 +478,39 @@ router.post('/waivers/:token/sign', async (req, res) => {
     res.json({ success: true, waiver_id: data.id });
 });
 
+// GET /api/public/menu — GCR entity_id/slug short-circuit, registered ahead
+// of requireSite below on purpose. gcr-unified's RestaurantMenu.jsx calls
+// this route with only ?slug= (no ?site_id=/?subdomain=), but the full /menu
+// handler further down in this file is registered after `router.use
+// (requireSite)`, which 404s any request with no site_id/subdomain/req.siteId
+// before that handler's own entity_id/slug resolution ever runs — so this
+// route has been unreachable via its real, documented usage pattern
+// (confirmed live against production: gcr-api-clean.vercel.app currently
+// 500s "getGcrDb is not a function" on ?slug=&site_id=, and plain ?slug=
+// alone 404s "Business not found" before ever reaching that code). Handling
+// entity_id/slug here — ahead of requireSite — fixes that without touching
+// the legacy ?site_id=/subdomain fallback path, which still runs, still
+// behind requireSite, exactly as before whenever this doesn't match.
+router.get('/menu', async (req, res, next) => {
+    if (!req.query.entity_id && !req.query.slug) return next();
+    try {
+        const gcrDb = require('../db');
+        const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok, display_template, display_config';
+        if (req.query.entity_id) {
+            const { data: ent } = await gcrDb.from('entity').select(ENTITY_COLS).eq('id', req.query.entity_id).maybeSingle();
+            if (ent) return await serveMenuFromGcr(res, gcrDb, ent);
+            return res.status(404).json({ error: 'Entity not found' });
+        }
+        const { data: ent } = await gcrDb.from('entity').select(ENTITY_COLS).eq('slug', req.query.slug).maybeSingle();
+        if (ent) return await serveMenuFromGcr(res, gcrDb, ent);
+        // Not a GCR entity — fall through to the legacy subdomain/site_id
+        // handler below (still gated by requireSite, unchanged).
+        return next();
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 router.use(requireSite);
 
 // ============================================
@@ -2917,8 +2950,14 @@ router.get('/business', async (req, res) => {
 router.get('/menu', async (req, res) => {
     try {
         let siteId = req.siteId; // from domain resolution
-        const getGcrDb = require('../db');
-        const gcrDb = getGcrDb();
+        // db.js exports the Supabase client instance directly (not a factory
+        // function) -- `getGcrDb()` below used to call that instance as a
+        // function and throw "getGcrDb is not a function" on every single
+        // request through this handler (?entity_id=, ?slug=, and the legacy
+        // site_id path all hit this line first). Pre-existing bug, found
+        // while verifying the entity_sections work below actually reaches
+        // real traffic.
+        const gcrDb = require('../db');
         const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok, display_template, display_config';
 
         // 1) Direct GCR lookup — ?entity_id=UUID
@@ -2964,9 +3003,9 @@ router.get('/menu', async (req, res) => {
                 .order('category', { ascending: true }),
             supabase.from('events').select('*').eq('site_id', siteId).order('event_date', { ascending: true }),
             supabase.from('specials').select('*').eq('site_id', siteId),
-            getGcrDb().from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
+            gcrDb.from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
                 .then(r => (r.data && r.data.entity_slug)
-                    ? getGcrDb().from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
+                    ? gcrDb.from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
                     : { data: null })
                 .catch(() => ({ data: null }))
         ]);
@@ -3004,7 +3043,7 @@ router.get('/menu', async (req, res) => {
         // Get live artist if available via GCR link
         let liveArtist = null;
         if (gcrEntity?.live_artist_id) {
-            const { data: artist } = await getGcrDb()
+            const { data: artist } = await gcrDb
                 .from('artist_profiles')
                 .select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount')
                 .eq('id', gcrEntity.live_artist_id)
