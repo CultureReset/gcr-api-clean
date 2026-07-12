@@ -9,7 +9,7 @@ const router = express.Router();
 // migrated to GCR.
 async function serveMenuFromGcr(res, gcrDb, entity) {
     const entitySlug = entity.slug;
-    const [menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, specials, photos, hours, social, artistData] = await Promise.all([
+    const [menuSections, menuItems, drinkSections, drinkItems, hhSections, hhItems, events, specials, photos, hours, social, artistData, sectionsRes] = await Promise.all([
         gcrDb.from('menu_sections').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
         gcrDb.from('menu_items').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
         gcrDb.from('drink_sections').select('*').eq('entity_slug', entitySlug).order('sort_order', { ascending: true }),
@@ -22,7 +22,54 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         gcrDb.from('entity_hours').select('*').eq('entity_slug', entitySlug),
         Promise.resolve({ data: [] }), // social_media_accounts is legacy/site_id-keyed OAuth data, not applicable here — modern social links come straight off entity.social_instagram/facebook/tiktok below
         entity.live_artist_id ? gcrDb.from('artist_profiles').select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount').eq('id', entity.live_artist_id).eq('is_active', true).maybeSingle() : Promise.resolve({ data: null }),
+        // Generic entity_sections content (rooms, pricing, offerings, amenities,
+        // highlights, policies, tour_types, process, etc.) — the admin editor's
+        // "Sections" tab writes here for every entity_type, but this was never
+        // queried by this endpoint, so non-restaurant businesses had no way to
+        // show it on the public page. is_active filter matches the admin UI's
+        // own show/hide toggle for a section.
+        gcrDb.from('entity_sections').select('*').eq('entity_slug', entitySlug).eq('is_active', true).order('sort_order', { ascending: true }),
     ]);
+
+    // entity_sections' only child table is entity_section_items (price_tiers
+    // links to entity_section_items.id via section_item_id for the rare item
+    // that has multiple price tiers instead of one price_from/to).
+    const sectionRows = sectionsRes.data || [];
+    const sectionIds = sectionRows.map(s => s.id);
+    const sectionItemsRes = sectionIds.length
+        ? await gcrDb.from('entity_section_items').select('*').in('section_id', sectionIds).order('sort_order', { ascending: true })
+        : { data: [] };
+    const sectionItems = sectionItemsRes.data || [];
+    const sectionItemIds = sectionItems.map(i => i.id);
+    const sectionTiersRes = sectionItemIds.length
+        ? await gcrDb.from('price_tiers').select('*').in('section_item_id', sectionItemIds).order('sort_order', { ascending: true })
+        : { data: [] };
+    const sectionTiers = sectionTiersRes.data || [];
+    const entitySections = sectionRows.map(s => ({
+        id: s.id,
+        section_type: s.section_type,
+        section_name: s.section_name,
+        subtitle: s.subtitle || null,
+        icon: s.icon || null,
+        layout: s.layout || null,
+        image_url: s.image_url || null,
+        sort_order: s.sort_order || 0,
+        items: sectionItems
+            .filter(i => i.section_id === s.id)
+            .map(i => ({
+                id: i.id,
+                item_name: i.item_name,
+                description: i.description || null,
+                price_from: i.price_from != null ? parseFloat(i.price_from) : null,
+                price_to: i.price_to != null ? parseFloat(i.price_to) : null,
+                price_label: i.price_label || null,
+                duration: i.duration || null,
+                icon: i.icon || null,
+                image_url: i.image_url || null,
+                metadata: i.metadata || {},
+                tiers: sectionTiers.filter(t => t.section_item_id === i.id),
+            })),
+    }));
 
     const groupItems = (sections, items, priceField) => {
         const byId = {};
@@ -81,6 +128,14 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         },
         hh_description: entity.hh_description || null,
         live_artist: artistData?.data || null,
+        // Generic non-restaurant display support — additive, existing fields
+        // above are untouched. display_template picks a renderer registry
+        // (menu/stay/booking/generic) on the frontend; entity_sections carries
+        // the real rooms/pricing/offerings/amenities/etc. content that used to
+        // be invisible on this endpoint for every non-restaurant business.
+        display_template: entity.display_template || 'generic',
+        display_config: entity.display_config || null,
+        entity_sections: entitySections,
     });
 }
 
@@ -2864,7 +2919,7 @@ router.get('/menu', async (req, res) => {
         let siteId = req.siteId; // from domain resolution
         const getGcrDb = require('../db');
         const gcrDb = getGcrDb();
-        const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok';
+        const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok, display_template, display_config';
 
         // 1) Direct GCR lookup — ?entity_id=UUID
         if (req.query.entity_id) {
