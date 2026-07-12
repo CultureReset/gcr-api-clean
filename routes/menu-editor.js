@@ -170,7 +170,7 @@ const BOOKABLE_SUBTYPES = new Set([
 ]);
 
 function buildTabManifest(entity) {
-  const tabs = ['today', 'gallery', 'specials', 'events', 'hours', 'business', 'preview'];
+  const tabs = ['today', 'gallery', 'share', 'specials', 'events', 'hours', 'business', 'preview'];
   const isRestaurant = RESTAURANT_TYPES.has(entity.entity_type);
   const isBookable = BOOKABLE_TYPES.has(entity.entity_type) || BOOKABLE_SUBTYPES.has(entity.entity_subtype);
   const isMarina = entity.entity_subtype === 'marina';
