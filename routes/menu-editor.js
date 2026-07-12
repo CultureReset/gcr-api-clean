@@ -901,6 +901,47 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
   }
 });
 
+// ─── STAFF (phone-recognized SMS toggle access) ───────────────────────────────
+// Whoever holds the PIN (owner/manager) can add other people by phone number
+// with a role. 'owner'/'manager' is really just a label today — the real
+// access split is that only PIN holders get the full editor, while everyone
+// added here gets recognized by routes/sms.js's inbound webhook for
+// toggle-only commands (SOLD OUT <item>, ON TAP <item>, etc.), regardless of
+// the role string. A future dashboard/SMS-identity merge can make role
+// actually gate something server-side; for now it's descriptive.
+
+function normalizeStaffPhone(raw) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length === 10) return '+1' + digits;
+  if (digits.length === 11 && digits[0] === '1') return '+' + digits;
+  return '+' + digits;
+}
+
+router.get('/:slug/staff', pinAuth, async (req, res) => {
+  const { data, error } = await db.from('business_staff').select('*').eq('entity_slug', req.entitySlug).order('created_at');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ staff: data || [] });
+});
+
+router.post('/:slug/staff', pinAuth, async (req, res) => {
+  const { phone, name, role } = req.body;
+  if (!phone) return res.status(400).json({ error: 'phone required' });
+  const normalized = normalizeStaffPhone(phone);
+  const { data, error } = await db.from('business_staff')
+    .upsert({ entity_slug: req.entitySlug, phone: normalized, name: name || null, role: role || 'staff', is_active: true, updated_at: new Date().toISOString() }, { onConflict: 'entity_slug,phone' })
+    .select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'business_staff', record_id: data.id, new_value: data });
+  res.status(201).json(data);
+});
+
+router.delete('/:slug/staff/:id', pinAuth, async (req, res) => {
+  const { error } = await db.from('business_staff').update({ is_active: false }).eq('id', req.params.id).eq('entity_slug', req.entitySlug);
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'business_staff', record_id: req.params.id });
+  res.json({ success: true });
+});
+
 // ─── QR MENU (public read — no PIN) ──────────────────────────────────────────
 // GET /api/menu-editor/:slug/qr-menu
 // Used by QR code scan → display the full menu publicly

@@ -5,6 +5,7 @@ const crypto   = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
+const { handleStaffCommand } = require('../lib/staff-commands');
 
 const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
 const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
@@ -165,6 +166,22 @@ router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSig
   // STOP / UNSTOP / HELP handled by Twilio automatically
   if (['STOP','UNSTOP','HELP'].includes(upper)) {
     return res.type('text/xml').send(twiml.toString());
+  }
+
+  // Business staff quick-toggle commands (SOLD OUT <item>, ON TAP <item>,
+  // etc.) share this same inbound number with tourist signup — checked
+  // first since it only ever matches a phone in business_staff, which is
+  // never a tourist's number. Falls through to tourist handling below for
+  // every other phone (the entire current inbound volume, since this table
+  // is brand new).
+  try {
+    const staffReply = await handleStaffCommand(phone, body);
+    if (staffReply) {
+      twiml.message(staffReply);
+      return res.type('text/xml').send(twiml.toString());
+    }
+  } catch (e) {
+    console.error('[sms/inbound] staff command check failed:', e.message);
   }
 
   // QR-code attribution — a QR-driven text reads "BEACH <CODE>" / "BEACHES <CODE>".
