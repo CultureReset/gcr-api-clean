@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const { logEdit } = require('../lib/edit-log');
+const { analyzePhoto } = require('../lib/analyze-photo');
 
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
@@ -533,7 +534,15 @@ router.post('/:slug/upload', pinAuth, upload.single('image'), async (req, res) =
   if (type === 'gallery') {
     const { data: existing } = await db.from('entity_photos').select('sort_order').eq('entity_slug', slug).order('sort_order', { ascending: false }).limit(1).single();
     const nextOrder = existing ? (existing.sort_order + 1) : 0;
-    await db.from('entity_photos').insert({ entity_slug: slug, url: publicUrl, image_path: storagePath, is_cover: nextOrder === 0, sort_order: nextOrder, caption: label || null });
+    const { data: insertedPhoto } = await db.from('entity_photos').insert({ entity_slug: slug, url: publicUrl, image_path: storagePath, is_cover: nextOrder === 0, sort_order: nextOrder, caption: label || null }).select('id').single();
+    // Fire-and-forget — never make the phone sit and wait on a vision call
+    // just to finish uploading a photo (same pattern as admin.js's upload route).
+    if (insertedPhoto?.id) {
+      analyzePhoto(publicUrl).then(result => {
+        if (!result) return;
+        return db.from('entity_photos').update({ ai_description: result.description, ai_tags: result.tags, ai_analyzed_at: new Date().toISOString() }).eq('id', insertedPhoto.id);
+      }).catch(() => {});
+    }
   } else if (type === 'hero') {
     await db.from('entity').update({ hero_image_url: publicUrl, hero_image_path: storagePath }).eq('slug', slug);
   } else {
@@ -622,6 +631,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
 
       let heroUrl = null;
 
+      const freshUploadUrls = [];
       for (let i = 0; i < gallery.length; i++) {
         const img = gallery[i];
         let imageUrl = img.url;
@@ -629,7 +639,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
         // Upload base64 if present
         if (img.url && img.url.startsWith('data:')) {
           const uploaded = await uploadBase64Image(slug, null, 'hero', img.url);
-          if (uploaded) imageUrl = uploaded.url;
+          if (uploaded) { imageUrl = uploaded.url; freshUploadUrls.push(imageUrl); }
         }
 
         // Map gallery type to photo_type and is_cover
@@ -662,6 +672,17 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       // Update hero image on the entity if one was marked as Hero
       if (heroUrl) {
         await db.from('entity').update({ hero_image_url: heroUrl }).eq('slug', slug);
+      }
+
+      // Only analyze photos that were actually just uploaded (base64 -> real
+      // URL this save) -- this endpoint deletes and reinserts the whole
+      // gallery on every save, so re-analyzing already-existing photos every
+      // time would burn a fresh vision call per photo on every single save.
+      for (const url of freshUploadUrls) {
+        analyzePhoto(url).then(result => {
+          if (!result) return;
+          return db.from('entity_photos').update({ ai_description: result.description, ai_tags: result.tags, ai_analyzed_at: new Date().toISOString() }).eq('entity_slug', slug).eq('url', url);
+        }).catch(() => {});
       }
     }
 

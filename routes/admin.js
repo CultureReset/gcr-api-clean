@@ -1900,6 +1900,41 @@ router.post('/gcr/upload-image', authRequired, upload.single('image'), async (re
   res.json({ url: publicUrl, path: fileName });
 });
 
+// POST /api/admin/gcr/backfill-photo-analysis — run AI vision tagging over
+// EXISTING entity_photos rows that predate this feature (imported from
+// Google Places, bulk CSV, etc — anything not uploaded through a path that
+// already calls analyzePhoto()). This costs one real Anthropic API call per
+// photo, which is why it's a manually-triggered batch, not something that
+// runs on its own — call it repeatedly (or raise `limit`) to work through
+// the backlog at whatever pace/cost you're comfortable with.
+// Body: { limit? } -- defaults to 25 photos per call.
+router.post('/gcr/backfill-photo-analysis', authRequired, async (req, res) => {
+  const limit = Math.min(parseInt(req.body?.limit) || 25, 200);
+  const { data: photos, error } = await getDb().from('entity_photos')
+    .select('id, url').is('ai_analyzed_at', null).not('url', 'is', null).limit(limit);
+  if (error) return res.status(500).json({ error: error.message });
+  if (!photos?.length) return res.json({ processed: 0, remaining: 0, message: 'Nothing left to analyze.' });
+
+  let processed = 0;
+  for (const photo of photos) {
+    const result = await analyzePhoto(photo.url);
+    if (result) {
+      await getDb().from('entity_photos').update({
+        ai_description: result.description, ai_tags: result.tags, ai_analyzed_at: new Date().toISOString(),
+      }).eq('id', photo.id);
+      processed++;
+    } else {
+      // Still stamp ai_analyzed_at so a permanently-broken image URL doesn't
+      // get retried forever every time this batch runs -- one failed attempt
+      // is enough to skip it going forward.
+      await getDb().from('entity_photos').update({ ai_analyzed_at: new Date().toISOString() }).eq('id', photo.id);
+    }
+  }
+
+  const { count: remaining } = await getDb().from('entity_photos').select('id', { count: 'exact', head: true }).is('ai_analyzed_at', null);
+  res.json({ processed, remaining: remaining || 0 });
+});
+
 // ─── ARTISTS ─────────────────────────────────────────────────────────────────
 
 // POST /api/admin/artists — create new artist
