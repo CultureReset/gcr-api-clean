@@ -5,6 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const { logEdit } = require('../lib/edit-log');
 
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
@@ -25,9 +26,18 @@ async function pinAuth(req, res, next) {
   const adminToken = req.headers['x-admin-token'];
   const menuToken = req.headers['x-menu-token'] || req.query.token;
 
+  // The PIN is shared by the whole business, not a per-person credential, so
+  // there's no real identity to attach to edits made through it yet (that
+  // arrives once the dashboard/SMS side is wired to business_staff). Until
+  // then, whoever is behind the PIN can optionally say who they are so the
+  // audit log isn't just "someone edited this" — same header the frontend's
+  // "who's editing" prompt sends.
+  req.actorName = req.headers['x-actor-name'] || req.body?.actor_name || null;
+
   // Admin bypass — if admin token is present, allow access
   if (adminToken) {
     req.entitySlug = slug;
+    req.actorRole = 'admin';
     return next();
   }
 
@@ -43,7 +53,21 @@ async function pinAuth(req, res, next) {
   if (menuToken !== expected) return res.status(401).json({ error: 'Invalid token' });
 
   req.entitySlug = slug;
+  req.actorRole = 'owner';
   next();
+}
+
+// Shared logEdit() call shaped for this router's req — every write route
+// passes req plus what changed so the channel/actor fields are never typed
+// out by hand at each call site.
+function log(req, fields) {
+  return logEdit({
+    entity_slug: req.entitySlug,
+    channel: 'menu_editor',
+    actor_name: req.actorName,
+    actor_role: req.actorRole,
+    ...fields,
+  });
 }
 
 // ─── POST /api/menu-editor/create ──────────────────────────────────────────────
@@ -105,6 +129,8 @@ router.post('/create', async (req, res) => {
     const { data: created, error } = await db.from('entity').insert(insertRow).select('slug, name').single();
     if (error) return res.status(500).json({ error: error.message });
 
+    logEdit({ entity_slug: created.slug, channel: 'menu_editor', actor_role: 'owner', action: 'create', table_name: 'entity', record_id: created.slug, new_value: insertRow });
+
     const token = makeToken(created.slug, pin);
     res.json({ success: true, slug: created.slug, name: created.name, pin, token });
   } catch (err) {
@@ -128,6 +154,33 @@ router.post('/:slug/auth', async (req, res) => {
   res.json({ success: true, token, slug: entity.slug, name: entity.name, hero_image_url: entity.hero_image_url });
 });
 
+// ─── BUSINESS-TYPE TAB MANIFEST ───────────────────────────────────────────────
+// The editor used to always assume "restaurant" — same 12 tabs no matter what
+// business the slug belonged to, so a charter/marina would just get empty
+// Menu/Drinks/Happy Hour tabs instead of anything relevant to them. This maps
+// entity_type/entity_subtype to which tabs actually apply, using columns that
+// already exist on `entity` (fuel_options, daily_capacity, capacity_per_slot)
+// and the existing business_availability table — no new schema needed beyond
+// what 006_staff_editor_and_audit_log.sql already added.
+const RESTAURANT_TYPES = new Set(['restaurant', 'coffee', 'dessert', 'bakery']);
+const BOOKABLE_TYPES = new Set(['activity', 'hotel', 'condo', 'vacation-rental']);
+const BOOKABLE_SUBTYPES = new Set([
+  'fishing_charter', 'dolphin_cruise', 'boat_rental', 'kayak_rental', 'jet_ski',
+  'tour_agency', 'travel_agency', 'tourist_attraction', 'golf_course', 'campground',
+]);
+
+function buildTabManifest(entity) {
+  const tabs = ['today', 'gallery', 'specials', 'events', 'hours', 'business', 'preview'];
+  const isRestaurant = RESTAURANT_TYPES.has(entity.entity_type);
+  const isBookable = BOOKABLE_TYPES.has(entity.entity_type) || BOOKABLE_SUBTYPES.has(entity.entity_subtype);
+  const isMarina = entity.entity_subtype === 'marina';
+
+  if (isRestaurant) tabs.splice(1, 0, 'menu', 'drinks', 'happyHour', 'sides', 'daily');
+  if (isBookable) tabs.splice(1, 0, 'availability');
+  if (isMarina) tabs.splice(1, 0, 'fuel');
+  return tabs;
+}
+
 // ─── GET /api/menu-editor/:slug/data ──────────────────────────────────────────
 // Load all menu data for the editor
 router.get('/:slug/data', pinAuth, async (req, res) => {
@@ -136,17 +189,17 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
   // Try extended select (includes rotating_sections + theme if columns exist)
   let entity;
   const { data: entityFull, error: entitySelErr } = await db.from('entity')
-    .select('id, slug, name, description, hero_image_url, phone, website_url, address_line_1, hh_days, hh_start, hh_end, hh_description, gallery_sections, rotating_sections, theme')
+    .select('id, slug, name, description, hero_image_url, phone, website_url, address_line_1, hh_days, hh_start, hh_end, hh_description, gallery_sections, rotating_sections, theme, entity_type, entity_subtype, fuel_options, daily_capacity, capacity_per_slot, price_from, price_to, price_unit')
     .eq('slug', slug).single();
   if (entitySelErr && (entitySelErr.code === '42703' || (entitySelErr.message || '').includes('does not exist'))) {
-    const { data } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, address_line_1, hh_days, hh_start, hh_end, hh_description, gallery_sections').eq('slug', slug).single();
+    const { data } = await db.from('entity').select('id, slug, name, description, hero_image_url, phone, website_url, address_line_1, hh_days, hh_start, hh_end, hh_description, gallery_sections, entity_type, entity_subtype, fuel_options, daily_capacity, capacity_per_slot, price_from, price_to, price_unit').eq('slug', slug).single();
     entity = data;
   } else {
     entity = entityFull;
   }
   if (!entity) return res.status(404).json({ error: 'Not found' });
 
-  const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures, photos] = await Promise.all([
+  const [menuSections, drinkSections, hhSections, specials, events, hours, sides, dailyFeatures, photos, availability] = await Promise.all([
     db.from('menu_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('drink_sections').select('*').eq('entity_slug', slug).order('sort_order'),
     db.from('happy_hour_sections').select('*').eq('entity_slug', slug).order('sort_order'),
@@ -156,13 +209,8 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     db.from('entity_sides').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_daily_features').select('*').eq('entity_slug', slug).eq('is_active', true),
     db.from('entity_photos').select('*').eq('entity_slug', slug).order('sort_order'),
+    db.from('business_availability').select('*').eq('entity_slug', slug).gte('availability_date', new Date().toISOString().slice(0, 10)).order('availability_date').order('time_slot'),
   ]);
-
-  const sectionIds = [
-    ...(menuSections.data || []).map(s => s.id),
-    ...(drinkSections.data || []).map(s => s.id),
-    ...(hhSections.data || []).map(s => s.id),
-  ];
 
   const [menuItems, drinkItems, hhItems] = await Promise.all([
     (menuSections.data || []).length ? db.from('menu_items').select('*').in('section_id', (menuSections.data || []).map(s => s.id)).order('id') : { data: [] },
@@ -172,6 +220,7 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
 
   res.json({
     entity,
+    tabs: buildTabManifest(entity),
     hours: hours.data || [],
     menu_sections: (menuSections.data || []).map(s => ({ ...s, items: (menuItems.data || []).filter(i => i.section_id === s.id) })),
     drink_sections: (drinkSections.data || []).map(s => ({ ...s, items: (drinkItems.data || []).filter(i => i.section_id === s.id) })),
@@ -182,7 +231,77 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     daily_features: dailyFeatures.data || [],
     entity_photos: photos.data || [],
     gallery_sections: entity?.gallery_sections || [],
+    availability: availability.data || [],
   });
+});
+
+// ─── AVAILABILITY / "SPOTS REMAINING" ─────────────────────────────────────────
+// business_availability already existed (total_capacity/booked_count/
+// remaining_spots/status) but had no self-serve write path — 100% admin-only.
+// These let the business itself post "2 spots left on the 4pm charter" the
+// same way they'd post a special.
+
+router.post('/:slug/availability', pinAuth, async (req, res) => {
+  const { availability_date, time_slot, end_time, total_capacity, booked_count, status, last_minute_deal, last_minute_price } = req.body;
+  if (!availability_date) return res.status(400).json({ error: 'availability_date required' });
+  const remaining_spots = total_capacity != null ? Math.max(0, total_capacity - (booked_count || 0)) : null;
+  const { data, error } = await db.from('business_availability').insert({
+    entity_slug: req.entitySlug, availability_date, time_slot: time_slot || null, end_time: end_time || null,
+    total_capacity: total_capacity ?? null, booked_count: booked_count || 0, remaining_spots,
+    status: status || (remaining_spots === 0 ? 'full' : 'available'),
+    last_minute_deal: last_minute_deal || null, last_minute_price: last_minute_price != null ? parseFloat(last_minute_price) : null,
+    source_platform: 'menu_editor',
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'business_availability', record_id: data.id, new_value: data });
+  res.status(201).json(data);
+});
+
+router.put('/:slug/availability/:id', pinAuth, async (req, res) => {
+  const { availability_date, time_slot, end_time, total_capacity, booked_count, status, last_minute_deal, last_minute_price } = req.body;
+  const update = { last_updated: new Date().toISOString() };
+  if (availability_date !== undefined) update.availability_date = availability_date;
+  if (time_slot !== undefined) update.time_slot = time_slot;
+  if (end_time !== undefined) update.end_time = end_time;
+  if (total_capacity !== undefined) update.total_capacity = total_capacity;
+  if (booked_count !== undefined) update.booked_count = booked_count;
+  if (last_minute_deal !== undefined) update.last_minute_deal = last_minute_deal;
+  if (last_minute_price !== undefined) update.last_minute_price = last_minute_price != null ? parseFloat(last_minute_price) : null;
+  if (total_capacity !== undefined || booked_count !== undefined) {
+    const { data: existing } = await db.from('business_availability').select('total_capacity, booked_count').eq('id', req.params.id).single();
+    const cap = total_capacity !== undefined ? total_capacity : existing?.total_capacity;
+    const booked = booked_count !== undefined ? booked_count : (existing?.booked_count || 0);
+    update.remaining_spots = cap != null ? Math.max(0, cap - booked) : null;
+  }
+  if (status !== undefined) update.status = status;
+  else if (update.remaining_spots === 0) update.status = 'full';
+  const { data, error } = await db.from('business_availability').update(update).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'business_availability', record_id: req.params.id, new_value: data });
+  res.json(data);
+});
+
+router.delete('/:slug/availability/:id', pinAuth, async (req, res) => {
+  const { error } = await db.from('business_availability').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'business_availability', record_id: req.params.id });
+  res.json({ success: true });
+});
+
+// ─── FUEL / PRICING (marina-style businesses) ─────────────────────────────────
+// entity.fuel_options is an existing jsonb column (Google Places import used
+// it for gas-station-shaped data) — reused here as a small free-form list of
+// { name, price, unit, updated_at } so a marina can update fuel prices the
+// same way a restaurant updates a menu price.
+
+router.put('/:slug/fuel', pinAuth, async (req, res) => {
+  const { fuel_options } = req.body;
+  if (!Array.isArray(fuel_options)) return res.status(400).json({ error: 'fuel_options must be an array' });
+  const stamped = fuel_options.map(f => ({ ...f, updated_at: new Date().toISOString() }));
+  const { error } = await db.from('entity').update({ fuel_options: stamped, updated_at: new Date().toISOString() }).eq('slug', req.entitySlug);
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'entity', record_id: req.entitySlug, field_name: 'fuel_options', new_value: stamped });
+  res.json({ success: true, fuel_options: stamped });
 });
 
 // ─── MENU SECTIONS ────────────────────────────────────────────────────────────
@@ -191,6 +310,7 @@ router.post('/:slug/menu-sections', pinAuth, async (req, res) => {
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('menu_sections').insert({ entity_slug: req.entitySlug, section_name, sort_order: sort_order || 0 }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'menu_sections', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
@@ -198,6 +318,7 @@ router.put('/:slug/menu-sections/:id', pinAuth, async (req, res) => {
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('menu_sections').update({ section_name, sort_order }).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'menu_sections', record_id: req.params.id, new_value: data });
   res.json(data);
 });
 
@@ -205,6 +326,7 @@ router.delete('/:slug/menu-sections/:id', pinAuth, async (req, res) => {
   await db.from('menu_items').delete().eq('section_id', req.params.id);
   const { error } = await db.from('menu_sections').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'menu_sections', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -214,6 +336,7 @@ router.post('/:slug/menu-items', pinAuth, async (req, res) => {
   const { item_name, description, price, section_id, tags, image_url } = req.body;
   const { data, error } = await db.from('menu_items').insert({ entity_slug: req.entitySlug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, tags: tags || null, image_url: image_url || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'menu_items', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
@@ -221,12 +344,14 @@ router.put('/:slug/menu-items/:id', pinAuth, async (req, res) => {
   const { item_name, description, price, section_id, tags, image_url } = req.body;
   const { data, error } = await db.from('menu_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, section_id: section_id || null, tags: tags || null, image_url: image_url || null }).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'menu_items', record_id: req.params.id, new_value: data });
   res.json(data);
 });
 
 router.delete('/:slug/menu-items/:id', pinAuth, async (req, res) => {
   const { error } = await db.from('menu_items').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'menu_items', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -236,6 +361,7 @@ router.post('/:slug/drink-sections', pinAuth, async (req, res) => {
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('drink_sections').insert({ entity_slug: req.entitySlug, section_name, sort_order: sort_order || 0 }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'drink_sections', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
@@ -243,6 +369,7 @@ router.delete('/:slug/drink-sections/:id', pinAuth, async (req, res) => {
   await db.from('drink_items').delete().eq('section_id', req.params.id);
   const { error } = await db.from('drink_sections').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'drink_sections', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -250,6 +377,7 @@ router.post('/:slug/drink-items', pinAuth, async (req, res) => {
   const { item_name, description, price, section_id, image_url } = req.body;
   const { data, error } = await db.from('drink_items').insert({ entity_slug: req.entitySlug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, image_url: image_url || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'drink_items', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
@@ -257,12 +385,14 @@ router.put('/:slug/drink-items/:id', pinAuth, async (req, res) => {
   const { item_name, description, price, section_id, image_url } = req.body;
   const { data, error } = await db.from('drink_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, section_id: section_id || null, image_url: image_url || null }).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'drink_items', record_id: req.params.id, new_value: data });
   res.json(data);
 });
 
 router.delete('/:slug/drink-items/:id', pinAuth, async (req, res) => {
   const { error } = await db.from('drink_items').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'drink_items', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -272,6 +402,7 @@ router.put('/:slug/happy-hour', pinAuth, async (req, res) => {
   const { hh_days, hh_start, hh_end, hh_description } = req.body;
   const { error } = await db.from('entity').update({ hh_days, hh_start, hh_end, hh_description, updated_at: new Date().toISOString() }).eq('slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'entity', record_id: req.entitySlug, field_name: 'happy_hour', new_value: { hh_days, hh_start, hh_end, hh_description } });
   res.json({ success: true });
 });
 
@@ -279,6 +410,7 @@ router.post('/:slug/hh-sections', pinAuth, async (req, res) => {
   const { section_name, sort_order } = req.body;
   const { data, error } = await db.from('happy_hour_sections').insert({ entity_slug: req.entitySlug, section_name, sort_order: sort_order || 0 }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'happy_hour_sections', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
@@ -286,6 +418,7 @@ router.delete('/:slug/hh-sections/:id', pinAuth, async (req, res) => {
   await db.from('happy_hour_items').delete().eq('section_id', req.params.id);
   const { error } = await db.from('happy_hour_sections').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'happy_hour_sections', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -293,6 +426,7 @@ router.post('/:slug/hh-items', pinAuth, async (req, res) => {
   const { item_name, description, price, original_price, section_id, image_url } = req.body;
   const { data, error } = await db.from('happy_hour_items').insert({ entity_slug: req.entitySlug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'happy_hour_items', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
@@ -300,12 +434,14 @@ router.put('/:slug/hh-items/:id', pinAuth, async (req, res) => {
   const { item_name, description, price, original_price, image_url } = req.body;
   const { data, error } = await db.from('happy_hour_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null }).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'happy_hour_items', record_id: req.params.id, new_value: data });
   res.json(data);
 });
 
 router.delete('/:slug/hh-items/:id', pinAuth, async (req, res) => {
   const { error } = await db.from('happy_hour_items').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'happy_hour_items', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -314,18 +450,21 @@ router.delete('/:slug/hh-items/:id', pinAuth, async (req, res) => {
 router.post('/:slug/specials', pinAuth, async (req, res) => {
   const { data, error } = await db.from('entity_specials').insert({ entity_slug: req.entitySlug, ...req.body, is_active: true }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'entity_specials', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
 router.put('/:slug/specials/:id', pinAuth, async (req, res) => {
   const { data, error } = await db.from('entity_specials').update(req.body).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'entity_specials', record_id: req.params.id, new_value: data });
   res.json(data);
 });
 
 router.delete('/:slug/specials/:id', pinAuth, async (req, res) => {
   const { error } = await db.from('entity_specials').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'entity_specials', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -334,18 +473,21 @@ router.delete('/:slug/specials/:id', pinAuth, async (req, res) => {
 router.post('/:slug/events', pinAuth, async (req, res) => {
   const { data, error } = await db.from('entity_events').insert({ entity_slug: req.entitySlug, ...req.body, is_active: true }).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'entity_events', record_id: data.id, new_value: data });
   res.status(201).json(data);
 });
 
 router.put('/:slug/events/:id', pinAuth, async (req, res) => {
   const { data, error } = await db.from('entity_events').update(req.body).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'entity_events', record_id: req.params.id, new_value: data });
   res.json(data);
 });
 
 router.delete('/:slug/events/:id', pinAuth, async (req, res) => {
   const { error } = await db.from('entity_events').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'entity_events', record_id: req.params.id });
   res.json({ success: true });
 });
 
@@ -400,6 +542,7 @@ router.post('/:slug/upload', pinAuth, upload.single('image'), async (req, res) =
       await db.from(table).update({ image_url: publicUrl, image_path: storagePath }).eq('id', itemId).eq('entity_slug', slug);
     }
   }
+  log(req, { action: 'create', table_name: 'entity_photos', field_name: type, new_value: { url: publicUrl, item_id: itemId } });
 
   res.json({ success: true, url: publicUrl, path: storagePath });
 });
@@ -750,6 +893,7 @@ router.post('/:slug/save', pinAuth, async (req, res) => {
       }
     }
 
+    log(req, { action: 'update', table_name: 'entity', record_id: slug, field_name: 'bulk_save', new_value: { business, areas_count: areas.length, gallery_count: gallery.length } });
     res.json({ success: true, message: 'Menu saved successfully' });
   } catch (err) {
     console.error('Save error:', err);
@@ -803,6 +947,7 @@ router.post('/:slug/set-hero', pinAuth, async (req, res) => {
   if (!url) return res.status(400).json({ error: 'url required' });
   const { error } = await db.from('entity').update({ hero_image_url: url }).eq('slug', req.params.slug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'entity', record_id: req.params.slug, field_name: 'hero_image_url', new_value: url });
   res.json({ success: true, hero_image_url: url });
 });
 
@@ -817,6 +962,7 @@ router.patch('/:slug/photo/:id', pinAuth, async (req, res) => {
   if (usage_note   !== undefined) update.usage_note  = usage_note;
   const { error } = await db.from('entity_photos').update(update).eq('id', req.params.id).eq('entity_slug', req.params.slug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'entity_photos', record_id: req.params.id, new_value: update });
   res.json({ success: true });
 });
 
@@ -824,6 +970,7 @@ router.patch('/:slug/photo/:id', pinAuth, async (req, res) => {
 router.delete('/:slug/photo/:id', pinAuth, async (req, res) => {
   const { error } = await db.from('entity_photos').delete().eq('id', req.params.id).eq('entity_slug', req.params.slug);
   if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'entity_photos', record_id: req.params.id });
   res.json({ success: true });
 });
 
