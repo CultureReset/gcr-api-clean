@@ -98,8 +98,12 @@ router.post('/:slug/request', async (req, res) => {
       return res.status(404).json({ error: 'Artist not found' });
     }
 
-    // Validate required fields
-    if (!song_title) {
+    // Validate required fields -- a song title only makes sense for an
+    // actual song request; shoutouts need a message, tips need neither.
+    if (request_type === 'shoutout' && !note) {
+      return res.status(400).json({ error: 'note required for a shoutout' });
+    }
+    if ((!request_type || request_type === 'song') && !song_title) {
       return res.status(400).json({ error: 'song_title required' });
     }
 

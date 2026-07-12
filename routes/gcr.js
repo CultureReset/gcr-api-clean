@@ -2235,27 +2235,6 @@ router.get('/artist/:slug/live', async (req, res) => {
   }
 })
 
-// POST /api/gcr/artist/:slug/request — log a song request
-router.post('/artist/:slug/request', async (req, res) => {
-  try {
-    const { song, name, message, amount, type } = req.body
-    await db.from('artist_requests').insert({
-      artist_slug: req.params.slug,
-      song:        song || null,
-      fan_name:    name || null,
-      message:     message || null,
-      amount:      amount || 0,
-      type:        type || 'request', // 'request' | 'shoutout' | 'tip'
-      paid:        false,
-      created_at:  new Date().toISOString(),
-    })
-    res.json({ success: true })
-  } catch (err) {
-    // Table may not exist yet — don't block the fan flow
-    res.json({ success: true })
-  }
-})
-
 // POST /api/gcr/opt-in — captures name/phone/consent BEFORE a customer enters
 // a booking/checkout flow (used ahead of A2P 10DLC approval — SMS only ever
 // actually goes out via sendSms()'s owner-relay mode until that's approved).
