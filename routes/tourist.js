@@ -1315,7 +1315,7 @@ MEMORY (you remember across chats):
 - If memory is outdated, update_memory or delete_memory
 
 SEARCHING BEYOND THE LIST ABOVE:
-- LIVE GULF COAST DATA above is only the top ~200 places by rating/proximity, and each entry there is a summary — it does NOT cover everything or every detail. If someone names a specific business that isn't in that list, or asks a "who has X" / "which places do Y" question (e.g. "who has dolphin cruises", "where does the Black Flag depart from"), call search_businesses instead of guessing or saying you don't know.
+- LIVE GULF COAST DATA above is only the top ~200 places by rating/proximity, and each entry there is a summary — it does NOT cover everything or every detail. For ANY "who has X" / "which places do Y" question — a dish ("who has crab legs"), a dietary need ("gluten-free"), an amenity ("lazy river"), an artist or live music, a special, an activity — call search_businesses. It queries the actual structured rows (menu items, drinks, happy hour items, specials, events/artists, tags, FAQs, offerings) — the same search the website uses — and each result shows exactly what matched. Never guess or say you don't know before searching.
 - search_businesses returns each match's parent hub (e.g. the marina a charter boat operates out of), so use it directly to answer "where does X depart from" style questions.
 - Once you know which business the traveler means (from the list above, or from search_businesses), call get_business_details(slug) to read that business's FULL page — menu/drinks/happy hour items, reviews, FAQs, policies, team, hours, offerings/pricing tiers, amenities, parent hub, everything that shows on its real page. Use this whenever a question needs more depth than the one-line summary above gives you (e.g. "what's actually in their spicy tuna roll", "do they have a kids menu", "what does their weekday happy hour include").
 - For "do they have spots/kayaks/units left today" or "any last-minute deals" questions, call check_availability(slug) — never invent a number. Most businesses don't have live availability tracked yet, and the tool will tell you that plainly; pass that along honestly instead of guessing.
@@ -1329,7 +1329,7 @@ HARD RULES:
     const tools = [
         {
             name: 'search_businesses',
-            description: 'Search ALL active Gulf Coast businesses (not just the top ~200 already listed in LIVE GULF COAST DATA) by name, type/subtype, or tag. Use this for "who has X" questions, or when a named business might not be in the pre-loaded list. Returns each match\'s parent hub (e.g. the marina it operates from) so you can answer "where does X depart from" directly.',
+            description: 'Search ALL active Gulf Coast businesses AND their item-level content — menu items, drink items, happy-hour items, specials, events/artists, amenities/tags, FAQs, offerings, and section content — the same search the public site uses. Use this for ANY "who has X" question ("who has crab legs", "who has gluten-free", "who has live music tonight", "which places do dolphin cruises"): the query matches the actual structured rows, and each result shows exactly WHAT matched (the item + price, the event + artist, the feature). Also returns each match\'s parent hub (e.g. the marina it operates from). Filters: query (free text), entity_type/entity_subtype (exact), tag (substring).',
             input_schema: {
                 type: 'object',
                 properties: {
@@ -1443,6 +1443,19 @@ HARD RULES:
                 (e.happy_hour_sections || []).forEach(s => { if (s.items?.length) lines.push(`Happy Hour — ${s.section_name} (${(s.days_of_week || []).join(',')} ${s.start_time || ''}-${s.end_time || ''}): ${fmtItems(s.items)}`); });
                 if ((e.specials || []).length) lines.push(`Specials: ${e.specials.slice(0, 10).map(s => `${s.special_name}${s.discount_value ? ` (${s.discount_type === 'percent' ? `${s.discount_value}% off` : `$${s.discount_value} off`})` : ''}`).join(' | ')}`);
 
+                // Events + live music — buildFullEntity already returns these with the
+                // joined artist row; they were fetched and then never shown to the AI.
+                if ((e.events || []).length) {
+                    lines.push(`Events / live music: ${e.events.slice(0, 12).map(ev => {
+                        const who = ev.artist_name || ev.artist?.name;
+                        const what = ev.event_name && ev.event_name !== who ? ev.event_name : (who || ev.event_name || 'Event');
+                        const when = ev.recurring && ev.day_of_week ? `every ${ev.day_of_week}` : (ev.event_date || '');
+                        const time = ev.start_time ? ` ${ev.start_time}${ev.end_time ? `–${ev.end_time}` : ''}` : '';
+                        const genre = ev.artist?.genre ? ` [${ev.artist.genre}]` : '';
+                        return `${what}${who && what !== who ? ` — ${who}` : ''}${genre} (${when}${time})${ev.cover_charge ? ` · cover $${ev.cover_charge}` : ''}`;
+                    }).join(' | ')}`);
+                }
+
                 (e.sections || []).forEach(s => {
                     if (s.items?.length) lines.push(`${s.section_name}: ${s.items.slice(0, 10).map(i => `${i.item_name}${i.price_from != null ? ` from $${i.price_from}` : ''}${i.description ? ` — ${i.description.slice(0, 60)}` : ''}`).join(' | ')}`);
                 });
@@ -1467,7 +1480,7 @@ HARD RULES:
                 const { data: tagRows, error: tagErr } = await gcrDb.from('entity_tags').select('entity_slug').ilike('tag_name', `%${input.tag}%`).limit(500);
                 if (tagErr) return { error: tagErr.message };
                 matchSlugs = [...new Set((tagRows || []).map(r => r.entity_slug))];
-                if (!matchSlugs.length) return { count: 0, results: [] };
+                if (!matchSlugs.length && !input.query) return { count: 0, results: [] };
             }
             let q = gcrDb.from('entity')
                 .select('name, slug, entity_type, entity_subtype, parent_entity_slug, city, rating, review_count, description, price_from, price_unit')
@@ -1475,27 +1488,80 @@ HARD RULES:
             if (input.query) q = q.ilike('name', `%${input.query}%`);
             if (input.entity_subtype) q = q.eq('entity_subtype', input.entity_subtype);
             if (input.entity_type) q = q.eq('entity_type', input.entity_type);
-            if (matchSlugs) q = q.in('slug', matchSlugs);
+            if (matchSlugs && matchSlugs.length) q = q.in('slug', matchSlugs);
             q = q.order('rating', { ascending: false, nullsFirst: false }).limit(limit);
             const { data, error } = await q;
             if (error) return { error: error.message };
 
-            const parentSlugs = [...new Set((data || []).map(e => e.parent_entity_slug).filter(Boolean))];
-            const parentNames = {};
-            if (parentSlugs.length) {
-                const { data: parents } = await gcrDb.from('entity').select('slug, name').in('slug', parentSlugs);
-                (parents || []).forEach(p => { parentNames[p.slug] = p.name; });
+            // Content-level search — THE SAME search the public site uses
+            // (POST /api/gcr/search): menu items, drinks, happy-hour items,
+            // specials, events/artists, tags, amenities, FAQs, offerings,
+            // section content. One search system for the site AND the AI —
+            // "who has crab legs" resolves against the actual menu rows, not
+            // just business names. Internal self-call, same pattern as
+            // dashboard.js's sync-now proxy.
+            let contentResults = [];
+            if (input.query) {
+                try {
+                    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
+                    const r = await fetch(`${base}/api/gcr/search`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: input.query, limit }),
+                        signal: AbortSignal.timeout(8000),
+                    });
+                    if (r.ok) contentResults = (await r.json()).results || [];
+                } catch (_) { /* content search unavailable — name/tag results still returned */ }
             }
-            const results = (data || []).map(e => ({
+
+            // Merge: precise name/type/tag hits first, then content hits, keyed
+            // by slug. Content hits carry WHAT matched (the menu item, the
+            // event/artist, the feature) so the answer can cite the real row.
+            const bySlug = new Map();
+            (data || []).forEach(e => bySlug.set(e.slug, {
                 name: e.name,
                 slug: e.slug,
                 type: [e.entity_type, e.entity_subtype].filter(Boolean).join('/'),
                 city: e.city,
                 rating: e.rating,
                 review_count: e.review_count,
-                parent_hub: e.parent_entity_slug ? (parentNames[e.parent_entity_slug] || e.parent_entity_slug) : null,
+                parent_slug: e.parent_entity_slug || null,
                 price: e.price_from != null ? (e.price_from === 0 ? 'Free' : `From $${e.price_from}${e.price_unit ? `/${e.price_unit}` : ''}`) : null,
                 description: e.description ? e.description.slice(0, 150) : null,
+            }));
+            contentResults.forEach(e => {
+                const matched = [
+                    ...(e.matched_menu_items || []).map(i => `menu/drink/HH item: ${i.item_name}${i.price ? ` $${i.price}` : ''}`),
+                    ...(e.matched_specials || []).map(s => `special: ${s.special_name}${s.discount_text ? ` (${s.discount_text})` : ''}`),
+                    ...(e.matched_events || []).map(ev => `event: ${ev.event_name || ev.artist_name}${ev.artist_name && ev.event_name !== ev.artist_name ? ` — ${ev.artist_name}` : ''}${ev.event_date ? ` (${ev.event_date})` : ''}`),
+                    ...(e.matched_features || []).map(f => `feature: ${f}`),
+                ].slice(0, 6);
+                const existing = bySlug.get(e.slug);
+                if (existing) {
+                    if (matched.length) existing.matched_content = matched;
+                } else if (bySlug.size < limit * 2) {
+                    bySlug.set(e.slug, {
+                        name: e.name,
+                        slug: e.slug,
+                        type: e.entity_subtype || '',
+                        city: e.city,
+                        rating: e.rating,
+                        matched_content: matched.length ? matched : undefined,
+                    });
+                }
+            });
+
+            const merged = [...bySlug.values()];
+            const parentSlugs = [...new Set(merged.map(e => e.parent_slug).filter(Boolean))];
+            const parentNames = {};
+            if (parentSlugs.length) {
+                const { data: parents } = await gcrDb.from('entity').select('slug, name').in('slug', parentSlugs);
+                (parents || []).forEach(p => { parentNames[p.slug] = p.name; });
+            }
+            const results = merged.map(e => ({
+                ...e,
+                parent_hub: e.parent_slug ? (parentNames[e.parent_slug] || e.parent_slug) : undefined,
+                parent_slug: undefined,
             }));
             return { count: results.length, results };
         }
