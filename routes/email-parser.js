@@ -937,6 +937,65 @@ async function upsertAvailability(entitySlug, parsed, emailLogId) {
   }
 }
 
+// ─── CLICK → OPT-IN → BOOKING RECONCILIATION ─────────────────────────────────
+// Closes the loop tourist_click_events / booking_opt_ins were built for but
+// never finished: mark the click that led here as converted, and remember
+// which opt-in (name/phone/email captured pre-checkout) this parsed booking
+// belongs to.
+async function markClickConverted(clickId, logId) {
+  if (!clickId) return;
+  await db.from('tourist_click_events')
+    .update({ converted: true, converted_at: new Date().toISOString(), email_log_id: logId })
+    .eq('id', clickId);
+}
+
+// entity_slug-keyed direct-checkout path (POST /api/email-parser/manual):
+// the frontend already has opt_in_id from Reserve.jsx's earlier /api/gcr/opt-in
+// call, so the link is exact, not a guess.
+async function resolveOptIn(optInId) {
+  if (!optInId) return { opt_in_id: null, click_id: null };
+  const { data: optIn } = await db.from('booking_opt_ins').select('id, click_id').eq('id', optInId).maybeSingle();
+  return { opt_in_id: optIn?.id || null, click_id: optIn?.click_id || null };
+}
+
+// Forwarded-confirmation-email path (POST /api/email-parser/inbound): the real
+// third-party email (FareHarbor/Airbnb/OpenTable/...) carries no click_id, so
+// this is a best-effort match — the most recent not-yet-converted opt-in for
+// this business, within a window generous enough to cover "book now, show up
+// later," but scoped tight enough (entity + optional name match) to avoid
+// crediting the wrong visitor's click. Never guessed if nothing plausible
+// exists — a parsed booking with no match just has opt_in_id/click_id null.
+async function findRecentUnconvertedOptIn(entitySlug, customerName) {
+  if (!entitySlug) return null;
+  const since = new Date(Date.now() - 14 * 86400000).toISOString();
+  let q = db.from('booking_opt_ins')
+    .select('id, click_id, name, created_at')
+    .eq('entity_slug', entitySlug)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  const { data: candidates } = await q;
+  if (!candidates || !candidates.length) return null;
+
+  const unconverted = [];
+  for (const c of candidates) {
+    if (!c.click_id) { unconverted.push(c); continue; }
+    const { data: click } = await db.from('tourist_click_events').select('converted').eq('id', c.click_id).maybeSingle();
+    if (!click?.converted) unconverted.push(c);
+  }
+  if (!unconverted.length) return null;
+
+  if (customerName) {
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const nameMatch = unconverted.find(c => c.name && norm(c.name) === norm(customerName));
+    if (nameMatch) return nameMatch;
+  }
+  // No name to compare (or no exact match) — fall back to the most recent
+  // unconverted opt-in for this business, since that's still the visitor
+  // most likely to have generated this confirmation.
+  return unconverted[0];
+}
+
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 
 /**
@@ -972,6 +1031,10 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     // Parse
     const parsed = detectAndExtract(from, subject, text, html);
 
+    // Best-effort match back to whoever clicked "Book Now" and gave us their
+    // contact info before this confirmation email ever arrived.
+    const match = await findRecentUnconvertedOptIn(entitySlug, parsed?.customer_name);
+
     // Log it
     const { data: logRow } = await db
       .from('email_parser_log')
@@ -996,10 +1059,14 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
         status: parsed?.status || 'unknown',
         parsed: !!parsed,
         email_hash: hash,
+        opt_in_id: match?.id || null,
+        click_id: match?.click_id || null,
         created_at: new Date().toISOString(),
       })
       .select('id')
       .single();
+
+    if (match?.click_id) await markClickConverted(match.click_id, logRow?.id);
 
     // Update availability
     if (entitySlug && parsed && parsed.event_date) {
@@ -1088,10 +1155,14 @@ router.post('/manual', async (req, res) => {
       confirmation_no, status, notes,
     };
 
+    const linked = await resolveOptIn(opt_in_id);
+
     const { data: logRow } = await db
       .from('email_parser_log')
-      .insert({ entity_slug, platform, ...parsed, parsed: true, manual: true, created_at: new Date().toISOString() })
+      .insert({ entity_slug, platform, ...parsed, parsed: true, manual: true, ...linked, created_at: new Date().toISOString() })
       .select('id').single();
+
+    if (linked.click_id) await markClickConverted(linked.click_id, logRow?.id);
 
     await upsertAvailability(entity_slug, parsed, logRow?.id);
 
@@ -1219,6 +1290,59 @@ router.get('/log', async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
 
     res.json({ total: count, logs: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/email-parser/click-conversions/:slug
+ * Admin/business: who clicked "Book Now", when, what contact info they gave
+ * before checkout, and whether/when it turned into an actual confirmed
+ * booking (manual entry with an opt_in_id, or a forwarded confirmation email
+ * matched heuristically) — the full click -> opt-in -> transaction chain.
+ * Query: ?limit=100&offset=0
+ */
+router.get('/click-conversions/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const limit = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { data: clicks, error } = await db
+      .from('tourist_click_events')
+      .select('id, click_type, target_url, created_at, converted, converted_at, email_log_id')
+      .eq('entity_slug', slug)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const clickIds = (clicks || []).map(c => c.id);
+    const logIds = (clicks || []).map(c => c.email_log_id).filter(Boolean);
+
+    const [{ data: optIns }, { data: logs }] = await Promise.all([
+      clickIds.length
+        ? db.from('booking_opt_ins').select('id, click_id, name, phone, email, created_at').in('click_id', clickIds)
+        : Promise.resolve({ data: [] }),
+      logIds.length
+        ? db.from('email_parser_log').select('id, event_date, event_time, party_size, customer_name, confirmation_no, platform, status').in('id', logIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const optInByClick = new Map((optIns || []).map(o => [o.click_id, o]));
+    const logById = new Map((logs || []).map(l => [l.id, l]));
+
+    const rows = (clicks || []).map(c => ({
+      clicked_at: c.created_at,
+      click_type: c.click_type,
+      target_url: c.target_url,
+      contact: optInByClick.get(c.id) || null,
+      converted: c.converted,
+      converted_at: c.converted_at,
+      booking: logById.get(c.email_log_id) || null,
+    }));
+
+    res.json({ entity_slug: slug, total: rows.length, clicks: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
