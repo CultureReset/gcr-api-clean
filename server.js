@@ -30,8 +30,8 @@ mount('/api/auth', () => require('./routes/auth'));
 mount('/api/gcr', () => require('./routes/gcr'));
 // v2 schema preview — additive only, does not touch /api/gcr/*. See db/v2/README.md.
 mount('/api/gcr/v2-preview', () => require('./routes/gcr-v2-preview'));
-// v2 iCal availability sync — additive only. See db/v2/README.md.
-mount('/api/gcr/v2-preview/ical', () => require('./routes/gcr-v2-ical-sync'));
+// iCal calendar sync (Airbnb/VRBO/FareHarbor etc.) lives in email-parser.js and
+// dashboard.js's /ical/external endpoints, now targeting the v2 schema. See db/v2/README.md.
 mount('/api/admin', () => require('./routes/admin'));
 
 // Dashboard (business owner) — TODO: has missing module dependencies

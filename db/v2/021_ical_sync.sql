@@ -1,9 +1,19 @@
 -- ============================================================================
--- GCR v2 — 021_ical_sync.sql  (EXECUTED)
+-- GCR v2 — 021_ical_sync.sql  (EXECUTED, SUPERSEDED — see 022)
 -- ----------------------------------------------------------------------------
+-- SUPERSEDED: this migration and its route (routes/gcr-v2-ical-sync.js, now
+-- deleted) duplicated a complete, already-working iCal system that already
+-- existed in routes/email-parser.js + routes/dashboard.js (cron-scheduled,
+-- dashboard "sync now" button already wired up) — it had just never been
+-- used. Rather than run two parallel sync systems, the original was
+-- repointed at v2 instead (022_generalize_calendar_sources.sql) and this
+-- one's route was deleted. The columns/constraints below are still in
+-- place and still used — just not through this file's now-deleted route.
+-- Left here, not deleted, as an honest record of the duplicate mistake and
+-- how it was found and corrected.
+--
 -- Supports real availability sync from Airbnb/VRBO/booking-platform iCal
 -- feeds into v2.availability_blocks, per resource (condo unit, boat).
--- Corresponds to routes/gcr-v2-ical-sync.js (additive API route).
 -- ============================================================================
 
 ALTER TABLE v2.availability_blocks ADD COLUMN IF NOT EXISTS source text;

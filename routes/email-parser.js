@@ -25,6 +25,11 @@ const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
 const db      = require('../db');
+const { createClient } = require('@supabase/supabase-js');
+// v2-schema client for the iCal calendar sync section below — writes real
+// availability into the canonical v2 schema instead of the legacy
+// business_availability/entity_external_calendars tables. See db/v2/README.md.
+const dbv2 = createClient(process.env.GCR_SUPABASE_URL, process.env.GCR_SUPABASE_SERVICE_KEY, { db: { schema: 'v2' } });
 
 // ─── UTILITIES ───────────────────────────────────────────────────────────────
 
@@ -1333,69 +1338,71 @@ router.get('/setup/:slug', async (req, res) => {
 
 // ─── EXTERNAL CALENDAR IMPORT (iCal) ──────────────────────────────────────
 // Reverse of the export feed (/api/public/ical/:slug/:token.ics): a business
-// pastes their Airbnb/VRBO .ics export URL, we poll it on a cron and mirror
-// its blocked date ranges into business_availability — so a booking made on
-// Airbnb also blocks that date on GCR, closing the loop on the unified
-// calendar.
+// pastes their Airbnb/VRBO/FareHarbor-style .ics export URL, we poll it on a
+// cron and mirror its blocked date ranges into v2.availability_blocks — so a
+// booking made on any of those platforms also blocks that date on GCR,
+// closing the loop on the unified calendar. Writes to v2, the canonical
+// schema, not the legacy business_availability/entity_external_calendars
+// tables — those are retired for this purpose. See db/v2/README.md.
 const { parseIcsEvents, datesInRange } = require('../utils/ical-parse');
 
-async function blockDateOnCalendar(entitySlug, date, sourceLabel, resourceId = null) {
-  // Match the existing row for this specific unit, or the entity-wide row when the
-  // feed isn't tied to a unit (resourceId null). Per-unit feeds let a multi-unit
-  // building block one unit's dates without touching its siblings.
-  let q = db.from('business_availability')
-    .select('id')
-    .eq('entity_slug', entitySlug)
-    .eq('availability_date', date)
-    .eq('time_slot', '00:00');
-  q = resourceId ? q.eq('resource_id', resourceId) : q.is('resource_id', null);
-  const { data: existing } = await q.maybeSingle();
-
-  if (existing) {
-    await db.from('business_availability').update({
-      status: 'blocked',
-      remaining_spots: 0,
-      source_platform: sourceLabel,
-      last_updated: new Date().toISOString(),
-    }).eq('id', existing.id);
-  } else {
-    await db.from('business_availability').insert({
-      entity_slug: entitySlug,
-      resource_id: resourceId,
-      availability_date: date,
-      time_slot: '00:00',
-      status: 'blocked',
-      remaining_spots: 0,
-      booked_count: 0,
-      source_platform: sourceLabel,
-    });
-  }
+async function blockDateOnCalendar(scope, date, sourceLabel, externalUid) {
+  // scope is { resource_id } or { entity_id } — whichever the calendar source is tied to.
+  const row = {
+    resource_id: scope.resource_id || null,
+    entity_id: scope.entity_id || null,
+    start_date: date,
+    end_date: date,
+    reason: sourceLabel,
+    source: 'ical_sync',
+    external_uid: externalUid,
+    synced_at: new Date().toISOString(),
+  };
+  const { error } = await dbv2
+    .from('availability_blocks')
+    .upsert(row, { onConflict: 'scope_key,external_uid' });
+  if (error) throw error;
 }
 
-async function syncExternalCalendar(row) {
+async function syncExternalCalendar(source) {
+  // source: a row from v2.resource_calendar_sources (resource_id XOR entity_id, url)
   try {
-    const res = await fetch(row.ical_url);
+    const res = await fetch(source.url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     const events = parseIcsEvents(text);
+    const scope = source.resource_id ? { resource_id: source.resource_id } : { entity_id: source.entity_id };
 
+    const seenUids = [];
     let blockedCount = 0;
     for (const ev of events) {
+      const uid = ev.uid || `${ev.start}-${ev.end}`; // fallback if the feed omits UID
+      seenUids.push(uid);
       for (const d of datesInRange(ev.start, ev.end)) {
-        await blockDateOnCalendar(row.entity_slug, d, row.source_label || 'external-ical', row.resource_id || null);
+        await blockDateOnCalendar(scope, d, source.source_label || source.provider || 'external-ical', `${uid}:${d}`);
         blockedCount++;
       }
     }
 
-    await db.from('entity_external_calendars').update({
+    // remove blocks for events that dropped out of the feed (cancellations) --
+    // never touches manually-entered blocks (source != 'ical_sync')
+    let cleanupQuery = dbv2.from('availability_blocks').delete().eq('source', 'ical_sync');
+    cleanupQuery = source.resource_id ? cleanupQuery.eq('resource_id', source.resource_id) : cleanupQuery.eq('entity_id', source.entity_id);
+    if (seenUids.length > 0) {
+      const uidPrefixes = seenUids.map(u => u.split(':')[0]);
+      cleanupQuery = cleanupQuery.not('external_uid', 'in', `(${uidPrefixes.map(u => `"${u}"`).join(',') || '""'})`);
+    }
+    await cleanupQuery;
+
+    await dbv2.from('resource_calendar_sources').update({
       last_synced_at: new Date().toISOString(),
       last_sync_status: `ok (${blockedCount} dates blocked)`,
-    }).eq('id', row.id);
+    }).eq('id', source.id);
   } catch (err) {
-    await db.from('entity_external_calendars').update({
+    await dbv2.from('resource_calendar_sources').update({
       last_synced_at: new Date().toISOString(),
       last_sync_status: 'error: ' + err.message,
-    }).eq('id', row.id);
+    }).eq('id', source.id);
   }
 }
 
@@ -1404,7 +1411,7 @@ router.get('/ical-import/run', async (req, res) => {
   if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  const { data: rows } = await db.from('entity_external_calendars').select('*');
+  const { data: rows } = await dbv2.from('resource_calendar_sources').select('*').eq('source_type', 'ical');
   for (const row of (rows || [])) {
     await syncExternalCalendar(row);
   }
@@ -1413,7 +1420,7 @@ router.get('/ical-import/run', async (req, res) => {
 
 // POST /api/email-parser/ical-import/sync-now/:id — manual "sync now" trigger from the dashboard
 router.post('/ical-import/sync-now/:id', async (req, res) => {
-  const { data: row } = await db.from('entity_external_calendars').select('*').eq('id', req.params.id).maybeSingle();
+  const { data: row } = await dbv2.from('resource_calendar_sources').select('*').eq('id', req.params.id).maybeSingle();
   if (!row) return res.status(404).json({ error: 'Not found' });
   await syncExternalCalendar(row);
   res.json({ success: true });
