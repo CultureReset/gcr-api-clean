@@ -27,15 +27,19 @@ ordered SQL migrations.
 | `002_hours.sql` | Hours (hour sets, periods, exceptions) | ✅ drafted |
 | `003_content_media.sql` | Content + media (media_assets, entity_media, content_blocks, faqs, policies, events, specials, announcements, reviews, review Q/A) | ✅ drafted |
 | `004_food.sql` | Food (menus, periods, sections, items, availability, dietary, option groups, daily features, table sessions/orders) | ✅ drafted |
-| `005_people.sql` | People (people, entity_people, person_offerings) | ⬜ todo |
-| `006_commerce.sql` | Commerce (offering_categories, offerings, prices, schedules, inclusions, requirements, addons, resources + resource_*) | ⬜ todo |
-| `007_booking.sql` | Booking (availability_slots/blocks, bookings, booking_items/guests/payments/waivers, waitlists, quotes) | ⬜ todo |
-| `008_lodging.sql` | Lodging (property_details, room_types, beds, amenities) | ⬜ todo |
-| `009_activities.sql` | Activities (activity_details, meeting_points, fish_species) | ⬜ todo |
-| `010_marina_public_retail.sql` | Marina, Public Places, Retail packs | ⬜ todo |
-| `011_artist.sql` | Artist pack (artist_profiles + shows/bookings/songs/etc.) | ⬜ todo |
-| `012_operations.sql` | Operations (users, entity_owners, claims, integrations, analytics, tourist_*) | ⬜ todo |
-| `013_key_map_profile.sql` | entity_key_map + entity_profile_cache (the projection every reader/AI uses) | ⬜ todo |
+| `005_people.sql` | People (people, entity_people; person_offerings in 006) | ✅ drafted |
+| `006_commerce.sql` | Commerce (offering_categories, offerings, prices, schedules, inclusions, requirements, addons, person_offerings, resources + resource_media/amenities/rates/fees/policies/calendars) | ✅ drafted |
+| `007_booking.sql` | Booking (availability_slots/blocks, bookings, booking_items/guests/payments/waivers, waitlists, quotes) | ✅ drafted |
+| `008_lodging.sql` | Lodging (property_details, room_types, beds, amenities) | ✅ drafted |
+| `009_activities.sql` | Activities (activity_details, meeting_points, fish_species) | ✅ drafted |
+| `010_marina_public_retail.sql` | Marina, Public Places (facilities/access_rules/live_conditions), Retail (products/variants/inventory) | ✅ drafted |
+| `011_artist.sql` | Artist pack (artist_profiles + shows/bookings/follows/goals/songs/links/requests/shoutouts) | ✅ drafted |
+| `012_operations.sql` | Operations (entity_owners, claims, invites, integrations, analytics_events, tourist_*) | ✅ drafted |
+| `013_key_map_profile.sql` | entity_key_map + entity_profile_cache + refresh queue + conflicts (the one projection every reader/AI uses) | ✅ drafted |
+
+**Core + every module pack is drafted: ~110 canonical tables across 13 files.**
+Next: stand up a Supabase dev branch and apply 001→013 there to validate (Phase 2),
+then build the entity_key_map + profile compiler and migrate data pack by pack.
 
 ## Phase tracker (plan's 16 phases)
 - [~] **1 Freeze contract** — routes documented in `../../CANONICAL_DATABASE.md`; "no new legacy tables" rule in force.
