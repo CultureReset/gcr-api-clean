@@ -37,9 +37,47 @@ ordered SQL migrations.
 | `012_operations.sql` | Operations (entity_owners, claims, invites, integrations, analytics_events, tourist_*) | ✅ drafted |
 | `013_key_map_profile.sql` | entity_key_map + entity_profile_cache + refresh queue + conflicts (the one projection every reader/AI uses) | ✅ drafted |
 
-**Core + every module pack is drafted: ~110 canonical tables across 13 files.**
-Next: stand up a Supabase dev branch and apply 001→013 there to validate (Phase 2),
-then build the entity_key_map + profile compiler and migrate data pack by pack.
+**Core + every module pack is drafted AND APPLIED to the live database** (project
+`mkepugvdlktfsossumox`, schema `v2` — 109 tables, confirmed via `list_tables`).
+`public.*` is completely untouched; `v2.*` is additive only.
+
+**`014_migrate_core_data.sql` has been EXECUTED against live production data.**
+Every number below is a verified exact match (source count == v2 count) run
+directly against the live database on 2026-07-15:
+
+| Data | Rows migrated |
+|---|---|
+| Entities | 3,428 / 3,428 |
+| Photos → media | 19,866 / 19,866 |
+| Hours | 13,805 / 13,805 |
+| Menu sections / items | 1,585 / 1,585 · 9,227 / 9,227 |
+| Drink items | 403 / 403 |
+| Happy hour items | 134 / 134 |
+| Reviews | 10,481 / 10,481 |
+| Events | 922 / 922 |
+| Specials | 33 / 33 |
+| Sections → content_blocks | 287 / 287 |
+| FAQs (merged faqs + entity_faqs) | 544 / 544 |
+| Policies | 35 / 35 |
+| Team members → people | 15 / 15 |
+| Tags (deduplicated) | 81,206 → 29,428 |
+
+Phases 1-3 done. Phase 4 (entity_key_map) done — populated with slug, legacy
+uuid, and google_place_id for every entity. Phase 6-7 (core identity + hours/
+media/content migration) done.
+
+**Not yet done:** Phase 5 (taxonomy cleanup — normalizing inconsistent
+entity_subtype spellings), Phase 8-9 (commerce/booking/industry-module data —
+these packs have no source data to migrate yet, most source tables are empty),
+Phase 10 (compile entity_profile_cache — the JSON every reader will serve),
+Phase 11 (stop legacy dashboard fallback writes), Phase 12 (switch API reads
+to v2), Phase 13-16 (validation, shadow, cutover, archive legacy).
+
+**IMPORTANT — this migration is a snapshot, not a live sync.** New/edited data
+written through the current API still goes to `public.*` only. `v2.*` will
+drift out of date until Phase 11/12 land (API writes/reads point at v2).
+Re-run this file (against a truncated v2, or write an incremental sync) before
+cutover.
 
 ## Phase tracker (plan's 16 phases)
 - [~] **1 Freeze contract** — routes documented in `../../CANONICAL_DATABASE.md`; "no new legacy tables" rule in force.
