@@ -79,6 +79,46 @@ drift out of date until Phase 11/12 land (API writes/reads point at v2).
 Re-run this file (against a truncated v2, or write an incremental sync) before
 cutover.
 
+## Second wave (`015_migrate_commerce_data.sql`) — the charter/rental/service side
+
+The first pass covered restaurant-style content but missed the booking/commerce
+tables. This wave migrated those, all verified exact against the live DB:
+
+| Data | Rows migrated |
+|---|---|
+| module_catalog | 29 / 29 |
+| entity_modules (which tabs/features are enabled per business) | 37,610 / 37,847 (see note) |
+| offerings (charters, tours, rentals, services, packages) | 348 / 348 |
+| offering_prices | 285 real + 6 synthesized from `offerings.price_from` where no price row existed = 291 |
+| bookable_resources → resources (condo units, boats, vehicles) | 1,008 / 1,008 |
+| resource_rates (nightly price) | 11 |
+| resource_fees (cleaning + service fees) | 2,016 |
+| requirements → content_blocks | 477 / 477 items (61 entities) |
+| whats_included → content_blocks | 54 / 54 items (+ 6 from entity_sections sharing the label, distinguishable by `legacy_ref`) |
+| what_to_bring → content_blocks | 22 / 22 items |
+| pricing_items → content_blocks | 204 / 204 items (+ 102 from entity_sections sharing the label) |
+| fish_species | 31 / 31 |
+| artist_profiles | 390 / 390 |
+
+**Notes, not hidden:**
+- **237 `entity_modules` rows were not migrated** — they reference an
+  `entity_slug` that doesn't exist in `public.entity` at all. This is
+  pre-existing bad data in the live database, not something the migration
+  broke. Logged in `v2.entity_conflicts` (`conflict_type='orphan_row'`) for
+  someone to review, not silently dropped.
+- **`public.artists` (390 rows) is still unmerged with `public.artist_profiles`
+  (390 rows).** Same row count, likely duplicates of the same 390 artists —
+  the plan flags this as a real merge decision, not something to auto-resolve.
+  Logged in `v2.entity_conflicts` (`conflict_type='duplicate_slug'`).
+- **None of the 390 `artist_profiles` rows link to a GCR entity.** Their
+  `entity_slug` values are all populated but point at a separate slug
+  namespace belonging to a disconnected artist-tipping mini-app (its own
+  `site_id`/`owner_user_id` fields) — not GCR businesses. `v2.artist_profiles.entity_id`
+  is NULL for all 390; this is real, not a bug.
+- **Spotify/YouTube/Venmo/CashApp are empty for all 390 artists in the source
+  data itself** — 0 populated, verified directly. `v2.music_links` /
+  `v2.tip_links` are correctly empty; there is nothing to migrate.
+
 ## Phase tracker (plan's 16 phases)
 - [~] **1 Freeze contract** — routes documented in `../../CANONICAL_DATABASE.md`; "no new legacy tables" rule in force.
 - [ ] **2 Supabase dev branch** — create branch, apply these migrations there first.
