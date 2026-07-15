@@ -119,6 +119,45 @@ tables. This wave migrated those, all verified exact against the live DB:
   data itself** — 0 populated, verified directly. `v2.music_links` /
   `v2.tip_links` are correctly empty; there is nothing to migrate.
 
+## Zero JSON, zero arrays — everything is a real table (hard requirement)
+
+`v2` originally had 9 `jsonb` columns and 2 array columns left over from the
+first two migration waves (`content_blocks.items`, `entity_modules.settings`,
+`media_assets.ai_tags`, `module_catalog.required_tables`/`default_for`,
+`analytics_events.utm`, `entity_conflicts.detail`,
+`entity_module_status.validation_errors`, `integration_accounts.settings`,
+`resource_calendar_sources.settings`, `tourist_itineraries.items`,
+`tourist_profiles.preferences`, `entity_relations.metadata`). **All of them
+have been eliminated** (`018_eliminate_remaining_json...` — applied directly,
+not yet saved as its own file below; see migration history). Every one was
+replaced with a real table or real typed columns, with existing data verified
+moved before the column was dropped (1,067/1,067 content items; 238/238
+conflict rows preserved with real `source_table`/`entity_slug`/`module_key`/
+`note` columns). Confirmed by direct query against
+`information_schema.columns`: **0 jsonb/json/array columns remain anywhere in
+schema `v2`.**
+
+New real tables from this pass: `content_block_items`, `entity_module_settings`,
+`media_asset_tags`, `module_catalog_tables`, `module_catalog_business_types`,
+`entity_page_assignments`, `entity_module_validation_errors`,
+`integration_account_settings`, `resource_calendar_source_settings`,
+`tourist_itinerary_stops`, `tourist_preference_scores`.
+
+**`entity_profile_cache` and `entity_profile_refresh_queue` were removed
+entirely**, not just de-JSONed. Their whole purpose was to hold a compiled
+JSON blob as a read cache — the opposite of what was asked for. There is no
+profile cache: every reader (web, QR, rental, service, any AI) queries the
+real modular tables directly, joined at read time. If read performance ever
+requires a cache later, that is a decision to make explicitly, not something
+to reintroduce by default.
+
+Also newly migrated into real rows (not arrays) from the original wide
+`entity` table: `known_for` (35), `highlights` (2,421), `good_for` (1,551),
+and `seo_keywords` (701) → `v2.entity_tags` with a matching `tag_category`.
+`secondary_subtypes` and `also_appears_on` were empty in the source (0 rows) —
+`v2.entity_page_assignments` exists and is ready for `also_appears_on` data
+whenever it's populated.
+
 ## Phase tracker (plan's 16 phases)
 - [~] **1 Freeze contract** — routes documented in `../../CANONICAL_DATABASE.md`; "no new legacy tables" rule in force.
 - [ ] **2 Supabase dev branch** — create branch, apply these migrations there first.
