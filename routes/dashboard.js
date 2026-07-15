@@ -2,9 +2,6 @@ const express = require('express');
 const { authRequired } = require('../middleware/auth');
 const supabase = require('../db');
 const getGcrDb = require('../db');
-const { createClient } = require('@supabase/supabase-js');
-// v2-schema client for the iCal external-calendar endpoints below. See db/v2/README.md.
-const dbv2 = createClient(process.env.GCR_SUPABASE_URL, process.env.GCR_SUPABASE_SERVICE_KEY, { db: { schema: 'v2' } });
 const { resolveEntityId, resolveEntity } = require('../lib/entity-resolver');
 const menuGcr = require('../lib/menu-gcr');
 const { extractJsonFromImage, getVisionProvidersStatus } = require('./ai-provider');
@@ -3371,21 +3368,17 @@ router.post('/ical/regenerate', async (req, res) => {
 });
 
 // GET /api/dashboard/ical/external — list this business's connected external calendars (Airbnb, VRBO, ...)
+// entity_external_calendars is the same table the live Reserve page's availability
+// depends on (via email-parser.js writing into business_availability, keyed the
+// same way: entity_slug [+ resource_id for a specific bookable_resources unit]).
 router.get('/ical/external', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
     if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
 
-    const { data: entity, error: entityErr } = await dbv2.from('entities').select('id').eq('slug', entitySlug).maybeSingle();
-    if (entityErr) return res.status(500).json({ error: entityErr.message });
-    if (!entity) return res.status(404).json({ error: 'This listing has no v2 record yet' });
-
-    const { data: resources } = await dbv2.from('resources').select('id').eq('entity_id', entity.id);
-    const resourceIds = (resources || []).map(r => r.id);
-    const { data: sources, error: srcErr } = await dbv2
-        .from('resource_calendar_sources')
-        .select('id, source_label, provider, resource_id, entity_id, url, last_synced_at, last_sync_status, created_at')
-        .eq('source_type', 'ical')
-        .or(`entity_id.eq.${entity.id}${resourceIds.length ? ',resource_id.in.(' + resourceIds.join(',') + ')' : ''}`)
+    const { data: sources, error: srcErr } = await supabase
+        .from('entity_external_calendars')
+        .select('id, source_label, provider, resource_id, entity_slug, ical_url, last_synced_at, last_sync_status, is_active, created_at')
+        .eq('entity_slug', entitySlug)
         .order('created_at');
     if (srcErr) return res.status(500).json({ error: srcErr.message });
     res.json(sources || []);
@@ -3399,17 +3392,17 @@ router.post('/ical/external', async (req, res) => {
     const { source_label, ical_url, resource_id, provider } = req.body;
     if (!ical_url) return res.status(400).json({ error: 'ical_url required' });
 
-    const { data: entity, error: entityErr } = await dbv2.from('entities').select('id').eq('slug', entitySlug).maybeSingle();
-    if (entityErr) return res.status(500).json({ error: entityErr.message });
-    if (!entity) return res.status(404).json({ error: 'This listing has no v2 record yet' });
+    const row = {
+        entity_slug: entitySlug,
+        ical_url,
+        source_label: source_label || 'External Calendar',
+        resource_id: resource_id || null, // optional: tie the feed to one bookable_resources unit
+        provider: provider || null,
+        is_active: true,
+    };
 
-    const row = { source_type: 'ical', url: ical_url, source_label: source_label || 'External Calendar' };
-    if (resource_id) row.resource_id = resource_id;   // optional: tie the feed to one unit
-    else row.entity_id = entity.id;                    // otherwise the feed covers the whole listing
-    if (provider) row.provider = provider;
-
-    const { data, error } = await dbv2
-        .from('resource_calendar_sources')
+    const { data, error } = await supabase
+        .from('entity_external_calendars')
         .insert(row)
         .select()
         .single();
@@ -3422,16 +3415,11 @@ router.delete('/ical/external/:id', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
     if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
 
-    const { data: entity } = await dbv2.from('entities').select('id').eq('slug', entitySlug).maybeSingle();
-    if (!entity) return res.status(404).json({ error: 'This listing has no v2 record yet' });
-    const { data: resources } = await dbv2.from('resources').select('id').eq('entity_id', entity.id);
-    const resourceIds = (resources || []).map(r => r.id);
-
-    const { error } = await dbv2
-        .from('resource_calendar_sources')
+    const { error } = await supabase
+        .from('entity_external_calendars')
         .delete()
         .eq('id', req.params.id)
-        .or(`entity_id.eq.${entity.id}${resourceIds.length ? ',resource_id.in.(' + resourceIds.join(',') + ')' : ''}`);
+        .eq('entity_slug', entitySlug);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });
@@ -3441,12 +3429,11 @@ router.post('/ical/external/:id/sync-now', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
     if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
 
-    const { data: entity } = await dbv2.from('entities').select('id').eq('slug', entitySlug).maybeSingle();
-    if (!entity) return res.status(404).json({ error: 'This listing has no v2 record yet' });
-    const { data: row } = await dbv2
-        .from('resource_calendar_sources')
+    const { data: row } = await supabase
+        .from('entity_external_calendars')
         .select('id')
         .eq('id', req.params.id)
+        .eq('entity_slug', entitySlug)
         .maybeSingle();
     if (!row) return res.status(404).json({ error: 'Not found' });
 

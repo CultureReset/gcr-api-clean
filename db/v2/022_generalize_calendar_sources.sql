@@ -1,5 +1,13 @@
 -- ============================================================================
--- GCR v2 — 022_generalize_calendar_sources.sql  (EXECUTED)
+-- GCR v2 — 022_generalize_calendar_sources.sql  (EXECUTED, SUPERSEDED)
+-- ----------------------------------------------------------------------------
+-- SUPERSEDED: routes/email-parser.js and routes/dashboard.js no longer write
+-- here. The live public frontend (gcr-unified) reads availability from
+-- public.business_availability, not v2 — so iCal sync was repointed there
+-- instead (see add-business-availability-ical-columns.sql at repo root, and
+-- the "Availability / iCal sync" section in README.md). These tables/
+-- columns are left in place, unused, as an honest record — same policy as
+-- 021_ical_sync.sql.
 -- ----------------------------------------------------------------------------
 -- Discovered mid-build: a complete, real iCal sync system already existed in
 -- this codebase (routes/email-parser.js + routes/dashboard.js's /ical/external

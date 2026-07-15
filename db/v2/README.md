@@ -158,6 +158,34 @@ and `seo_keywords` (701) → `v2.entity_tags` with a matching `tag_category`.
 `v2.entity_page_assignments` exists and is ready for `also_appears_on` data
 whenever it's populated.
 
+## Availability / iCal sync — built in v2, then reverted (honest record)
+
+`021_ical_sync.sql` and `022_generalize_calendar_sources.sql` built and then
+generalized a v2 iCal sync system (`v2.availability_blocks` +
+`v2.resource_calendar_sources`), and `routes/email-parser.js` /
+`routes/dashboard.js` were repointed at it. That was itself a mistake, caught
+on a second pass: the live public frontend (gcr-unified's `Reserve.jsx` /
+`BusinessDetail.jsx`) never reads v2 at all — it calls
+`GET /api/email-parser/availability/:slug`, which reads
+`public.business_availability` directly. Writing iCal blocks into v2 would
+have created a second, disconnected "calendar" that no page ever displays,
+while the real one stayed blind to Airbnb/VRBO/FareHarbor bookings — the
+exact "one calendar, not two" requirement, violated a second time by trying
+to fix it in the wrong schema.
+
+Final state: iCal sync writes into `public.business_availability` (same
+table `upsertAvailability`/email parsing already writes), scoped by
+`entity_slug` [+ `resource_id` → `bookable_resources.id` for a specific
+condo/boat unit]. Config rows (feed URL, provider) live in
+`public.entity_external_calendars` — a table that already existed with
+exactly the right shape and was simply never wired to anything. See
+`add-business-availability-ical-columns.sql` (repo root) for the one column
+this actually needed (`external_uid`, for dedupe/cleanup of synced events).
+
+`v2.availability_blocks` / `v2.resource_calendar_sources` are left in place,
+unused, as part of the still-unmigrated v2 rebuild — not deleted, same
+policy as `021_ical_sync.sql`'s own superseded note.
+
 ## Phase tracker (plan's 16 phases)
 - [~] **1 Freeze contract** — routes documented in `../../CANONICAL_DATABASE.md`; "no new legacy tables" rule in force.
 - [ ] **2 Supabase dev branch** — create branch, apply these migrations there first.
