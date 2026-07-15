@@ -1,7 +1,15 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const SUPABASE_URL = 'https://mkepugvdlktfsossumox.supabase.co';
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZXB1Z3ZkbGt0ZnNvc3N1bW94Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQyMjQwMSwiZXhwIjoyMDk0OTk4NDAxfQ.uWxvQQKDxbaAz0FgcfwOhH3mtq92uXPOc4luQnw48DI';
+// SECURITY: never hardcode the service_role key. Read from env only.
+// The previously committed key MUST be rotated in Supabase (Settings → API);
+// it remains in git history. See CONSOLIDATION_PLAN.md.
+const SUPABASE_URL = process.env.GCR_SUPABASE_URL || 'https://mkepugvdlktfsossumox.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.GCR_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_SERVICE_KEY) {
+  console.error('Missing GCR_SUPABASE_SERVICE_KEY env var. Refusing to run.');
+  process.exit(1);
+}
 
 const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
