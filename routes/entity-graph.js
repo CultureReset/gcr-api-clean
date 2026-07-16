@@ -10,4 +10,4 @@ const db = createClient(
 const PUBLIC_ENTITY_FIELDS = [
   'id', 'slug', 'name', 'subtitle', 'description',
   'entity_type', 'entity_subtype', 'parent_entity_slug',
-  'icon', 'hero_image_url
+  'icon', 'hero_image_url',
