@@ -281,7 +281,7 @@ async function buildFullEntity(slug) {
       db.from('whats_included').select('id,item_name,included_item,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
       db.from('requirements').select('id,requirement_name,requirement_text,applies_to,sort_order').eq('entity_slug', slug).order('sort_order'),
       db.from('activity_schedules').select('*').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
-      db.from('meeting_points').select('id,name,address,lat,lng,instructions,parking_note').eq('entity_slug', slug).order('sort_order'),
+      db.from('meeting_points').select('id,name,address,lat:latitude,lng:longitude,instructions,parking_note').eq('entity_slug', slug).order('sort_order'),
       db.from('activity_options').select('*').eq('entity_slug', slug).order('sort_order'),
       db.from('fish_species').select('id,species,season').eq('entity_slug', slug).order('sort_order'),
       db.from('what_to_bring').select('id,item,sort_order').eq('entity_slug', slug).order('sort_order'),
