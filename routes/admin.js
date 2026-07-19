@@ -2476,6 +2476,100 @@ router.delete('/gcr/daily-features/:id', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── PROFILE SECTION ROWS (generic per-entity table CRUD) ─────────────────────
+// Every table the public entity payload displays (gcr.js conditional queries)
+// gets an admin edit path through one whitelisted route family. Keys are the
+// URL-safe kind; values the real table. Singletons (one row per entity) are
+// listed separately and use get/put upsert semantics.
+const PROFILE_ROW_TABLES = {
+  'order-links': 'order_links',
+  'meeting-points': 'meeting_points',
+  'fish-species': 'fish_species',
+  'what-to-bring': 'what_to_bring',
+  'room-types': 'room_types',
+  'amenities': 'amenities',
+  'property-fees': 'property_fees',
+  'stay-links': 'stay_links',
+  'service-categories': 'service_categories',
+  'service-menu': 'service_menu',
+  'service-packages': 'service_packages',
+  'class-schedule': 'class_schedule',
+  'product-categories': 'product_categories',
+  'products': 'products',
+  'facilities': 'facilities',
+  'spot-rules': 'spot_rules',
+  'announcements': 'announcements',
+};
+const PROFILE_SINGLETON_TABLES = {
+  'activity-details': 'activity_details',
+  'property-details': 'property_details',
+  'access-info': 'access_info',
+};
+
+router.get('/gcr/entities/:slug/profile-rows/:kind', authRequired, async (req, res) => {
+  const table = PROFILE_ROW_TABLES[req.params.kind];
+  if (!table) return res.status(400).json({ error: 'Unknown section: ' + req.params.kind });
+  const { data, error } = await getDb().from(table).select('*').eq('entity_slug', req.params.slug);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/profile-rows/:kind', authRequired, async (req, res) => {
+  const table = PROFILE_ROW_TABLES[req.params.kind];
+  if (!table) return res.status(400).json({ error: 'Unknown section: ' + req.params.kind });
+  const row = { ...req.body, entity_slug: req.params.slug };
+  delete row.id;
+  const { data, error } = await getDb().from(table).insert(row).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  invalidateCache(res, req.params.slug);
+  res.status(201).json(data);
+});
+
+router.put('/gcr/profile-rows/:kind/:id', authRequired, async (req, res) => {
+  const table = PROFILE_ROW_TABLES[req.params.kind];
+  if (!table) return res.status(400).json({ error: 'Unknown section: ' + req.params.kind });
+  const patch = { ...req.body };
+  delete patch.id; delete patch.entity_slug;
+  const { data, error } = await getDb().from(table).update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/profile-rows/:kind/:id', authRequired, async (req, res) => {
+  const table = PROFILE_ROW_TABLES[req.params.kind];
+  if (!table) return res.status(400).json({ error: 'Unknown section: ' + req.params.kind });
+  const { error } = await getDb().from(table).delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+router.get('/gcr/entities/:slug/profile-singleton/:kind', authRequired, async (req, res) => {
+  const table = PROFILE_SINGLETON_TABLES[req.params.kind];
+  if (!table) return res.status(400).json({ error: 'Unknown section: ' + req.params.kind });
+  const { data, error } = await getDb().from(table).select('*').eq('entity_slug', req.params.slug).maybeSingle();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || {});
+});
+
+router.put('/gcr/entities/:slug/profile-singleton/:kind', authRequired, async (req, res) => {
+  const table = PROFILE_SINGLETON_TABLES[req.params.kind];
+  if (!table) return res.status(400).json({ error: 'Unknown section: ' + req.params.kind });
+  const slug = req.params.slug;
+  const patch = { ...req.body };
+  delete patch.id; delete patch.entity_slug;
+  const db = getDb();
+  const { data: existing } = await db.from(table).select('id').eq('entity_slug', slug).maybeSingle();
+  let out;
+  if (existing) {
+    out = await db.from(table).update(patch).eq('id', existing.id).select().single();
+  } else {
+    out = await db.from(table).insert({ ...patch, entity_slug: slug }).select().single();
+  }
+  if (out.error) return res.status(500).json({ error: out.error.message });
+  invalidateCache(res, slug);
+  res.json(out.data);
+});
+
 // ─── SECONDARY HOURS ──────────────────────────────────────────────────────────
 router.get('/gcr/entities/:slug/secondary-hours', authRequired, async (req, res) => {
   const { data, error } = await getDb().from('entity_secondary_hours').select('*').eq('entity_slug', req.params.slug).order('hours_type, day_of_week');
