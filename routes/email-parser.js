@@ -399,7 +399,7 @@ const EXTRACTORS = [
       const confM  = text.match(/(?:Confirmation|Reservation)\s*#?:?\s*([A-Z0-9]+)/i);
       // Restaurant-side notifications name the diner — that's the customer
       // relationship the business gets to keep
-      const nameM  = text.match(/(?:Guest|Diner|Name|Reservation for)[:\s]+([A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){1,2})/);
+      const nameM  = text.match(/(?:Guest|Diner|Name|Reservation for)[: \t]+([A-Z][A-Za-z'’.-]+(?:[ \t]+[A-Z][A-Za-z'’.-]+){1,2})/);
       return {
         platform: 'opentable',
         booking_type: 'restaurant',
@@ -425,7 +425,7 @@ const EXTRACTORS = [
       const timeM  = text.match(/(?:Time)[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
       const guestM = text.match(/(?:Party|Guests?)[:\s]+(\d+)/i);
       const confM  = text.match(/(?:Confirmation|Resy|Ref)\s*#?:?\s*([A-Z0-9]+)/i);
-      const nameM  = text.match(/(?:Guest|Diner|Name|Reservation for)[:\s]+([A-Z][A-Za-z'’.-]+(?:\s+[A-Z][A-Za-z'’.-]+){1,2})/);
+      const nameM  = text.match(/(?:Guest|Diner|Name|Reservation for)[: \t]+([A-Z][A-Za-z'’.-]+(?:[ \t]+[A-Z][A-Za-z'’.-]+){1,2})/);
       return {
         platform: 'resy',
         booking_type: 'restaurant',
