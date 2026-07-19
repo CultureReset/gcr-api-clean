@@ -1379,12 +1379,47 @@ async function syncExternalCalendar(row) {
     const text = await res.text();
     const events = parseIcsEvents(text);
 
-    let blockedCount = 0;
+    const dates = new Set();
     for (const ev of events) {
-      for (const d of datesInRange(ev.start, ev.end)) {
-        await blockDateOnCalendar(row.entity_slug, d, row.source_label || 'external-ical', row.resource_id || null);
-        blockedCount++;
-      }
+      for (const d of datesInRange(ev.start, ev.end)) dates.add(d);
+    }
+
+    let blockedCount = 0;
+    for (const d of dates) {
+      await blockDateOnCalendar(row.entity_slug, d, row.source_label || 'external-ical', row.resource_id || null);
+      blockedCount++;
+    }
+
+    // Mirror into booking_calendar — the ONE table the platform engine
+    // computes availability from — so a booking made on Airbnb/VRBO also
+    // blocks the direct checkout. Source is scoped per feed row, which lets
+    // us prune dates that fell out of the feed without touching anything
+    // else. A feed tied to one unit claims just that unit (kind 'booking'
+    // + offering_id → per-resource busy); an entity-wide feed hard-blocks
+    // the date (kind 'block').
+    const calSource = 'ical:' + row.id;
+    const perUnit = !!row.resource_id;
+    const { data: existing } = await db.from('booking_calendar')
+      .select('id, date').eq('entity_slug', row.entity_slug).eq('source', calSource).limit(2000);
+    const have = {};
+    (existing || []).forEach(r => { have[r.date] = r.id; });
+    for (const d of dates) {
+      if (have[d]) { delete have[d]; continue; }
+      await db.from('booking_calendar').insert({
+        entity_slug: row.entity_slug,
+        date: d,
+        kind: perUnit ? 'booking' : 'block',
+        source: calSource,
+        status: 'active',
+        title: (row.source_label || 'External calendar') + ' (synced)',
+        external_uid: d,
+        offering_id: row.resource_id || null,
+        details: { provider: row.provider || null, feed: row.source_label || null, synced: true },
+      });
+    }
+    // anything left in `have` is no longer claimed by the feed — free it
+    for (const d of Object.keys(have)) {
+      await db.from('booking_calendar').delete().eq('id', have[d]);
     }
 
     await db.from('entity_external_calendars').update({

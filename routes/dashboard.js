@@ -3413,6 +3413,13 @@ router.delete('/ical/external/:id', async (req, res) => {
         .eq('id', req.params.id)
         .eq('entity_slug', entitySlug);
     if (error) return res.status(500).json({ error: error.message });
+
+    // free the dates this feed had claimed on the unified calendar
+    await supabase.from('booking_calendar')
+        .delete()
+        .eq('entity_slug', entitySlug)
+        .eq('source', 'ical:' + req.params.id);
+
     res.json({ success: true });
 });
 
