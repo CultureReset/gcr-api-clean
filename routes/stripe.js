@@ -308,18 +308,28 @@ router.post('/create-payment-intent', async (req, res) => {
         return res.status(400).json({ error: 'amount required' });
     }
 
-    // Resolve site_id — may be a UUID or a subdomain string
+    // Resolve site_id — may be a UUID, an entity slug (platform public pages
+    // send PAGE.site_id which IS the entity slug), or a legacy subdomain
     let targetSiteId = req.siteId || null;
     if (site_id) {
         if (/^[0-9a-f-]{36}$/.test(site_id)) {
             targetSiteId = site_id;
         } else {
-            const { data: biz } = await supabase
-                .from('businesses')
-                .select('site_id')
-                .eq('subdomain', site_id)
-                .single();
-            targetSiteId = biz?.site_id || null;
+            const { data: owner } = await supabase
+                .from('entity_owners')
+                .select('user_id')
+                .eq('entity_slug', site_id)
+                .maybeSingle();
+            if (owner && owner.user_id) {
+                targetSiteId = owner.user_id; // entity_owners.user_id stores the businesses.id / siteId
+            } else {
+                const { data: biz } = await supabase
+                    .from('businesses')
+                    .select('site_id')
+                    .eq('subdomain', site_id)
+                    .single();
+                targetSiteId = biz?.site_id || null;
+            }
         }
     }
 
