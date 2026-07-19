@@ -1428,6 +1428,67 @@ router.post('/search', async (req, res) => {
 });
 
 // ─── GET /api/gcr/sections ────────────────────────────────────────────────────
+// GET /api/gcr/entity/:slug/availability-month?month=YYYY-MM
+// One business, one month, one merged answer — same three-source union the
+// availability search uses (capacity + resource slots + calendar-block veto),
+// shaped for calendars: the embeddable widget, profile pages, the AI.
+router.get('/entity/:slug/availability-month', async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : new Date().toISOString().slice(0, 7);
+    const from = month + '-01';
+    const lastDay = new Date(Date.UTC(parseInt(month.slice(0, 4)), parseInt(month.slice(5, 7)), 0)).getUTCDate();
+    const to = month + '-' + String(lastDay).padStart(2, '0');
+
+    const [capRes, resRes, blockRes] = await Promise.all([
+      db.from('business_availability')
+        .select('availability_date, remaining_spots, total_capacity, status')
+        .eq('entity_slug', slug).gte('availability_date', from).lte('availability_date', to),
+      db.from('availability')
+        .select('date, spots_remaining, spots_total, status')
+        .eq('entity_slug', slug).gte('date', from).lte('date', to),
+      db.from('booking_calendar')
+        .select('date, end_date, kind, offering_id, status')
+        .eq('entity_slug', slug).eq('kind', 'block').is('offering_id', null)
+        .neq('status', 'cancelled').lte('date', to),
+    ]);
+
+    const days = {};
+    const mergeDay = (date, remaining, total, status) => {
+      const d = days[date] || (days[date] = { date, remaining: null, total: null, status: 'unknown' });
+      if (remaining != null) d.remaining = d.remaining == null ? remaining : Math.max(d.remaining, remaining);
+      if (total != null) d.total = d.total == null ? total : Math.max(d.total, total);
+      if (status && status !== 'unknown' && d.status !== 'blocked') d.status = status;
+    };
+    (capRes.data || []).forEach(r => mergeDay(r.availability_date, r.remaining_spots, r.total_capacity, r.status));
+    (resRes.data || []).forEach(r => mergeDay(r.date, r.spots_remaining, r.spots_total, r.status || 'available'));
+    // capacity-derived status when the row didn't carry one
+    Object.values(days).forEach(d => {
+      if (d.status === 'unknown' && d.remaining != null) {
+        d.status = d.remaining <= 0 ? 'full' : d.remaining <= 3 ? 'limited' : 'available';
+      }
+    });
+    // entity-wide blocks veto everything they cover
+    (blockRes.data || []).forEach(b => {
+      const start = b.date < from ? from : b.date;
+      const end = (b.end_date && b.end_date > b.date) ? (b.end_date > to ? to : b.end_date) : b.date;
+      if (end < from) return;
+      let d = new Date(start + 'T00:00:00Z');
+      const endD = new Date(end + 'T00:00:00Z');
+      while (d <= endD) {
+        const key = d.toISOString().slice(0, 10);
+        days[key] = { date: key, remaining: 0, total: days[key]?.total ?? null, status: 'blocked' };
+        d = new Date(d.getTime() + 86400000);
+      }
+    });
+
+    res.set('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.json({ slug, month, days: Object.values(days).sort((a, b) => a.date < b.date ? -1 : 1) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/gcr/taxonomy — the category system, served from the database.
 // subtype_taxonomy is the single source of truth (293 curated subtypes):
 // frontends hydrate their subtype→section maps and section lists from this
