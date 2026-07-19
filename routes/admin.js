@@ -2476,6 +2476,38 @@ router.delete('/gcr/daily-features/:id', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── MENU ITEM OPTIONS (modifiers: add-ons, prep choices, substitutions) ─────
+// Keyed by menu_item_id, not entity_slug — real rows already exist in prod
+// ("Add shrimp +$2.95"); these routes give them an edit path.
+router.get('/gcr/menu-items/:id/options', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('menu_item_options')
+    .select('*').eq('menu_item_id', req.params.id).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/menu-items/:id/options', authRequired, async (req, res) => {
+  const row = { ...req.body, menu_item_id: req.params.id };
+  delete row.id;
+  const { data, error } = await getDb().from('menu_item_options').insert(row).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/menu-item-options/:id', authRequired, async (req, res) => {
+  const patch = { ...req.body };
+  delete patch.id; delete patch.menu_item_id;
+  const { data, error } = await getDb().from('menu_item_options').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/menu-item-options/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('menu_item_options').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // ─── PROFILE SECTION ROWS (generic per-entity table CRUD) ─────────────────────
 // Every table the public entity payload displays (gcr.js conditional queries)
 // gets an admin edit path through one whitelisted route family. Keys are the

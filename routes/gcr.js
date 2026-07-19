@@ -112,11 +112,18 @@ async function buildFullEntity(slug) {
     // silently had its entity_specials rows ignored no matter what was in
     // the table.
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
+    // Structured facts + proximity + exclusions — these tables held tens of
+    // thousands of rows that never reached the payload; the voice AI (and
+    // anything else reading the entity) needs them queryable at the source.
+    db.from('entity_attributes').select('category,key,label,value,value_type,unit,is_filterable').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_nearby_landmarks').select('kind,name,types,spatial_relationship,containment,travel_distance_meters,straight_line_distance_meters').eq('entity_slug', slug).order('sort_order').limit(25),
+    db.from('whats_excluded').select('id,excluded_item,sort_order').eq('entity_slug', slug).order('sort_order'),
   ];
 
   const [
     hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
-    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes, specialsRes
+    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes, specialsRes,
+    attributesRes, landmarksRes, whatsExcludedRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -408,6 +415,11 @@ async function buildFullEntity(slug) {
     social_posts: socialPostsRes.data || [],
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
+    // distinct key from entity.attributes (the legacy textarea array) so the
+    // admin editor's populate path keeps working untouched
+    structured_attributes: attributesRes.data || [],
+    nearby_landmarks: landmarksRes.data || [],
+    whats_excluded: whatsExcludedRes.data || [],
     child_count: childCountRes?.count || 0,
     parent: parentInfo,
     parent_amenities: parentAmenities,

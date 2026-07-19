@@ -24,7 +24,28 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         entity.live_artist_id ? gcrDb.from('artist_profiles').select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount').eq('id', entity.live_artist_id).eq('is_active', true).maybeSingle() : Promise.resolve({ data: null }),
     ]);
 
-    const groupItems = (sections, items, priceField) => {
+    // Modifier options live in their own table (menu_item_options — real
+    // add-on/prep rows keyed by menu_item_id) and were never joined in;
+    // the modifiers slot below always emitted empty. Serve them.
+    const foodItemIds = (menuItems.data || []).map(i => i.id).filter(Boolean);
+    const optionsByItem = {};
+    if (foodItemIds.length) {
+        const { data: opts } = await gcrDb.from('menu_item_options')
+            .select('menu_item_id, group_id, group_label, name, price_delta, sort_order')
+            .in('menu_item_id', foodItemIds)
+            .order('sort_order', { ascending: true });
+        (opts || []).forEach(o => {
+            if (!optionsByItem[o.menu_item_id]) optionsByItem[o.menu_item_id] = [];
+            optionsByItem[o.menu_item_id].push({
+                group: o.group_label || 'Options',
+                group_id: o.group_id || null,
+                name: o.name,
+                price_delta: parseFloat(o.price_delta) || 0,
+            });
+        });
+    }
+
+    const groupItems = (sections, items, priceField, optionsMap) => {
         const byId = {};
         (sections.data || []).forEach(s => { byId[s.id] = { name: s.section_name, items: [] }; });
         (items.data || []).forEach(i => {
@@ -38,13 +59,14 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 photo_url: i.image_url || '',
                 image_url: i.image_url || '',
                 tags: Array.isArray(i.tags) ? i.tags : [],
-                modifiers: Array.isArray(i.modifiers) ? i.modifiers : [],
+                modifiers: (optionsMap && optionsMap[i.id])
+                    || (Array.isArray(i.modifiers) ? i.modifiers : []),
             });
         });
         return Object.values(byId).filter(s => s.items.length);
     };
 
-    const foodSections = groupItems(menuSections, menuItems, 'price');
+    const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem);
     const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price');
     const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price');
 
