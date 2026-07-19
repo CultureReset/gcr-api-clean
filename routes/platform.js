@@ -525,7 +525,9 @@ router.post('/state', authRequired, async (req, res) => {
             // the name differently). Check by phone before assuming this is
             // brand new — claiming the real, already-populated profile beats
             // creating an empty duplicate, as long as nobody already owns it.
-            if (!ent && biz.phone) {
+            // Standalone (BookPro) signups NEVER claim existing GCR listings —
+            // the booking platform stays fully separate from directory data.
+            if (!ent && biz.phone && !biz.standalone) {
                 const phoneMatch = await findExistingEntity(supabase, { phone: biz.phone });
                 if (phoneMatch) {
                     const { data: alreadyOwned } = await supabase.from('entity_owners')
@@ -552,7 +554,10 @@ router.post('/state', authRequired, async (req, res) => {
                     entity_type: (biz.type || 'service').toLowerCase(),
                     subtitle: biz.tagline || null, phone: biz.phone || null,
                     email: biz.email || null,
-                    icon: biz.emoji || '🏪', is_active: true,
+                    // standalone (BookPro) businesses are hidden from the GCR
+                    // directory (it filters is_active=true); their /p/ page and
+                    // booking engine work regardless — entityBySlug doesn't filter
+                    icon: biz.emoji || '🏪', is_active: !biz.standalone,
                     hero_image_url: biz.hero || null,
                     logo_url: biz.logo || null,
                     website_url: biz.website || null,
