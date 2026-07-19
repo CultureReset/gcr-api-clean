@@ -1,0 +1,3014 @@
+[
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0194c6f9-6df3-459b-ad51-3bfc549ec72f",
+  "business_name": "CC's Salon, Day Spa & Boutique",
+  "match_method": "phone",
+  "live_slug": "cc-s-boutique-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CCsSalonDaySpaBoutique",
+   "social_instagram": "https://www.instagram.com/ccsalon_dayspa_boutique/",
+   "description": "CC's Salon, Day Spa, and Boutique is a full-service salon designed to help you relax and unwind serving clients in Gulf Shores, Perdido Key, Foley, and Orange Beach. Our salon professionals use their 50+ years of combined experience to help clients escape their busy schedules and focus on beauty, relaxation, and style. Located on Gulf Shores Parkway, our team strives to provide premier customer service with Gulf Coast charm. To us, our customers are more than clients – they're friends. We help our friends tell their stories through beauty and style. Since 2009, CC's Salon, Day Spa & Boutique has been helping clients in Gulf Shores, Orange Beach, Foley, and Perdido Key look and feel their best. At CC's, our clients are more than guests – they're friends. Our salon professionals, estheticians, and nail technicians help clients achieve the perfect look through our hair design services, fresh manicures and pedicures, our trendy boutique items, and more."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "01a8dccf-dc2b-4f17-b144-085d9ff45a50",
+  "business_name": "Young's Suncoast Realty & Vacation Rentals",
+  "match_method": "phone",
+  "live_slug": "crystal-shores-west",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/YoungsSuncoastVacations/",
+   "social_instagram": "https://www.instagram.com/youngssuncoast/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "031b0a4b-c21f-4bd1-bae7-95c41fc21252",
+  "business_name": "Sam's Bait and Tackle",
+  "match_method": "phone",
+  "live_slug": "sam-s-bait-and-tackle",
+  "status": "overlap",
+  "fills": {
+   "website": "https://myislandtimecharters.com/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "03c74ebe-63e7-4081-b7c2-4e29035f9d40",
+  "business_name": "Big Mike's Steakhouse - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "big-mike-s-steakhouse-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "05028c74-1f47-4e93-8fba-c02380013c6d",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/cosmosrestaurantandbar"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "050b630c-77ec-421a-b0d1-21d910ade681",
+  "business_name": "Serenity at The Beach Salon & Spa",
+  "match_method": "phone",
+  "live_slug": "serenity-at-the-beach-salon-spa",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SerenityAtTheBeachSalonSpa"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0552b88f-08f9-479a-a5e6-f651f0196be6",
+  "business_name": "Staybridge Suites Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "staybridge-suites-gulf-shores-by-ihg",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/staybridge",
+   "social_instagram": "https://instagram.com/staybridge"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "071510f3-ca4e-4233-8059-24d950c4c664",
+  "business_name": "Mikato Japanese Restaurant",
+  "match_method": "place_id",
+  "live_slug": "mikato-japanese-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "082ac647-2810-4ae6-829b-36da9ea7c9a4",
+  "business_name": "San Bar at the wharf",
+  "match_method": "phone",
+  "live_slug": "ferris-wheel",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "085115fc-c367-4728-8d9b-d74ee73b524a",
+  "business_name": "The Southern Grind Coffee House at the WHARF",
+  "match_method": "place_id",
+  "live_slug": "the-southern-grind-coffee-house-at-the-wharf",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "09500634-ad77-40c1-8d2e-b7ca2f7cd04a",
+  "business_name": "Hurricane Grill & Wings-Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "hurricane-grill-wings-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0a5d6e83-e0f6-4163-a8c1-eef3291d72de",
+  "business_name": "AL’s Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-beer-hardees-area-gs",
+  "status": "overlap",
+  "fills": {
+   "rating": 4
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0a696a86-c708-458e-8080-b3831d5546f9",
+  "business_name": "The Massage Office",
+  "match_method": "phone",
+  "live_slug": "the-massage-office",
+  "status": "overlap",
+  "fills": {
+   "description": "A local small business, proudly serving the Gulf Shores and Orange Beach areas for over 18 years. At the Massage Office we offer true therapeutic massage tailored to each client's individual needs. Prepare yourself for a whole being therapeutic massage vacation at the Massage Office in the heart of beautiful Orange Beach, Alabama. The Massage Office brings massage out of the day spa and into a massage only setting, making it an accessible part of your healthy life ritual. Come and enjoy our aromatherapy, heated tables, hot towels, soothing music and clean comfortable rooms. It is the perfect place to ease pain, de-stress, heal your body and center your mind! Enhanced sanitizing methods are in place for the health of our clients."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0b28a9ff-1fe7-4de4-9dc8-498a44822fdc",
+  "business_name": "Agave Bar & Grill",
+  "match_method": "place_id",
+  "live_slug": "agave-bar-grill",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0b8c2d51-9325-4974-b9b6-ce86ca44a2c6",
+  "business_name": "Microtel Inn & Suites by Wyndham Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "microtel-inn-suites-by-wyndham-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Microtel",
+   "social_instagram": "https://www.instagram.com/wyndham/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0b963394-a0c9-4d50-a34c-6263b6e81125",
+  "business_name": "Island Wing Company Grill & Bar - Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "island-wing-company-grill-bar-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0dfbe1cd-4d1e-467b-8667-9f7cda2a33b6",
+  "business_name": "Parlor Doughnuts",
+  "match_method": "place_id",
+  "live_slug": "parlor-doughnuts",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0eb0603a-866a-4045-a94b-f33b09d02fce",
+  "business_name": "MISO SEAFOOD",
+  "match_method": "place_id",
+  "live_slug": "miso-seafood",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0f467a44-e840-4de8-bc52-e816eb7cdeff",
+  "business_name": "Hog Wild Beach & BBQ",
+  "match_method": "place_id",
+  "live_slug": "hog-wild-beach-bbq",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0f5ce7f8-239f-405e-ab20-326ff9c8d3d3",
+  "business_name": "COASTAL Restaurant",
+  "match_method": "phone",
+  "live_slug": "coastal-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0f793bba-7912-411b-b369-d1408459e272",
+  "business_name": "Perdido Bay Golf Club",
+  "match_method": "phone",
+  "live_slug": "legends-bar-grille-C0MylQ",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/PerdidoBayGolf/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "0ffbe77c-d855-4637-9c73-73905267c9aa",
+  "business_name": "Crico's Pizza & Subs",
+  "match_method": "place_id",
+  "live_slug": "crico-s-pizza-subs",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "111889d5-0f10-465a-8cb9-4cda05515676",
+  "business_name": "Kayden’s Homemade Candies & Ice Cream",
+  "match_method": "place_id",
+  "live_slug": "kayden-s-homemade-candies-ice-cream",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1159ccd5-c4a5-4602-93e0-d4e1542883fd",
+  "business_name": "Villaggio Grille",
+  "match_method": "place_id",
+  "live_slug": "villaggio-grille",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "116d305e-a410-4911-8e1e-eb1ed5185dd8",
+  "business_name": "Phoenix All Suites Hotel",
+  "match_method": "place_id",
+  "live_slug": "phoenix-all-suites-hotel",
+  "status": "overlap",
+  "fills": {
+   "description": "Beachfront 1-bedroom condos with balconies and full kitchens, plus beach access & pools."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "11ce792d-ebd8-416b-926b-ea909ea47176",
+  "business_name": "TCBY",
+  "match_method": "place_id",
+  "live_slug": "tcby",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "13596a52-cacc-4889-a3ab-f8aaa42582eb",
+  "business_name": "Gulf Shores Seafood",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-seafood",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1390f70e-513a-46a4-8829-0d1e48d7b9f9",
+  "business_name": "Shrimp Basket",
+  "match_method": "place_id",
+  "live_slug": "shrimp-basket",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "144824a1-1065-4023-bbd9-c976ce3bbcd0",
+  "business_name": "Woodside Restaurant",
+  "match_method": "place_id",
+  "live_slug": "woodside-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1497e095-89d3-4a64-8339-d0374c3ae4f9",
+  "business_name": "Sunliner Diner",
+  "match_method": "phone",
+  "live_slug": "sunliner-diner-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/sunlinerdiner/",
+   "social_instagram": "https://www.instagram.com/sunlinerdiner/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1577850e-ca7d-4cd7-8814-acd630966c2e",
+  "business_name": "Brookman's Smokehouse",
+  "match_method": "place_id",
+  "live_slug": "brookman-s-smokehouse",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "158c7e58-5796-4270-9ea8-95c8dfd71ec7",
+  "business_name": "Scales 'N' Tails Charters",
+  "match_method": "phone",
+  "live_slug": "scales-n-tails-charters",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pages/Scales-N-Tails-Charters/336174499810437"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "15cdcf49-ec73-4775-be68-570124573d46",
+  "business_name": "Lickin Good Donuts & Kolaches -Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "lickin-good-donuts-kolaches-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "181be9e8-705e-4f42-9e00-4039304f2261",
+  "business_name": "LUXE Brows and Lashes",
+  "match_method": "phone",
+  "live_slug": "luxe-brows-and-lashes",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LUXEbrowsandlashes/?fref=ts",
+   "social_instagram": "https://www.instagram.com/luxebrowsandlashes/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "19360678-acd3-471d-99c7-d7da7a23f154",
+  "business_name": "Amelia's Deli",
+  "match_method": "phone",
+  "live_slug": "amelia-s-deli",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "19c228d7-2304-45fd-8abb-f41d3dcf5ead",
+  "business_name": "The Sloop Galley and Spirits",
+  "match_method": "phone",
+  "live_slug": "the-sloop",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1b9aaada-0201-4512-9ca6-6d5a1e9a3e98",
+  "business_name": "Dippin' Dots",
+  "match_method": "place_id",
+  "live_slug": "dippin-dots",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1bb622c6-9569-4e4d-9e9b-10bf30874165",
+  "business_name": "China Dragon",
+  "match_method": "place_id",
+  "live_slug": "china-dragon",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1db81349-b5a2-4ce7-a26d-b5e2a3d37b7a",
+  "business_name": "Island Ice Cream & Treats",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-coffee-co",
+  "status": "overlap",
+  "fills": {
+   "description": "Gulf Shores ice cream shop serving premium Blue Bell ice cream with over 40 flavor options including Italian Ice, yogurt, sherbet, and reduced fat options. Offers milkshakes, smoothies, sundaes, chocolates, and doughnut sandwiches."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1e1af20a-93de-4ed5-904e-a644855ee7d6",
+  "business_name": "S&S Seafood Market + Kitchen",
+  "match_method": "place_id",
+  "live_slug": "s-s-seafood-market-kitchen",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1eee05e1-4d06-437f-a671-2416b9a0b193",
+  "business_name": "Pelican Place at Craft Farms",
+  "match_method": "phone",
+  "live_slug": "pelican-place-at-craft-farms",
+  "status": "overlap",
+  "fills": {
+   "website": "https://gulfbank.com/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1efcfaae-6327-416c-8b8f-48871fa76b9c",
+  "business_name": "Cobalt the Restaurant",
+  "match_method": "place_id",
+  "live_slug": "cobalt-the-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1f221976-6098-4308-a5c1-538d1c463c49",
+  "business_name": "Terry Cove RV Resort",
+  "match_method": "phone",
+  "live_slug": "terry-cove-motor-coach-resort",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TerryCoveMotorCoach",
+   "description": "Our gated community is private and family-friendly and only 1.5 miles away from the beautiful white sand beaches! Our Resort is restricted to Class-A coaches only. Coaches must be 15 years old or newer. Terry Cove Motor Coach Resort features immaculate grounds with wide brick paver streets, 2 pools, a clubhouse, and miles of trails nearby. All lots are spacious 40' x 70' with 21' wide paved parking pads and 12' x 18' screened gazebos. Whether you're an owner or a guest, you'll enjoy the spacious oversized lots at Terry Cove RV Resort. We offer both pull-through lots and back-in lots, all the same size and all featuring great outdoor living space. All lots are spacious enough to handle BIG RIGS, AWNINGS, SLIDES and OUTDOOR FURNITURE. The beach is 5 minutes by car, 12 minutes by golf cart, or a short bike ride on paved sidewalks. Staying at the beach has never been so affordable. If you are looking to buy, our lots start out at $140k. And you can rent many of our lots for a fraction of the cost of a condo!"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "1fdf10e4-0b66-45a4-aec9-c8c2e0a5eb87",
+  "business_name": "Cafe Beignets of Alabama GS",
+  "match_method": "place_id",
+  "live_slug": "cafe-beignets-of-alabama-gs",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2025e95d-8520-4ed2-af7c-abfb1571d275",
+  "business_name": "Sunny Lady Dolphin Cruises",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-extreme-jet-ski-rental",
+  "status": "overlap",
+  "fills": {
+   "website": "https://www.tripshock.com/orange-beach-dolphin-and-sunset-cruises-aboard-sunny-lady/details/1054/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "24067a7f-5679-451c-a892-525d8aa9bfb4",
+  "business_name": "Journeys",
+  "match_method": "phone",
+  "live_slug": "journeys-tanger-outlet-center-foley",
+  "status": "overlap",
+  "fills": {
+   "rating": 4.3
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2674937a-e8c5-4d83-bd46-d96acd511fbf",
+  "business_name": "Holiday Harbor Marina & Sunset Grille",
+  "match_method": "phone",
+  "live_slug": "holiday-harbor-marina-2biHP8",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HolidayHarborMarinaPerdidoKey",
+   "social_instagram": "https://www.instagram.com/holidayharbormarina/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2767cd03-67da-4f6b-b494-294134596215",
+  "business_name": "Bleus Burger Restaurant and Bar",
+  "match_method": "place_id",
+  "live_slug": "bleus-burger-restaurant-and-bar",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "280f26d0-bf01-4b27-8db5-98c8aa78067a",
+  "business_name": "Portside on Main",
+  "match_method": "phone",
+  "live_slug": "salon-paradise",
+  "status": "overlap",
+  "fills": {
+   "website": "https://alwharf.com/portside"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2a514262-a6e6-43e1-964a-2889353851c4",
+  "business_name": "Gulf Coast Rental Co",
+  "match_method": "phone",
+  "live_slug": "gulf-coast-rental-co",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/GulfCoastRentalCo/",
+   "social_instagram": "https://www.instagram.com/gulfcoastrentalco/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2bd063db-1936-413f-b14c-254997937ad3",
+  "business_name": "De Soto's Seafood Kitchen",
+  "match_method": "place_id",
+  "live_slug": "de-soto-s-seafood-kitchen",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2c844722-a751-4cdc-845c-5fe0701ca7d4",
+  "business_name": "ONE Club Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "one-club-full-swing-simulator-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/ONECLUBGS/",
+   "social_instagram": "https://www.instagram.com/oneclubgulfshores/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2d009a2b-8eae-4763-b941-1a4d4ea3cf99",
+  "business_name": "Coastal Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "coastal-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "EXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "2e1efc6d-c280-465d-a733-b0675d8a2ac8",
+  "business_name": "Island Ice Cream & Treats",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-coffee-co",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "32b14467-2c8d-4ad4-a89b-ef5163d28135",
+  "business_name": "Big Fish Restaurant",
+  "match_method": "place_id",
+  "live_slug": "big-fish-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "EXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "33db3c88-fd6d-4132-845d-459b78f2e89e",
+  "business_name": "Swiger Studio",
+  "match_method": "phone",
+  "live_slug": "swiger-studio",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SwigerStudio/",
+   "social_instagram": "https://www.instagram.com/swigerstudio/",
+   "description": "Swiger Studio is a creative collective based in Gulf Shores and Baton Rouge specializing in art, music production, graphic design, drone videography, mixed media, and murals. The studio features multiple artists and creators offering comprehensive branding, audio engineering, and visionary art services."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "34285574-3f41-4854-b568-de9ad4efc168",
+  "business_name": "Southern Shores Coffee",
+  "match_method": "place_id",
+  "live_slug": "southern-shores-coffee",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "342df911-c9f5-4f3e-bb66-a35f69808598",
+  "business_name": "BuzzCatz Coffee & Sweets",
+  "match_method": "place_id",
+  "live_slug": "buzzcatz-coffee-and-sweets",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "353a3e39-90e5-4c09-a29b-3a1ddea1d7e5",
+  "business_name": "Efes Greek Kitchen",
+  "match_method": "place_id",
+  "live_slug": "efes-greek-kitchen",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "35778bbf-d368-4898-8a58-8bd963ff57c3",
+  "business_name": "DRI Gulf Coast",
+  "match_method": "phone",
+  "live_slug": "dri-gulf-coast",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/DRIGulfCoast/",
+   "description": "Jack Galletta is passionate about two things: hard work and customer service. That's why those are two foundational core values of DRI Gulf Coast, the premier water, fire & mold restoration company on the Alabama & Florida Gulf Coast. Founding DRI Gulf Coast in 2010, Jack saw a need for better customer service in the restoration industry along the Alabama Gulf Coast. He took his experience in primary retail and began implementing the same customer service tenets that made his previous employers successful. Jack started DRI providing flooring restoration services. Over the years, DRI has continued to evolve and it is now a leader in water damage restoration, fire & smoke restoration and mold remediation along the Alabama Gulf Coast. The team also serves the rest of the coastline along the Gulf of Mexico, travelling from Florida to Louisiana if the need arises."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "36783d89-b5c5-46e4-ab92-465e4b7d2aeb",
+  "business_name": "Purple Parrot Resort",
+  "match_method": "phone",
+  "live_slug": "grand-carribean-west-condo-perdido-key-RMVRK8",
+  "status": "overlap",
+  "fills": {
+   "description": "At Perdido Key Resort Management (PKRM), we are incredibly proud to be the exclusive rental management company administering the Purple Parrot Resort's rental program. Our deep connection to this iconic resort goes beyond its operations—it's a place we genuinely love and feel at home. The Purple Parrot Resort is a true gem in Perdido Key, offering unmatched amenities and a welcoming, laid-back vibe. It's the only resort on the island featuring a lagoon-style outdoor pool, complete with a tropical waterfall and island hot tub, providing the ultimate space for relaxation. For cooler months, our indoor pool ensures that every season is perfect for a visit. Guests also enjoy the island's only designated beach volleyball area, adding an extra touch of fun and community spirit to their stay. Steps from the resort, you'll find the pristine Gulf Islands National Seashore, offering seven miles of untouched beaches and breathtaking views. Within the resort gates, the much-loved Purple Parrot Tiki Bar serves as a lively social hub, with live music, great food, and a friendly atmosphere that keeps guests coming back. From the moment you drive through the privacy gates, you'll feel the charm of this unique community. The paver-lined streets, upscale coastal architecture, and clusters of cottage-style condos surrounded by lush greenspaces create a picturesque setting. Whether you're enjoying soak therapy in the hot tub, floating in the lagoon pool, or chatting with neighbors and guests, the Purple Parrot exudes a welcoming, laid-back vibe that feels like home. PKRM's dedicated team brings extensive market knowledge and a commitment to exceptional service to every guest and property owner interaction. With a diverse portfolio of vacation properties, ranging from cozy one-bedroom condos for romantic getaways to spacious three-bedroom homes for families and groups, the Purple Parrot Resort offers accommodations for every need. For us at PKRM, the Purple Parrot Resort is more than just a place to work—it's a beloved community and an extraordinary destination that we're privileged to call home.",
+   "website": "https://www.purpleparrotresort.com/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "37c59cb0-e8a1-448a-b8fe-0958b077c78c",
+  "business_name": "Tacky Jacks Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "tacky-jacks-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "399f4e21-3e9c-4035-911f-48b3a0eca7c1",
+  "business_name": "Bungalows",
+  "match_method": "place_id",
+  "live_slug": "bungalows",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3a01c034-eafb-4fdd-9a6a-77b904276f40",
+  "business_name": "Yumm Twister & Ice Cream",
+  "match_method": "phone",
+  "live_slug": "yumm-twister-ice-cream",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3a1c23b1-c6e9-413f-89f3-4f01c0206e45",
+  "business_name": "Scoops Ice Cream",
+  "match_method": "place_id",
+  "live_slug": "scoops-ice-cream",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3a3f7026-bd9d-4381-b471-b30f03891a92",
+  "business_name": "Treehouse Cafe",
+  "match_method": "phone",
+  "live_slug": "treehouse",
+  "status": "overlap",
+  "fills": {
+   "website": "http://www.treehouse.gs/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3a668aa2-65e1-4c22-a766-bf8fc65fc223",
+  "business_name": "Louisiana Lagniappe, Orange Beach, AL",
+  "match_method": "place_id",
+  "live_slug": "louisiana-lagniappe-orange-beach-al",
+  "status": "overlap",
+  "fills": {
+   "price_range": "EXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3af5b383-d1d1-47e8-a9fd-4080b9fb943e",
+  "business_name": "Coast Restaurant at The Beach Club",
+  "match_method": "place_id",
+  "live_slug": "coast-restaurant-at-the-beach-club",
+  "status": "overlap",
+  "fills": {
+   "price_range": "EXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3b5be2c5-847b-4563-8ef7-0e5109e3fd4d",
+  "business_name": "The Southern Grind at INDIGO",
+  "match_method": "place_id",
+  "live_slug": "the-southern-grind-at-indigo",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3b9958c5-79f2-4696-a2d6-1f1ec5131154",
+  "business_name": "Gulf Shores Rentals, Inc.",
+  "match_method": "phone",
+  "live_slug": "surf-side-shores-condominium",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/gsrentalsfanpage",
+   "social_instagram": "https://www.instagram.com/alabamasbeachessportsevents/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "3cba8087-bb2d-422c-90e7-70527c44d2f8",
+  "business_name": "Barefoot Tours & Charters",
+  "match_method": "phone",
+  "live_slug": "barefoot-private-family-jet-ski-co-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/109297029096961",
+   "social_instagram": "https://www.instagram.com/barefoot_tours"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "42e4f698-61f6-4a69-b27d-b90ef61d6f37",
+  "business_name": "Shores at Orange Beach",
+  "match_method": "phone",
+  "live_slug": "escapes-to-the-shores",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/VacationCondos/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "42f3860a-3c3e-4ceb-8a61-114c2af803bc",
+  "business_name": "Tiki & Raw Bar Orange Beach",
+  "match_method": "phone",
+  "live_slug": "pleasure-island-tiki",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TikiBarOB",
+   "social_instagram": "https://www.instagram.com/tikibarob"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "4371f94f-3b8d-48e9-b0e9-71748f424b20",
+  "business_name": "Treehouse",
+  "match_method": "phone",
+  "live_slug": "treehouse",
+  "status": "overlap",
+  "fills": {
+   "website": "http://www.treehouse.gs"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "43bb06d1-9f27-47a7-8b12-04c0cd6f39b4",
+  "business_name": "AL’s Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-area-gs",
+  "status": "overlap",
+  "fills": {
+   "rating": 2.2
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "43bbcbcd-12f3-4969-9231-7efb38c19a20",
+  "business_name": "Topsail Steamer Seafood Boils (Take-home)",
+  "match_method": "place_id",
+  "live_slug": "topsail-steamer-seafood-boils-take-home",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "45a4f844-3fe7-421c-92df-393652d6bbb0",
+  "business_name": "The ugly Diner",
+  "match_method": "place_id",
+  "live_slug": "the-ugly-diner",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "47ba5725-835d-4fdd-95c6-83c9d2613785",
+  "business_name": "DeSoto's Seafood Kitchen",
+  "match_method": "phone",
+  "live_slug": "de-soto-s-seafood-kitchen",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/desotosseafoodkitchen/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "4885283b-e5d6-44f9-8e2e-6567d0b59a80",
+  "business_name": "Marco's Pizza",
+  "match_method": "place_id",
+  "live_slug": "marco-s-pizza",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "4994107f-bfc2-4840-a62d-080b015a977d",
+  "business_name": "Best Western on the Beach",
+  "match_method": "phone",
+  "live_slug": "best-western-on-the-beach",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/BCHeritageM",
+   "social_instagram": "@bestwesternonthebeach"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "4a596c59-4e38-4b88-9b5e-00ec9c01c4c4",
+  "business_name": "Bird Dog Chicken Company",
+  "match_method": "place_id",
+  "live_slug": "bird-dog-chicken-company",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "4ea6d242-37cf-4ae7-929b-d87c85b2bb64",
+  "business_name": "Beach Girl Coffee",
+  "match_method": "phone",
+  "live_slug": "beach-girl-coffee",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "4eb3cb17-4087-49d3-b58e-94b8ea983f7f",
+  "business_name": "Al's Liquor, Tobacco, Wine & Cigars",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-shopping-center-ob",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pages/category/Wine--Beer---Spirits-Store/ALs-Liquor-and-Wine-1233592243404882/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "506062bb-45f2-4682-adc2-33e79ca6280e",
+  "business_name": "Doc’s Seafood and Steaks",
+  "match_method": "place_id",
+  "live_slug": "doc-s-seafood-and-steaks",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "51b635f5-c716-44c2-8e16-ea784ad5afcc",
+  "business_name": "Janino's Pizza Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "janino-s-pizza-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5283c74b-84dd-473c-a70c-9f48ab1c1736",
+  "business_name": "Paradise Boutiques",
+  "match_method": "phone",
+  "live_slug": "paradise-boutiques",
+  "status": "overlap",
+  "fills": {
+   "website": "https://www.floridastateparks.org"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "52dc88b6-5021-4756-8b02-8b98d18058a1",
+  "business_name": "The Sugar Shack & Cafe",
+  "match_method": "place_id",
+  "live_slug": "the-sugar-shack-cafe",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "534e63fa-8bef-45a7-b597-49e56b146db5",
+  "business_name": "Vinny's Pizzeria",
+  "match_method": "place_id",
+  "live_slug": "vinny-s-pizzeria",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5458964e-0e0d-4c1e-ad16-34a46f023f40",
+  "business_name": "Craft Farms Golf Club",
+  "match_method": "phone",
+  "live_slug": "craft-farms-golf-club",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CraftFarmsGolf/",
+   "social_instagram": "https://www.instagram.com/craftfarms/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5493b619-efe5-4fd5-9a8b-df5d5f126bd6",
+  "business_name": "Lauria's by the Beach",
+  "match_method": "place_id",
+  "live_slug": "lauria-s-by-the-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "54bd83e9-386a-4731-abd7-10f992e14881",
+  "business_name": "Palm Beach Resort",
+  "match_method": "phone",
+  "live_slug": "palm-beach",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/VacationCondos/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "55259e63-013a-4155-8dd0-ddab8d523562",
+  "business_name": "Ristorante Carmelo",
+  "match_method": "place_id",
+  "live_slug": "ristorante-carmelo",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5581277c-a06b-4bf5-9d59-019a88d1dbbd",
+  "business_name": "Truist Gulf Shores Branch",
+  "match_method": "phone",
+  "live_slug": "truist",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/truist",
+   "social_instagram": "https://www.instagram.com/truist"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "57e5ee44-3a27-4aa5-b2df-e6e3ea55537f",
+  "business_name": "Caribe Resort",
+  "match_method": "place_id",
+  "live_slug": "caribe-resort",
+  "status": "overlap",
+  "fills": {
+   "description": "Contemporary condo resort between the gulf & bay with pools, water slides, lazy river & boat slips."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5cc6526a-514d-4fdb-98bf-1e5cf039fdf5",
+  "business_name": "Tee Off at The Wharf Powered by Topgolf Swing Suite",
+  "match_method": "phone",
+  "live_slug": "tee-off-at-the-wharf",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5e62b191-bf73-46bc-9372-bbcb483e4d5c",
+  "business_name": "Vacasa - Bluewater Condominiums",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-beach-house-vacation-rental",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "5f1c2297-9aa3-4d99-b53a-8898bbb1ecfc",
+  "business_name": "Hammered Crab",
+  "match_method": "place_id",
+  "live_slug": "hammered-crab",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "64e55c29-7869-444a-892c-e7349affa41e",
+  "business_name": "Nauti Fishing Charters",
+  "match_method": "phone",
+  "live_slug": "nauti-fishing-charters",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/102086641301033"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "66392e46-424b-4446-8edb-83940be52712",
+  "business_name": "Louisiana Lagniappe",
+  "match_method": "phone",
+  "live_slug": "louisiana-lagniappe-orange-beach-al",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "66a31e99-36ca-4d28-9b3f-aa531b7f4061",
+  "business_name": "The Original Romar House Bed & Breakfast Inn",
+  "match_method": "phone",
+  "live_slug": "original-romar-house-b-b-inn",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/share.php?u=https://theoriginalromarhouse.com"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6a5d48ae-eaca-49ff-a21a-1fe61b00a65c",
+  "business_name": "Sugar Sands RV Resort",
+  "match_method": "phone",
+  "live_slug": "sugar-sands-rv-resort",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SugarSandsRVResortAL",
+   "social_instagram": "https://www.instagram.com/sugarsandsrvresort/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6a67d797-e698-45bf-98d0-678e1a3493d9",
+  "business_name": "Brick & Spoon - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "brick-spoon-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6b82f642-b33e-4e2e-bd84-d5e88e375b3e",
+  "business_name": "Blalock Seafood & Specialty Market",
+  "match_method": "phone",
+  "live_slug": "blalock-seafood-specialty-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6bbd03a1-b520-48e2-9942-3ec1dd266924",
+  "business_name": "Carmelo",
+  "match_method": "phone",
+  "live_slug": "carmelo-italian",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CarmeloRistorante"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6c0405da-8fb7-4ea6-8cb1-3963b4caf643",
+  "business_name": "Wolf Bay Restaurant at Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "wolf-bay-restaurant-at-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6c071e90-de49-4670-866e-6b5314b88e27",
+  "business_name": "Vacasa",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-beach-house-vacation-rental",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6e5656ef-581e-487b-bdea-5425339a9463",
+  "business_name": "Paradise Isle Resort",
+  "match_method": "phone",
+  "live_slug": "bluegreen-paradise-isle-resort",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/bluegreenvacations",
+   "social_instagram": "https://www.instagram.com/bluegreenvacations"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6ea95918-0f53-4854-a229-0c61e9b8e3fe",
+  "business_name": "Cactus Cantina Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "cactus-cantina-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "6eeed887-88b1-404c-81b9-5ac492e658b9",
+  "business_name": "Sassy Bass Amazin' Grill",
+  "match_method": "place_id",
+  "live_slug": "sassy-bass-amazin-grill",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "717185b3-34bc-48fe-97d2-754e1f7f7aeb",
+  "business_name": "Pink Pony Pub",
+  "match_method": "place_id",
+  "live_slug": "pink-pony-pub",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "74d27435-466b-417c-ac90-ca0c383f6668",
+  "business_name": "TIKI & RAW BAR",
+  "match_method": "phone",
+  "live_slug": "pleasure-island-tiki",
+  "status": "overlap",
+  "fills": {
+   "social_instagram": "@tikibarob"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "777a71ea-167e-410b-873d-d2082b967438",
+  "business_name": "Flora-Bama Ole River Grill",
+  "match_method": "phone",
+  "live_slug": "flora-bama-ole-river-grill",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/florabamaolerivergrill/",
+   "social_instagram": "https://www.instagram.com/fbolerivergrill/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7a375fd9-30ed-4e82-86d5-143c6c72bf9e",
+  "business_name": "Chicken Salad Chick",
+  "match_method": "place_id",
+  "live_slug": "chicken-salad-chick",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7b622070-11e2-458f-a7a3-c206715d69a0",
+  "business_name": "Papa Rocco's",
+  "match_method": "place_id",
+  "live_slug": "papa-roccos",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7c1b8c95-7f18-499b-8d26-3b76d59c854c",
+  "business_name": "Cotton's Restaurant",
+  "match_method": "phone",
+  "live_slug": "cotton-s-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7c78b99e-1ed8-4057-986a-b872d42d7f4a",
+  "business_name": "Waffle House",
+  "match_method": "place_id",
+  "live_slug": "waffle-house",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7daa2283-0229-4668-9dc4-6dba670a98fa",
+  "business_name": "Luxury RV Resort",
+  "match_method": "phone",
+  "live_slug": "luxury-rv-resort",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/luxuryrvresort",
+   "social_instagram": "https://www.instagram.com/luxuryrv_resort/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7debca83-dcfb-4a83-9b12-25940d164858",
+  "business_name": "Tacky Jacks Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "tacky-jacks-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "7e9e6bb4-84ac-4b1a-8abf-5e3371fff523",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "#",
+   "social_instagram": "#"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8034552e-cad9-4d71-8066-f7fc312b9d13",
+  "business_name": "China King",
+  "match_method": "place_id",
+  "live_slug": "china-king",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "805487b4-a220-4dfe-987b-bfb0129dafc2",
+  "business_name": "The Beach House Kitchen and Cocktails",
+  "match_method": "place_id",
+  "live_slug": "the-beach-house-kitchen-and-cocktails",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "822962a0-87ed-4709-9b17-5427a448e988",
+  "business_name": "Amelia's Deli",
+  "match_method": "place_id",
+  "live_slug": "amelia-s-deli",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "835d88fe-8251-4ab9-86f6-fe9a3be938ff",
+  "business_name": "Shrimp Basket",
+  "match_method": "place_id",
+  "live_slug": "the-shrimp-basket",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "84baddb8-9a5b-417d-a655-34c056867b45",
+  "business_name": "Orange Beach History Museum",
+  "match_method": "phone",
+  "live_slug": "orange-beach-history-museum",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://facebook.com/orangebeachal",
+   "social_instagram": "https://instagram.com/orangebeachal"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8aa81ab0-df07-41dc-b5c3-e0a6a394fd6a",
+  "business_name": "Sail Wild Hearts",
+  "match_method": "phone",
+  "live_slug": "sail-wild-hearts",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8aeec77d-fca8-4695-a2c3-579c65d44125",
+  "business_name": "The Galway Irish Public House",
+  "match_method": "place_id",
+  "live_slug": "the-galway-irish-public-house",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8b01b39c-bda7-481e-8b78-9133d2d4420f",
+  "business_name": "Matt's Homemade Ice Cream",
+  "match_method": "place_id",
+  "live_slug": "matt-s-homemade-ice-cream",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8d2cf780-4d06-4d4c-b967-61dfd5896c5a",
+  "business_name": "Pizza At The Pass",
+  "match_method": "place_id",
+  "live_slug": "pizza-at-the-pass",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8d337df5-9cff-42af-891c-f31be2824d3c",
+  "business_name": "LuLu's Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "lulu-s-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "8d94e732-b633-4387-aed3-0f587f5bd30e",
+  "business_name": "Foam Coffee",
+  "match_method": "place_id",
+  "live_slug": "foam-coffee",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "90c72d2a-5e72-4ec0-b4f7-216a0c0e66f5",
+  "business_name": "The Hammered Crab",
+  "match_method": "phone",
+  "live_slug": "hammered-crab",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9123de84-23ed-4355-9c89-1750d7723eb4",
+  "business_name": "Sassy Bass Wine & Spirits",
+  "match_method": "phone",
+  "live_slug": "beach-dream-inc",
+  "status": "overlap",
+  "fills": {
+   "website": "https://www.sassybass.com/",
+   "rating": 3
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "917e5fc8-57b8-45f1-abc0-ec8b6594147b",
+  "business_name": "Pizza Hut",
+  "match_method": "place_id",
+  "live_slug": "pizza-hut",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "92425dd1-e51f-4383-9bab-d40b8e8af350",
+  "business_name": "Pirates Cove",
+  "match_method": "phone",
+  "live_slug": "pirates-cove",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/piratescove",
+   "social_instagram": "https://www.instagram.com/piratescoveriffraff"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "939d55dd-b9d5-41d1-8ab1-d33ef0c826f1",
+  "business_name": "Zeke's Landing Marina",
+  "match_method": "phone",
+  "live_slug": "kittywake-charters",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "Zeke's Landing",
+   "social_instagram": "@zekesmarina"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "94edd8c1-f7cf-4a92-b6e4-e164334a5e01",
+  "business_name": "Duck's Diner Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "duck-s-diner-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "95888556-15c0-409e-9fd0-1463f34339c3",
+  "business_name": "The Wharf Amphitheater",
+  "match_method": "phone",
+  "live_slug": "the-wharf-amphitheater",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheWharfOB",
+   "social_instagram": "https://www.instagram.com/thewharfob"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9616d3fc-f17a-4d2e-b113-050fd153ec37",
+  "business_name": "Sun Outdoors Orange Beach",
+  "match_method": "phone",
+  "live_slug": "pandion-ridge-luxury-rv-resort",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SunOutdoorsOrangeBeach",
+   "social_instagram": "https://www.instagram.com/sunoutdoorsorangebeach/",
+   "description": "Sun Outdoors Orange Beach (formerly Pandion Ridge RV Resort) is a 30-acre all-ages resort located in Orange Beach, Alabama. Our RV resort has some of the best access to the beach, including the only privately owned resort or campground with direct access through Gulf State Park. You'll find that camping here is full of premium touches, with a dose of Southern charm, all at an affordable price. Orange Beach offers a great location that's just minutes from the best beaches and attractions along Alabama's Gulf Coast. The nearest access point to the beach is approximately 3 miles away via the Gulf State Park trail system, which Sun Outdoors Orange Beach has unique walk or biking access through. For guests who prefer to drive or have more to carry, the closest public beach access is about a 6 mile drive from the resort. We offer spacious RV sites with full hookups with 30- or 50-amp electric. Our upscale RV sites have asphalt or full concrete pads. They have both back-in and pull-through availability. They can accommodate RVs of any size with plenty of room for slide-outs. Choose short-term or extended stays for families and snowbirds with access to top-tier amenities that will make for a great monthly or seasonal stay. Our newly renovated resort offers a restaurant, arcade, general store, and state of the art playground with an addition of a new pool and splash pad."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "96b45794-2e01-4663-b1a3-e05b6fcf6954",
+  "business_name": "Martinique on the Gulf",
+  "match_method": "phone",
+  "live_slug": "martinique-on-the-gulf",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/martiniquegulf"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "96b7aec0-3a86-4099-9a4a-5f38c165ab6c",
+  "business_name": "The Wharf at Orange Beach",
+  "match_method": "phone",
+  "live_slug": "ferris-wheel",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheWharfOB",
+   "social_instagram": "https://www.instagram.com/thewharfob"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "97953615-411f-4746-a3a4-3ea1540cd911",
+  "business_name": "Nonna's Pizza",
+  "match_method": "place_id",
+  "live_slug": "nonna-s-pizza",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "999065c8-f707-442e-a723-b8b04b9a2dd5",
+  "business_name": "Skincare By Mia LLC",
+  "match_method": "phone",
+  "live_slug": "skincare-by-mia",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61574818106965",
+   "description": "I've been an esthetician since 1995, and I still absolutely love what I do. Whether it's helping someone clear up stubborn acne or customizing an anti-aging treatment that actually works, my goal is always the same — to help you feel confident in your skin. I'm big on results, but I also believe skincare should feel relaxing and personal. I'll always take the time to tailor your treatments and recommend the best at-home routine to keep your skin happy between visits. Sometimes your skin just needs more than a product. It needs a professional touch. With over 30 years of experience, I combine advanced technique with personalized care to restore your skin's natural radiance. Signature facials, gentle chemical peels, microchanneling, teen treatments and more. Every service is intended to leave you glowing, relaxed, and confident. Your skin deserves this."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9b79d2cc-500c-4c42-893a-aa48cfd0a461",
+  "business_name": "Angry Crab Shack",
+  "match_method": "place_id",
+  "live_slug": "angry-crab-shack",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9c21deed-c454-491c-8044-960792a11865",
+  "business_name": "The Laundry Lounge",
+  "match_method": "phone",
+  "live_slug": "the-laundry-lounge",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61563827530632",
+   "social_instagram": "https://www.instagram.com/laun.drylounge/",
+   "description": "The Laundry Lounge brings Gulf Shores a modern, full-service laundromat experience with brand-new state-of-the-art machines, stylish interiors, and unbeatable amenities. We offer self-service laundry machines, wash and fold services, and commercial laundry solutions. Our facility features free high-speed Wi-Fi, a luxurious lounge to relax in while you wait, charging stations for your devices, and on-site assistance during staffed hours. We also offer specialized dog wash stations in separate rooms for convenience."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9d6b0854-580d-41df-b292-85dc586ee2c2",
+  "business_name": "bp",
+  "match_method": "phone",
+  "live_slug": "bp-gas-station-pensacola",
+  "status": "overlap",
+  "fills": {
+   "rating": 2
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9f77c4d1-9b48-432f-b4fd-522a6ab91e64",
+  "business_name": "Foodcraft",
+  "match_method": "place_id",
+  "live_slug": "foodcraft",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "9fb8cc8d-38f7-4bff-8af7-a8795ff16ee7",
+  "business_name": "Lost Bay Guide Service",
+  "match_method": "phone",
+  "live_slug": "lost-bay-fishing",
+  "status": "overlap",
+  "fills": {
+   "rating": 4.5
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a024f32f-ba17-44e0-885f-f0ee36dfd7c6",
+  "business_name": "Marco's Pizza Cotton Creek Drive, Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "marco-s-pizza",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/MarcosPizza/",
+   "social_instagram": "https://www.instagram.com/marcospizza/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a16d118d-10fb-4e24-b7d5-a0842f892f1c",
+  "business_name": "El Toro Mexican Restaurant",
+  "match_method": "place_id",
+  "live_slug": "el-toro-mexican-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a1915af1-30eb-4708-ab7f-63aece4100cb",
+  "business_name": "Hancock Whitney Bank at Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "hancock-whitney-bank",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HancockWhitney",
+   "social_instagram": "https://www.instagram.com/hancockwhitney",
+   "description": "Hancock Whitney Bank was founded over a century ago with one mission: To help the people of the Gulf South reach their financial goals and dreams and achieve the quality of life we all cherish. Our founders created an institution anchored in values, reinforced with the strength and resilience of the people of the gulf coast, and focused on growth and opportunity. Today, Hancock Whitney carries on that remarkable legacy as one of America's strongest, safest banks serving one of the nation's most vibrant corridors. Our service area includes over 200 full-service financial centers in Mississippi, Louisiana, Alabama, Florida and Texas, plus nearly 300 ATMs throughout the region. We offer a full array of banking services, including checking and savings accounts, online and mobile banking, credit cards, loans, mortgages, and wealth management and private banking services to individuals and large and small businesses. But Hancock Whitney is more than simply a bank; we're a trusted financial partner committed to creating opportunities for the people and communities we serve in the scenic coastal region we call home."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a2a05c25-dee3-4ea4-a0b1-669639d0feb2",
+  "business_name": "Cactus Cantina Perdido Beach Blvd",
+  "match_method": "place_id",
+  "live_slug": "cactus-cantina-perdido-beach-blvd",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a358456d-30f7-4633-992b-b00d5ea88c68",
+  "business_name": "Domino's Pizza",
+  "match_method": "place_id",
+  "live_slug": "domino-s-pizza",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a45627bc-d023-485c-9ca6-812063e5efda",
+  "business_name": "Wacked Out Weiner Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "wacked-out-weiner-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a50fd955-5970-46d2-9b80-c7980e67477c",
+  "business_name": "Latitude 30",
+  "match_method": "place_id",
+  "live_slug": "latitude-30",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a5f3ba73-f4b7-4f00-8dac-908f42205e95",
+  "business_name": "Intimidator Deep Sea Fishing Charters",
+  "match_method": "phone",
+  "live_slug": "intimidator-sport-fishing-inc",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a70f621b-a4b9-4ae1-a75f-2bbaecc4fa32",
+  "business_name": "Island Time Daiquiris & Pizza at The Wharf",
+  "match_method": "place_id",
+  "live_slug": "island-time-daiquiris-pizza-at-the-wharf",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a7a5f71c-b0c1-4f54-96ed-2dafcdcc4971",
+  "business_name": "Tuscany Pizza and Grill",
+  "match_method": "place_id",
+  "live_slug": "tuscany-pizza-and-grill",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a7eb1692-6f7b-496b-a5e7-57dba0e1eec0",
+  "business_name": "Gulf State Park",
+  "match_method": "phone",
+  "live_slug": "20115-state-highway-135-parking",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/alstateparks",
+   "social_instagram": "https://instagram.com/alstateparks",
+   "description": "Gulf State Park is a 6,150-acre state park featuring beach pavilions, nature center, swimming pool, Lake Shelby day-use area with kayaking and canoeing, fishing and education pier, backcountry biking trails, butterfly garden, learning campus, interpretive center, hiking trails, geocaching, paddle sports, and more. The park offers accommodations including The Lodge at Gulf State Park (Hilton Hotel), lakeside cabins, woods cabins, eagle cottages, improved 496-site campground with full hookups, primitive camping, and glamping sites.",
+   "website": "https://www.alapark.com/gulf-state-park"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a8e43ea9-6329-415e-b6c1-e2d75dc35c06",
+  "business_name": "Sago Art Gallery at Beach Girl At Home",
+  "match_method": "place_id",
+  "live_slug": "sago-art-gallery-at-beach-girl-at-home",
+  "status": "overlap",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "a910d230-93b6-412c-bc2c-94007de0d276",
+  "business_name": "Cactus Cantina Canal Road",
+  "match_method": "place_id",
+  "live_slug": "cactus-cantina-canal-road",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "aa11741d-f52a-4613-b4d6-3074c370b584",
+  "business_name": "Coastal Arts Center of Orange Beach",
+  "match_method": "phone",
+  "live_slug": "coastal-arts-center-of-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/orangebeach",
+   "social_instagram": "https://www.instagram.com/cityoforangebeach"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "abf92c3e-9766-42d4-b2e4-4f9fd5a84fc4",
+  "business_name": "Dick's Last Resort - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "dick-s-last-resort-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "addff154-6993-45ae-8b1e-683b1e64dba7",
+  "business_name": "Splash Resort Wear",
+  "match_method": "phone",
+  "live_slug": "splash-resort-wear",
+  "status": "overlap",
+  "fills": {
+   "website": "http://splashresortwearpk.com/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "aebf326e-a36e-473a-a495-8ee9a73983ad",
+  "business_name": "Orange Beach Dolphin & Sunset Cruises @ The Wharf Aboard Sunny Lady",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-extreme-jet-ski-rental",
+  "status": "overlap",
+  "fills": {
+   "website": "https://www.tripshock.com/orange-beach-dolphin-and-sunset-cruises-aboard-sunny-lady/details/1054/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "af6572d9-a073-4bbc-9ab5-f027682d7780",
+  "business_name": "Regions Bank - Gulf Shores 1400 Gulf Shores Parkway",
+  "match_method": "phone",
+  "live_slug": "regions-bank",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/regionsbank",
+   "social_instagram": "https://www.instagram.com/regionsbank/?hl=en",
+   "description": "Regions Financial Corporation is a member of the S&P 500 Index and is one of the nation's largest full-service providers of consumer and commercial banking, wealth management and mortgage products and services. Regions serves customers across the South, Midwest and Texas. Our mission is to achieve superior economic value for our shareholders over time by making life better for our customers, associates, and communities while creating shared value as we help them meet their financial goals and aspirations. We offer checking accounts, savings accounts including money market and CDs, credit cards, credit lines, loans, mortgages, insurance, securities, and investments. Our Gulf Shores branch provides personal and business banking services with drive-thru and ATM access."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b30d59e7-cbcb-4dcc-b8a1-7b77d0044dd3",
+  "business_name": "West Beach Coffee House",
+  "match_method": "place_id",
+  "live_slug": "west-beach-coffee-house",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b409bbcc-4f16-4dcf-84b7-bde232ca3335",
+  "business_name": "Pelican Grill - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "pelican-grill-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b47316c2-4fcc-43b9-9d84-d7b858b1cdd9",
+  "business_name": "The Perdido Key Oyster Bar Restaurant and Marina",
+  "match_method": "phone",
+  "live_slug": "oyster-bar-31",
+  "status": "overlap",
+  "fills": {
+   "description": "The Perdido Key Oyster Bar Restaurant & Marina offers waterfront dining featuring fresh oysters, Gulf seafood including gumbo, snapper, mahi-mahi, yellow fin tuna, steamed shrimp, fried platters, whole flounder, steaks, chicken, and pasta. Enjoy dining on the river with fresh daily preparations and classic Gulf Coast cuisine."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b4b36eb7-b8f4-4617-b525-4c258fb1afdb",
+  "business_name": "The Bluebird Cottage",
+  "match_method": "phone",
+  "live_slug": "bouquets-and-baskets",
+  "status": "overlap",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b4df2cd2-d6b7-4487-8193-2c80452d2bdd",
+  "business_name": "Soul Bowlz",
+  "match_method": "place_id",
+  "live_slug": "soul-bowlz",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b5345911-a018-4367-83e7-9c623f6a8760",
+  "business_name": "Cotton's Restaurant",
+  "match_method": "place_id",
+  "live_slug": "cotton-s-restaurant",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b57d54f9-af6e-4f1c-a644-21551d5b75e6",
+  "business_name": "Sea N Suds",
+  "match_method": "place_id",
+  "live_slug": "sea-n-suds",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b5a8dfb7-e252-4e11-b2f2-cbc1ef484748",
+  "business_name": "LuLu's Fun Food & Music",
+  "match_method": "phone",
+  "live_slug": "lulu-s-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LucyBuffettLULUS",
+   "social_instagram": "https://www.instagram.com/lulusgulfshores/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b76b50b9-d6b9-45f0-b7b0-4072e3f8d193",
+  "business_name": "Peninsula Golf & Racquet Club",
+  "match_method": "phone",
+  "live_slug": "peninsula-golf-racquet-club",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b7a2be88-724a-45e4-a59b-84e1a0be0856",
+  "business_name": "Pelican Grill",
+  "match_method": "phone",
+  "live_slug": "pelican-grill",
+  "status": "overlap",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b7ad6e7e-124a-404a-b290-5612f1c5522a",
+  "business_name": "Mile Marker 158",
+  "match_method": "place_id",
+  "live_slug": "mile-marker-158",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b893c267-f1d9-461b-9b25-b7d96b417da4",
+  "business_name": "Poke Bowl Sushi Burrito & Boba",
+  "match_method": "place_id",
+  "live_slug": "poke-bowl-sushi-burrito-boba",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "b8c7f87b-e6b5-442b-844d-9ff354f136aa",
+  "business_name": "Original Oyster House Boardwalk",
+  "match_method": "place_id",
+  "live_slug": "original-oyster-house-boardwalk",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "bb85a412-35ed-457a-8152-a30625bc4fb8",
+  "business_name": "Kitty's Kafe",
+  "match_method": "place_id",
+  "live_slug": "kittys-kafe",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "bcbaa5cc-a4eb-4965-986d-6605f09dbb51",
+  "business_name": "The Steamer Baked Oyster Bar",
+  "match_method": "place_id",
+  "live_slug": "the-steamer-baked-oyster-bar",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "be3180fb-6179-4af5-a8a4-f844579e5788",
+  "business_name": "Jellystone Park™ Gulf Coast",
+  "match_method": "phone",
+  "live_slug": "jellystone-park-alabama-gulf-coast-gDfYSs",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/jellystonegulfcoast",
+   "social_instagram": "https://www.instagram.com/jellystonegulfcoast"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "bf10b9e0-ac4c-46f6-84f8-d4f429fad711",
+  "business_name": "The Dragonfly Bar & Grill",
+  "match_method": "place_id",
+  "live_slug": "the-dragonfly-bar-grill",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c16c1e81-ba12-44a8-ae8c-09cd9cee56de",
+  "business_name": "Holiday Inn Express Orange Beach-On The Beach",
+  "match_method": "phone",
+  "live_slug": "holiday-inn-express-orange-beach-on-the-beach-by-ihg",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HolidayInnExpress/",
+   "social_instagram": "https://www.instagram.com/holidayinnexpress/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c1c41182-e5aa-4bab-bef7-0d9a9a844219",
+  "business_name": "Coinstar Kiosk - Bitcoin ATM",
+  "match_method": "phone",
+  "live_slug": "coinstar",
+  "status": "overlap",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c41bd597-5490-4ece-a847-3bde07160773",
+  "business_name": "The Yard Milkshake Bar",
+  "match_method": "place_id",
+  "live_slug": "the-yard-milkshake-bar",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c4d8666f-7f57-4e44-8573-f4f777eff97e",
+  "business_name": "Flora-Bama Lounge and Oyster Bar",
+  "match_method": "phone",
+  "live_slug": "flora-bama-liquor-lotto",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/florabama",
+   "social_instagram": "https://www.instagram.com/_florabama",
+   "rating": 4.5
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c6d81055-277e-4460-88f1-ca6f3d0c404a",
+  "business_name": "Bahama Buck's - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "bahama-buck-s-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c7c51050-2844-450e-ac79-c3deff710dcf",
+  "business_name": "Sunliner Diner - Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "sunliner-diner-gulf-shores",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c7d34b55-19c3-4c17-aff9-ab286af2c27b",
+  "business_name": "Icehouse Tap Room",
+  "match_method": "phone",
+  "live_slug": "ice-house-taproom",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c7de14bd-7c4a-4fa5-966f-33c1a7088658",
+  "business_name": "Perdido Beach Resort",
+  "match_method": "phone",
+  "live_slug": "coastal-coffee-co",
+  "status": "overlap",
+  "fills": {
+   "description": "Perdido Beach Resort is a premier beachfront hotel in Orange Beach, Alabama, offering Gulf-front views, exquisite dining options, and endless relaxation. The resort features luxurious accommodations including rooms and suites with various views, multiple dining venues, aquatic adventures, live music entertainment, and comprehensive meeting and wedding facilities."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c82a2023-1053-43a3-ba2c-c80036a25079",
+  "business_name": "Vacasa",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-beach-house-vacation-rental",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "c9dd43c2-47e1-4293-a030-685e98eaa721",
+  "business_name": "Kilwins Ice Cream - Chocolate - Fudge (Wharf)",
+  "match_method": "place_id",
+  "live_slug": "kilwins-ice-cream-chocolate-fudge-wharf",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "ca984d1b-f4a0-4ca5-a2ee-09e9e4ef7c10",
+  "business_name": "West Marine",
+  "match_method": "place_id",
+  "live_slug": "west-marine",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "cb7555cd-ce24-42a7-90e4-b5009186e5bd",
+  "business_name": "The Galley on the River",
+  "match_method": "phone",
+  "live_slug": "the-galley-on-the-river",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61564534360972",
+   "social_instagram": "https://www.instagram.com/thegalleyontheriver"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "cb823db9-9b6a-4713-a526-d8ad9740bc43",
+  "business_name": "Yo Ho Rum & Tacos",
+  "match_method": "place_id",
+  "live_slug": "yo-ho-rum-tacos",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "cc71df4c-c004-492c-9879-83167c239d09",
+  "business_name": "The Sloop",
+  "match_method": "place_id",
+  "live_slug": "the-sloop",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "cd612ea6-87a0-43af-82bb-df13521c3b4e",
+  "business_name": "Buena Vista Motor Coach Resort",
+  "match_method": "phone",
+  "live_slug": "buena-vista-motor-coach-resort",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/BuenaVistaMotorCoachResort",
+   "social_instagram": "https://www.instagram.com/buenavistamotorcoachresort/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "cec43274-13a5-4a61-b106-387c111c92b2",
+  "business_name": "Ginny Lane Bar and Grill",
+  "match_method": "place_id",
+  "live_slug": "ginny-lane-bar-and-grill",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "cfeb0d1e-3d5d-42ed-8461-a39caa6138e5",
+  "business_name": "Taco Fiesta",
+  "match_method": "place_id",
+  "live_slug": "taco-fiesta",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d1f1a318-8e54-469b-9abc-6f94121dda40",
+  "business_name": "Island Pancake House",
+  "match_method": "place_id",
+  "live_slug": "island-pancake-house",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d2187ccf-8cdb-4751-9e65-e55b1b974336",
+  "business_name": "Mrs. Fields® Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "mrs-field-s-cookies",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/mrsfieldscookies",
+   "social_instagram": "https://www.instagram.com/mrsfieldscookies",
+   "description": "At our Mrs. Fields® Gulf Shores bakery, we serve our delicious cookies, brownies, and cookie cakes in Gulf Shores, AL, with the same passion for gourmet quality that propelled Debbie Fields' original store. Enjoy fresh baked cookies, brownies and custom frosted cookie cakes along with gifts and party trays for any occasion. Order online and pick up in store. Mrs. Fields® freshly baked treats have never been so easy to enjoy. Mrs. Fields® came from humble beginnings in Debbi Fields' first store in Palo Alto, California in 1977. A young mother from a Navy family, Debbie had been told no business could survive just selling cookies. However, her one store quickly turned into hundreds stretching across the country, and eventually, the world. Her recipe for success? A headstrong personality and sincere concern for people. Her mission has always been to create the highest quality product possible - every time."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d260046a-18bf-48d2-829b-a7cdc1a3d980",
+  "business_name": "AL’s Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-shopping-center-ob",
+  "status": "overlap",
+  "fills": {
+   "rating": 2.7
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d2608c42-50dc-46d8-9f8c-de5fc712a9ba",
+  "business_name": "Live Bait Night Club",
+  "match_method": "place_id",
+  "live_slug": "live-bait-night-club",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d493edb9-40a2-4cb5-a7cd-4f17311875d0",
+  "business_name": "Lartigue's Original Fresh Seafood Market",
+  "match_method": "phone",
+  "live_slug": "lartigue-s-original-fresh-seafood-market",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d5216ed0-acc2-4709-a78c-61fd94ae0482",
+  "business_name": "Kiva Grill",
+  "match_method": "place_id",
+  "live_slug": "kiva-grill",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d77e93bc-531b-438d-920d-ab8d992af707",
+  "business_name": "Mudbugs Dive Bar",
+  "match_method": "place_id",
+  "live_slug": "mudbugs-dive-bar",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "d9980e3e-68bf-444c-8ce5-6f1b50e12e7f",
+  "business_name": "Hudson Marina Deep Sea Fishing",
+  "match_method": "place_id",
+  "live_slug": "hudson-marina-deep-sea-fishing",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "da7a0cf6-a44e-4fa9-98d8-21dee1007b7f",
+  "business_name": "Tee Off at The Wharf Powered by TOPGOLF Swing Suites",
+  "match_method": "phone",
+  "live_slug": "tee-off-at-the-wharf",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/people/Tee-Off-at-The-Wharf/61573192735473/",
+   "social_instagram": "https://www.instagram.com/teeoff.thewharf/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "dafaacab-0910-4455-b9a2-37c9debe83bd",
+  "business_name": "Books-A-Million",
+  "match_method": "place_id",
+  "live_slug": "books-a-million",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "dbb04c7b-7d35-43c7-a923-08cd0c3d6a25",
+  "business_name": "A SHOP FOR WOMEN.COM",
+  "match_method": "phone",
+  "live_slug": "the-market-mainly-shoes",
+  "status": "overlap",
+  "fills": {
+   "description": "A Shop for Women is celebrating their 40th year as a premier women's retail destination in Downtown Pensacola. The shop specializes in high-quality women's clothing, shoes, and Italian linens. They feature curated designer collections including Bottega di Brunella."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "dca69e27-e5e6-49af-ab86-73aee5f254b2",
+  "business_name": "Brick & Spoon",
+  "match_method": "phone",
+  "live_slug": "cleopatras-beauty-boutique",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://facebook.com/brickandspoon",
+   "social_instagram": "@brickandspoon",
+   "description": "Brick & Spoon serves creative Southern-inspired breakfast and brunch in Orange Beach. Known for loaded Benedicts, Gulf shrimp & grits, and $1 oyster happy hour daily from 2–5:30pm."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "dec0aee6-0f9e-46a1-843b-f05114b1dc52",
+  "business_name": "LongHorn Steakhouse",
+  "match_method": "place_id",
+  "live_slug": "longhorn-steakhouse",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "df7e4454-6c09-4b08-9571-89c1fdf54664",
+  "business_name": "Moe's Original BBQ",
+  "match_method": "place_id",
+  "live_slug": "moes-original-bbq-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e0c2b7b8-4b3e-4bd5-943c-25bafa2a5abe",
+  "business_name": "High Tide #3",
+  "match_method": "phone",
+  "live_slug": "high-tide-daiquiris-mimosas",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e0cee882-e457-461d-b227-01577c34a99a",
+  "business_name": "Extreme Chaos Fishing Charters",
+  "match_method": "phone",
+  "live_slug": "extreme-chaos-fishing-charters",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e14fbdc1-fbdf-4071-8555-f0481aa639de",
+  "business_name": "Perch at Gulf State Park",
+  "match_method": "phone",
+  "live_slug": "perch",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://facebook.com/perchgsp"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e2178cd4-3fba-4a4b-b3fc-332ebb988b39",
+  "business_name": "Rotolo's Pizzeria",
+  "match_method": "place_id",
+  "live_slug": "rotolo-s-pizzeria",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e2811612-b9b3-4bc7-b1fc-afbb5451a63a",
+  "business_name": "Hope's Cheesecake",
+  "match_method": "place_id",
+  "live_slug": "hope-s-cheesecake",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e4a871b9-d98d-4d50-958c-8448fe607b1f",
+  "business_name": "Big Beach Brewing Company",
+  "match_method": "phone",
+  "live_slug": "big-beach-brewing",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://facebook.com/bigbeachbrewing",
+   "social_instagram": "https://instagram.com/bigbeachbrewing"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e536b3bb-24fc-419f-bced-2f6110b0a1cb",
+  "business_name": "OSO at Bear Point Harbor - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "oso-at-bear-point-harbor-orange-beach",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e5852892-83ce-4f35-b8d2-251c0be99acc",
+  "business_name": "Cafe Beignet of Alabama OB",
+  "match_method": "place_id",
+  "live_slug": "cafe-beignet-of-alabama-ob",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e74980d8-1607-46ab-af37-fffe18286283",
+  "business_name": "Uptown Plaza",
+  "match_method": "phone",
+  "live_slug": "uptown-plaza",
+  "status": "overlap",
+  "fills": {
+   "website": "http://visitowa.com/explore/downtown-owa/?utm_source=Yext"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e76ceaa2-b762-4916-9c1c-966443b7c3f9",
+  "business_name": "Meyer Park Pavilion",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-activity-center",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/cityofgulfshoresal",
+   "social_instagram": "https://www.instagram.com/city_gulfshores/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e7f3e754-2522-42cd-9fa9-f23c110aae88",
+  "business_name": "The Gulf",
+  "match_method": "place_id",
+  "live_slug": "the-gulf",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "e81e0c3f-f421-441c-8f60-a733e6f49910",
+  "business_name": "Niki's Seafood & Thai",
+  "match_method": "place_id",
+  "live_slug": "niki-s-seafood-thai",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "ea435145-c913-40a6-a030-f5e22f13ef3d",
+  "business_name": "GTs On The Bay",
+  "match_method": "place_id",
+  "live_slug": "gts-on-the-bay",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "eb1f5080-33d5-4518-8045-2a77da113fdf",
+  "business_name": "Bottomed Out Fishing Charters",
+  "match_method": "phone",
+  "live_slug": "bottomed-out-fishing-charters",
+  "status": "overlap",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "eb9cb4e0-d8f1-4797-8ba8-18d605c26366",
+  "business_name": "Flora-Bama Lounge, Package and Oyster Bar",
+  "match_method": "phone",
+  "live_slug": "flora-bama-liquor-lotto",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/florabama",
+   "social_instagram": "https://www.instagram.com/_florabama"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "ec6d47e4-a237-4cab-92b6-7152a94eb812",
+  "business_name": "Eden Spa and Salon",
+  "match_method": "phone",
+  "live_slug": "cleopatras-beauty-boutique",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/edenspaandsalon",
+   "description": "In 2001, Master Cosmetologist Pamela Elledge opened the Spa of Eden in Gulf Shores, Alabama with the goal of building lasting relationships with clients by providing personalized services in a unique setting. After relocating the spa to Orange Beach, Alabama, the result is an eclectically charming, Island Oasis. A place where clientele - local residents as well as visitors, women and men, of all ages - can treat themselves or someone they care for to the ultimate pampering experience.\n\nLocated directly across the street from the beautiful Gulf of Mexico, our spa is a relaxing oasis in the heart of Orange Beach, Alabama. From the moment you walk in the door, our focus is on your complete relaxation. From facials and massage to nail and hair treatments, our services are a great way to take a step back from the bustle of everyday life. Come take a break with us.\n\nWe offer salon services including hair care (style, cuts, color, perms), master barbering, blowout station, and hair removal (waxing). Our licensed, experienced therapists and estheticians can provide a wide range of treatments including facial care (cleansing, exfoliation, hydration), and body care (several types of massage, aromatherapy, body wraps, mud masks).\n\nOur professional staff of stylists, estheticians, and therapists is committed to providing our clients with the \"ultimate indulgence\" - a relaxing, rejuvenating and stress relieving hour . . . or an entire day or week filled with personalized treatments, including hair, nail, skin and body care. If you are planning a vacation to the area, especially during the high season (April thru August), we strongly suggest that you schedule your appointment in advance. We can accommodate large groups, and we can arrange for out-calls (we come to you) for special events including bridal parties, corporate meetings, etc."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "ed6c8959-396a-48d4-8988-bf81ff480953",
+  "business_name": "Bouquets & Baskets Florists LLC",
+  "match_method": "phone",
+  "live_slug": "bouquets-and-baskets",
+  "status": "overlap",
+  "fills": {
+   "rating": 4.8
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "edcc1386-eee2-40c6-be1d-34b1bbd786a0",
+  "business_name": "The Last Resort RV Community",
+  "match_method": "phone",
+  "live_slug": "last-resort-rv-community-foley-alabama-tHyjlo",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61572618443011",
+   "social_instagram": "https://www.instagram.com/ghvjhvgk"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f16a4eff-33e1-4332-a29b-ed543f725047",
+  "business_name": "Doc's Seafood Shack & Oyster Bar",
+  "match_method": "place_id",
+  "live_slug": "docs-seafood-shack-and-oyster-bar",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f1acba28-1707-485d-844e-3e4b2ce692e0",
+  "business_name": "Kiva Grill",
+  "match_method": "phone",
+  "live_slug": "kiva-grill",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/kivagrill",
+   "social_instagram": "https://www.instagram.com/kivadunes/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f2e66b1c-80e7-41ff-99b5-b65bfa2cadd2",
+  "business_name": "Another Broken Egg Cafe",
+  "match_method": "place_id",
+  "live_slug": "another-broken-egg-cafe",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f3d52407-0576-410a-983c-8e5fcca5a505",
+  "business_name": "Tacky Jacks Fort Morgan",
+  "match_method": "place_id",
+  "live_slug": "tacky-jacks-fort-morgan",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f3e74140-ce16-497a-bb42-969329e0dc27",
+  "business_name": "Mile Marker 158 Dockside",
+  "match_method": "phone",
+  "live_slug": "mile-marker-158",
+  "status": "overlap",
+  "fills": {
+   "price_range": "$$$"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f521a762-9ff4-48d2-8777-182e6a1ab6c2",
+  "business_name": "City Donut",
+  "match_method": "place_id",
+  "live_slug": "city-donut",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f578008c-4ee4-42b1-ad5f-784e25bcd35f",
+  "business_name": "The Spa at The Beach Club Resort",
+  "match_method": "phone",
+  "live_slug": "the-spa-at-the-beach-club",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheSpaatTheBeachClub"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "f68b2eb4-f489-4044-8d80-074d3f07ac31",
+  "business_name": "Papa John's Pizza",
+  "match_method": "place_id",
+  "live_slug": "papa-john-s-pizza",
+  "status": "overlap",
+  "fills": {
+   "price_range": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "fb17f306-f8f9-4b9b-86eb-961296c3320e",
+  "business_name": "Voyagers",
+  "match_method": "phone",
+  "live_slug": "coastal-coffee-co",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/voyagersrestaurant",
+   "social_instagram": "https://www.instagram.com/voyagersrestaurant",
+   "description": "Discover authentic Gulf Coast cuisine amidst an intimate setting and panoramic Gulf views while dining at Voyagers. Located in Orange Beach, Alabama, Voyagers features a seasonal menu consisting of local produce, sustainable seafood, and organic meats reflecting the flavors of the Orange Beach region. The combination of spectacular views, an award-winning wine list, local gulf caught seafood and dry aged steaks make Voyagers a unique culinary destination. Chef Brody Olive's skillfully prepared and perfectly executed dishes are accompanied by first class service. Voyagers' floor to ceiling windows, contemporary décor, and relaxing background music create a tranquil ambiance. Specializing in fresh coastal cuisine, Voyagers features the Gulf Wild brand which ensures that all seafood served is responsibly caught and harvested by local fisherman operating in the Gulf of Mexico."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "fb4b3735-de64-45e2-80a5-e234dd17030f",
+  "business_name": "Acme Oyster House",
+  "match_method": "place_id",
+  "live_slug": "acme-oyster-house",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "fbad5e95-4da9-41e0-81c3-daa337ff97e8",
+  "business_name": "Delta Blue",
+  "match_method": "place_id",
+  "live_slug": "delta-blue",
+  "status": "overlap",
+  "fills": {
+   "price_range": "MODERATE"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "fc42b2f8-d569-4bfc-ae96-971b98fbda92",
+  "business_name": "Premier Hormone Health and Wellness",
+  "match_method": "phone",
+  "live_slug": "brown-gynecology-and-surgery",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61573597801380",
+   "social_instagram": "https://www.instagram.com/premierhormonehealthwellness/",
+   "description": "At Premier Hormone Health and Wellness, we understand how frustrating hormonal changes can be, and we're here to help you take back control of your health with treatments designed for real results. Whether you're navigating perimenopause or menopause, experiencing hair loss after illness or surgery, feeling the effects of low testosterone, or simply wanting to feel like yourself again, our expert team provides science-backed solutions tailored to your body's needs. With backgrounds in hormone optimization and cutting-edge wellness therapies, our providers stay at the forefront of the latest research to offer safe, science-backed treatments. We take the time to listen, understand your concerns, and create a customized plan tailored to your unique needs—whether it's hormone replacement, testosterone therapy, PRP for hair loss, or advanced weight loss solutions."
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "ff4322cd-335f-4172-bbb2-b6734c74d3db",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": "phone",
+  "live_slug": "gulf-shores-extreme-jet-ski-rental",
+  "status": "overlap",
+  "fills": {
+   "website": "https://www.tripshock.com/orange-beach-dockside-parasail/details/5989/"
+  }
+ },
+ {
+  "source_db": "march",
+  "source_table": "entity",
+  "source_id": "ff88536a-fabc-414d-b7a8-ba8c39b8cdba",
+  "business_name": "Breakout Games - Orange Beach",
+  "match_method": "phone",
+  "live_slug": "breakout-games",
+  "status": "overlap",
+  "fills": {
+   "social_facebook": "https://facebook.com/breakoutgames",
+   "social_instagram": "https://instagram.com/breakoutgames"
+  }
+ }
+]

@@ -1,0 +1,803 @@
+[
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJrVDCM48HmogRVQ6n92A2Qqs",
+  "business_name": "Premium Parking - P2853",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2853",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJV_sXelIHmogRfAZa8jksqpA",
+  "business_name": "Premium Parking - P2657",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2657",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJsUmN4rcEmogRAzoLxzgXS1I",
+  "business_name": "Papa John's Pizza",
+  "match_method": "place_id",
+  "live_slug": "papa-john-s-pizza",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:30 AM – 11:00 PM",
+   "Tuesday: 10:30 AM – 11:00 PM",
+   "Wednesday: 10:30 AM – 11:00 PM",
+   "Thursday: 10:30 AM – 11:00 PM",
+   "Friday: 10:30 AM – 12:00 AM",
+   "Saturday: 10:30 AM – 12:00 AM",
+   "Sunday: 10:30 AM – 12:00 AM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "10:30",
+    "closes_at": "23:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "10:30",
+    "closes_at": "23:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "10:30",
+    "closes_at": "23:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "10:30",
+    "closes_at": "23:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "10:30",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "10:30",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "10:30",
+    "closes_at": "00:00"
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJG9DyZ8gEmogRyl-SkXmDWLE",
+  "business_name": "AL’s Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-beer-hardees-area-gs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00 AM – 12:00 AM",
+   "Tuesday: 9:00 AM – 12:00 AM",
+   "Wednesday: 9:00 AM – 12:00 AM",
+   "Thursday: 9:00 AM – 12:00 AM",
+   "Friday: 9:00 AM – 12:00 AM",
+   "Saturday: 9:00 AM – 12:00 AM",
+   "Sunday: 9:00 AM – 12:00 AM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   }
+  ],
+  "name_similarity": 0.645
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJy3G-_fMGmogRphQQyDCg2zM",
+  "business_name": "AL’s Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-walmart-area-ob",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00 AM – 12:00 AM",
+   "Tuesday: 9:00 AM – 12:00 AM",
+   "Wednesday: 9:00 AM – 12:00 AM",
+   "Thursday: 9:00 AM – 12:00 AM",
+   "Friday: 9:00 AM – 12:00 AM",
+   "Saturday: 9:00 AM – 12:00 AM",
+   "Sunday: 9:00 AM – 12:00 AM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "09:00",
+    "closes_at": "00:00"
+   }
+  ],
+  "name_similarity": 0.742
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJFxiYcgsPmogRlOW8ok0SVAg",
+  "business_name": "Rental Center at The Home Depot",
+  "match_method": "phone",
+  "live_slug": "the-home-depot-kFVvJs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 6:00 AM – 8:00 PM",
+   "Tuesday: 6:00 AM – 8:00 PM",
+   "Wednesday: 6:00 AM – 8:00 PM",
+   "Thursday: 6:00 AM – 8:00 PM",
+   "Friday: 6:00 AM – 8:00 PM",
+   "Saturday: 6:00 AM – 8:00 PM",
+   "Sunday: 8:00 AM – 8:00 PM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "06:00",
+    "closes_at": "20:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "06:00",
+    "closes_at": "20:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "06:00",
+    "closes_at": "20:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "06:00",
+    "closes_at": "20:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "06:00",
+    "closes_at": "20:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "06:00",
+    "closes_at": "20:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "08:00",
+    "closes_at": "20:00"
+   }
+  ],
+  "name_similarity": 0.538
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJSz2ElvAGmogRMrjNNK42B-U",
+  "business_name": "Phoenix Orange Beach Vacation Rental Condominiums",
+  "match_method": "phone",
+  "live_slug": "orange-beach-home-w-hot-tub-2-mi-to-the-wharf-Y_40wo",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00 AM – 5:00 PM",
+   "Tuesday: 9:00 AM – 5:00 PM",
+   "Wednesday: 9:00 AM – 5:00 PM",
+   "Thursday: 9:00 AM – 5:00 PM",
+   "Friday: 9:00 AM – 5:00 PM",
+   "Saturday: 9:00 AM – 5:00 PM",
+   "Sunday: 9:00 AM – 5:00 PM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "09:00",
+    "closes_at": "17:00"
+   }
+  ],
+  "name_similarity": 0.32,
+  "weak_match": true
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJfT_7t3oFmogRth70BJbSZdE",
+  "business_name": "Island Carpet & Tile Cleaning",
+  "match_method": "place_id",
+  "live_slug": "island-carpet-and-tile-cleaning",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00 AM – 6:00 PM",
+   "Tuesday: 8:00 AM – 6:00 PM",
+   "Wednesday: 8:00 AM – 6:00 PM",
+   "Thursday: 8:00 AM – 6:00 PM",
+   "Friday: 8:00 AM – 6:00 PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "08:00",
+    "closes_at": "18:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "08:00",
+    "closes_at": "18:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "08:00",
+    "closes_at": "18:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "08:00",
+    "closes_at": "18:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "08:00",
+    "closes_at": "18:00"
+   },
+   {
+    "day": "Saturday",
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJORpnHO0HmogROZBVDGLh_J8",
+  "business_name": "Premium Parking - P2852",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2852",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJ3Z71uyQbmogRKPH68xAlkB0",
+  "business_name": "Premium Parking - P2651",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2651",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "00:00",
+    "closes_at": "24:00"
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJn8_AhjMOmogRKlotSkFVvJs",
+  "business_name": "The Home Depot",
+  "match_method": "place_id",
+  "live_slug": "the-home-depot-kFVvJs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 6:00 AM – 9:00 PM",
+   "Tuesday: 6:00 AM – 9:00 PM",
+   "Wednesday: 6:00 AM – 9:00 PM",
+   "Thursday: 6:00 AM – 9:00 PM",
+   "Friday: 6:00 AM – 9:00 PM",
+   "Saturday: 6:00 AM – 9:00 PM",
+   "Sunday: 8:00 AM – 8:00 PM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "06:00",
+    "closes_at": "21:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "06:00",
+    "closes_at": "21:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "06:00",
+    "closes_at": "21:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "06:00",
+    "closes_at": "21:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "06:00",
+    "closes_at": "21:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "06:00",
+    "closes_at": "21:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "08:00",
+    "closes_at": "20:00"
+   }
+  ],
+  "duplicate_of_slug": true
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJsZRc7b4EmogROuoKSAxmWEw",
+  "business_name": "Island Market",
+  "match_method": "phone",
+  "live_slug": "island-market",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00 AM – 7:00 PM",
+   "Tuesday: 9:00 AM – 7:00 PM",
+   "Wednesday: 9:00 AM – 7:00 PM",
+   "Thursday: 9:00 AM – 7:00 PM",
+   "Friday: 9:00 AM – 7:00 PM",
+   "Saturday: 9:00 AM – 7:00 PM",
+   "Sunday: 9:00 AM – 7:00 PM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "09:00",
+    "closes_at": "19:00"
+   }
+  ],
+  "name_similarity": 1.0
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJnYH6s-YPmogRXv1cmlPdHiY",
+  "business_name": "Legend Spirits",
+  "match_method": "phone",
+  "live_slug": "liquor-paradise-foley",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00 AM – 10:00 PM",
+   "Tuesday: 9:00 AM – 10:00 PM",
+   "Wednesday: 9:00 AM – 10:00 PM",
+   "Thursday: 9:00 AM – 10:00 PM",
+   "Friday: 9:00 AM – 11:00 PM",
+   "Saturday: 9:00 AM – 11:00 PM",
+   "Sunday: 9:30 AM – 9:00 PM"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "opens_at": "09:00",
+    "closes_at": "22:00"
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "09:00",
+    "closes_at": "22:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "09:00",
+    "closes_at": "22:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "09:00",
+    "closes_at": "22:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "09:00",
+    "closes_at": "23:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "09:00",
+    "closes_at": "23:00"
+   },
+   {
+    "day": "Sunday",
+    "opens_at": "09:30",
+    "closes_at": "21:00"
+   }
+  ],
+  "name_similarity": 0.114,
+  "weak_match": true
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses.google_places_data.opening_hours",
+  "type": "hours",
+  "source_id": "ChIJA4W0a-oHmogReryvzKBRCW0",
+  "business_name": "Pink Pelican Art Gallery",
+  "match_method": "place_id",
+  "live_slug": "pink-pelican-art-gallery",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00 AM – 4:00 PM",
+   "Wednesday: 11:00 AM – 4:00 PM",
+   "Thursday: 11:00 AM – 4:00 PM",
+   "Friday: 11:00 AM – 4:00 PM",
+   "Saturday: 11:00 AM – 4:00 PM",
+   "Sunday: Closed"
+  ],
+  "hours": [
+   {
+    "day": "Monday",
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens_at": "11:00",
+    "closes_at": "16:00"
+   },
+   {
+    "day": "Wednesday",
+    "opens_at": "11:00",
+    "closes_at": "16:00"
+   },
+   {
+    "day": "Thursday",
+    "opens_at": "11:00",
+    "closes_at": "16:00"
+   },
+   {
+    "day": "Friday",
+    "opens_at": "11:00",
+    "closes_at": "16:00"
+   },
+   {
+    "day": "Saturday",
+    "opens_at": "11:00",
+    "closes_at": "16:00"
+   },
+   {
+    "day": "Sunday",
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "dec",
+  "source_table": "gcr_businesses",
+  "type": "phone",
+  "source_id": "ChIJA4W0a-oHmogReryvzKBRCW0",
+  "business_name": "Pink Pelican Art Gallery",
+  "match_method": "place_id",
+  "live_slug": "pink-pelican-art-gallery",
+  "status": "net_new",
+  "phone": "2512190050",
+  "note": "live entity has no phone; Dec provides it"
+ }
+]

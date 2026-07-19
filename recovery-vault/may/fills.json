@@ -1,0 +1,3875 @@
+[
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2666ad1f-8276-4bd3-895f-1544dfd8bd3d",
+  "business_name": "The Bad Alibi",
+  "match_method": "phone",
+  "live_slug": "bad-ass-coffee-of-hawaii",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4f14b50b-9f42-4ac6-ac1c-09ddfc3be3d2",
+  "business_name": "Wonderful House",
+  "match_method": "place_id",
+  "live_slug": "wonderful-house-NHFURU",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3977fc99-98e4-4656-96b8-5cd301e25fec",
+  "business_name": "Escapes! To The Shores",
+  "match_method": "place_id",
+  "live_slug": "escapes-to-the-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/VacationCondos/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "86a5a704-a985-4717-8c38-204506741cbf",
+  "business_name": "Gulf Shores Sports Complex",
+  "match_method": "place_id",
+  "live_slug": "gulf-shores-sports-complex",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://gulfshoressports.bookdirect.net"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8120f47e-8374-43e4-8815-53c76841ea7f",
+  "business_name": "The Susan N. McCollough Gallery & Art Studio",
+  "match_method": "place_id",
+  "live_slug": "the-susan-n-mccollough-gallery-art-studio",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/susannmccolloughart",
+   "social_instagram": "https://www.instagram.com/susann.mccollough/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d6ea7cd6-10c8-4ec1-8146-d81060157259",
+  "business_name": "Indian Delight Ocean Springs",
+  "match_method": "place_id",
+  "live_slug": "indian-delight-ocean-springs-rpmPJs",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8a34abe4-05d1-469f-a612-f8dfe60ac6e8",
+  "business_name": "Blue Parrot #7",
+  "match_method": "place_id",
+  "live_slug": "blue-parrot-7",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/bluepillowIT/",
+   "social_instagram": "https://www.instagram.com/bluepillow.it",
+   "description": "Bluepillow is the global vacation rental search engine for finding the best solution at the lowest price. Browse hundreds of thousands of vacation rental apartments, villas and cottages from around the world. All the accommodation in one place, easy to use with no hidden fees. We search the best offers to find you the right one. Choose where you would like to go, compare more than 10,000,000 vacation rental offers, and find your ideal solution and save on your stay. Publish your apartment or vacation home and earn more to help you achieve your goals. Register your property on Bluepillow and pay ZERO commissions."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8367fa11-bde7-4a29-b1cc-3ff32948495c",
+  "business_name": "Perdido Beach Resort",
+  "match_method": "place_id",
+  "live_slug": "perdido-beach-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/perdidobeachresort",
+   "social_instagram": "https://www.instagram.com/perdidobeachresort/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "f2d6dc70-fab9-4b32-af75-28c47862aff5",
+  "business_name": "Perdido Pass Jetty",
+  "match_method": "place_id",
+  "live_slug": "perdido-pass-jetty",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://alwharf.com/?utm_source=GBP&utm_medium=organic&utm_campaign=website"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1dddfdd8-47e0-4529-91ec-623af5a45849",
+  "business_name": "Brick & Spoon - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "brick-spoon-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_instagram": "https://www.instagram.com/brickandspoon_hq/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "853c8177-c622-40b7-8a8e-f495e91d6dff",
+  "business_name": "Getaway Charters",
+  "match_method": "place_id",
+  "live_slug": "getaway-charters",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":\"Getaway Charters has been in business since 1995 with some of the best fishing charter boats in Orange Beach, Alabama. Located at Zekes Marina, we are only 10 minutes from Gulf Shores AL and Perdido Key FL. Two exceptional vessels (Getaway & Another Getaway) designed for unforgettable fishing experiences with one of the most popular charter companies on the Gulf of Mexico.\",\"elevator_pitch\":\"Premier deep sea and family fishing charter company in Orange Beach offering full and half-day adventures since 1995.\",\"vibe\":\"Professional, family-friendly, experienced captains and deckhands, well-maintained vessels with modern electronics and comfortable amenities\",\"best_for\":[\"families\",\"beginners\",\"kids\",\"experienced anglers\",\"groups\",\"adventure seekers\"],\"capacity\":\"Up to 6 passengers per boat\",\"duration_options\":[\"4 hours\",\"5 hours\",\"6 hours\",\"6-8 hours\",\"full day\",\"overnight excursions\"],\"departure_location\":\"Zekes Marina, Orange Beach, AL\",\"what_provided\":[\"fishing rods\",\"tackle\",\"fishing license\",\"climate controlled cabin\",\"comfortable seating\",\"restroom\",\"sleeping accommodations (overnight trips)\",\"Sirius Satellite Stereo\"],\"what_to_bring\":null,\"age_restriction\":null,\"weight_restriction\":null,\"reservations\":\"Book Now available on website\",\"cancellation_policy\":null,\"insider_tip\":\"Located only 10 minutes from Gulf Shores AL and Perdido Key FL. Vessels equipped with Furuno radar, Simrad bottom machine, and Simrad chart plotter for optimal fishing conditions.\"}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9dd9a800-f38c-45d8-bc7f-8300ba3c155f",
+  "business_name": "Premium Parking - P2651",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2651",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/PremiumParking/",
+   "social_instagram": "https://www.instagram.com/premium.parking/",
+   "description": "Premium Parking offers convenient, reliable, and affordable parking options for individuals and businesses. Experience personalized service and innovative technology that makes parking stress-free, whether you're looking for daily, monthly, or yearly parking solutions."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "dccf9d1b-fa6a-40e9-9f7a-c27c14a240dc",
+  "business_name": "Parlor Doughnuts",
+  "match_method": "place_id",
+  "live_slug": "parlor-doughnuts",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/parlordoughnuts",
+   "social_instagram": "https://www.instagram.com/parlordoughnuts"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "bb435595-0121-4ce0-8b40-826de9a63d1e",
+  "business_name": "Hurricane Grill & Wings-Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "hurricane-grill-wings-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/hurricanewings",
+   "social_instagram": "https://instagram.com/hurricanewings"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5cadc3fe-e9af-4656-bc29-481be0e2b529",
+  "business_name": "Voyagers",
+  "match_method": "place_id",
+  "live_slug": "voyagers",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/voyagersrestaurant",
+   "social_instagram": "https://www.instagram.com/voyagersrestaurant"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "01c3d5b0-2e8c-4e12-b1ad-f9e4dcaf1111",
+  "business_name": "Baumhower's Victory Grille",
+  "match_method": "place_id",
+  "live_slug": "baumhower-s-victory-grille",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b1b6ad2d-c8dc-4d8a-8b9e-9a03e3584b1d",
+  "business_name": "Gulf State Park Beach",
+  "match_method": "place_id",
+  "live_slug": "gulf-state-park-beach",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://www.alapark.com/parks/gulf-state-park",
+   "rating": 4.7
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "523d0ca6-5e46-443d-82c7-82c33e5c18f1",
+  "business_name": "Coinstar LLC",
+  "match_method": "place_id",
+  "live_slug": "coinstar-llc-1euMz8",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Coinstar",
+   "social_instagram": "https://www.instagram.com/Coinstar"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8e74e4f3-0011-41fc-a11a-b5dad2fbc4a9",
+  "business_name": "Anchors Aweigh RV Resort LLC",
+  "match_method": "place_id",
+  "live_slug": "anchors-aweigh-rv-resort-llc-1gpJLg",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=100063573340913"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8c4b267f-eebe-4d7e-99e1-650553152ac9",
+  "business_name": "The Market & Mainly Shoes",
+  "match_method": "place_id",
+  "live_slug": "the-market-mainly-shoes",
+  "status": "net_new",
+  "fills": {
+   "description": "A Shop for Women is celebrating their 40th year as a premier women's retail destination in Downtown Pensacola. The shop specializes in high-quality women's clothing, shoes, and Italian linens. They feature curated designer collections including Bottega di Brunella.",
+   "editorial_summary": "Roomy boutique showcasing a wide range of contemporary women's apparel, footwear & accessories."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8199642d-95a8-45aa-b67b-c8c59e49be21",
+  "business_name": "Walgreens",
+  "match_method": "place_id",
+  "live_slug": "walgreens",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE",
+   "social_facebook": "https://www.facebook.com/Walgreens",
+   "social_instagram": "https://www.instagram.com/walgreens",
+   "description": "For 125 years, Walgreens has helped communities live healthier lives. 8,000 locations across all 50 states serving 9 million customers and patients daily. Visit your local Walgreens for health and wellness products, personal care items, and photo services.",
+   "editorial_summary": "Drugstore chain with health & beauty aids, prescriptions & photo services, plus mini-mart basics."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9dceaaed-289c-47e1-8082-b802f513a08c",
+  "business_name": "Phoenix All Suites Hotel",
+  "match_method": "place_id",
+  "live_slug": "phoenix-all-suites-hotel",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":\"Two beachfront hotels in Gulf Shores offering condo-style amenities with hotel service. Features one-bedroom suites with fully-equipped kitchens, balconies overlooking the Gulf of Mexico, and convenient access to beaches, restaurants, and downtown Gulf Shores.\",\"elevator_pitch\":\"Luxury beachfront hotels combining condo-style amenities with hotel service in Gulf Shores, Alabama.\",\"total_units\":null,\"floors\":null,\"year_built\":null,\"pet_friendly\":null,\"minimum_stay\":null,\"check_in\":null,\"check_out\":null,\"age_restriction\":null}",
+   "editorial_summary": "Beachfront 1-bedroom condos with balconies and full kitchens, plus beach access & pools."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e8ed0d6c-3c6a-43b9-aa65-7097cdf50c67",
+  "business_name": "Chute Em Up Parasail",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.8
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c76ed9e4-4b31-4525-8531-2aca7d0676ec",
+  "business_name": "Walgreens Pharmacy",
+  "match_method": "place_id",
+  "live_slug": "walgreens-pharmacy",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE",
+   "social_facebook": "https://www.facebook.com/Walgreens",
+   "social_instagram": "https://www.instagram.com/walgreens"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "45d58167-b14b-4b05-99c5-5680e1d6af13",
+  "business_name": "HWY TO INDIA",
+  "match_method": "place_id",
+  "live_slug": "hwy-to-india-nhi0aA",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0351b10e-ce4d-4c99-a0aa-34a73d835a99",
+  "business_name": "1905 W 1st St",
+  "match_method": "place_id",
+  "live_slug": "1905-w-1st-st",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/cityofgulfshoresal",
+   "social_instagram": "https://www.instagram.com/city_gulfshores/",
+   "description": "The City of Gulf Shores Recreation & Cultural Affairs Department enriches lives and fosters harmony within the community through area-wide leisure services targeted to improve healthy life styles, educational and recreational opportunities, public participation, and environmental and economical stewardship. The department provides top quality recreation and leisure activities for the community while striving to be the best stewards of the public resources that fall within the department's care, adapting as necessary to meet the varied needs of the residents and visitors.",
+   "website_url": "https://www.gulfshoresal.gov"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cfdce44d-339a-414b-9769-ab4f3fe74a86",
+  "business_name": "Chef's Da Chinese Restaurant",
+  "match_method": "place_id",
+  "live_slug": "chefs-da-chinese-restaurant-ogFNLQ",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3b7ac80c-b0d5-4cfc-a2f0-9bcae07d57e0",
+  "business_name": "De Soto's Seafood Kitchen",
+  "match_method": "place_id",
+  "live_slug": "de-soto-s-seafood-kitchen",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/desotosseafoodkitchen/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "794dc541-4ca4-41b2-bd6d-96afca1c8291",
+  "business_name": "DESI TADKA INDIAN RESTAURANT - ALABAMA",
+  "match_method": "place_id",
+  "live_slug": "desi-tadka-indian-restaurant-alabama-zR6JRI",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "91455d06-dda5-4595-a193-eb4cb94b5527",
+  "business_name": "Gary's Brewery & Biergarten",
+  "match_method": "place_id",
+  "live_slug": "gary-s-brewery-biergarten",
+  "status": "net_new",
+  "fills": {
+   "description": "Family-owned, dog-friendly microbrewery and taproom offering 18 rotating taps of beer, cider, seltzer, and more, all crafted on site. Features a 1.3-acre beer garden, one of the largest in Florida, with cornhole, board games, and outdoor games. Also operates Gary's Home Brew Supply store offering brewing and winemaking ingredients and kits."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7effe482-0df4-48f2-ab87-4e77dce972b5",
+  "business_name": "LuLu's Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "lulu-s-gulf-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LucyBuffettLULUS",
+   "social_instagram": "https://www.instagram.com/lulusgulfshores/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b1484fc9-b0fa-4506-bb9d-e76bc1e02ab5",
+  "business_name": "Indian Kitchen",
+  "match_method": "place_id",
+  "live_slug": "indian-kitchen-U2jiqE",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "bb6abbba-6369-4571-aab6-ff4ca1c3335b",
+  "business_name": "Lake Wedowee Winery and Brewery",
+  "match_method": "place_id",
+  "live_slug": "lake-wedowee-winery-and-brewery",
+  "status": "net_new",
+  "fills": {
+   "description": "Lake Wedowee Winery is Wedowee Alabama's premier winery and tasting room. Located in beautiful downtown Wedowee less than a mile from the Lake Wedowee shoreline. We ferment, bottle, and sell our wines on location in Wedowee. In addition to our wide selection of locally made wines, we also brew our own Lake Wedowee Winery and Brewery beer. Wine will always be our passion and main product but we also offer variety with our craft beers. Many of the fruits we use are purchased from local area farmers in an effort to keep business right here at home. Each recipe is strictly adhered to and while the fruit may change due to seasonal and weather differences, the recipes are never altered. We are carving our own niche with artisanal wines that are a blend of traditional wine varieties along with new and unique varieties."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a1ef35d0-7eaf-43a1-a46e-283e615abd79",
+  "business_name": "Local and Company Food+Drink",
+  "match_method": "place_id",
+  "live_slug": "local-and-company-food-drink",
+  "status": "net_new",
+  "fills": {
+   "description": "Elevate your south Alabama dining experience with inspired cuisine. At our Foley, AL restaurant you'll find a diverse offering of menu items crafted from the finest, locally-sourced ingredients."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "f673b3d1-9f18-4c60-ab21-3172ad3c6611",
+  "business_name": "No. 1 China",
+  "match_method": "place_id",
+  "live_slug": "no-1-china-pAfnIk",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":null,\"cuisine_type\":\"chinese\"}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d5fa3554-f3a8-4017-9b48-09cdd179527f",
+  "business_name": "Moe's Original BBQ",
+  "match_method": "place_id",
+  "live_slug": "moes-original-bbq-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "BBQ, Southern",
+   "atmosphere": "Local hotspot for entertainment with live music, welcoming atmosphere with something for everyone"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cb0e5a76-e394-4f53-b0c5-fefe820bf03a",
+  "business_name": "Big Beach Brewing",
+  "match_method": "place_id",
+  "live_slug": "big-beach-brewing",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/bigbeachbrewing",
+   "social_instagram": "https://www.instagram.com/bigbeachbrewing/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ddaea052-f5b2-4c6d-b506-f0bbf1a446ca",
+  "business_name": "Perdido Key Oyster Bar",
+  "match_method": "place_id",
+  "live_slug": "oyster-bar-31",
+  "status": "net_new",
+  "fills": {
+   "description": "The Perdido Key Oyster Bar Restaurant & Marina offers waterfront dining featuring fresh oysters, Gulf seafood including gumbo, snapper, mahi-mahi, yellow fin tuna, steamed shrimp, fried platters, whole flounder, steaks, chicken, and pasta. Enjoy dining on the river with fresh daily preparations and classic Gulf Coast cuisine."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0c41d3fd-2074-4098-a7bc-5eb8141306dc",
+  "business_name": "Picnic Beach Bar & Grill",
+  "match_method": "place_id",
+  "live_slug": "picnic-beach-bar-grill",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=100089609662502",
+   "social_instagram": "https://www.instagram.com/picnicbeachal?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw=="
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "db65abf9-7a3a-4a77-89e1-9de463d1c426",
+  "business_name": "Perch",
+  "match_method": "place_id",
+  "live_slug": "perch",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "http://facebook.com/perchatgsp",
+   "social_instagram": "https://www.instagram.com/perchatgsp/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1fe79565-c836-4b10-8ae1-91dc24b9d9a8",
+  "business_name": "Taste of India Destin",
+  "match_method": "place_id",
+  "live_slug": "taste-of-india-destin-5Ga0pQ",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c06821ca-04b7-4f50-9db9-f9ec7289a9fc",
+  "business_name": "The Hangout",
+  "match_method": "place_id",
+  "live_slug": "the-hangout",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/thehangoutgs",
+   "social_instagram": "https://www.instagram.com/thehangoutgs"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6488a180-1426-4332-b25c-ef8eaad7750e",
+  "business_name": "Louisiana Lagniappe, Orange Beach, AL",
+  "match_method": "place_id",
+  "live_slug": "louisiana-lagniappe-orange-beach-al",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/lagniappedestin?fref=ts"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e2259533-fffb-4da5-8b98-2238e04a9c0d",
+  "business_name": "Breakout Games",
+  "match_method": "place_id",
+  "live_slug": "breakout-games",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/breakoutgames",
+   "social_instagram": "https://instagram.com/breakoutgames"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4f59a376-2c8c-4f17-8948-b77c6367195d",
+  "business_name": "The Galley on the River",
+  "match_method": "place_id",
+  "live_slug": "the-galley-on-the-river",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61564534360972",
+   "social_instagram": "https://www.instagram.com/thegalleyontheriver"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c915766f-a0bd-4b1b-89b2-83f91da03ac5",
+  "business_name": "Louisiana Lagniappe",
+  "match_method": "phone",
+  "live_slug": "louisiana-lagniappe",
+  "status": "net_new",
+  "fills": {
+   "price_level": "EXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4eff1ef7-bb86-4081-89d7-13af667c6105",
+  "business_name": "The Tin Top Restaurant & Oyster Bar",
+  "match_method": "place_id",
+  "live_slug": "the-tin-top-restaurant-oyster-bar",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/tintoprestaurant"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "09b45592-56fd-4766-af21-65963ec0c7c3",
+  "business_name": "Tokyo Asian Cuisine",
+  "match_method": "place_id",
+  "live_slug": "tokyo-asian-cuisine-SOSn1s",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":null,\"cuisine_type\":\"Asian\"}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "abb15baa-5150-45c6-aab4-cf21e9b2060c",
+  "business_name": "Wolf Bay Restaurant at Foley",
+  "match_method": "place_id",
+  "live_slug": "wolf-bay-restaurant-at-foley-V-Ba0I",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/Wolfbaylodge",
+   "social_instagram": "http://instagram.com/wolfbayseafood/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "08b6f37e-c69c-4f5e-8a9f-311a8982d601",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-beer-hardees-area-gs",
+  "status": "net_new",
+  "fills": {
+   "rating": 4
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "072b5c5e-ae6f-49ed-8f6e-ebe8fb0d2fa7",
+  "business_name": "Barefoot Tours & Charters",
+  "match_method": "phone",
+  "live_slug": "barefoot-private-family-jet-ski-co-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "fe127f67-a892-4f00-95c6-e764ebe815f7",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4d5106cb-96cb-464b-b1e0-81187410442f",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2953311c-fde2-40b2-a415-9b9b1c851593",
+  "business_name": "Journeys",
+  "match_method": "place_id",
+  "live_slug": "journeys-W8EnB4",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/Journeys",
+   "social_instagram": "https://instagram.com/journeys/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "459fa53a-6bd2-40d8-83d3-e3740f514f93",
+  "business_name": "Hudson Marina",
+  "match_method": "phone",
+  "live_slug": "29-dolphin-cruise",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7d06b80d-9e75-4a46-92b9-457b3c37bdf1",
+  "business_name": "Crave Cookies",
+  "match_method": "place_id",
+  "live_slug": "crave-cookies",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/thecravecookies",
+   "social_instagram": "https://instagram.com/thecravecookies"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "f068439e-1795-4a6d-a3d6-f5cca12201bf",
+  "business_name": "The Flora-Bama Yacht Club",
+  "match_method": "place_id",
+  "live_slug": "the-flora-bama-yacht-club",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/florabamayachtclub/",
+   "social_instagram": "https://www.instagram.com/fbyachtclub_"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "94869be6-75df-445e-8840-6dee63f4b1ae",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-walmart-area-ob",
+  "status": "net_new",
+  "fills": {
+   "rating": 2.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "f47a8867-9526-4f44-be00-92979fa962e0",
+  "business_name": "Happy Harbor Marina & Dry Storage",
+  "match_method": "phone",
+  "live_slug": "happy-harbor",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e7b1ce96-1cf7-4ed4-9712-d906d0e527e2",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "68c92742-34c2-499e-8b83-4bd505c8291e",
+  "business_name": "Happy Harbor Marina & Dry Storage",
+  "match_method": "phone",
+  "live_slug": "happy-harbor",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.6
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0c849b45-eea3-4b75-956c-b0be77e8b15f",
+  "business_name": "ALâs Liquor Tobacco & Wine",
+  "match_method": "place_id",
+  "live_slug": "al-s-liquor-tobacco-wine",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pages/category/Wine--Beer---Spirits-Store/ALs-Liquor-and-Wine-1233592243404882/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "759fc3cc-dbf9-49a6-b958-5bcef9033565",
+  "business_name": "Tee Off at The Wharf",
+  "match_method": "place_id",
+  "live_slug": "tee-off-at-the-wharf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/people/Tee-Off-at-The-Wharf/61573192735473/",
+   "social_instagram": "https://www.instagram.com/teeoff.thewharf/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d11e8b47-cf2d-464b-8990-3c0dfc8e4d9d",
+  "business_name": "Pelican Place at Craft Farms",
+  "match_method": "place_id",
+  "live_slug": "pelican-place-at-craft-farms",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://gulfbank.com/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b14861c0-5ff5-487b-b5f8-baec638c9fa9",
+  "business_name": "Gulf Babe Wine Boutique",
+  "match_method": "place_id",
+  "live_slug": "gulf-babe-wine-boutique",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61561421729540",
+   "social_instagram": "https://www.instagram.com/gulfbabe_wineboutique"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "09995217-ed97-4525-a3da-3fe775ebde70",
+  "business_name": "Bluewater Condominiums by Vacasa",
+  "match_method": "place_id",
+  "live_slug": "bluewater-condominiums-by-vacasa",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa/",
+   "description": "Vacasa is North America's #1 vacation rental partner, providing expert care to more than 40,000 vacation homes in the most sought-after guest destinations. We're dedicated to providing the most comprehensive care for our homeowners, so they can rent with confidence knowing that our local and national teams are with them every step of the way. Our owners benefit from Vacasa's 360-degree revenue management, which yields more bookings than our competitors in 92% of the markets we serve. Our nightly rates are determined by the industry's fastest and most precise data and forecasting, fueled by billions of data points on guest demand, available properties and even local events and weather. Guests can find our wide range of propertiesâfrom tiny houses to resort condos to large, family-friendly homesâin more places guests are looking and booking through our direct partnerships with Airbnb, Vrbo and Booking.com, as well as exclusive platforms including American Express Select Homes + Retreats and Homes & Villas by Marriott Bonvoy. Owners and guests alike can rest easy upon arrival at a clean, comfortable and well-maintained home each and every stay. From secure e-locks, to 24/7 on-the-ground-support, we're ready to welcome you to your next five-star stay. Vacasa was born around a dining room table. It began in 2009, when our founder struggled to find a property manager that could offer both professional care and strong financial returns for a family vacation home on the Washington coast. He knew there had to be a better way to care for vacation homes and provide guests with an exceptional experience. So he decided to give the vacation rental industry a renovation. The market was ready for a company with a forward-thinking approachâusing technology and data to enable local teams to care for homes and guests, while maximizing revenue for homeowners. Vacasa quickly grew from one house on the Washington coast to servicing homes across North America. Today, Vacasa is the leading full-service vacation rental management company in North America."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "453621f0-c869-42c1-b3ec-de70d60bfac0",
+  "business_name": "Terry Cove Motor Coach Resort",
+  "match_method": "place_id",
+  "live_slug": "terry-cove-motor-coach-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TerryCoveMotorCoach",
+   "description": "Our gated community is private and family-friendly and only 1.5 miles away from the beautiful white sand beaches! Our Resort is restricted to Class-A coaches only. Coaches must be 15 years old or newer. Terry Cove Motor Coach Resort features immaculate grounds with wide brick paver streets, 2 pools, a clubhouse, and miles of trails nearby. All lots are spacious 40' x 70' with 21' wide paved parking pads and 12' x 18' screened gazebos. Whether you're an owner or a guest, you'll enjoy the spacious oversized lots at Terry Cove RV Resort. We offer both pull-through lots and back-in lots, all the same size and all featuring great outdoor living space. All lots are spacious enough to handle BIG RIGS, AWNINGS, SLIDES and OUTDOOR FURNITURE. The beach is 5 minutes by car, 12 minutes by golf cart, or a short bike ride on paved sidewalks. Staying at the beach has never been so affordable. If you are looking to buy, our lots start out at $140k. And you can rent many of our lots for a fraction of the cost of a condo!"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "79d9d6b7-086f-4d9a-8ee6-96300b1e216e",
+  "business_name": "Surf Style 202: Surf, Swimwear, Sporting Goods in Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "surf-style-202-surf-swimwear-sporting-goods-in-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SurfStyle",
+   "social_instagram": "https://www.instagram.com/surfstyle"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1f877a4b-446d-46b7-a001-f0050b8840b7",
+  "business_name": "Groovy Goat",
+  "match_method": "place_id",
+  "live_slug": "groovy-goat-HZPcBc",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":null,\"elevator_pitch\":null,\"vibe\":null,\"best_for\":[],\"established\":null,\"reservations\":null,\"insider_tip\":null}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d021e330-a65d-46a9-ade5-05b7589a59e4",
+  "business_name": "Paradise Boutiques",
+  "match_method": "place_id",
+  "live_slug": "paradise-boutiques",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://www.floridastateparks.org"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "95006a1b-2822-4c63-a3d8-e3e3d06c12da",
+  "business_name": "Joe Curlette, Associate Broker: Young's Suncoast Realty on the Gulf",
+  "match_method": "place_id",
+  "live_slug": "joe-curlette-associate-broker-young-s-suncoast-realty-on-the-gulf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/joecurletterealestate",
+   "description": "Joe Curlette is an Associate Broker with Young's Suncoast Realty specializing in investment and beach properties on the Gulf Coast. I'm in the office most days during regular business hours and I'm ALWAYS ready to take your call about beach properties or any inquiries regarding homes for sale in Baldwin County AL. As your dedicated local real estate agent, I'm here to assist you in any way possible. With straight talk, solid experience, and honest real estate practices, Joe Curlette serves buyers, sellers, and investors throughout the Gulf Shores and Baldwin County area."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "96165cb7-40a6-4546-96fa-96d29508dbf7",
+  "business_name": "Sam's Bait and Tackle",
+  "match_method": "place_id",
+  "live_slug": "sam-s-bait-and-tackle",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://myislandtimecharters.com/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8b619283-a0d9-4bb4-b7a4-27dc12fcf270",
+  "business_name": "Original Romar House B & B Inn",
+  "match_method": "place_id",
+  "live_slug": "original-romar-house-b-b-inn",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/share.php?u=https://theoriginalromarhouse.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7f2227ac-792d-4055-b734-c3881afd024a",
+  "business_name": "Serenity at The Beach Salon & Spa",
+  "match_method": "place_id",
+  "live_slug": "serenity-at-the-beach-salon-spa",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SerenityAtTheBeachSalonSpa"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "bbb626e2-4625-4da2-ad01-841117c8c976",
+  "business_name": "The Commons",
+  "match_method": "place_id",
+  "live_slug": "the-commons",
+  "status": "net_new",
+  "fills": {
+   "website_url": "http://pcci.edu/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5abeb79e-8631-4a31-8d49-29ccb694f6da",
+  "business_name": "Bluegreen Paradise Isle Resort",
+  "match_method": "place_id",
+  "live_slug": "bluegreen-paradise-isle-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/bluegreenvacations",
+   "social_instagram": "https://www.instagram.com/bluegreenvacations"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "29f72d0f-3de0-4528-acc7-a8154fd2fbaf",
+  "business_name": "The Sound Wave",
+  "match_method": "place_id",
+  "live_slug": "the-sound-wave",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/soundwavegulfshores/",
+   "social_instagram": "https://www.instagram.com/soundwave.gs/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9491338e-3e00-439d-9339-dcc981f24189",
+  "business_name": "Fort Pickens Area of Gulf Island National Seashore",
+  "match_method": "place_id",
+  "live_slug": "fort-pickens-area-of-gulf-island-national-seashore-6RaIYE",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/nationalparkservice",
+   "social_instagram": "https://www.instagram.com/nationalparkservice"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "293b5cec-4128-4d27-9ed8-ba20bf35d946",
+  "business_name": "Marco's Pizza",
+  "match_method": "place_id",
+  "live_slug": "marco-s-pizza",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE",
+   "social_facebook": "https://www.facebook.com/MarcosPizza/",
+   "social_instagram": "https://www.instagram.com/marcospizza/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "17d930f8-691d-4b08-9580-2d8bfd8c9917",
+  "business_name": "Canal Road Animal Hospital",
+  "match_method": "place_id",
+  "live_slug": "canal-road-animal-hospital",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Canal-Road-Animal-Hospital-194250497291133/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2c5cee8a-f977-455e-897a-de860611d0fd",
+  "business_name": "Think Outside...",
+  "match_method": "place_id",
+  "live_slug": "think-outside",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/thinkoutsidegulfshores/",
+   "description": "Family-owned and operated, Think Outside is the premier retailer of fine patio furniture and accessories on the Alabama Gulf Coast. We offer comfortable, stylish, durable patio & balcony furniture and outdoor accessories so you can enjoy resort-style relaxation at home. At Think Outside, we believe that life is best lived outdoors, and we'd love to help you breathe the fresh air more often. We specialize in outdoor elegance and are well-equipped to design a relaxing open-air environment that appeals to your tastes. We have more than 50 years of retail experience, and we offer design and decorating consultations to help you envision and execute the look you'll love. Visit us to shop our stellar showroom. Among our curated inventory, you'll find the best brands, diverse designs, and pieces that are just as beautiful as they are durable. Delivery is free to the local community, and many of our lines will drop ship throughout the continental U.S. Let us outfit your balcony, patio or porch with high-end items that are suited to our Coastal conditions. When you're ready to turn your dream outdoor retreat into a reality, just Think Outside."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "166d95b4-306a-4f41-b7c1-df88b2d38480",
+  "business_name": "CVS",
+  "match_method": "place_id",
+  "live_slug": "cvs",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CVS"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e1430aa4-c0f8-4505-8370-630f07c227c3",
+  "business_name": "Palm Beach Resort",
+  "match_method": "place_id",
+  "live_slug": "palm-beach-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/VacationCondos/",
+   "description": "With a wide range of conveniences and amenities, the one, two, and three-bedroom accommodations at Palm Beach Resort make the perfect home away from home. Spend the day exploring all this beach town has to offer and end your day relaxing in your spacious accommodations. Cook a meal for your family in the fully equipped kitchens or take advantage of the onsite access to watch the sunset from the beach. No matter what time of year your visit, a stay at the Palm Beach Resort is guaranteed to make lifelong memories. To increase sustainability and conserve the earth's natural resources Palm Beach Resort is going green! We are now a contactless front desk. You will receive an email 7 days before you check in to fill out your guest registration. On the day of your arrival, you will receive a text message from our front desk with your check in instructions!"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a576c70a-0580-416b-9b9b-9f055d451427",
+  "business_name": "Premium Parking - P2852",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2852",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/PremiumParking/",
+   "social_instagram": "https://www.instagram.com/premium.parking/",
+   "description": "Premium Parking offers convenient, reliable, and affordable parking options for individuals and businesses. Experience personalized service and innovative technology that makes parking stress-free, whether you're looking for daily, monthly, or yearly parking solutions."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6df065c3-5c71-468c-8eaa-aa6174348343",
+  "business_name": "Meyer Park",
+  "match_method": "place_id",
+  "live_slug": "meyer-park",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/cityofgulfshoresal",
+   "social_instagram": "https://www.instagram.com/city_gulfshores/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "da839a55-3b23-4029-aaac-4bad4d549f7d",
+  "business_name": "Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "orange-beach",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":\"The City of Orange Beach is a municipal government website providing information about city departments, services, programs, facilities, and community resources for residents and visitors.\",\"elevator_pitch\":\"Official government website for the City of Orange Beach, Alabama, offering city services, community information, and recreational programs.\",\"vibe\":\"Professional municipal portal with community-focused resources and event information\",\"best_for\":[\"residents\",\"visitors\",\"community members seeking city information\"],\"established\":null,\"reservations\":null,\"insider_tip\":null}",
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "59fdb49b-fcad-48b3-b0bc-9341d959f293",
+  "business_name": "Best Western on the Beach",
+  "match_method": "place_id",
+  "live_slug": "best-western-on-the-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/BCHeritageM",
+   "social_instagram": "@bestwesternonthebeach"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ae76d3ff-8886-470c-8802-9c31cd6d6675",
+  "business_name": "Crocs at Foley Outlet (Riviera)",
+  "match_method": "place_id",
+  "live_slug": "crocs-at-foley-outlet-riviera",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Crocs/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2e03e7e2-fef9-441d-ac4f-cf948ddf91e6",
+  "business_name": "Toni Klutho, PD",
+  "match_method": "place_id",
+  "live_slug": "toni-klutho-pd",
+  "status": "net_new",
+  "fills": {
+   "website_url": "http://www.thinkoutsidegulfshores.com/",
+   "rating": 4.5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "86a2904a-6af6-4792-b0c0-2d9b5cb446af",
+  "business_name": "Hand & Stone Massage and Facial Spa",
+  "match_method": "place_id",
+  "live_slug": "hand-stone-massage-and-facial-spa",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/handandstoneusa/",
+   "social_instagram": "https://www.instagram.com/handandstoneusa/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2741ede2-0b72-4a81-b30a-64bf6ae60749",
+  "business_name": "Microtel Inn & Suites by Wyndham Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "microtel-inn-suites-by-wyndham-gulf-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Microtel",
+   "social_instagram": "https://www.instagram.com/wyndham/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "42b1fc9f-0ceb-4756-aaad-8ef855a896ca",
+  "business_name": "Conch Out 1405",
+  "match_method": "place_id",
+  "live_slug": "conch-out-1405",
+  "status": "net_new",
+  "fills": {
+   "description": "Escape to Conch Out, a stunning Gulf-front beach house in Gulf Shores, Alabama, offering the perfect combination of comfort, luxury, and location. Nestled between the Gulf of Mexico and Little Lagoon, this four-bedroom, four-bath vacation rental is a true beachfront retreatâideal for families and groups seeking weekly summer rentals with direct beach access."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a9d0eef1-014c-445c-ac5e-8e1d17941501",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "place_id",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "#",
+   "social_instagram": "#",
+   "description": "Experience the beauty of the water with Beachside Circle Boats, your go-to destination for easy, fun and unforgettable boat rentals. Whether you're looking to relax, explore the waterways, or spend quality time with family and friends, our boats are designed for comfort and simplicity. No license required, easy and fun to drive. Just show up and enjoy the ride!"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d12e712a-699e-4e52-862b-a50d5a1f1968",
+  "business_name": "Peninsula Golf & Racquet Club",
+  "match_method": "place_id",
+  "live_slug": "peninsula-golf-racquet-club",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":\"Peninsula Golf & Racquet Club, located on the Fort Morgan Peninsula of Gulf Shores, AL, provides a perfect blend of southern hospitality and championship golf. The 27-hole course delivers a playable and enjoyable layout for golfers of all skill levels, with brand-new Tiff Eagle greens that are fast, consistent and enjoyable.\",\"elevator_pitch\":\"A championship golf course with brand-new Tiff Eagle greens and southern hospitality in Gulf Shores, Alabama.\",\"vibe\":\"Upscale luxury golf club offering championship golf experience with recreational and fitness amenities\",\"best_for\":[\"golfers\",\"tournaments\",\"group outings\",\"fitness enthusiasts\",\"tennis players\"],\"established\":null,\"reservations\":\"Book Tee Times available\",\"insider_tip\":\"Recently upgraded with brand-new Tiff Eagle greens\"}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e9983c7d-92df-4a17-ba9f-f60cdabf5960",
+  "business_name": "Looks Good Gulf Karts LLC",
+  "match_method": "place_id",
+  "live_slug": "looks-good-gulf-karts-llc",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com",
+   "social_instagram": "https://instagram.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "beb501aa-6acc-4808-aa2c-022c3242d562",
+  "business_name": "Paradise Citi Campground",
+  "match_method": "place_id",
+  "live_slug": "paradise-citi-campground",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/",
+   "social_instagram": "https://www.instagram.com/rveverafter_/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a1e770aa-0760-4b29-8812-4f10a4b5f358",
+  "business_name": "Mo's Landing Park",
+  "match_method": "place_id",
+  "live_slug": "mo-s-landing-park",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/GulfShoresRec",
+   "social_instagram": "https://www.instagram.com/city_gulfshores/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8c6d5669-4f61-4237-8f4b-1eb8f037d7de",
+  "business_name": "The Wharf",
+  "match_method": "place_id",
+  "live_slug": "the-wharf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheWharfOB",
+   "social_instagram": "https://www.instagram.com/thewharfob"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5551bb51-d1e3-4e19-ac6d-33318c0917cc",
+  "business_name": "Salt & Light Aesthetics",
+  "match_method": "place_id",
+  "live_slug": "salt-light-aesthetics",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/GlossGenius/",
+   "social_instagram": "https://www.instagram.com/saltandlightaesthetics",
+   "description": "My name is Magan McInnis. I am a licensed esthetician and owner operator of Salt and Light Aesthetics. I have always dreamed of being an entrepreneur thats core value is for women to feel good about themselves and feel beautiful in their own skin. I believe in healing the skin from the inside out."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "eb9faa54-5fee-4a35-9c9a-c618b9672f5c",
+  "business_name": "Caribe Resort",
+  "match_method": "place_id",
+  "live_slug": "caribe-resort",
+  "status": "net_new",
+  "fills": {
+   "description": "Caribe Resort is a premier destination property located on the Alabama Gulf Coast in Orange Beach. The staff and management of Caribe Resort are dedicated to making your vacation a life-long dream. We offer hundreds of vacation rentals ranging from 2 to 4+ bedroom condominiums, all fully equipped with everything you need for a comfortable stay. You won't have to go far to enjoy relaxing amenities such as the lazy river, pools, slides, saunas, hot tubs, tennis courts, and more. Our property features complimentary boat slips for guests, an on-site marina, and access to world-class dining at Cobalt Restaurant. Whether you're planning a family vacation, romantic getaway, group retreat, or special event, Caribe Resort provides the perfect blend of luxury and leisure. We are within minutes of many popular locations, stores, and restaurants, and provide complimentary trolley service from 8:00 am to 8:00 pm to the public beach access point and throughout the property.",
+   "editorial_summary": "Contemporary condo resort between the gulf & bay with pools, water slides, lazy river & boat slips."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "daf18b77-0b4c-450d-b518-698f4ab26aaa",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.7
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a3e16359-232c-46e8-9a15-5e059ac7442b",
+  "business_name": "The Oasis at The Wharf",
+  "match_method": "place_id",
+  "live_slug": "the-oasis-at-the-wharf",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://alwharf.com/?utm_source=GBP&utm_medium=organic&utm_campaign=website"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "47fcefe1-122d-4f4d-a86d-31dcb57ff5f5",
+  "business_name": "The Massage Office",
+  "match_method": "place_id",
+  "live_slug": "the-massage-office",
+  "status": "net_new",
+  "fills": {
+   "description": "A local small business, proudly serving the Gulf Shores and Orange Beach areas for over 18 years. At the Massage Office we offer true therapeutic massage tailored to each client's individual needs. Prepare yourself for a whole being therapeutic massage vacation at the Massage Office in the heart of beautiful Orange Beach, Alabama. The Massage Office brings massage out of the day spa and into a massage only setting, making it an accessible part of your healthy life ritual. Come and enjoy our aromatherapy, heated tables, hot towels, soothing music and clean comfortable rooms. It is the perfect place to ease pain, de-stress, heal your body and center your mind! Enhanced sanitizing methods are in place for the health of our clients."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "acb2e20c-ee8b-42e2-8cfa-934649cdb672",
+  "business_name": "Luxury RV Resort",
+  "match_method": "place_id",
+  "live_slug": "luxury-rv-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/luxuryrvresort",
+   "social_instagram": "https://www.instagram.com/luxuryrv_resort/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "dd84dc00-0256-4832-a072-8f496e06c247",
+  "business_name": "Island Tower",
+  "match_method": "phone",
+  "live_slug": "caribe-resort",
+  "status": "net_new",
+  "fills": {
+   "description": "Youâll enjoy stunning views of the beachfront and Gulf of Mexico from your room at Island Tower Gulf Shores.Â  Located just a few blocks west of Hwy 59, the Island Tower resort condominiums are both conveniently located and comfortably secluded just off the beaten path.Â  Rest and relax in the hot tub or the sauna and follow it up with a refreshing splash in one of the two pools on the property.Â  If youâre looking for fun in the sun and a relaxing vacation, Island Tower rentals Gulf Shores has pre"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "547a268a-78e5-4a3a-b548-62c610888a21",
+  "business_name": "Deep South Boat Storage & RV Park",
+  "match_method": "place_id",
+  "live_slug": "deep-south-boat-storage-rv-park-AwwZpM",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/deepsouthboatstorageandrvpark/",
+   "social_instagram": "https://www.instagram.com/deepsouthboatstorageandrvpark/?hl=en"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "66febbe2-5d03-4328-b3e7-68d182e8fcc9",
+  "business_name": "Big Mike's Steakhouse - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "big-mike-s-steakhouse-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/BigMikesSteakhouseANDY/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0a73a9e8-50c8-42a5-8af7-1edbafe1f053",
+  "business_name": "Young's Suncoast Vacation Rentals",
+  "match_method": "place_id",
+  "live_slug": "young-s-suncoast-vacation-rentals",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/YoungsSuncoastVacations/",
+   "social_instagram": "https://www.instagram.com/youngssuncoast/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "675742cf-a72b-4773-bafb-df7f25908b61",
+  "business_name": "Walmart Supercenter",
+  "match_method": "place_id",
+  "live_slug": "walmart-supercenter",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE",
+   "social_facebook": "https://www.facebook.com/Walmart2748/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1acc7eb1-73d1-4efc-be88-0fd2457f5481",
+  "business_name": "The Lodge at Gulf State Park, a Hilton Hotel",
+  "match_method": "place_id",
+  "live_slug": "the-lodge-at-gulf-state-park-a-hilton-hotel",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/lodgeatgsp/",
+   "social_instagram": "https://www.instagram.com/lodgeatgsp/?hl=en"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7df6ed18-107b-4247-8ef9-11ec5cf666d7",
+  "business_name": "Dollar General",
+  "match_method": "place_id",
+  "live_slug": "dollar-general",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e2093b03-949e-483f-b281-1ee2fbd95622",
+  "business_name": "Staybridge Suites Gulf Shores by IHG",
+  "match_method": "place_id",
+  "live_slug": "staybridge-suites-gulf-shores-by-ihg",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/staybridge",
+   "social_instagram": "https://instagram.com/staybridge"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "81336a02-bbbe-4227-9ee2-f0bd0c4b4312",
+  "business_name": "Sunliner Diner - Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "sunliner-diner-gulf-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/sunlinerdiner/",
+   "social_instagram": "https://www.instagram.com/sunlinerdiner"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5427924e-38e7-4732-9259-49399d7dd2d9",
+  "business_name": "Swiger Studio",
+  "match_method": "place_id",
+  "live_slug": "swiger-studio",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SwigerStudio/",
+   "social_instagram": "https://www.instagram.com/swigerstudio/",
+   "description": "Swiger Studio is a creative collective based in Gulf Shores and Baton Rouge specializing in art, music production, graphic design, drone videography, mixed media, and murals. The studio features multiple artists and creators offering comprehensive branding, audio engineering, and visionary art services."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4db84a6e-4a81-4290-a31e-63010007d5a2",
+  "business_name": "SanRoc Cay Marina - Shopping",
+  "match_method": "place_id",
+  "live_slug": "sanroc-cay-marina-shopping",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/sanroccay",
+   "social_instagram": "https://www.instagram.com/sanroccaymarina"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b56d24f7-52f3-4462-81f0-d5ce7b64ca7b",
+  "business_name": "Admirals Quarters Condominiums",
+  "match_method": "place_id",
+  "live_slug": "admirals-quarters-condominiums",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7d6d29f7-7451-439e-a8fb-9ff97ca1d76b",
+  "business_name": "Orange Beach History Museum",
+  "match_method": "place_id",
+  "live_slug": "orange-beach-history-museum",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/orangebeach",
+   "social_instagram": "https://www.instagram.com/cityoforangebeach"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "71821c86-103d-4d1c-abe2-fc5851510e0b",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-area-gs",
+  "status": "net_new",
+  "fills": {
+   "rating": 2.2
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8913a614-7748-4b15-95cb-70d245af7357",
+  "business_name": "Lost Bay Guide Service",
+  "match_method": "place_id",
+  "live_slug": "lost-bay-guide-service-j77fSs",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LastLocalGuideService",
+   "social_instagram": "https://www.instagram.com/captjohnvann/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1256455c-adc2-44c5-be38-8bde45ea7712",
+  "business_name": "OSO at Bear Point Harbor - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "oso-at-bear-point-harbor-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/OSOatBearPointHarbor",
+   "social_instagram": "https://www.instagram.com/oso_bear_point_harbor/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "72957a00-c7a0-4751-80eb-6a75ff45c84c",
+  "business_name": "ONE Club Gulf Shores Apartments",
+  "match_method": "place_id",
+  "live_slug": "one-club-gulf-shores-apartments",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/ONECLUBGS/",
+   "social_instagram": "https://www.instagram.com/oneclubgulfshores/",
+   "description": "ONE Club Gulf Shores is a premier five-star resort and residence community located on 30+ acres in Gulf Shores, Alabama. The community features luxury apartments with 1, 2, and 3-bedroom floor plans, a championship-inspired 9-hole executive golf course, two resort-style pools (including a 21+ adult pool), state-of-the-art fitness center, pickleball courts, beach volleyball, Bar 45 restaurant and bar, and extensive indoor and outdoor amenities. ONE Club is open to everyoneâno membership required to dine at Bar 45 or enjoy the community. The property offers both year-round apartment rentals and short-term vacation rentals within minutes of Gulf Shores' white sand beaches. With flexible memberships (Pool, Social Club, Golf Exclusive, and Ultimate Sport), curated resident events, and a vibrant community atmosphere, ONE Club serves active lifestyle enthusiasts, families, couples, snowbirds, and vacationers. The community has been voted the #1 place to live and vacation in Baldwin County for six consecutive years."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "35e70680-1dc3-49cc-bb11-ca17b9fb6493",
+  "business_name": "The Home Depot",
+  "match_method": "place_id",
+  "live_slug": "the-home-depot-kFVvJs",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a3833b8b-8517-4f82-9583-9fc10858494d",
+  "business_name": "Scales N Tails Charters",
+  "match_method": "place_id",
+  "live_slug": "scales-n-tails-charters",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pages/Scales-N-Tails-Charters/336174499810437"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ea478b58-ccab-4bfd-a0db-77bf48db1c38",
+  "business_name": "Shipps Dockside Grill",
+  "match_method": "phone",
+  "live_slug": "shipps-dockside-grill",
+  "status": "net_new",
+  "fills": {
+   "email": "info@shippsdockside.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6bcc0283-5dfb-4f85-bd21-c2ce73fd4478",
+  "business_name": "Tacky Jacks Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "tacky-jacks-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/tackyjacksorangebeach",
+   "social_instagram": "https://www.instagram.com/tackyjacksorangbeach/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "16b8903f-b72c-4c0e-aca5-76d6c02f572c",
+  "business_name": "Scuttlebutt Pub",
+  "match_method": "phone",
+  "live_slug": "scuttlebutt-pub",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/scuttlebuttpub",
+   "social_instagram": "https://www.instagram.com/scuttlebuttfoleycocktails/",
+   "cuisine_type": "Pub, Cocktails",
+   "atmosphere": "Vibrant, friendly neighborhood pub with outdoor patio featuring games like pool and giant Jenga. Live entertainment venue."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "dc875412-a7cd-470e-835e-937b04724b6c",
+  "business_name": "Junavelli Winery",
+  "match_method": "phone",
+  "live_slug": "junavelli-winery-llc-r0DwHU",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/JunavelliWinery",
+   "description": "Junavelli Winery is a family-owned and operated winery located in Brewton, Alabama that specializes in handcrafted sweet and semi-sweet wines. The winery offers wine tastings, live events, and online wine shipping. Experience the rich and diverse selection of wines at Junavelli Winery. From the luscious sweetness of Southern Sweet Blueberry to the delightful notes of Muscadine, our wines are crafted to perfection. Savor the taste of our small-town charm and let your palate be delighted. Immerse yourself in the small-town charm of Junavelli Winery. Our winery is located in the picturesque North Brewton community and offers a serene and welcoming atmosphere. Take a tour, enjoy a tasting, and create lasting memories with friends and family.",
+   "cuisine_type": "Winery - Wine Tasting",
+   "atmosphere": "Small-town charm, serene and welcoming atmosphere, picturesque North Brewton community location",
+   "email": "junavelliwinery@gmail.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b3347e94-98d9-4726-9890-1e53a3d35226",
+  "business_name": "Papa John's Pizza",
+  "match_method": "place_id",
+  "live_slug": "papa-john-s-pizza",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "eb5d7336-81f9-4fa9-927b-c0f923299d1a",
+  "business_name": "Nike Factory Store - Foley",
+  "match_method": "place_id",
+  "live_slug": "nike-factory-store-foley",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/nike",
+   "social_instagram": "https://www.instagram.com/nike/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3d2254e1-7dec-4fa6-ad0a-1d9f8df6b076",
+  "business_name": "Fat Daddy's Arcade",
+  "match_method": "place_id",
+  "live_slug": "fat-daddy-s-arcade",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/thetrackfamilyfunparks",
+   "social_instagram": "https://instagram.com/funatthetrack"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0a15bba7-8afe-4ed3-9a8b-4d3278d1f5a8",
+  "business_name": "FoodCraft",
+  "match_method": "phone",
+  "live_slug": "foodcraft",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "http://facebook.com/foodcraftatgsp",
+   "social_instagram": "https://www.instagram.com/foodcraftatgsp/",
+   "cuisine_type": "American",
+   "atmosphere": "Coastal with stunning views of Alabama's Gulf Coast"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "53cad863-a54d-431d-8552-d90c203f0949",
+  "business_name": "Mikee's Seafood",
+  "match_method": "phone",
+  "live_slug": "mikee-s-seafood",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/MikeesSeafood",
+   "social_instagram": "https://www.instagram.com/mikees_seafood/",
+   "cuisine_type": "Seafood, Southern",
+   "atmosphere": "Family-friendly, warm, local tradition, casual dining"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1ace9a39-7f70-40b6-9564-49a61b9bcfc4",
+  "business_name": "Hurricane Grill & Wings-Orange Beach",
+  "match_method": "phone",
+  "live_slug": "hurricane-grill-wings-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HurricaneWings/",
+   "social_instagram": "https://www.instagram.com/hurricanewings/",
+   "cuisine_type": "Casual Dining - Wings, Burgers, Sandwiches, Bar",
+   "atmosphere": "Bar atmosphere, casual dining, beach lifestyle"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "16247704-b424-48c0-bd25-627eb7a0c1a8",
+  "business_name": "20115 State Park Rd",
+  "match_method": "place_id",
+  "live_slug": "20115-state-park-rd",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/alstateparks",
+   "social_instagram": "https://instagram.com/alstateparks",
+   "description": "Gulf State Park is a 6,150-acre state park featuring beach pavilions, nature center, swimming pool, Lake Shelby day-use area with kayaking and canoeing, fishing and education pier, backcountry biking trails, butterfly garden, learning campus, interpretive center, hiking trails, geocaching, paddle sports, and more. The park offers accommodations including The Lodge at Gulf State Park (Hilton Hotel), lakeside cabins, woods cabins, eagle cottages, improved 496-site campground with full hookups, primitive camping, and glamping sites.",
+   "website_url": "https://www.alapark.com/gulf-state-park"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2fd13e28-7ddb-48ab-bd6b-963e0cad68b2",
+  "business_name": "The Spa at The Beach Club",
+  "match_method": "place_id",
+  "live_slug": "the-spa-at-the-beach-club",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheSpaatTheBeachClub"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "af8bf712-3758-4882-90e5-28f12cdfbbe1",
+  "business_name": "Gulf Shores Family Pharmacy",
+  "match_method": "place_id",
+  "live_slug": "gulf-shores-family-pharmacy",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/GulfShoresFamilyPharmacy/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cab5476a-0bdd-4e86-972f-4d030a017a25",
+  "business_name": "Island Wing Company Grill & Bar - Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "island-wing-company-grill-bar-gulf-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/islandwingtallahassee/",
+   "social_instagram": "https://www.instagram.com/islandwingtallahassee/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "92898027-b0b6-465e-828c-c141f5f99fe8",
+  "business_name": "Pink Pony Pub",
+  "match_method": "phone",
+  "live_slug": "pink-pony-pub",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Seafood",
+   "atmosphere": "Beachfront bar and grill with casual beach atmosphere"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8b4aa42e-5157-4e84-87cf-1b600f927a65",
+  "business_name": "SpringHill Suites by Marriott Orange Beach Gulf Shores",
+  "match_method": "phone",
+  "live_slug": "salt-sips",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "American"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "437f8670-9203-4918-a517-194391e720af",
+  "business_name": "Grand Riviera Rv Resort â Foley, Alabama",
+  "match_method": "place_id",
+  "live_slug": "grand-riviera-rv-resort-foley-alabama-ZFELqQ",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Grandrivierarvresort"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "33a2fddd-21d5-4951-a220-d0a1938c6e07",
+  "business_name": "Pirates Cove",
+  "match_method": "phone",
+  "live_slug": "pirates-cove",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/piratescove",
+   "social_instagram": "https://www.instagram.com/piratescoveriffraff",
+   "cuisine_type": "Bar & Grill",
+   "atmosphere": "Historic waterfront bar with pirate theme, casual relaxed atmosphere",
+   "email": "info@piratescoveriffraff.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9eda5e0d-3e39-4e0e-930f-c3cdc91c8086",
+  "business_name": "The Beach House Kitchen & Cocktails",
+  "match_method": "phone",
+  "live_slug": "the-beach-house-kitchen-and-cocktails",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Seafood, American",
+   "atmosphere": "Casual dining, porch seating available, beachfront location",
+   "email": "info@beachhouseGS.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "546806cb-07cb-4740-97f1-63cd8f4bf7ee",
+  "business_name": "Blalock Seafood & Specialty Market",
+  "match_method": "phone",
+  "live_slug": "blalock-seafood-specialty-gulf-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/BlalocksSeafood",
+   "cuisine_type": "Seafood Market",
+   "atmosphere": "Locally owned and operated seafood market with knowledgeable staff, clean facilities, and large assortment of fresh seafood",
+   "email": "info@blalockseafoodgulfshores.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "82eb746c-c8bf-4611-bbb5-2a897868a426",
+  "business_name": "Best Western on the Beach",
+  "match_method": "phone",
+  "live_slug": "best-western-on-the-beach",
+  "status": "net_new",
+  "fills": {
+   "atmosphere": "Beachfront, tropical vacation destination",
+   "email": "info@bestwesternonthebeach.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c374222c-a248-407f-b84b-35450b57f39a",
+  "business_name": "Bleus Burger Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "bleus-burger",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Burgers, Craft Beer & Cocktails",
+   "atmosphere": "Modern casual dining with craft beer and cocktail focus, vibrant and elevated burger restaurant",
+   "email": "info@bleusburger.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "81d1d3a5-b5d9-4fa3-84cb-e31508ac6dc6",
+  "business_name": "Happy Harbor Marina & Dry Storage",
+  "match_method": "phone",
+  "live_slug": "happy-harbor",
+  "status": "net_new",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "23c37819-1598-40be-974d-d3ea58e5211b",
+  "business_name": "Gulf Shores Rentals",
+  "match_method": "place_id",
+  "live_slug": "gulf-shores-rentals",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/gsrentalsfanpage",
+   "social_instagram": "https://www.instagram.com/alabamasbeachessportsevents/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4700a022-5196-4724-b00f-bd150f95530a",
+  "business_name": "The Louisiana Lagniappe",
+  "match_method": "phone",
+  "live_slug": "louisiana-lagniappe",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Gulf Seafood with Creole flair",
+   "atmosphere": "Casual upscale waterfront dining experience, family-friendly"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5828cbc5-1368-40c6-8788-de8dd58094b2",
+  "business_name": "Craft Farms Golf Club",
+  "match_method": "place_id",
+  "live_slug": "craft-farms-golf-club",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CraftFarmsGolf/",
+   "social_instagram": "https://www.instagram.com/craftfarms/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8628bfa6-f2ed-4879-b8cc-7ab6b05da48c",
+  "business_name": "Brandon Styles Live Theater & Magic Shop at OWA",
+  "match_method": "place_id",
+  "live_slug": "brandon-styles-live-theater-magic-shop-at-owa",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Brandon-Styles-Impressionist-6881773297/?fref=ts",
+   "social_instagram": "https://www.instagram.com/brandonstylesshow"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "99f7d955-a406-45b2-9631-f33848db51f8",
+  "business_name": "Howell Gulf House - Beautiful 4BR Gulf Front Home",
+  "match_method": "place_id",
+  "live_slug": "howell-gulf-house-beautiful-4br-gulf-front-home",
+  "status": "net_new",
+  "fills": {
+   "description": "Welcome to Howell Gulf House! Your Gulf-front home away from home is located right on the sugar-white sand with expansive Gulf views in your backyard and tranquil Little Lagoon views in the front. With an updated open floor plan, four bedrooms, and four full bathrooms, this getaway sleeps 12 with all the comforts of home â except with an amazing Gulf Coast location.",
+   "website_url": "https://www.redawning.com/rental-property/howell-gulf-house-2865-gulf-shores"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c67f2114-51fc-4872-9d1d-175a5352035f",
+  "business_name": "Lillians Pizza",
+  "match_method": "phone",
+  "live_slug": "lillians-pizza",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Pizza, Italian",
+   "atmosphere": "Casual dining with bar, entertainment options including music bingo, trivia, family feud, and live entertainment"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "48f399e7-38db-4950-9292-29464f739d48",
+  "business_name": "Papa Rocco's",
+  "match_method": "phone",
+  "live_slug": "papa-roccos",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Pizza, Oysters, Wings",
+   "email": "jamabaker963@gmail.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3ccf1405-3b64-47ca-bef1-015b8cb9a8f0",
+  "business_name": "Lambert's Cafe - Home of Throwed Rolls",
+  "match_method": "phone",
+  "live_slug": "lamberts-caf-gsc4Xc",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LCSIKESTONMO/",
+   "social_instagram": "https://www.instagram.com/lcsikeston/?hl=en",
+   "cuisine_type": "Southern, American comfort food",
+   "atmosphere": "Family-friendly, casual dining with unique tradition of throwing rolls to diners",
+   "email": "Lamberts1@Throwedrolls.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "19810531-4ce6-4f31-afd1-60152c957b7e",
+  "business_name": "27120 Perd Bch Blvd",
+  "match_method": "place_id",
+  "live_slug": "27120-perd-bch-blvd",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://www.brett-robinson.com/orange-beach/phoenix-east-2/?utm_source=gmb&utm_medium=organic&utm_campaign=website-link&utm_term=phoenix-east-2-vacation-rental-condos",
+   "rating": 4.5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6ce1c6c2-0a97-4ecf-bdaf-e4a1b94578e3",
+  "business_name": "Holiday Inn Express Orange Beach-on the Beach by IHG",
+  "match_method": "place_id",
+  "live_slug": "holiday-inn-express-orange-beach-on-the-beach-by-ihg",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HolidayInnExpress/",
+   "social_instagram": "https://www.instagram.com/holidayinnexpress/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0d53d7d1-95a6-4fb2-9a48-51ac50853692",
+  "business_name": "Gulf Village Condominium",
+  "match_method": "place_id",
+  "live_slug": "gulf-village-condominium",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":\"Gulf Village is a beachfront vacation rental property in Gulf Shores, Alabama, managed by Brett/Robinson Vacation Rentals, a family-owned and operated company with over 40 years of experience. The property offers quality accommodations with direct beach access and various unit configurations for families and groups.\",\"elevator_pitch\":\"Beachfront Gulf Shores condo offering quality vacation rentals with direct beach access and family-friendly amenities managed by a 40+ year legacy company.\",\"total_units\":null,\"floors\":null,\"year_built\":null,\"pet_friendly\":null,\"minimum_stay\":\"3 nights\",\"check_in\":null,\"check_out\":null,\"age_restriction\":null}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "341c5c9a-b90f-4928-b0e9-2fc227025f7e",
+  "business_name": "Happy Harbor Marina & Dry Storage",
+  "match_method": "phone",
+  "live_slug": "happy-harbor",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.6
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "021e9125-7b5b-433f-88ee-a1d542900a85",
+  "business_name": "Holiday Harbor Marina",
+  "match_method": "place_id",
+  "live_slug": "holiday-harbor-marina-2biHP8",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HolidayHarborMarinaPerdidoKey",
+   "social_instagram": "https://www.instagram.com/holidayharbormarina/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "14125f7c-6872-46bb-bc7b-cd02445f40d2",
+  "business_name": "Coastal Arts Center of Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "coastal-arts-center-of-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/orangebeach",
+   "social_instagram": "https://www.instagram.com/cityoforangebeach"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "05289559-fe09-4626-9fac-fa301cd22985",
+  "business_name": "Mile Marker 158 Dockside",
+  "match_method": "phone",
+  "live_slug": "mile-marker-158",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Marker158dockside",
+   "social_instagram": "https://www.instagram.com/milemarker158",
+   "cuisine_type": "Casual American, Seafood",
+   "atmosphere": "Upscale casual with waterfront/dockside patio views overlooking the Wharf's Marina. Pleasant indoor dining experience. Family-friendly with outdoor seating available.",
+   "email": "dockside158@gmail.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "28f76741-77b5-4a8b-86bd-8770d25c4f6e",
+  "business_name": "Gulf Coast Rental Co",
+  "match_method": "place_id",
+  "live_slug": "gulf-coast-rental-co",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/GulfCoastRentalCo/",
+   "social_instagram": "https://www.instagram.com/gulfcoastrentalco/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9b62bf2d-0ed9-48f6-93c4-565ae9d79640",
+  "business_name": "Villaggio Grille",
+  "match_method": "phone",
+  "live_slug": "villaggio-grille",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/villaggiogrille/",
+   "social_instagram": "https://www.instagram.com/villaggiogrilleob/",
+   "cuisine_type": "Italian Fusion & Seafood",
+   "atmosphere": "Fine dining with bar and dining room, located at the wharf"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c27c871f-4fd5-450b-82eb-e00a1bdc8657",
+  "business_name": "The Jellyfish - Seafood Restaurant and Bar",
+  "match_method": "phone",
+  "live_slug": "the-jellyfish-bar",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Seafood, Sushi, Steakhouse",
+   "email": "info@thejellyfishbar.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0933d787-c63d-4602-b650-7e1e85882ebf",
+  "business_name": "Alvin's Island - Orange Beach, AL #780",
+  "match_method": "place_id",
+  "live_slug": "alvin-s-island-orange-beach-al-780",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Alvinsisland/",
+   "social_instagram": "https://www.instagram.com/alvins_island"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b1d88963-d24e-4ea7-80ff-5c5d3317ed9c",
+  "business_name": "Another Broken Egg Cafe",
+  "match_method": "phone",
+  "live_slug": "another-broken-egg-cafe",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/AnotherBrokenEgg/",
+   "social_instagram": "https://www.instagram.com/anotherbrokenegg/",
+   "cuisine_type": "Breakfast, Brunch, Lunch",
+   "atmosphere": "Casual getaway with family, friends and friendly service, patio dining available"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "f7cdda3d-162a-43ff-90fc-4ee4be3ed31e",
+  "business_name": "Kristin Pierre Art",
+  "match_method": "place_id",
+  "live_slug": "kristin-pierre-art",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/kristinpierreart/",
+   "social_instagram": "https://www.instagram.com/kristinpierreart"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "56ab8570-24f0-4d1f-b3fd-fcef9f205644",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "place_id",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/cosmosrestaurantandbar",
+   "social_instagram": "https://www.instagram.com/cosmosrestaurantandbar/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "11577858-7bb2-44fd-ac4b-be90ce43c2d6",
+  "business_name": "Hooters",
+  "match_method": "place_id",
+  "live_slug": "hooters",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/hooters/",
+   "social_instagram": "https://www.instagram.com/hooters/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e18717b4-9537-4d37-a954-d737c583f155",
+  "business_name": "Old Salt Tavern",
+  "match_method": "phone",
+  "live_slug": "old-salt-tavern",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/oldsalttavern",
+   "social_instagram": "https://www.instagram.com/oldsalttavern",
+   "cuisine_type": "American",
+   "atmosphere": "Upscale neighborhood hangout with sports viewing"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "949ac372-8e69-4641-b450-d299bc65bb4c",
+  "business_name": "Domino's Pizza",
+  "match_method": "place_id",
+  "live_slug": "domino-s-pizza",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d7056e6c-3dcc-420d-8b2b-c89ac2a88c10",
+  "business_name": "Flora-Bama",
+  "match_method": "place_id",
+  "live_slug": "flora-bama",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Beach Bar, Seafood",
+   "atmosphere": "World famous beach bar with live music"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "051f5bd3-1622-41db-a51b-906996ac5030",
+  "business_name": "Moe's Original BBQ Orange Beach, AL",
+  "match_method": "phone",
+  "live_slug": "moes-original-bbq-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Barbecue, Southern",
+   "atmosphere": "Lively Gulf Coast BBQ destination with backyard dining oasis, full-service bar, stage area, live music performances, spacious outdoor seating. Casual dining with entertainment focus."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "931ed2c4-19fe-4778-aaa9-bcc830495265",
+  "business_name": "The Steamer & Baked Oyster Bar",
+  "match_method": "phone",
+  "live_slug": "the-steamer-baked-oyster-bar",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Seafood"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8d272f2b-1758-4093-9c00-de1186aff5fb",
+  "business_name": "The Southern Grind Coffee House at the WHARF",
+  "match_method": "place_id",
+  "live_slug": "the-southern-grind-coffee-house-at-the-wharf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheSouthernGrindCoffeeHouse",
+   "social_instagram": "https://www.instagram.com/thesoutherngrind_coffeehouse/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "775c13f1-21d6-4bc0-a247-1effeca8e7ca",
+  "business_name": "The Sloop",
+  "match_method": "phone",
+  "live_slug": "the-sloop",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Dive Bar, Grill and Bar",
+   "atmosphere": "Dive bar",
+   "email": "biz@thesloop.biz"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b0ca4427-bbfd-4ae9-9c1f-e0dbfdd0076c",
+  "business_name": "Cobalt, The Restaurant",
+  "match_method": "phone",
+  "live_slug": "cobalt-the-restaurant",
+  "status": "net_new",
+  "fills": {
+   "cuisine_type": "Contemporary Coastal Cuisine",
+   "atmosphere": "Casual and relaxing waterfront dining with live music"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "42f1ecd7-ae1c-48f1-a249-5b7d060de7a1",
+  "business_name": "Papa Johns Pizza Commercial Avenue",
+  "match_method": "phone",
+  "live_slug": "papa-john-s-pizza",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/papajohnsus",
+   "social_instagram": "https://www.instagram.com/papajohns/",
+   "cuisine_type": "Pizza"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4096f30b-a09d-49f8-b03b-518189522da6",
+  "business_name": "Buena Vista Motor Coach Resort",
+  "match_method": "place_id",
+  "live_slug": "buena-vista-motor-coach-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/BuenaVistaMotorCoachResort",
+   "social_instagram": "https://www.instagram.com/buenavistamotorcoachresort/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cb750b00-9fcc-409d-894f-cd198151dd73",
+  "business_name": "Gulf Shores Museum",
+  "match_method": "place_id",
+  "live_slug": "gulf-shores-museum",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/GulfShoresMuseum/",
+   "social_instagram": "https://www.instagram.com/city_gulfshores/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a77c4d39-fdd5-4666-b94e-5ed59f176fcd",
+  "business_name": "Pirates Cove",
+  "match_method": "place_id",
+  "live_slug": "pirates-cove",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/piratescove",
+   "social_instagram": "https://www.instagram.com/piratescoveriffraff"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3110aa7b-f7fd-4280-910b-837048e7fb69",
+  "business_name": "Kiva Dunes Resort and Golf",
+  "match_method": "place_id",
+  "live_slug": "kiva-dunes-resort-and-golf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/KivaDunes",
+   "social_instagram": "https://www.instagram.com/kivadunes"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e5b8e9ed-9140-47fe-a781-e4ead7260525",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "35abe469-c721-490d-b9d1-14d1ece508cb",
+  "business_name": "Kiva Grill",
+  "match_method": "place_id",
+  "live_slug": "kiva-grill",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/kivagrill",
+   "social_instagram": "https://www.instagram.com/kivadunes/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "06379011-38dc-4d10-a5a1-340398bd4dc4",
+  "business_name": "Sun Outdoors Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "sun-outdoors-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SunOutdoorsOrangeBeach",
+   "social_instagram": "https://www.instagram.com/sunoutdoorsorangebeach/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "22db2db6-baa8-46dc-bac2-c5a8502c1b1f",
+  "business_name": "Tanger Outlets Foley",
+  "match_method": "place_id",
+  "live_slug": "tanger-outlet-foley",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/Journeys",
+   "social_instagram": "https://instagram.com/journeys/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c71f5318-aa31-4d0d-a693-343f5ad9c134",
+  "business_name": "8 Reale OBAL",
+  "match_method": "place_id",
+  "live_slug": "8-reale-obal",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/8realeOBAL/",
+   "social_instagram": "https://www.instagram.com/8_reale_obal/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "84157877-e26b-47c7-980f-f3e52dfe1d79",
+  "business_name": "Bahama Bob's Beach Side Cafe",
+  "match_method": "place_id",
+  "live_slug": "bahama-bob-s-beach-side-cafe",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Bahama-Bobs-102198286490359/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ecc4d748-db9c-4d9c-9f77-28e7248f8ec0",
+  "business_name": "Flora-Bama Ole River Grill",
+  "match_method": "place_id",
+  "live_slug": "flora-bama-ole-river-grill",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/florabamaolerivergrill/",
+   "social_instagram": "https://www.instagram.com/fbolerivergrill/",
+   "cuisine_type": "Seafood, American, Sports Bar",
+   "atmosphere": "Casual dining, waterfront, open-air deck, sports bar with large outdoor decks and big screens"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1725d35f-ef24-4333-a876-bc66c07e7144",
+  "business_name": "Orange Beach Private Family Dolphin Tours & Boating Safaris",
+  "match_method": "phone",
+  "live_slug": "barefoot-private-family-jet-ski-co-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cbb54578-6d8a-4d70-9e8d-6c5cc3e168b2",
+  "business_name": "Surfside Pizza Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "surfside-pizza-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/people/Surfside-Pizza-Orange-Beach/61573131423216/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "aebe1cc0-1d5b-47ae-96dc-df0e17536a07",
+  "business_name": "bp",
+  "match_method": "phone",
+  "live_slug": "bp-gas-station-pensacola",
+  "status": "net_new",
+  "fills": {
+   "rating": 2
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1400241c-5797-4e15-a5de-0a3f9321084f",
+  "business_name": "Sago Art Gallery at Beach Girl At Home",
+  "match_method": "place_id",
+  "live_slug": "sago-art-gallery-at-beach-girl-at-home",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6dc7133a-3be1-4575-b87e-5d6621236428",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "730864da-326a-48be-8684-5a58647d93f9",
+  "business_name": "Chute Em Up Parasail Fort Morgan",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.7
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5df6882f-897d-4604-ba7b-5024a3ebb046",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.9
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7dc13168-9e27-4e84-a214-a05688c95384",
+  "business_name": "Southern Rose Dolphin Trips",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.6
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8a464c8f-aa1a-48a2-8127-d464bb253ccf",
+  "business_name": "Top Tier Watersports",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.4
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0d90673c-63a1-4511-a5bd-6fd907f4f02e",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.8
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cf2035d3-4b4d-4885-86bc-b3f3c7dcddff",
+  "business_name": "LUXE Brows and Lashes",
+  "match_method": "place_id",
+  "live_slug": "luxe-brows-and-lashes",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LUXEbrowsandlashes/?fref=ts",
+   "social_instagram": "https://www.instagram.com/luxebrowsandlashes/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "fa458aa5-0fa6-411b-a6ee-eab35a66482c",
+  "business_name": "Paradise Bar & Grill",
+  "match_method": "place_id",
+  "live_slug": "paradise-bar-and-grill",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "97ed8407-2826-4c72-9e04-8e847fc8cbc3",
+  "business_name": "Kilwins Ice Cream - Chocolate - Fudge (Wharf)",
+  "match_method": "place_id",
+  "live_slug": "kilwins-ice-cream-chocolate-fudge-wharf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/KilwinsFrame",
+   "social_instagram": "https://instagram.com/KilwinsFrame"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "72e10e63-d4ff-4305-8c31-64cc2617ada9",
+  "business_name": "Windemere Condominium",
+  "match_method": "place_id",
+  "live_slug": "windemere-condominium-7EQzjE",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/windemerecondo",
+   "social_instagram": "https://instagram.com/windemerecondo"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "00c6aaf5-d7b9-4dee-9aff-aca12b4c6526",
+  "business_name": "CCs Salon and Day Spa",
+  "match_method": "place_id",
+  "live_slug": "ccs-salon-and-day-spa",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CCsSalonDaySpaBoutique",
+   "social_instagram": "https://www.instagram.com/ccsalon_dayspa_boutique/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3a91dd93-b188-4014-b164-dcc565105f02",
+  "business_name": "Southern Shores Coffee",
+  "match_method": "place_id",
+  "live_slug": "southern-shores-coffee",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SouthernShoresCoffeeFoley/",
+   "social_instagram": "https://www.instagram.com/southernshoreseatsanddrinks"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "7b6a7746-6df8-4a6e-9188-37668196e76b",
+  "business_name": "Holi Indian Grill (A Flavor Of Joy)",
+  "match_method": "place_id",
+  "live_slug": "holi-indian-grill-a-flavor-of-joy-44dARw",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3d4f72c4-2112-448f-be18-a253d3c2d3b4",
+  "business_name": "Circle K | Gas Station",
+  "match_method": "place_id",
+  "live_slug": "circle-k-gas-station-xvS9lU",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/circlekstores",
+   "social_instagram": "https://www.instagram.com/circlekstores"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d7ed073c-d45c-43a3-b5f5-ae9a12c252e3",
+  "business_name": "Goin' Coastal - Condo at Gulf Shores",
+  "match_method": "place_id",
+  "live_slug": "goin-coastal-condo-at-gulf-shores",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/gonecoastalingulfshores",
+   "social_instagram": "https://www.instagram.com/gonecoastal24/",
+   "description": "Nestled within the sun-kissed shores of Gulf Shores, Gone Coastal is more than just a place to stay â it's a heartfelt promise of hospitality. As the proud owner, my journey began in the 90s when I ventured here with my two beloved Golden Retrievers, only to find a lack of pet-friendly accommodations. Determined to fill that void, I embarked on a mission to create spaces that marry immaculate cleanliness with a warm welcome for both pets and their human companions. Each property, whether a cozy condo for couples or a spacious house for group getaways, reflects my commitment to 5-star hospitality, ensuring that every guest feels like family."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9bcce1de-45f5-4f33-be35-fee07ed8ab29",
+  "business_name": "Panda Palace Buffet",
+  "match_method": "place_id",
+  "live_slug": "panda-palace-buffet-KogI3A",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":null,\"elevator_pitch\":null,\"vibe\":null,\"best_for\":[],\"established\":null,\"reservations\":null,\"insider_tip\":null}"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6338486d-94f7-4860-98d3-35150139b887",
+  "business_name": "Premium Parking - P0145",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p0145-p2qNcw",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/PremiumParking/",
+   "social_instagram": "https://www.instagram.com/premium.parking/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ed6722ae-f711-46f5-9ae3-262c467094e8",
+  "business_name": "Tarkiln Bayou Preserve State Park",
+  "match_method": "place_id",
+  "live_slug": "tarkiln-bayou-preserve-state-park-CPfnSM",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/FLStateParks/",
+   "social_instagram": "https://www.instagram.com/fl.stateparks/?hl=en"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "64052a21-4cd3-4470-b38b-340ac7624b75",
+  "business_name": "GOLDEN CHARIOT INDIAN RESTAURANT ( Aventura )",
+  "match_method": "place_id",
+  "live_slug": "golden-chariot-indian-restaurant-aventura--cB7svE",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "27b0a605-0300-4490-a282-6b4b7de4c0dc",
+  "business_name": "Versona",
+  "match_method": "place_id",
+  "live_slug": "versona",
+  "status": "net_new",
+  "fills": {
+   "description": "Retailer stocking women's apparel & a range of accessories, including jewelry, belts & scarves.",
+   "editorial_summary": "Retailer stocking women's apparel & a range of accessories, including jewelry, belts & scarves."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d9e93f4e-5a84-456f-9138-e1d80fc5dcbc",
+  "business_name": "Sitar Indian Restaurant",
+  "match_method": "place_id",
+  "live_slug": "sitar-indian-restaurant-6Tpwd4",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9204e283-9f24-43eb-a536-6c0e27eb43a5",
+  "business_name": "Roses and Blooms",
+  "match_method": "place_id",
+  "live_slug": "roses-and-blooms",
+  "status": "net_new",
+  "fills": {
+   "description": "Roses and Blooms offers a wide selection of fresh flowers, including locally sourced blooms and exotic varieties. Weather you're looking for a classic dozen or a custom-designed arrangement for a special event, our expert florist can bring your vision to life. We also specialize in wedding and event flowers, providing personalized service from consultation to delivery."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "122599fc-9c56-474e-b5a3-7c40e6fc7d6c",
+  "business_name": "Gulf Shores & Orange Beach Tourism Operations Center",
+  "match_method": "place_id",
+  "live_slug": "gulf-shores-orange-beach-tourism-operations-center",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/magicacresfarm23",
+   "social_instagram": "https://www.instagram.com/visitalabamasbeaches",
+   "description": "Gulf Shores Entertainment Agency is a fully integrated marketing, production and event planning firm. We have 15 years of experience in talent buying, event planning, and production all over America with 8 years of experience in marketing on the Gulf Coast. We provide talent buying, event planning, production and promotion. We work hand in hand with your marketing team and venue management. Hosting a private house party, corporate event, family reunion, wedding, anniversary or birthday party? We supply family friendly performers who will entertain your guests of all ages. We have it all; magicians, singers, comedians, impressionists, bands and djs."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0e7e5747-dab1-446c-a2ad-7aeb3118f3e6",
+  "business_name": "The Curry Modern Indian",
+  "match_method": "place_id",
+  "live_slug": "the-curry-modern-indian-DM6pdI",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a5b82c6b-6b79-4e85-b711-fd0b9945cd3e",
+  "business_name": "4851 Wharf Pkwy E Unit D228",
+  "match_method": "place_id",
+  "live_slug": "4851-wharf-pkwy-e-unit-d228",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.6
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "6c944e54-f1b2-4cf8-906d-a4149273b645",
+  "business_name": "Perfect Plain Brewing Co.",
+  "match_method": "place_id",
+  "live_slug": "perfect-plain-brewing-co",
+  "status": "net_new",
+  "fills": {
+   "description": "Light-filled, industrial-style brewery offering local craft beers & a spacious, dog-friendly patio.",
+   "editorial_summary": "Light-filled, industrial-style brewery offering local craft beers & a spacious, dog-friendly patio."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "539f04bc-82e3-4fd5-9e37-09af026bcfc3",
+  "business_name": "Sugar Shack",
+  "match_method": "phone",
+  "live_slug": "sugar-shack",
+  "status": "net_new",
+  "fills": {
+   "rating": 3.4
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "96412c47-0619-46a0-a3eb-e8105bdb7d2b",
+  "business_name": "Emerald Coast Carpet Cleaning & Restoration, LLC",
+  "match_method": "place_id",
+  "live_slug": "emerald-coast-carpet-cleaning-restoration-llc",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/emeraldcoastcarpetcleaning/",
+   "description": "Emerald Coast Carpet Cleaning, LLC is family owned and operated by life long Baldwin County residents. We've been serving the Gulf Coast since 1997. We specialize in water damage restoration and mold remediation, carpet, tile, and upholstery cleaning. Located in Orange Beach, AL, Emerald Coast Carpet Cleaning, LLC specializes in water damage restoration, mold remediation, carpet, tile, and upholstery cleaning, pet odor & stain removal. Our staff includes technicians that are IICRC certified in carpet cleaning, water damage, and mold remediation. Serving South Baldwin County, Alabama and Perdido Key, Florida. John Haber took over ownership of Emerald Coast Carpet Cleaning in 1997 after retiring from Gulf Telephone Company. His family moved from Elberta to Orange Beach in 2002. Since then, the business has grown from one truck mount van into 5 vans and a warehouse of equipment. In 2019, his son, Jamie, took over the family business. Our technicians are IICRC certified in carpet, upholstery, tile & grout cleaning and water damage restoration. Jamie is also certified in mold remediation."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "285970fa-3d82-4ec1-9a82-8b3d57d6cca8",
+  "business_name": "Shoppes at Bel Air",
+  "match_method": "place_id",
+  "live_slug": "shoppes-at-bel-air",
+  "status": "net_new",
+  "fills": {
+   "description": "Renovated shopping mall with department stores, fashion & fast-food outlets.",
+   "editorial_summary": "Renovated shopping mall with department stores, fashion & fast-food outlets."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e93f87b4-c0da-40fd-bf69-426ee796af38",
+  "business_name": "Dick's Last Resort - Orange Beach",
+  "match_method": "place_id",
+  "live_slug": "dick-s-last-resort-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/dickslastresort",
+   "social_instagram": "https://www.instagram.com/dicks_lastresort/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "aaf03b19-654a-44dc-9121-a1596675acf8",
+  "business_name": "Orange Beach Home w/ Hot Tub < 2 Mi to The Wharf",
+  "match_method": "place_id",
+  "live_slug": "orange-beach-home-w-hot-tub-2-mi-to-the-wharf-Y_40wo",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/houfy",
+   "social_instagram": "https://www.instagram.com/houfy_inc"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4fd18935-8609-482a-a74a-e52f8fdac898",
+  "business_name": "Dairy Queen Grill & Chill",
+  "match_method": "place_id",
+  "live_slug": "dairy-queen-grill-chill",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "44a79a80-2c0d-4a07-8803-56de75d4239e",
+  "business_name": "Kraken Reels, LLC",
+  "match_method": "place_id",
+  "live_slug": "kraken-reels-llc-GpIRco",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/krakenreels",
+   "social_instagram": "https://www.instagram.com/krakenreels/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ca75a33a-d2fe-403f-9b91-dcbcf48ca64d",
+  "business_name": "CVS Pharmacy",
+  "match_method": "place_id",
+  "live_slug": "cvs-pharmacy",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CVS"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b00280db-1f97-40fe-a9cb-fbf8984eff9d",
+  "business_name": "Target",
+  "match_method": "place_id",
+  "live_slug": "target",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE",
+   "social_facebook": "https://www.facebook.com/target",
+   "social_instagram": "https://www.instagram.com/target"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a1b96381-7aa5-4c71-ae3e-75fabe3ce527",
+  "business_name": "Fort Morgan Museum & Gift Shop",
+  "match_method": "place_id",
+  "live_slug": "fort-morgan-museum-gift-shop",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://ahc.alabama.gov/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0639c3ee-7a05-4b92-b23a-84ec75d625e5",
+  "business_name": "FunSpot 1713",
+  "match_method": "place_id",
+  "live_slug": "funspot-1713",
+  "status": "net_new",
+  "fills": {
+   "description": "Just 3 miles from the heart of Gulf Shores alongside Lagoon Pass, this Gulf-front Fun Spot is beckoning large families and groups of up to 15 to sit back, relax, and enjoy the beach. With two spacious living areas, a fully-stocked kitchen, five tranquil bedrooms, multiple Gulf-view decks, and direct beach access, Fun Spot is paradise found.",
+   "rating": 4.6
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3df50794-1f7a-420c-9271-472f456c8afd",
+  "business_name": "Zales Outlet",
+  "match_method": "place_id",
+  "live_slug": "zales-outlet-zGDoDg",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/zales",
+   "social_instagram": "https://www.instagram.com/zalesjewelers"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1d43072a-097a-4ae1-a065-db784cbc526a",
+  "business_name": "Phoenix Orange Beach Vacation Rental Condominiums",
+  "match_method": "phone",
+  "live_slug": "orange-beach-home-w-hot-tub-2-mi-to-the-wharf-Y_40wo",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/houfy",
+   "social_instagram": "https://www.instagram.com/houfy_inc"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1802566c-85ea-4810-9568-9c50c2b77413",
+  "business_name": "Subway",
+  "match_method": "place_id",
+  "live_slug": "subway",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE",
+   "social_facebook": "https://www.facebook.com/subway",
+   "social_instagram": "https://www.instagram.com/subway/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "da806925-d57a-438e-ba6f-ee5ddbc0cebf",
+  "business_name": "Dollar General",
+  "match_method": "phone",
+  "live_slug": "dollar-general-store-9271-pensacola",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE",
+   "rating": 4.2
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "88ebb934-7cf9-4495-a589-c4f449298890",
+  "business_name": "Renasant Bank",
+  "match_method": "place_id",
+  "live_slug": "renasant-bank",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/renasantbank",
+   "social_instagram": "https://www.instagram.com/renasantbank/",
+   "description": "Renasant has humble roots, starting in 1904 as a $100,000 bank in a Lee County, Mississippi, bakery. Today, Renasant operates consumer and commercial banking, mortgage and wealth management offices throughout the Southeast. Our success stems from each of our teammates' commitment to serving and investing in their communities as a way of better understanding the people we serve. At Renasant, we understand you because we work and live alongside you every day."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "bb74f5e5-ae91-4262-b3b9-3a9879c50e83",
+  "business_name": "Publix Super Market at The Shoppes at Palm Pointe",
+  "match_method": "place_id",
+  "live_slug": "publix-super-market-at-the-shoppes-at-palm-pointe",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://facebook.com/publix",
+   "social_instagram": "https://instagram.com/publix"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "5795f6c5-85e4-4bd5-9039-08b36e7afec9",
+  "business_name": "First National Bank Tower",
+  "match_method": "place_id",
+  "live_slug": "first-national-bank-tower-yrDokw",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/FNBO",
+   "social_instagram": "http://www.instagram.com/fnbo"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "78f170d7-0366-4a0d-996e-76142f537db2",
+  "business_name": "Walmart Bakery",
+  "match_method": "place_id",
+  "live_slug": "walmart-bakery",
+  "status": "net_new",
+  "fills": {
+   "description": "Shopping for your essentials shouldn't be complicated. Take the stress out of trying to find the best prices by letting Walmart be your one-stop shop. If you're low on groceries in your pantry and refrigerator, need to refill your candy dish and or secret sweets stash, or just want to stock up on all your favorite beauty supplies and perfumes, you can find everything you need at your Orange Beach Walmart Neighborhood Market. We're conveniently located at 25241 Perdido Beach Blvd Ste W, just 0.9 mi from Adventure Island. We know that you're busy, so we're here for you every day from 7am, so you can get what you need when you need it. Looking to get more out of your next Walmart run? Check out Walmart+ today. You'll get free shipping and delivery from your store and member perks like Scan & Go and early access to our best deals. Even better, you'll get exclusive discounts at Walmart and Sam's Club fuel stations â plus great savings on Exxon, Mobil, and Murphy gas stations â so you can save even more money and live better."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "892ddc2e-4d48-4f99-8250-f1e9fb7b79d8",
+  "business_name": "Martinique on the Gulf",
+  "match_method": "place_id",
+  "live_slug": "martinique-on-the-gulf",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/martiniquegulf"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0ae9f322-7c86-4985-b9bc-a124f95a53e5",
+  "business_name": "Shell",
+  "match_method": "place_id",
+  "live_slug": "shell",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "bd25e4f1-c9fd-4582-a68a-66ca4b4d557a",
+  "business_name": "Swift-Coles Historic Home",
+  "match_method": "place_id",
+  "live_slug": "swift-coles-historic-home",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/swiftcoles.historichome",
+   "social_instagram": "https://www.instagram.com/swiftcoleshistorichome/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "829093c9-b67c-46d6-befe-cfca888e544d",
+  "business_name": "Da' Carwash",
+  "match_method": "place_id",
+  "live_slug": "da-carwash",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Dacarwash"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4d3e0360-7828-413c-9548-4785289568db",
+  "business_name": "Nike Company Store",
+  "match_method": "place_id",
+  "live_slug": "nike-company-store-tGJtKw",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/nike",
+   "social_instagram": "https://www.instagram.com/nike/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "dad314aa-1771-4a59-986b-7ea2df484100",
+  "business_name": "El Jacal Mexican Grill",
+  "match_method": "place_id",
+  "live_slug": "el-jacal-mexican-grill-ZFkPg4",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2aa01f54-7c11-4f12-b010-fda9c5bc5b11",
+  "business_name": "Brentley R. Taylor, M.D.",
+  "match_method": "place_id",
+  "live_slug": "brentley-r-taylor-m-d",
+  "status": "net_new",
+  "fills": {
+   "price_level": "EXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cb9db5d8-c409-46d1-bf79-69c2807ebe9b",
+  "business_name": "Premier Hormone Health and Wellness",
+  "match_method": "place_id",
+  "live_slug": "premier-hormone-health-and-wellness",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61573597801380",
+   "social_instagram": "https://www.instagram.com/premierhormonehealthwellness/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cc251930-1026-46c9-a62e-258f05030e4c",
+  "business_name": "splash resort wear",
+  "match_method": "place_id",
+  "live_slug": "splash-resort-wear",
+  "status": "net_new",
+  "fills": {
+   "website_url": "http://splashresortwearpk.com/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8f8a7587-d9ec-4ab9-9174-77da2304df1b",
+  "business_name": "Uh-Oh Labs",
+  "match_method": "place_id",
+  "live_slug": "uh-oh-labs-HunO0M",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CaribeFun/",
+   "social_instagram": "https://www.instagram.com/cariberesort/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cf6c4ef9-a604-4cec-95ba-7caac82db0a1",
+  "business_name": "Skincare By Mia",
+  "match_method": "place_id",
+  "live_slug": "skincare-by-mia",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61574818106965",
+   "description": "I've been an esthetician since 1995, and I still absolutely love what I do. Whether it's helping someone clear up stubborn acne or customizing an anti-aging treatment that actually works, my goal is always the same â to help you feel confident in your skin. I'm big on results, but I also believe skincare should feel relaxing and personal. I'll always take the time to tailor your treatments and recommend the best at-home routine to keep your skin happy between visits. Sometimes your skin just needs more than a product. It needs a professional touch. With over 30 years of experience, I combine advanced technique with personalized care to restore your skin's natural radiance. Signature facials, gentle chemical peels, microchanneling, teen treatments and more. Every service is intended to leave you glowing, relaxed, and confident. Your skin deserves this."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a9116a0c-0320-4a7c-8179-5913546290f7",
+  "business_name": "Lambert's CafÃ©",
+  "match_method": "place_id",
+  "live_slug": "lamberts-caf-gsc4Xc",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/LCSIKESTONMO/",
+   "social_instagram": "https://www.instagram.com/lcsikeston/?hl=en"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "af003b13-e368-46b2-a8b7-34d7212557ba",
+  "business_name": "DRI Gulf Coast",
+  "match_method": "place_id",
+  "live_slug": "dri-gulf-coast",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/DRIGulfCoast/",
+   "description": "Jack Galletta is passionate about two things: hard work and customer service. That's why those are two foundational core values of DRI Gulf Coast, the premier water, fire & mold restoration company on the Alabama & Florida Gulf Coast. Founding DRI Gulf Coast in 2010, Jack saw a need for better customer service in the restoration industry along the Alabama Gulf Coast. He took his experience in primary retail and began implementing the same customer service tenets that made his previous employers successful. Jack started DRI providing flooring restoration services. Over the years, DRI has continued to evolve and it is now a leader in water damage restoration, fire & smoke restoration and mold remediation along the Alabama Gulf Coast. The team also serves the rest of the coastline along the Gulf of Mexico, travelling from Florida to Louisiana if the need arises."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2cc9d02b-89bd-4e6b-95d9-a5d889c856e4",
+  "business_name": "Chevron",
+  "match_method": "place_id",
+  "live_slug": "chevron",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/Chevron",
+   "social_instagram": "https://www.instagram.com/chevron",
+   "description": "Find the Chevron or Texaco gas station nearest to you. Fuel up on premium Chevron with Techron fuel, grab drinks and snacks inside the store, or use the car wash (at participating locations)."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "13044d6b-bdcf-4da8-9fba-99a59a4d5ccb",
+  "business_name": "4099 Orange Beach Blvd",
+  "match_method": "place_id",
+  "live_slug": "4099-orange-beach-blvd",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/orangebeach",
+   "social_instagram": "https://www.instagram.com/cityoforangebeach",
+   "description": "The City of Orange Beach, Alabama is a vibrant coastal community committed to providing excellent municipal services. The city government oversees planning and development, public safety, parks and recreation, water utilities, and community services. Orange Beach features beautiful beaches, parks, trails including the Hugh S. Branyon Backcountry Trail system, and various recreational facilities. The city maintains high-performing schools, promotes economic development, and preserves the natural environment while sustaining tourism-based economy.",
+   "website_url": "https://www.orangebeachal.gov"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a9b385ea-59bc-4192-a788-5a90ad81c409",
+  "business_name": "Artworks Local Art and Gifts LLC",
+  "match_method": "place_id",
+  "live_slug": "artworks-local-art-and-gifts-llc-cEIPKE",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/ArtworksPensacola",
+   "social_instagram": "https://www.instagram.com/ArtworksPensacola"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9e93dd38-1470-4a5e-8048-c4f5e954bedd",
+  "business_name": "Regions Bank",
+  "match_method": "place_id",
+  "live_slug": "regions-bank",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/regionsbank",
+   "social_instagram": "https://www.instagram.com/regionsbank/?hl=en",
+   "description": "Regions Financial Corporation is a member of the S&P 500 Index and is one of the nation's largest full-service providers of consumer and commercial banking, wealth management and mortgage products and services. Regions serves customers across the South, Midwest and Texas. Our mission is to achieve superior economic value for our shareholders over time by making life better for our customers, associates, and communities while creating shared value as we help them meet their financial goals and aspirations. We offer checking accounts, savings accounts including money market and CDs, credit cards, credit lines, loans, mortgages, insurance, securities, and investments. Our Gulf Shores branch provides personal and business banking services with drive-thru and ATM access."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d0bcdcdd-f13f-4bff-9acf-30b9aa650957",
+  "business_name": "Truist",
+  "match_method": "place_id",
+  "live_slug": "truist",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/truist",
+   "social_instagram": "https://www.instagram.com/truist"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9a024249-79a8-4103-93e7-465d047cb5ab",
+  "business_name": "Palacio Condo Rentals in Perdido Key by Avari",
+  "match_method": "place_id",
+  "live_slug": "palacio-condo-rentals-in-perdido-key-by-avari-_UO3DM",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "f0cee31e-847d-46ba-9f21-a96f417e36b3",
+  "business_name": "Jellystone Parkâ¢ Alabama Gulf Coast",
+  "match_method": "place_id",
+  "live_slug": "jellystone-park-alabama-gulf-coast-gDfYSs",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/jellystonegulfcoast",
+   "social_instagram": "https://www.instagram.com/jellystonegulfcoast"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2d7e1dab-a62e-4b32-a50a-7584fac3c077",
+  "business_name": "Mrs Fieldâs Cookies",
+  "match_method": "place_id",
+  "live_slug": "mrs-field-s-cookies",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/mrsfieldscookies",
+   "social_instagram": "https://www.instagram.com/mrsfieldscookies",
+   "description": "At our Mrs. FieldsÂ® Gulf Shores bakery, we serve our delicious cookies, brownies, and cookie cakes in Gulf Shores, AL, with the same passion for gourmet quality that propelled Debbie Fields' original store. Enjoy fresh baked cookies, brownies and custom frosted cookie cakes along with gifts and party trays for any occasion. Order online and pick up in store. Mrs. FieldsÂ® freshly baked treats have never been so easy to enjoy. Mrs. FieldsÂ® came from humble beginnings in Debbi Fields' first store in Palo Alto, California in 1977. A young mother from a Navy family, Debbie had been told no business could survive just selling cookies. However, her one store quickly turned into hundreds stretching across the country, and eventually, the world. Her recipe for success? A headstrong personality and sincere concern for people. Her mission has always been to create the highest quality product possible - every time.",
+   "editorial_summary": "Mall-based chain offering cookies, brownies & personalized cookie cakes."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b095de22-ae98-49a1-95f3-8aab95cb4d89",
+  "business_name": "Gulf Shores Plantation",
+  "match_method": "place_id",
+  "live_slug": "gulf-shores-plantation",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/ALAVHR/",
+   "website_url": "https://www.alabamavacationhomerentals.com/listing.112"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "ecc5027e-e048-4f1f-a747-bedc1fe4e7c4",
+  "business_name": "Circle K",
+  "match_method": "phone",
+  "live_slug": "circle-k-foley",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3a3b540a-ec9e-4717-a4f4-447933f0e91e",
+  "business_name": "Pizza Hut",
+  "match_method": "place_id",
+  "live_slug": "pizza-hut",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "26d073bc-fed6-4629-a445-dbe8132ef6a6",
+  "business_name": "McDonald's",
+  "match_method": "place_id",
+  "live_slug": "mcdonald-s",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE",
+   "social_facebook": "https://www.facebook.com/McDonalds/",
+   "social_instagram": "https://www.instagram.com/mcdonalds/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c1411bf6-bbc3-4ca1-aa9d-b7811dd28a4f",
+  "business_name": "Winn-Dixie Liquor",
+  "match_method": "place_id",
+  "live_slug": "winn-dixie-liquor-JNZ74g",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/winndixie",
+   "social_instagram": "https://www.instagram.com/winndixie"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3fc7a5db-881a-4f28-9871-6eb7c21c0075",
+  "business_name": "Wolf Bay Restaurant at Orange Beach",
+  "match_method": "phone",
+  "live_slug": "wolf-bay",
+  "status": "net_new",
+  "fills": {
+   "rating": 4.2
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b8ccc848-13bc-4348-bde5-d3beb3668c89",
+  "business_name": "Bouquets & Baskets Florists LLC",
+  "match_method": "place_id",
+  "live_slug": "bouquets-baskets-florists-llc",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/FanFSN"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "53014f85-6d30-4f0c-87bf-fae64fb48bc3",
+  "business_name": "Walmart Neighborhood Market",
+  "match_method": "place_id",
+  "live_slug": "walmart-neighborhood-market",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE",
+   "social_facebook": "https://www.facebook.com/Walmart5653/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1147504a-1a5a-4cd2-a623-b6dac163b511",
+  "business_name": "My Beach Getaways",
+  "match_method": "phone",
+  "live_slug": "beach-getaways",
+  "status": "net_new",
+  "fills": {
+   "rating": 3.8
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "1391848f-42e9-48ca-839a-15c858c51faa",
+  "business_name": "Holi Indian Kitchen (A Flavor Of Joy)",
+  "match_method": "place_id",
+  "live_slug": "holi-indian-kitchen-a-flavor-of-joy-kpcgo4",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "79dd0107-0448-44fa-938c-9841afae7d26",
+  "business_name": "East Gulf Place",
+  "match_method": "place_id",
+  "live_slug": "east-gulf-place",
+  "status": "net_new",
+  "fills": {
+   "rating": 5
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "519f5cc6-8456-45b8-9cf7-4f6e2e69e897",
+  "business_name": "The Wharf Amphitheater",
+  "match_method": "place_id",
+  "live_slug": "the-wharf-amphitheater",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/TheWharfOB",
+   "social_instagram": "https://www.instagram.com/thewharfob"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b3a18611-1dd6-40d2-9b53-d547408c2272",
+  "business_name": "Circle K",
+  "match_method": "phone",
+  "live_slug": "circle-k-gas-station-xvS9lU",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/circlekstores",
+   "social_instagram": "https://www.instagram.com/circlekstores"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "0a265642-3db0-4a5f-b717-432ccf10c405",
+  "business_name": "Hancock Whitney Bank",
+  "match_method": "place_id",
+  "live_slug": "hancock-whitney-bank",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/HancockWhitney",
+   "social_instagram": "https://www.instagram.com/hancockwhitney",
+   "description": "Hancock Whitney Bank was founded over a century ago with one mission: To help the people of the Gulf South reach their financial goals and dreams and achieve the quality of life we all cherish. Our founders created an institution anchored in values, reinforced with the strength and resilience of the people of the gulf coast, and focused on growth and opportunity. Today, Hancock Whitney carries on that remarkable legacy as one of America's strongest, safest banks serving one of the nation's most vibrant corridors. Our service area includes over 200 full-service financial centers in Mississippi, Louisiana, Alabama, Florida and Texas, plus nearly 300 ATMs throughout the region. We offer a full array of banking services, including checking and savings accounts, online and mobile banking, credit cards, loans, mortgages, and wealth management and private banking services to individuals and large and small businesses. But Hancock Whitney is more than simply a bank; we're a trusted financial partner committed to creating opportunities for the people and communities we serve in the scenic coastal region we call home."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "776ff259-1104-4447-94af-3fd80b50f568",
+  "business_name": "Last Resort RV Community - Foley, Alabama",
+  "match_method": "place_id",
+  "live_slug": "last-resort-rv-community-foley-alabama-tHyjlo",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61572618443011",
+   "social_instagram": "https://www.instagram.com/ghvjhvgk"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "33ac2b54-774d-4d83-a0f5-de0c806b8196",
+  "business_name": "Merchants Bank of Alabama, a division of SouthPoint Bank",
+  "match_method": "place_id",
+  "live_slug": "merchants-bank-of-alabama-a-division-of-southpoint-bank-f_Vcuw",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/MerchantsBankAL",
+   "social_instagram": "https://www.instagram.com/merchantsbankal/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "a18ce999-14ed-45a7-a334-76212f52e123",
+  "business_name": "Vacasa Headquarters - Portland, Oregon",
+  "match_method": "place_id",
+  "live_slug": "vacasa-headquarters-portland-oregon-IYXlU0",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vacasa",
+   "social_instagram": "https://www.instagram.com/vacasa/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c889f1ec-6d7e-43d8-8976-c8e6358dbcf8",
+  "business_name": "Wharf-Ticket Office",
+  "match_method": "place_id",
+  "live_slug": "wharf-ticket-office",
+  "status": "net_new",
+  "fills": {
+   "website_url": "https://alwharf.com"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c72bd2ef-625f-4ff1-9edd-8d5d94bad108",
+  "business_name": "Reed Real Estate & Construction - Fort Morgan Properties by Reed Real Estate",
+  "match_method": "place_id",
+  "live_slug": "reed-real-estate-construction-fort-morgan-properties-by-reed-real-estate",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pages/Reed-Real-Estate/195286794325",
+   "social_instagram": "https://www.instagram.com/reedvacationrentals/",
+   "description": "For over 37 years, Reed Real Estate has been helping families create unforgettable beach vacations in Fort Morgan & Gulf Shores, AL. We focus on comfortable beach houses and personal, friendly service. Whether it is just a weekend retreat or a multi-generational family reunion, we can help you find the best beach vacation rental to suit your needs. As a family-owned and operated business, we know what it means to spend time with the ones you love and not want to worry about vacation details. We focus on comfortable beach houses and personal, friendly service. We want all our guests to feel right at home with us! As the only pet-friendly beach in Alabama, we even encourage you to bring your pet! We have many pet friendly vacation rental homes to choose from. Do you need information on local attractions and restaurants near your beach house in Gulf Shores and Fort Morgan, or a canopy and beach chairs set up on your beach? Would you like to surprise a special someone with a romantic getaway to the beach? If so, we can handle all the details for you. So, pack your bags and leave the rest to us."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "05144c68-487d-4805-a725-b06ca92d4a9e",
+  "business_name": "Cole's Acting Knowin II 415",
+  "match_method": "place_id",
+  "live_slug": "cole-s-acting-knowin-ii-415",
+  "status": "net_new",
+  "fills": {
+   "description": "Welcome to Cole's Acting Knowin II, your serene Gulf-front retreat nestled down Fort Morgan Road in Gulf Shores, Alabama! This spacious 3-bedroom, 2-bath home offers a tranquil escape for up to 8 guests, making it perfect for families or groups seeking a peaceful beach getaway. Enjoy stunning Gulf views from the comfort of your own home, and relax on the spacious deck overlooking the water. Inside, you'll find a comfortable and inviting living space, with a fully equipped kitchen and dining area perfect for family meals and gatherings. Retreat to the master bedroom with a king-size bed, while the second bedroom offers another king bed for additional comfort. The third bedroom features a cozy queen bed, and there's a convenient sofa queen in the living room for extra sleeping space. Located away from the hustle and bustle of Hwy 58 and the Beach Rd, Cole's Acting Knowin II provides a serene setting for relaxation, yet it's still close enough to local shops and restaurants for dining and entertainment options. Escape to the tranquility of Gulf Shores at Cole's Acting Knowin II. Book your stay now and experience the best of Gulf Coast living!"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d19cdd47-5067-4c29-9984-95dbdcc7e35a",
+  "business_name": "Haze Coffee Co.",
+  "match_method": "place_id",
+  "live_slug": "haze-coffee-co",
+  "status": "net_new",
+  "fills": {
+   "social_instagram": "https://www.instagram.com/hazecoffeecompany"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "81706c63-0ff0-421f-99a9-4311305e33d4",
+  "business_name": "Angel Hair Salon & Boutique",
+  "match_method": "place_id",
+  "live_slug": "angel-hair-salon-boutique",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/vagaropro"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "b47882b6-6b6c-46d3-9a63-8ee5e5b18068",
+  "business_name": "ALDI",
+  "match_method": "place_id",
+  "live_slug": "aldi",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/ALDI.USA",
+   "social_instagram": "https://www.instagram.com/aldiusa"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2b98521c-1ec7-4f74-b6b5-be5120994ab7",
+  "business_name": "SITAR INDIAN CUISINE",
+  "match_method": "place_id",
+  "live_slug": "sitar-indian-cuisine-F1WUIQ",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8618fbdb-098e-446a-9044-f39c4c3296e7",
+  "business_name": "Romar Place Condominiums",
+  "match_method": "place_id",
+  "live_slug": "romar-place-condominiums",
+  "status": "net_new",
+  "fills": {
+   "website_url": "http://kaydenscandyfactory.com/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c46e6c58-da34-4cd9-910b-fc3ee79b4d98",
+  "business_name": "Sugar Sands RV Resort",
+  "match_method": "place_id",
+  "live_slug": "sugar-sands-rv-resort",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SugarSandsRVResortAL",
+   "social_instagram": "https://www.instagram.com/sugarsandsrvresort/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3522d874-5dae-4f28-b332-2c0e3bfeda00",
+  "business_name": "Portabella's | Italian",
+  "match_method": "place_id",
+  "live_slug": "portabellas-italian-xLt3bA",
+  "status": "net_new",
+  "fills": {
+   "description": "{\"description\":null,\"elevator_pitch\":null,\"vibe\":null,\"best_for\":[],\"established\":null,\"reservations\":null,\"insider_tip\":null}",
+   "editorial_summary": "Low-key storefront offering classic & specialty pizzas, subs & other Italian eats in a cozy space."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8695aa43-4759-4ed1-a2f7-e04766f7973a",
+  "business_name": "Endless Summer Condo 2312",
+  "match_method": "place_id",
+  "live_slug": "endless-summer-condo-2312",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/airbnb",
+   "social_instagram": "https://instagram.com/airbnb"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "77df6831-a572-44ff-ae02-71d3d61f8b8c",
+  "business_name": "Coast Restaurant at The Beach Club",
+  "match_method": "place_id",
+  "live_slug": "coast-restaurant-at-the-beach-club",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/CoastRestaurantAL",
+   "social_instagram": "https://www.instagram.com/coast_restaurant_"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "383be1f2-836d-4522-9e5b-fbc4a7103f92",
+  "business_name": "Jon Jon Giles, eXp Realty",
+  "match_method": "place_id",
+  "live_slug": "jon-jon-giles-exp-realty",
+  "status": "net_new",
+  "fills": {
+   "website_url": "http://www.buythecoastproperties.com/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "8b287bc5-f386-4f46-a7fe-98685ab1ff81",
+  "business_name": "Smoothie King",
+  "match_method": "place_id",
+  "live_slug": "smoothie-king",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SmoothieKing",
+   "social_instagram": "https://www.instagram.com/smoothieking/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "2a432861-c12b-44bc-a682-8a76b1c2f619",
+  "business_name": "Alabama Florida State line on the beach",
+  "match_method": "place_id",
+  "live_slug": "alabama-florida-state-line-on-the-beach-MLxc6o",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/VISITFLORIDA",
+   "social_instagram": "https://www.instagram.com/VISITFLORIDA"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "64a0e846-d1c2-4972-868d-076bb96a1b38",
+  "business_name": "Spectrum Resorts",
+  "match_method": "place_id",
+  "live_slug": "spectrum-resorts",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/SpectrumResorts",
+   "social_instagram": "https://www.instagram.com/spectrumresorts/",
+   "description": "Spectrum Resorts is the premier vacation rental management company along the Alabama Gulf Coast in Gulf Shores and Orange Beach, providing over 500 luxury rentals at The Beach Club Resort & Spa in Gulf Shores and Turquoise Place Beach Resort in Orange Beach Alabama. Spectrum Resorts is more than a vacation rental management company. We are the exclusive onsite manager for The Beach Club Resort & Spa in Gulf Shores and Turquoise Place in Orange Beach, two world-class resorts attracting thousands of visitors annually. We are property owners, too, and we know what it takes to own and manage a rental investment. Like you, we've experienced the stress of vacant off-seasons and last-minute maintenance. And we understand the importance of maximizing rental revenue while minimizing headaches and hassles. Which is why our owner services are designed to provide you with a worry-free ownership experience. We offer a full range of services to manage, maintain, and market your vacation rental, leaving you free to enjoy the perks of your property. And because we only manage rentals at our two resorts, we can offer full end-to-end management with unmatched expertise and personal care."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "486cee3f-a7a2-492a-adff-355c68630681",
+  "business_name": "Danny C Holland, DO",
+  "match_method": "phone",
+  "live_slug": "hangout-music-festival",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "787ffdd6-cadb-42f4-b02c-89d068e52581",
+  "business_name": "Anchor",
+  "match_method": "phone",
+  "live_slug": "avenue-pub-orange-beach",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "c22609eb-f02f-4351-ae53-f790d9d24831",
+  "business_name": "Boomtown Casino Biloxi",
+  "match_method": "place_id",
+  "live_slug": "boomtown-casino-biloxi-Ld7MUQ",
+  "status": "net_new",
+  "fills": {
+   "price_level": "MODERATE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "cd4c0ea2-93b0-43e1-bae1-ff3e326790df",
+  "business_name": "Nauti Fishing Charters",
+  "match_method": "place_id",
+  "live_slug": "nauti-fishing-charters",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/102086641301033"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "9a29d83f-296f-4bc9-b20d-fadf3cfeb280",
+  "business_name": "Walmart Vision & Glasses",
+  "match_method": "place_id",
+  "live_slug": "walmart-vision-glasses-ZWO1Og",
+  "status": "net_new",
+  "fills": {
+   "price_level": "INEXPENSIVE"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "d9047ca9-51fc-4fc6-a6c4-410f1bd13bd4",
+  "business_name": "Uptown Plaza",
+  "match_method": "place_id",
+  "live_slug": "uptown-plaza",
+  "status": "net_new",
+  "fills": {
+   "website_url": "http://visitowa.com/explore/downtown-owa/?utm_source=Yext"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4ffc6276-e447-40fe-914f-06dfd3aae149",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-shopping-center-ob",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pages/category/Wine--Beer---Spirits-Store/ALs-Liquor-and-Wine-1233592243404882/",
+   "rating": 2.7
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "4d42896c-aadb-450c-9347-f92512dbe4a6",
+  "business_name": "The Laundry Lounge",
+  "match_method": "place_id",
+  "live_slug": "the-laundry-lounge",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/profile.php?id=61563827530632",
+   "social_instagram": "https://www.instagram.com/laun.drylounge/",
+   "description": "The Laundry Lounge brings Gulf Shores a modern, full-service laundromat experience with brand-new state-of-the-art machines, stylish interiors, and unbeatable amenities. We offer self-service laundry machines, wash and fold services, and commercial laundry solutions. Our facility features free high-speed Wi-Fi, a luxurious lounge to relax in while you wait, charging stations for your devices, and on-site assistance during staffed hours. We also offer specialized dog wash stations in separate rooms for convenience."
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "e3395d95-f301-414d-b16d-ee3fb5a2ca10",
+  "business_name": "Palm Beach Tan",
+  "match_method": "place_id",
+  "live_slug": "palm-beach-tan-jj50Q0",
+  "status": "net_new",
+  "fills": {
+   "social_facebook": "https://www.facebook.com/pbtofficial/",
+   "social_instagram": "https://instagram.com/pbtofficial/"
+  }
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity",
+  "source_id": "3e35d646-ea38-4424-8c04-966683ad51d5",
+  "business_name": "Ocean Reef",
+  "match_method": "place_id",
+  "live_slug": "ocean-reef",
+  "status": "net_new",
+  "fills": {
+   "description": "Ocean Reef is a premier beachfront property offering panoramic views of the Gulf of Mexico. Known for its well-maintained grounds, inviting pool area, and direct beach access, Ocean Reef is a favorite among returning guests. Each condo unit is individually owned, providing unique decor and amenities that give every stay a distinctive feel. Whether you are lounging by the pool or walking the shoreline, Ocean Reef delivers a true coastal experience."
+  }
+ }
+]

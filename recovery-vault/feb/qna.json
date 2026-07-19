@@ -1,0 +1,4326 @@
+[
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "6b561ac2-0bcb-4864-87d1-0e83bd45d1c3",
+  "business_name": "Orange Beach: Swim, Grill, & Chill Excursion",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 3 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "6b561ac2-0bcb-4864-87d1-0e83bd45d1c3",
+  "business_name": "Orange Beach: Swim, Grill, & Chill Excursion",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 5749 Bay La Launch Ave, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "6b561ac2-0bcb-4864-87d1-0e83bd45d1c3",
+  "business_name": "Orange Beach: Swim, Grill, & Chill Excursion",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 18 years old must be supervised by a paying adult at all times.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "6b561ac2-0bcb-4864-87d1-0e83bd45d1c3",
+  "business_name": "Orange Beach: Swim, Grill, & Chill Excursion",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items are strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "6b561ac2-0bcb-4864-87d1-0e83bd45d1c3",
+  "business_name": "Orange Beach: Swim, Grill, & Chill Excursion",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Charter has a maximum capacity of 6 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "6b561ac2-0bcb-4864-87d1-0e83bd45d1c3",
+  "business_name": "Orange Beach: Swim, Grill, & Chill Excursion",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Charter is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7640efde-cba9-402a-9d0f-aff899a0c727",
+  "business_name": "Orange Beach: Dolphin Cruises aboard Cruise Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7640efde-cba9-402a-9d0f-aff899a0c727",
+  "business_name": "Orange Beach: Dolphin Cruises aboard Cruise Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27844 Canal Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7640efde-cba9-402a-9d0f-aff899a0c727",
+  "business_name": "Orange Beach: Dolphin Cruises aboard Cruise Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children ages 7 years old and under are required to wear a life vest on decks outside the cabin space.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7640efde-cba9-402a-9d0f-aff899a0c727",
+  "business_name": "Orange Beach: Dolphin Cruises aboard Cruise Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a minimum of 15 guests required in order to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7640efde-cba9-402a-9d0f-aff899a0c727",
+  "business_name": "Orange Beach: Dolphin Cruises aboard Cruise Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass items are strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7640efde-cba9-402a-9d0f-aff899a0c727",
+  "business_name": "Orange Beach: Dolphin Cruises aboard Cruise Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Tour has a maximum capacity of 75 guests.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d6c99c35-ed38-4177-bc28-e072c48ede6b",
+  "business_name": "Orange Beach: Private ONO Island Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d6c99c35-ed38-4177-bc28-e072c48ede6b",
+  "business_name": "Orange Beach: Private ONO Island Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d6c99c35-ed38-4177-bc28-e072c48ede6b",
+  "business_name": "Orange Beach: Private ONO Island Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times, vests provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d6c99c35-ed38-4177-bc28-e072c48ede6b",
+  "business_name": "Orange Beach: Private ONO Island Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items, other than wine bottles, are strictly prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d6c99c35-ed38-4177-bc28-e072c48ede6b",
+  "business_name": "Orange Beach: Private ONO Island Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers, regardless of age and size.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d6c99c35-ed38-4177-bc28-e072c48ede6b",
+  "business_name": "Orange Beach: Private ONO Island Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b342b4ce-75f8-4c24-b3ca-a4055e61cef6",
+  "business_name": "Orange Beach Sea Fox Center Console Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b342b4ce-75f8-4c24-b3ca-a4055e61cef6",
+  "business_name": "Orange Beach Sea Fox Center Console Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27194 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b342b4ce-75f8-4c24-b3ca-a4055e61cef6",
+  "business_name": "Orange Beach Sea Fox Center Console Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Renters are responsible for the cost of all damages to the watercraft (including parts and labor, up to the cost of the entire watercraft in the event it is totaled) and lost equipment while it is in their possession.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b342b4ce-75f8-4c24-b3ca-a4055e61cef6",
+  "business_name": "Orange Beach Sea Fox Center Console Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "The center console boat has a maximum capacity of 8 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b342b4ce-75f8-4c24-b3ca-a4055e61cef6",
+  "business_name": "Orange Beach Sea Fox Center Console Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "09246ccd-d6a3-4c2a-abfa-b9e727d9e31d",
+  "business_name": "Orange Beach: Daytime Dolphin Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 3 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "09246ccd-d6a3-4c2a-abfa-b9e727d9e31d",
+  "business_name": "Orange Beach: Daytime Dolphin Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 5749 Bay La Launch Ave, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "09246ccd-d6a3-4c2a-abfa-b9e727d9e31d",
+  "business_name": "Orange Beach: Daytime Dolphin Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Guests must be at least 18 years old to reserve this charter.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "09246ccd-d6a3-4c2a-abfa-b9e727d9e31d",
+  "business_name": "Orange Beach: Daytime Dolphin Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Charter has a maximum capacity of 6 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "09246ccd-d6a3-4c2a-abfa-b9e727d9e31d",
+  "business_name": "Orange Beach: Daytime Dolphin Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass items are strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "09246ccd-d6a3-4c2a-abfa-b9e727d9e31d",
+  "business_name": "Orange Beach: Daytime Dolphin Sightseeing Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Trip is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9f559a77-78a8-4b6a-9236-441607ee016e",
+  "business_name": "Orange Beach: Chute Em Up Parasail Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 Hr..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9f559a77-78a8-4b6a-9236-441607ee016e",
+  "business_name": "Orange Beach: Chute Em Up Parasail Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9f559a77-78a8-4b6a-9236-441607ee016e",
+  "business_name": "Orange Beach: Chute Em Up Parasail Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Expectant mothers, children 3 years old and under, and those with heart issues, knee injuries, and back injuries are not permitted on boats.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9f559a77-78a8-4b6a-9236-441607ee016e",
+  "business_name": "Orange Beach: Chute Em Up Parasail Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a maximum of 2-3 flyers with a combined weight limit of 500 lbs for each flight.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9f559a77-78a8-4b6a-9236-441607ee016e",
+  "business_name": "Orange Beach: Chute Em Up Parasail Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Parasail boats have a maximum capacity of 15 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bb655e3d-5c89-4387-86bf-a68a2e98c72f",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 0,
+  "item": {
+   "a": "Happy Hour is daily 3–5 PM featuring specials on draft beer, house wines, delicious appetizers, $2 off all sushi rolls, and our famous Firecracker Shrimp.",
+   "q": "What are your Happy Hour specials?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bb655e3d-5c89-4387-86bf-a68a2e98c72f",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 1,
+  "item": {
+   "a": "Our Banana Leaf Wrapped Fish was named one of \"the top 100 dishes to eat before you die\" by the Year of Alabama Food.",
+   "q": "What is the most famous dish?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bb655e3d-5c89-4387-86bf-a68a2e98c72f",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 2,
+  "item": {
+   "a": "Yes! Alabama Coastal Catering is available. Visit our website for more information.",
+   "q": "Do you offer catering?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bb655e3d-5c89-4387-86bf-a68a2e98c72f",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 3,
+  "item": {
+   "a": "25753 Canal Rd, Orange Beach, AL — off the beaten path, but worth the trip!",
+   "q": "Where are you located?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bb655e3d-5c89-4387-86bf-a68a2e98c72f",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 4,
+  "item": {
+   "a": "Sunday through Thursday 11am–9:30pm, Friday and Saturday 11am–10pm.",
+   "q": "What are your hours?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bf4cd444-ec5e-430a-9fb8-d69d390be0ee",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 0,
+  "item": {
+   "a": "Daily 3–5 PM: draft beer, house wines, appetizers, $2 off all sushi rolls, and the famous Firecracker Shrimp.",
+   "q": "What are your Happy Hour specials?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bf4cd444-ec5e-430a-9fb8-d69d390be0ee",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 1,
+  "item": {
+   "a": "The Banana Leaf Wrapped Fish — named one of the top 100 dishes to eat before you die by the Year of Alabama Food.",
+   "q": "What is the most famous dish?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bf4cd444-ec5e-430a-9fb8-d69d390be0ee",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 2,
+  "item": {
+   "a": "Yes! Alabama Coastal Catering is available. Visit our website for details.",
+   "q": "Do you offer catering?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bf4cd444-ec5e-430a-9fb8-d69d390be0ee",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 3,
+  "item": {
+   "a": "25753 Canal Rd, Orange Beach, AL — off the beaten path but worth the trip!",
+   "q": "Where are you located?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "bf4cd444-ec5e-430a-9fb8-d69d390be0ee",
+  "business_name": "Cosmo's Restaurant & Bar",
+  "match_method": "phone",
+  "live_slug": "cosmo-s-restaurant-bar",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 4,
+  "item": {
+   "a": "Sun–Thu 11am–9:30pm, Fri–Sat 11am–10pm.",
+   "q": "What are your hours?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 3190 Airport Dr, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Due to FAA regulations, no single passenger can be over 300lbs and the total combined weight cannot exceed 600lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "There is a minimum of 2 passengers required in order to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Smoking or vaping is not permitted inside the helicopter.",
+   "q": "Is smoking or vaping allowed?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Helicopter has a maximum capacity of 3 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Guests must be 18 years old or older to book.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "50b99b08-d703-4846-a71b-73d4b114e0d9",
+  "business_name": "Orange Beach: Gulf Shores Helicopter Tours",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 6,
+  "item": {
+   "a": "This tour is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "89a8d2a7-44af-47fe-b1f9-b9bf51bdba25",
+  "business_name": "Orange Beach: Guided Jet Ski Dolphin Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1.5 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "89a8d2a7-44af-47fe-b1f9-b9bf51bdba25",
+  "business_name": "Orange Beach: Guided Jet Ski Dolphin Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 5749 Bay La Launch Ave, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "89a8d2a7-44af-47fe-b1f9-b9bf51bdba25",
+  "business_name": "Orange Beach: Guided Jet Ski Dolphin Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Renters must be at least 19 years of age or older with valid U.S. driver’s license to rent and drive waverunner. If you are between the ages of 16-18 years old, with a valid U.S. driver's license, you may drive the jet ski with a legal parent or guardian riding on the same jet ski.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "89a8d2a7-44af-47fe-b1f9-b9bf51bdba25",
+  "business_name": "Orange Beach: Guided Jet Ski Dolphin Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "The jet skis have a maximum capacity of 2 people with a total weight capacity of 450lbs combined.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "89a8d2a7-44af-47fe-b1f9-b9bf51bdba25",
+  "business_name": "Orange Beach: Guided Jet Ski Dolphin Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "There is a minimum of 2 jet skis required to be booked for the tour to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "3253114c-1096-4341-85d7-c2cf1ce73166",
+  "business_name": "Orange Beach: Bear Point Marina Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "3253114c-1096-4341-85d7-c2cf1ce73166",
+  "business_name": "Orange Beach: Bear Point Marina Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 5749 Bay La Launch Ave, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "3253114c-1096-4341-85d7-c2cf1ce73166",
+  "business_name": "Orange Beach: Bear Point Marina Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Renters must be at least 19 years of age or older with valid U.S. driver’s license to rent and drive waverunner. If you are between the ages of 16-18 years old, with a valid U.S. driver's license, you may drive the jet ski with a legal parent or guardian riding on the same jet ski.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "3253114c-1096-4341-85d7-c2cf1ce73166",
+  "business_name": "Orange Beach: Bear Point Marina Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "The jet skis have a maximum capacity of 3 people with a total weight capacity of 450lbs combined.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9c132e75-98e6-445c-ba6c-e7d38c704d2c",
+  "business_name": "Orange Beach: 24ft Bentley Pontoon with 90HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9c132e75-98e6-445c-ba6c-e7d38c704d2c",
+  "business_name": "Orange Beach: 24ft Bentley Pontoon with 90HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9c132e75-98e6-445c-ba6c-e7d38c704d2c",
+  "business_name": "Orange Beach: 24ft Bentley Pontoon with 90HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Seat upholstery will be checked at the end of the day. Any damages will be charged accordingly.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9c132e75-98e6-445c-ba6c-e7d38c704d2c",
+  "business_name": "Orange Beach: 24ft Bentley Pontoon with 90HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 10 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "9c132e75-98e6-445c-ba6c-e7d38c704d2c",
+  "business_name": "Orange Beach: 24ft Bentley Pontoon with 90HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass is strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da3e1d28-2d83-47e5-8f68-e45ea37e31d5",
+  "business_name": "Gulf Shores Paddleboarding Lesson & Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 Hr..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da3e1d28-2d83-47e5-8f68-e45ea37e31d5",
+  "business_name": "Gulf Shores Paddleboarding Lesson & Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 13900 AL-180, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da3e1d28-2d83-47e5-8f68-e45ea37e31d5",
+  "business_name": "Gulf Shores Paddleboarding Lesson & Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "To be able to participate on this tour, participants will have to be strong enough to carry the paddleboard on their own in order to use their own board. Boards weigh anywhere from 15-30lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da3e1d28-2d83-47e5-8f68-e45ea37e31d5",
+  "business_name": "Gulf Shores Paddleboarding Lesson & Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Each paddleboard can carry a maximum of 1 person with a weight limit of 280lbs.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da3e1d28-2d83-47e5-8f68-e45ea37e31d5",
+  "business_name": "Gulf Shores Paddleboarding Lesson & Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Guests must be 18 years old or older to book this activity.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "4aa69fb5-ec36-4e85-8e2a-8a9da6bcb911",
+  "business_name": "Orange Beach: Hourly Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 - 3 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "4aa69fb5-ec36-4e85-8e2a-8a9da6bcb911",
+  "business_name": "Orange Beach: Hourly Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "4aa69fb5-ec36-4e85-8e2a-8a9da6bcb911",
+  "business_name": "Orange Beach: Hourly Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Recommended minimum age for children as passengers for any jet ski rental is 5 years of age or an age where the guardian feels comfortable with them being able to ride behind the driver, which is mandated by insurance and state law.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "4aa69fb5-ec36-4e85-8e2a-8a9da6bcb911",
+  "business_name": "Orange Beach: Hourly Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a maximum of 3 people per jet ski with a maximum combined weight of 400 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b7a5c059-5c58-4f7c-9590-023e89293aee",
+  "business_name": "Orange Beach: Private Bushwacker & Restaurant Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b7a5c059-5c58-4f7c-9590-023e89293aee",
+  "business_name": "Orange Beach: Private Bushwacker & Restaurant Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b7a5c059-5c58-4f7c-9590-023e89293aee",
+  "business_name": "Orange Beach: Private Bushwacker & Restaurant Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times, vests provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b7a5c059-5c58-4f7c-9590-023e89293aee",
+  "business_name": "Orange Beach: Private Bushwacker & Restaurant Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers, regardless of age or size.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b7a5c059-5c58-4f7c-9590-023e89293aee",
+  "business_name": "Orange Beach: Private Bushwacker & Restaurant Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass items, other than wine bottles, are prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b7a5c059-5c58-4f7c-9590-023e89293aee",
+  "business_name": "Orange Beach: Private Bushwacker & Restaurant Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d8e0e53c-af3a-44fd-af0b-60a4e0d91556",
+  "business_name": "Gulf Shores: Family Fun Banana Boat Rides",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 401 E Beach Blvd, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d8e0e53c-af3a-44fd-af0b-60a4e0d91556",
+  "business_name": "Gulf Shores: Family Fun Banana Boat Rides",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "All guests are required to sign a waiver. Children ages 3-18 years old may ride if their parent/guardian signs their waiver.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e6996e87-fc39-4cc1-a3b6-9a0612cc81f4",
+  "business_name": "Orange Beach: Half-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e6996e87-fc39-4cc1-a3b6-9a0612cc81f4",
+  "business_name": "Orange Beach: Half-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e6996e87-fc39-4cc1-a3b6-9a0612cc81f4",
+  "business_name": "Orange Beach: Half-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Recommended minimum age for children as passengers for any jet ski rental is 5 years of age OR an age where the guardian feels comfortable with them being able to ride behind the driver, which is mandated by insurance and state law.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e6996e87-fc39-4cc1-a3b6-9a0612cc81f4",
+  "business_name": "Orange Beach: Half-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a maximum of 3 people (2 adults & 1 child) per jet ski with a total combined weight limit of 400 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e45aecc1-7ac0-4ff5-8493-5bb460e4a5b8",
+  "business_name": "Orange Beach: Private Islands Booze Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e45aecc1-7ac0-4ff5-8493-5bb460e4a5b8",
+  "business_name": "Orange Beach: Private Islands Booze Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e45aecc1-7ac0-4ff5-8493-5bb460e4a5b8",
+  "business_name": "Orange Beach: Private Islands Booze Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times, vests provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e45aecc1-7ac0-4ff5-8493-5bb460e4a5b8",
+  "business_name": "Orange Beach: Private Islands Booze Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items, other than wine bottles, are strictly prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e45aecc1-7ac0-4ff5-8493-5bb460e4a5b8",
+  "business_name": "Orange Beach: Private Islands Booze Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers, regardless of age and size.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e45aecc1-7ac0-4ff5-8493-5bb460e4a5b8",
+  "business_name": "Orange Beach: Private Islands Booze Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c8f9ef32-a1dc-4704-9206-22c9f8187db1",
+  "business_name": "Orange Beach 20-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c8f9ef32-a1dc-4704-9206-22c9f8187db1",
+  "business_name": "Orange Beach 20-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27267 Perdido Beach Blvd suite 100, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c8f9ef32-a1dc-4704-9206-22c9f8187db1",
+  "business_name": "Orange Beach 20-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Operators will provide safety training on-site for the use of any motorized water vessel. If the operator determines, in its sole discretion, that a guest is unable to understand the training it provides, is unable to read and understand waterway signage, is impaired, or is a threat to their own safety or the safety of others, operation of the vessel may be denied, and a full refund will be issued. TripShock has no authority or discretion to determine whether or not a guest may operate a motorized water vessel.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c8f9ef32-a1dc-4704-9206-22c9f8187db1",
+  "business_name": "Orange Beach 20-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 8 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8c7f54f2-4b4f-48b2-8a55-7f9360505ff2",
+  "business_name": "Orange Beach: Full-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8c7f54f2-4b4f-48b2-8a55-7f9360505ff2",
+  "business_name": "Orange Beach: Full-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8c7f54f2-4b4f-48b2-8a55-7f9360505ff2",
+  "business_name": "Orange Beach: Full-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Recommended minimum age for children as passengers for any jet ski rental is 5 years of age or an age where the guardian feels comfortable with them being able to ride behind the driver, which is mandated by insurance and state law.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8c7f54f2-4b4f-48b2-8a55-7f9360505ff2",
+  "business_name": "Orange Beach: Full-Day Jet Ski Rentals departing from Happy Harbor Marina",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Jet skis can hold a maximum of 3 people (2 adults and 1 child) with a total weight capacity of 400 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be37ed51-9516-4b19-9d32-dd26a61047e9",
+  "business_name": "Perdido Key: Banana Boat Ride Experience",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 13825 Perdido Key Dr, Pensacola, FL 32507, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be37ed51-9516-4b19-9d32-dd26a61047e9",
+  "business_name": "Perdido Key: Banana Boat Ride Experience",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "All guests are required to sign a waiver. Children ages 3-18 years old must be accompanied by an adult to sign their waiver.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be37ed51-9516-4b19-9d32-dd26a61047e9",
+  "business_name": "Perdido Key: Banana Boat Ride Experience",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "This activity is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "218765c6-1c64-4a65-92b7-8b5bdf7e9609",
+  "business_name": "Pontoon Boat Rental with Slide in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "218765c6-1c64-4a65-92b7-8b5bdf7e9609",
+  "business_name": "Pontoon Boat Rental with Slide in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27194 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "218765c6-1c64-4a65-92b7-8b5bdf7e9609",
+  "business_name": "Pontoon Boat Rental with Slide in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "The person who books must be at least 19 years old have a valid drivers license & credit card.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "218765c6-1c64-4a65-92b7-8b5bdf7e9609",
+  "business_name": "Pontoon Boat Rental with Slide in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items are strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "218765c6-1c64-4a65-92b7-8b5bdf7e9609",
+  "business_name": "Pontoon Boat Rental with Slide in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "470965c1-5182-4ca6-9828-df3d5dce116e",
+  "business_name": "Orange Beach: Dolphin & Sunset Cruises Aboard the Southern Rose",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1.5 - 2 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "470965c1-5182-4ca6-9828-df3d5dce116e",
+  "business_name": "Orange Beach: Dolphin & Sunset Cruises Aboard the Southern Rose",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "470965c1-5182-4ca6-9828-df3d5dce116e",
+  "business_name": "Orange Beach: Dolphin & Sunset Cruises Aboard the Southern Rose",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "In the event another boat is being used, you will be cruising on a boat that has a maximum capacity of 15 passengers. This boat has no covering, no restroom, and is not handicap accessible.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "470965c1-5182-4ca6-9828-df3d5dce116e",
+  "business_name": "Orange Beach: Dolphin & Sunset Cruises Aboard the Southern Rose",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Children under 18 years old must be accompanied by a paying adult and must be supervised at all times.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "470965c1-5182-4ca6-9828-df3d5dce116e",
+  "business_name": "Orange Beach: Dolphin & Sunset Cruises Aboard the Southern Rose",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "There is a minimum of 20 paying passengers required in order to depart on the trip.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "470965c1-5182-4ca6-9828-df3d5dce116e",
+  "business_name": "Orange Beach: Dolphin & Sunset Cruises Aboard the Southern Rose",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 4673 Wharf Pkwy W, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "The trip has limited handicap accessibility. Please call ahead for special needs requests.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Guests must be 21 years old or older to consume alcoholic beverages.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "There is a minimum of 15 participants required to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Smoking and vaping of any kind is not permitted.",
+   "q": "Is smoking or vaping allowed?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 6,
+  "item": {
+   "a": "The boat has a maximum capacity of 40 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c049e829-8703-4ba8-80d4-747aa46dde6a",
+  "business_name": "Orange Beach: Dolphin Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 7,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7af0e517-6fa2-471e-ad43-394dbb03b57d",
+  "business_name": "Orange Beach Tritoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7af0e517-6fa2-471e-ad43-394dbb03b57d",
+  "business_name": "Orange Beach Tritoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27194 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7af0e517-6fa2-471e-ad43-394dbb03b57d",
+  "business_name": "Orange Beach Tritoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Renters are responsible for the cost of all damages to the watercraft (including parts and labor, up to the cost of the entire watercraft in the event it is totaled) and lost equipment while it is in their possession.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7af0e517-6fa2-471e-ad43-394dbb03b57d",
+  "business_name": "Orange Beach Tritoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Pontoon boats have a maximum capacity of 12 passengers or 1700 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7af0e517-6fa2-471e-ad43-394dbb03b57d",
+  "business_name": "Orange Beach Tritoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "The pontoon boat is handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7af0e517-6fa2-471e-ad43-394dbb03b57d",
+  "business_name": "Orange Beach Tritoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "5d2bf839-d2ab-4fa0-80a9-918e702eac92",
+  "business_name": "Orange Beach Tritoon Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "5d2bf839-d2ab-4fa0-80a9-918e702eac92",
+  "business_name": "Orange Beach Tritoon Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27194 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "5d2bf839-d2ab-4fa0-80a9-918e702eac92",
+  "business_name": "Orange Beach Tritoon Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Renters are responsible for the cost of all damages to the watercraft (including parts and labor, up to the cost of the entire watercraft in the event it is totaled) and lost equipment while it is in their possession.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "5d2bf839-d2ab-4fa0-80a9-918e702eac92",
+  "business_name": "Orange Beach Tritoon Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Pontoon boats has a maximum capacity of 12 passengers or 1700 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "5d2bf839-d2ab-4fa0-80a9-918e702eac92",
+  "business_name": "Orange Beach Tritoon Boat Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass items are strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7ad38e9d-82d4-4ebc-ab3c-c4a9cf35731c",
+  "business_name": "Orange Beach: Gulf Coast 6-Seater Golf Cart Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: Orange Beach, AL, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7ad38e9d-82d4-4ebc-ab3c-c4a9cf35731c",
+  "business_name": "Orange Beach: Gulf Coast 6-Seater Golf Cart Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Vendor does not service or deliver to the following areas due to neighborhood restrictions: Gulf Shores and anywhere on Perdido Beach Blvd except RV Parks or Tannin Village.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7ad38e9d-82d4-4ebc-ab3c-c4a9cf35731c",
+  "business_name": "Orange Beach: Gulf Coast 6-Seater Golf Cart Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Golf carts are limited in storage capacity. Items must fit in your lap or in the back seats if they are empty.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "028e57c1-43eb-40d3-a9d1-d241315e2823",
+  "business_name": "Gulf Shores: Extreme Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 925 Beach Club Trail, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "028e57c1-43eb-40d3-a9d1-d241315e2823",
+  "business_name": "Gulf Shores: Extreme Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Guests must be 19 years old or older to rent/drive a Waverunner. A valid government-issued photo ID is required to rent.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "028e57c1-43eb-40d3-a9d1-d241315e2823",
+  "business_name": "Gulf Shores: Extreme Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Jet skis can carry a maximum of 2 people with a total combined weight of 400 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "028e57c1-43eb-40d3-a9d1-d241315e2823",
+  "business_name": "Gulf Shores: Extreme Jet Ski Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "This activity is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1.5 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 4673 Wharf Pkwy W, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Cruise has limited handicap accessibility. Wheelchairs and strollers are not permitted on board. However, canes and walkers are welcome.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a minimum of 15 participants required for this trip to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Guests must be 21 years old or older to purchase and consume alcohol.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Smoking and vaping of any kind are not permitted.",
+   "q": "Is smoking or vaping allowed?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1ae9b1a4-91a3-4a7e-9a1a-e73fd16d0144",
+  "business_name": "Orange Beach: Dolphin Eco Cruise on The Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 6,
+  "item": {
+   "a": "The boat has a maximum capacity of 40 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 3190 Airport Dr #4, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Helicopter has a maximum capacity of 3 passengers. If there is a large group, you will be accommodated in multiple flights.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Due to FAA regulations, no single passenger can be over 300lbs and the total combined weight cannot exceed 650lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a minimum of 2 people required in order for the tour to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Smoking or vaping is not permitted inside the helicopter.",
+   "q": "Is smoking or vaping allowed?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Guests must be 18 years old or older to book.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "be2fc148-a4aa-4581-bb6e-54547f3cd7b9",
+  "business_name": "Orange Beach: Sunset Helicopter Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 6,
+  "item": {
+   "a": "This tour is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 4673 Wharf Pkwy W, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Cruise has limited handicap accessibility. Wheelchairs and strollers are not permitted on board. However, canes and walkers are welcome.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Guests must be 21 years old or older to purchase and consume alcohol.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "There is a minimum of 12 participants required to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Smoking and vaping of any kind are not permitted.",
+   "q": "Is smoking or vaping allowed?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "fa78c61a-8297-4f80-8fa2-39bfb618bee7",
+  "business_name": "Orange Beach: Dolphin Sunset Cruise on the Explorer",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 6,
+  "item": {
+   "a": "The boat has a maximum capacity of 40 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f7d0faf2-1caf-44c0-b06e-8c35753fdcf8",
+  "business_name": "Orange Beach: Private Sightseeing & Eco Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f7d0faf2-1caf-44c0-b06e-8c35753fdcf8",
+  "business_name": "Orange Beach: Private Sightseeing & Eco Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f7d0faf2-1caf-44c0-b06e-8c35753fdcf8",
+  "business_name": "Orange Beach: Private Sightseeing & Eco Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times, vests provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f7d0faf2-1caf-44c0-b06e-8c35753fdcf8",
+  "business_name": "Orange Beach: Private Sightseeing & Eco Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items, other than wine bottles, are strictly prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f7d0faf2-1caf-44c0-b06e-8c35753fdcf8",
+  "business_name": "Orange Beach: Private Sightseeing & Eco Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers, regardless of age and size.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f7d0faf2-1caf-44c0-b06e-8c35753fdcf8",
+  "business_name": "Orange Beach: Private Sightseeing & Eco Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2ae9891d-6761-49f3-b24d-49efedb76e53",
+  "business_name": "Orange Beach: Private Blue Angels Airshow Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2ae9891d-6761-49f3-b24d-49efedb76e53",
+  "business_name": "Orange Beach: Private Blue Angels Airshow Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2ae9891d-6761-49f3-b24d-49efedb76e53",
+  "business_name": "Orange Beach: Private Blue Angels Airshow Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times. Vests are provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2ae9891d-6761-49f3-b24d-49efedb76e53",
+  "business_name": "Orange Beach: Private Blue Angels Airshow Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass containers other than wine bottles are prohibited aboard the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2ae9891d-6761-49f3-b24d-49efedb76e53",
+  "business_name": "Orange Beach: Private Blue Angels Airshow Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2ae9891d-6761-49f3-b24d-49efedb76e53",
+  "business_name": "Orange Beach: Private Blue Angels Airshow Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8d4179cc-4a27-40a3-85bf-e85655c1e210",
+  "business_name": "Perdido Key: Parasailing Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 13825 Perdido Key Dr, Pensacola, FL 32507, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8d4179cc-4a27-40a3-85bf-e85655c1e210",
+  "business_name": "Perdido Key: Parasailing Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Children ages 3-18 years old may parasail and be spectators if a parent signs their waiver.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8d4179cc-4a27-40a3-85bf-e85655c1e210",
+  "business_name": "Perdido Key: Parasailing Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "There is a total combined weight of 500lbs, typically 2-3 people can fly at once.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8d4179cc-4a27-40a3-85bf-e85655c1e210",
+  "business_name": "Perdido Key: Parasailing Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "The boat has a maximum capacity of 6 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8d4179cc-4a27-40a3-85bf-e85655c1e210",
+  "business_name": "Perdido Key: Parasailing Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "This activity is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "269157ad-5ecf-411c-9cc3-e32fe6060bf1",
+  "business_name": "Orange Beach: Private Island Grillin & Chillin Boat Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 3 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "269157ad-5ecf-411c-9cc3-e32fe6060bf1",
+  "business_name": "Orange Beach: Private Island Grillin & Chillin Boat Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "269157ad-5ecf-411c-9cc3-e32fe6060bf1",
+  "business_name": "Orange Beach: Private Island Grillin & Chillin Boat Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times, vests provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "269157ad-5ecf-411c-9cc3-e32fe6060bf1",
+  "business_name": "Orange Beach: Private Island Grillin & Chillin Boat Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items, other than wine bottles, are strictly prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "269157ad-5ecf-411c-9cc3-e32fe6060bf1",
+  "business_name": "Orange Beach: Private Island Grillin & Chillin Boat Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers, regardless of age or size.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "269157ad-5ecf-411c-9cc3-e32fe6060bf1",
+  "business_name": "Orange Beach: Private Island Grillin & Chillin Boat Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "593c2bbc-39b2-4ce7-bb7e-e512ab35f79a",
+  "business_name": "Gulf Shores Kayak Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 Hr..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "593c2bbc-39b2-4ce7-bb7e-e512ab35f79a",
+  "business_name": "Gulf Shores Kayak Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 13900 AL-180, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "593c2bbc-39b2-4ce7-bb7e-e512ab35f79a",
+  "business_name": "Gulf Shores Kayak Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 16 years old must be accompanied by an adult at all times. Children under 6 years old are not permitted.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "593c2bbc-39b2-4ce7-bb7e-e512ab35f79a",
+  "business_name": "Gulf Shores Kayak Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a minimum of 2 people required to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "593c2bbc-39b2-4ce7-bb7e-e512ab35f79a",
+  "business_name": "Gulf Shores Kayak Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Activity has a maximum capacity of 6 guests.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "593c2bbc-39b2-4ce7-bb7e-e512ab35f79a",
+  "business_name": "Gulf Shores Kayak Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "905806c3-6493-430b-8de2-d2f46a1ed3d3",
+  "business_name": "Orange Beach: Gulf Coast 4-Seater Golf Cart Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: Orange Beach, AL, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "905806c3-6493-430b-8de2-d2f46a1ed3d3",
+  "business_name": "Orange Beach: Gulf Coast 4-Seater Golf Cart Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Vendor does not service or deliver to the following areas due to neighborhood restrictions: Gulf Shores and anywhere on Perdido Beach Blvd except RV Parks or Tannin Village.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "905806c3-6493-430b-8de2-d2f46a1ed3d3",
+  "business_name": "Orange Beach: Gulf Coast 4-Seater Golf Cart Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Golf carts are limited in storage capacity. Items must fit in your lap or in the back seats if they are empty.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "cde9d092-9f24-4bd9-8ea7-945d74436d6d",
+  "business_name": "Orange Beach Tritoon with Slide",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "cde9d092-9f24-4bd9-8ea7-945d74436d6d",
+  "business_name": "Orange Beach Tritoon with Slide",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27194 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "cde9d092-9f24-4bd9-8ea7-945d74436d6d",
+  "business_name": "Orange Beach Tritoon with Slide",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Renters are responsible for the cost of all damages to the watercraft (including parts and labor, up to the cost of the entire watercraft in the event it is totaled) and lost equipment while it is in their possession.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "cde9d092-9f24-4bd9-8ea7-945d74436d6d",
+  "business_name": "Orange Beach Tritoon with Slide",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Pontoon boats have a maximum capacity of 12 passengers or 1700 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "cde9d092-9f24-4bd9-8ea7-945d74436d6d",
+  "business_name": "Orange Beach Tritoon with Slide",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "The pontoon boat is handicap accessible, the slide is not.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "cde9d092-9f24-4bd9-8ea7-945d74436d6d",
+  "business_name": "Orange Beach Tritoon with Slide",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c94282d3-6219-4a3b-9809-e159a22a2a77",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 Hr..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c94282d3-6219-4a3b-9809-e159a22a2a77",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27550 Larry C Kelley Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c94282d3-6219-4a3b-9809-e159a22a2a77",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "This departure location allows guests to step directly onto the vessel. There is a place for guests to leave their wheelchairs/walkers/scooters at the dock during the excursion.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c94282d3-6219-4a3b-9809-e159a22a2a77",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "For guests under the age of 19, a parent or legal guardian is required to sign a waiver. Guests 19 years of age or older may sign their own waiver.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c94282d3-6219-4a3b-9809-e159a22a2a77",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "The combined weight of guests flying must be between 150 and 450 pounds.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "c94282d3-6219-4a3b-9809-e159a22a2a77",
+  "business_name": "Orange Beach: Dockside Parasail",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "There is a maximum of 2 observers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "86e1bba1-81e3-4b2f-81bf-372e4762f3d5",
+  "business_name": "Orange Beach: 22-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "86e1bba1-81e3-4b2f-81bf-372e4762f3d5",
+  "business_name": "Orange Beach: 22-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27267 Perdido Beach Blvd suite 100, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "86e1bba1-81e3-4b2f-81bf-372e4762f3d5",
+  "business_name": "Orange Beach: 22-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Operators will provide safety training on-site for the use of any motorized water vessel. If the operator determines, in its sole discretion, that a guest is unable to understand the training it provides, is unable to read and understand waterway signage, is impaired, or is a threat to their own safety or the safety of others, operation of the vessel may be denied, and a full refund will be issued. TripShock has no authority or discretion to determine whether or not a guest may operate a motorized water vessel.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "86e1bba1-81e3-4b2f-81bf-372e4762f3d5",
+  "business_name": "Orange Beach: 22-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 10 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "686f4daf-4c54-4121-8e8d-5bd431859383",
+  "business_name": "Orange Beach 24-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "686f4daf-4c54-4121-8e8d-5bd431859383",
+  "business_name": "Orange Beach 24-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27267 Perdido Beach Blvd suite 100, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "686f4daf-4c54-4121-8e8d-5bd431859383",
+  "business_name": "Orange Beach 24-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Operators will provide safety training on-site for the use of any motorized water vessel. If the operator determines, in its sole discretion, that a guest is unable to understand the training it provides, is unable to read and understand waterway signage, is impaired, or is a threat to their own safety or the safety of others, operation of the vessel may be denied and a full refund will be issued. TripShock has no authority or discretion to determine whether or not a guest may operate a motorized water vessel.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "686f4daf-4c54-4121-8e8d-5bd431859383",
+  "business_name": "Orange Beach 24-Foot Pontoon Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "196e9d6f-b9e7-4819-a124-84a352410961",
+  "business_name": "Orange Beach: Private Bachelor(ette) Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "196e9d6f-b9e7-4819-a124-84a352410961",
+  "business_name": "Orange Beach: Private Bachelor(ette) Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "196e9d6f-b9e7-4819-a124-84a352410961",
+  "business_name": "Orange Beach: Private Bachelor(ette) Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life vest at all times. Provider does not have life vests for children under 30 pounds so guests must provide their own.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "196e9d6f-b9e7-4819-a124-84a352410961",
+  "business_name": "Orange Beach: Private Bachelor(ette) Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items and containers are prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "196e9d6f-b9e7-4819-a124-84a352410961",
+  "business_name": "Orange Beach: Private Bachelor(ette) Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "196e9d6f-b9e7-4819-a124-84a352410961",
+  "business_name": "Orange Beach: Private Bachelor(ette) Boat Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "45aed543-fedc-4d02-a21f-25933f94a015",
+  "business_name": "Orange Beach: 24ft Bentley Sport Pontoon with 140 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "45aed543-fedc-4d02-a21f-25933f94a015",
+  "business_name": "Orange Beach: 24ft Bentley Sport Pontoon with 140 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "45aed543-fedc-4d02-a21f-25933f94a015",
+  "business_name": "Orange Beach: 24ft Bentley Sport Pontoon with 140 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Seat upholstery will be checked at the end of the day. Any damages will be charged accordingly.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "45aed543-fedc-4d02-a21f-25933f94a015",
+  "business_name": "Orange Beach: 24ft Bentley Sport Pontoon with 140 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "45aed543-fedc-4d02-a21f-25933f94a015",
+  "business_name": "Orange Beach: 24ft Bentley Sport Pontoon with 140 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass is strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "36d88ec5-083a-4449-80e1-2ac2289d3003",
+  "business_name": "Orange Beach: Private Dolphin Sightseeing Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "36d88ec5-083a-4449-80e1-2ac2289d3003",
+  "business_name": "Orange Beach: Private Dolphin Sightseeing Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "36d88ec5-083a-4449-80e1-2ac2289d3003",
+  "business_name": "Orange Beach: Private Dolphin Sightseeing Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 8 years old must wear a life jacket at all times, vests provided for most standard sizes.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "36d88ec5-083a-4449-80e1-2ac2289d3003",
+  "business_name": "Orange Beach: Private Dolphin Sightseeing Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items, other than wine bottles, are strictly prohibited aboard boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "36d88ec5-083a-4449-80e1-2ac2289d3003",
+  "business_name": "Orange Beach: Private Dolphin Sightseeing Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers, regardless of age and size.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "36d88ec5-083a-4449-80e1-2ac2289d3003",
+  "business_name": "Orange Beach: Private Dolphin Sightseeing Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Boat is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2cf50de3-f50b-45a0-87eb-b560a586bde4",
+  "business_name": "Orange Beach: Family-Friendly Dolphin Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1.5 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2cf50de3-f50b-45a0-87eb-b560a586bde4",
+  "business_name": "Orange Beach: Family-Friendly Dolphin Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 4575 S Wilson Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2cf50de3-f50b-45a0-87eb-b560a586bde4",
+  "business_name": "Orange Beach: Family-Friendly Dolphin Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "There is a minimum of 10 guests required in order for the tour to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2cf50de3-f50b-45a0-87eb-b560a586bde4",
+  "business_name": "Orange Beach: Family-Friendly Dolphin Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Guests must be 21 years old or older to consume alcoholic beverages.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2cf50de3-f50b-45a0-87eb-b560a586bde4",
+  "business_name": "Orange Beach: Family-Friendly Dolphin Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Cruise has a maximum capacity of 130 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "2cf50de3-f50b-45a0-87eb-b560a586bde4",
+  "business_name": "Orange Beach: Family-Friendly Dolphin Cruise",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "Glass items are strictly prohibited.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "174e2b52-ca71-4c8f-b2ae-5c2a13bc8458",
+  "business_name": "Orange Beach: Sunset Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "174e2b52-ca71-4c8f-b2ae-5c2a13bc8458",
+  "business_name": "Orange Beach: Sunset Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 4673 Wharf Pkwy W, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "174e2b52-ca71-4c8f-b2ae-5c2a13bc8458",
+  "business_name": "Orange Beach: Sunset Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "The trip has limited handicap accessibility. Please call ahead for special needs requests.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "174e2b52-ca71-4c8f-b2ae-5c2a13bc8458",
+  "business_name": "Orange Beach: Sunset Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Guests must be 21 years old or older to purchase and consume alcohol.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "174e2b52-ca71-4c8f-b2ae-5c2a13bc8458",
+  "business_name": "Orange Beach: Sunset Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "There is a minimum of 15 participants required to depart.",
+   "q": "Is there a minimum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "174e2b52-ca71-4c8f-b2ae-5c2a13bc8458",
+  "business_name": "Orange Beach: Sunset Sailing Tour Aboard a 52-Foot Catamaran",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 5,
+  "item": {
+   "a": "The boat has a maximum capacity of 40 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "826b6616-a5fc-4aef-be86-d1647a39ce44",
+  "business_name": "Orange Beach: 30ft Double Deck Pontoon with 2 Slides and 115HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "826b6616-a5fc-4aef-be86-d1647a39ce44",
+  "business_name": "Orange Beach: 30ft Double Deck Pontoon with 2 Slides and 115HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "826b6616-a5fc-4aef-be86-d1647a39ce44",
+  "business_name": "Orange Beach: 30ft Double Deck Pontoon with 2 Slides and 115HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Seat upholstery will be checked at the end of the day. Any damages will be charged accordingly.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "826b6616-a5fc-4aef-be86-d1647a39ce44",
+  "business_name": "Orange Beach: 30ft Double Deck Pontoon with 2 Slides and 115HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "826b6616-a5fc-4aef-be86-d1647a39ce44",
+  "business_name": "Orange Beach: 30ft Double Deck Pontoon with 2 Slides and 115HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass is strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "07df0ea1-d0d2-4c35-92f3-7a6bd0628654",
+  "business_name": "Gulf Shores: Parasailing & Banana Boat Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 401 E Beach Blvd, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "07df0ea1-d0d2-4c35-92f3-7a6bd0628654",
+  "business_name": "Gulf Shores: Parasailing & Banana Boat Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Expectant mothers and those with heart issues, knee, back, or shoulder injuries, and children under 4 years old are not permitted on this experience.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "07df0ea1-d0d2-4c35-92f3-7a6bd0628654",
+  "business_name": "Gulf Shores: Parasailing & Banana Boat Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "The parasail limit is 2-3 people with a combined total weight of 500 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "07df0ea1-d0d2-4c35-92f3-7a6bd0628654",
+  "business_name": "Gulf Shores: Parasailing & Banana Boat Adventure",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Trip has a maximum capacity of 6 people per group.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7f99f9a5-37b4-4796-81aa-682073f64e35",
+  "business_name": "Gulf Shores: Launch from the Beach Jet Ski Rentals",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 401 E Beach Blvd, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7f99f9a5-37b4-4796-81aa-682073f64e35",
+  "business_name": "Gulf Shores: Launch from the Beach Jet Ski Rentals",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Guests must be 19 years old or older to rent and drive a Waverunner. A valid government-issued photo ID is required.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7f99f9a5-37b4-4796-81aa-682073f64e35",
+  "business_name": "Gulf Shores: Launch from the Beach Jet Ski Rentals",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Jet skis have a maximum weight limit of 400 lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "7f99f9a5-37b4-4796-81aa-682073f64e35",
+  "business_name": "Gulf Shores: Launch from the Beach Jet Ski Rentals",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Jet skis are not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f46c331a-955c-4380-bb7c-fe3cf8888024",
+  "business_name": "Fort Morgan Parasailing & Banana Boat Experience",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 925 Beach Club Trail, Gulf Shores, AL 36542, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f46c331a-955c-4380-bb7c-fe3cf8888024",
+  "business_name": "Fort Morgan Parasailing & Banana Boat Experience",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "All guests are required to sign a waiver. Children ages 3-18 may fly if accompanied by an adult. Parents must sign waivers for all minors.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "f46c331a-955c-4380-bb7c-fe3cf8888024",
+  "business_name": "Fort Morgan Parasailing & Banana Boat Experience",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Chutes can accommodate up to 2-3 flyers at a time with a maximum combined weight of 500 lbs. per flight.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "19067db9-5439-4cbb-82ea-b8917ecdcc63",
+  "business_name": "Orange Beach: Sunset Dolphin Cruise with Captain",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 Hr..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "19067db9-5439-4cbb-82ea-b8917ecdcc63",
+  "business_name": "Orange Beach: Sunset Dolphin Cruise with Captain",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 5749 Bay La Launch Ave, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "19067db9-5439-4cbb-82ea-b8917ecdcc63",
+  "business_name": "Orange Beach: Sunset Dolphin Cruise with Captain",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Children under 18 years old must be supervised by an adult at all times.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "19067db9-5439-4cbb-82ea-b8917ecdcc63",
+  "business_name": "Orange Beach: Sunset Dolphin Cruise with Captain",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 6 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "19067db9-5439-4cbb-82ea-b8917ecdcc63",
+  "business_name": "Orange Beach: Sunset Dolphin Cruise with Captain",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Trip is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b9125a84-a60c-4b19-8b9b-be48ec90757b",
+  "business_name": "Orange Beach: Waverunner Dolphin Tour with Free Photos",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1.5 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b9125a84-a60c-4b19-8b9b-be48ec90757b",
+  "business_name": "Orange Beach: Waverunner Dolphin Tour with Free Photos",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 5749 Bay La Launch Ave, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b9125a84-a60c-4b19-8b9b-be48ec90757b",
+  "business_name": "Orange Beach: Waverunner Dolphin Tour with Free Photos",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Guests must be 19 years old or older with a valid U.S. driver's license to rent. If you are between the ages of 16-18 and have a valid U.S. driver's license, you may drive the jet ski with a legal parent or guardian riding on the same jet ski. Anyone that has had their license revoked or suspended may not operate jet skis.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "b9125a84-a60c-4b19-8b9b-be48ec90757b",
+  "business_name": "Orange Beach: Waverunner Dolphin Tour with Free Photos",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Each jet ski has a maximum capacity of 2 passengers with a total maximum combined weight of 400lbs.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8231d9cd-ae77-4a2f-8a56-e12ca47d6743",
+  "business_name": "Orange Beach: Gulf Coast Sweet Jeep Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 6 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8231d9cd-ae77-4a2f-8a56-e12ca47d6743",
+  "business_name": "Orange Beach: Gulf Coast Sweet Jeep Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 25150 Canal Rd Suite B, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8231d9cd-ae77-4a2f-8a56-e12ca47d6743",
+  "business_name": "Orange Beach: Gulf Coast Sweet Jeep Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Sweet Jeep rental requires all renters to use provider's insurance. Insurance cost is $25/6 hour ride or $50/day. Vendor can provide you with a form to be filled out by your insurance company if you have personal full coverage insurance. This form will waive vendor's insurance, please inquire at our store location.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8231d9cd-ae77-4a2f-8a56-e12ca47d6743",
+  "business_name": "Orange Beach: Gulf Coast Sweet Jeep Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "There is a maximum of 2 Jeep rentals per group.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "8231d9cd-ae77-4a2f-8a56-e12ca47d6743",
+  "business_name": "Orange Beach: Gulf Coast Sweet Jeep Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Activity is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da93747d-020c-45c4-9e74-7e74976a6c97",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 70HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da93747d-020c-45c4-9e74-7e74976a6c97",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 70HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da93747d-020c-45c4-9e74-7e74976a6c97",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 70HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Seat upholstery will be checked at the end of the day. Any damages will be charged accordingly.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da93747d-020c-45c4-9e74-7e74976a6c97",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 70HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "da93747d-020c-45c4-9e74-7e74976a6c97",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 70HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass is strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e1a0f4fc-24c4-46a9-8e0d-3433d49060b3",
+  "business_name": "Pontoon Boat Rental in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 2 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e1a0f4fc-24c4-46a9-8e0d-3433d49060b3",
+  "business_name": "Pontoon Boat Rental in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27194 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e1a0f4fc-24c4-46a9-8e0d-3433d49060b3",
+  "business_name": "Pontoon Boat Rental in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "The person who books must be at least 19 years old have a valid drivers license & credit card.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e1a0f4fc-24c4-46a9-8e0d-3433d49060b3",
+  "business_name": "Pontoon Boat Rental in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Glass items are strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "e1a0f4fc-24c4-46a9-8e0d-3433d49060b3",
+  "business_name": "Pontoon Boat Rental in Orange Beach",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d80c412c-d123-4296-9939-26f5e0048113",
+  "business_name": "Orange Beach: Polaris Slingshot Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Meeting point: 25150 Canal Rd Suite B, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d80c412c-d123-4296-9939-26f5e0048113",
+  "business_name": "Orange Beach: Polaris Slingshot Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Guests must be 21 years old or older with valid driver's license or equivalent international license in order to rent and drive Polaris Slingshot.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d80c412c-d123-4296-9939-26f5e0048113",
+  "business_name": "Orange Beach: Polaris Slingshot Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Slingshot has a maximum capacity of 2 people.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "d80c412c-d123-4296-9939-26f5e0048113",
+  "business_name": "Orange Beach: Polaris Slingshot Rental",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Rental is not handicap accessible.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1e37eafc-94de-4fd5-8d5f-adaf554b0743",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 115 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 4 - 8 Hrs..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1e37eafc-94de-4fd5-8d5f-adaf554b0743",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 115 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 27212 Marina Rd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1e37eafc-94de-4fd5-8d5f-adaf554b0743",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 115 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "Seat upholstery will be checked at the end of the day. Any damages will be charged accordingly.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1e37eafc-94de-4fd5-8d5f-adaf554b0743",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 115 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Boat has a maximum capacity of 12 passengers.",
+   "q": "What is the maximum group size?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "1e37eafc-94de-4fd5-8d5f-adaf554b0743",
+  "business_name": "Orange Beach: 24ft Double Deck Pontoon with Slide and 115 HP",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "Glass is strictly prohibited on the boat.",
+   "q": "Can I bring glass items?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "15fcfa33-dfd0-44b3-99a6-4c4207d6d30a",
+  "business_name": "Orange Beach: Sunset & Crab Grab Clear Kayak Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 0,
+  "item": {
+   "a": "Duration is approximately 1 Hr..",
+   "q": "How long does this activity take?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "15fcfa33-dfd0-44b3-99a6-4c4207d6d30a",
+  "business_name": "Orange Beach: Sunset & Crab Grab Clear Kayak Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 1,
+  "item": {
+   "a": "Meeting point: 28101 Perdido Beach Blvd, Orange Beach, AL 36561, USA",
+   "q": "Where do we meet?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "15fcfa33-dfd0-44b3-99a6-4c4207d6d30a",
+  "business_name": "Orange Beach: Sunset & Crab Grab Clear Kayak Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 2,
+  "item": {
+   "a": "The tour is not handicap accessible. Guests must be able to get in and out of a kayak from the launch.",
+   "q": "Is this activity accessible?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "15fcfa33-dfd0-44b3-99a6-4c4207d6d30a",
+  "business_name": "Orange Beach: Sunset & Crab Grab Clear Kayak Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 3,
+  "item": {
+   "a": "Guests must be 21 years old or older to consume alcoholic beverages.",
+   "q": "Are there age requirements?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "15fcfa33-dfd0-44b3-99a6-4c4207d6d30a",
+  "business_name": "Orange Beach: Sunset & Crab Grab Clear Kayak Tour",
+  "match_method": null,
+  "live_slug": null,
+  "status": "unmatched",
+  "item_index": 4,
+  "item": {
+   "a": "The maximum weight per tandem kayak is 420lb in total.",
+   "q": "Are there weight restrictions?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 0,
+  "item": {
+   "answer": "Just bring your beach-day essentials: Sunscreen, beach towels, cooler with your favorite drinks and snacks, whatever you'd bring for a perfect day on the water!\nWant to go a little extra? You're welcome to bring chairs and large coolers, but we recommend renting one of our floating docks that attaches to your boat. It gives you extra room to spread out, float, and tie up with friends.\nPro tip: The chair on your Circle Boat pops right off and works great as a beach chair when you stop at the island. Pretty handy right?",
+   "question": "WHAT SHOULD I BRING?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 1,
+  "item": {
+   "answer": "Most of our guests meet us at one of our launch locations, where we'll have your boat in the water and give you a quick safety rundown before you head out to explore.\nYou can launch from locations in :\n*Orange Beach\n*Gulf Shores.\nStaying at a water front vacation rental? We may be able to deliver directly to you--as long as your location if in a safe boating area like no-wake zones or lake.\nIf it's safe, we'll bring the fun straight to your dock. Easy as that!",
+   "question": "DO YOU DELIVER THE CIRCLE BOAT TO ME?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 2,
+  "item": {
+   "answer": "ORANGE BEACH\nRomar Marina\n26350 Cotton Bayou Dr.\nOrange Beach, AL\nBook 9am-1pm or 2pm-6pm  or all day 9am-6pm\n\nGULF SHORES\nGALLEY ON THE RIVER (Bon Secur River)\n18546 County Road 10\nHalf -day trips only",
+   "question": "WHERE DO YOU LAUNCH?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 3,
+  "item": {
+   "answer": "That's a hard NO.\nOur Circle Boats are designed for calm protected water, not Gulf waves or currents. The Gulf can get rough, and our trolling motors prefer a more relaxed beach vibe.",
+   "question": "CAN I USE MY CIRCLE BOAT IN THE GULF?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 4,
+  "item": {
+   "answer": "No wake zones are the sweet spot.\nAround Orange Beach you'll find gorgeous little islands with white sandy beaches, calm water, and even a few waterfront bars and restaurants you can pull right up to.\nWe'll give you a waterproof map that shows the best spots to explore, float, beach your boat, and enjoy the day safely. Island hopping+floating with your crew=best beach day ever!",
+   "question": "WHERE CAN I RIDE MY CIRCLE BOAT?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 5,
+  "item": {
+   "answer": "Simple: look for the signs.\nAlso keep an eye on the speed of the boats around you. If everyone is cruising slowly, you're probably in a no-wake zone.\nOne friendly reminder:\nLarger boats under power can't always maneuver quickly, and many are charter boats with professional captains.\nSo be courteous, stay in the designated  no-wake areas, and keep the  the vibe safe and chill for everyone on the water.",
+   "question": "HOW CAN I TELL WHERE THE NO-WAKE ZONES ARE?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 6,
+  "item": {
+   "answer": "Nope---that's the beauty of it.\n*  You must be 21 years old to rent\n* Drivers must be at least 14 years old to drive.\nThese boats are incredibly easy to operate. Just point the motor where you want to go and turn the throttle.\nWe'll give you a quick safety briefing, and the you're ready to roll!\nSeriously--if you can steer a shopping cart you can drive a circle boat!",
+   "question": "DO I NEED A BOATING LICENSE TO OPERAT A CIRCLE BOAT?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 7,
+  "item": {
+   "answer": "First of all....don't panic. You'll have contact information, and if anything happens we'll come to you.  Often, one of our guides are on the water nearby.\nBefore every rental, our boats are fully charged 100%. The battery typically last up to 8 hours, depending on current, weight and how much cruising you do.\nYou can even connect to your battery via Bluetooth in the app to check battery life anytime.\nAnd if you're battery dies there's an anchor onboard to keep your floating paradise right where you are.",
+   "question": "WHAT HAPPENS IF MY BOAT BREAKS DOWN?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 8,
+  "item": {
+   "answer": "Extremely safe---and ridiculously stable.\nYou can stand up on them and they won't tip over. They're designed specifically for relaxed, low speed cruising.\nInstead of a large engine, they use a small trolling motor with a protective propeller shield, making them safer for swimmers and sandbars.\nFollow a few simple rules and you'll have a great day:\n* Stay in no-wake zones\n* Stay close to the banks as possible to stay out of other boaters way\n* Be aware of other boaters\nDo that and you're all set for one the safest, easiest, and most fun days you can have on the water.\n* Respect the water",
+   "question": "HOW SAFE ARE CIRCLE BOATS?"
+  }
+ },
+ {
+  "source_db": "feb",
+  "source_table": "site_content.qna",
+  "site_id": "22222222-2222-2222-2222-222222222222",
+  "business_name": "Beachside Circle Boat Rentals and Sales",
+  "match_method": "phone",
+  "live_slug": "beachside-circle-boat-rentals-and-sales",
+  "status": "net_new",
+  "phone_ambiguous": true,
+  "phone_entity_count": 2,
+  "item_index": 9,
+  "item": {
+   "answer": "One person per boat unless you rent one of our 2-seater Circle Boats, which fits two.\nBut here's where it gets fun....\nIf you're coming with a group, you can rent a floating dock and tie up to 4 Circle Boats together. That means everyone can cruise around on their own boat and then link up to float, swim, snack, and hang out like your own little beach party. 🌴\nPro tip: Groups love this setup because everyone gets to drive their own boat and still hang out together on the water. Best of both worlds!",
+   "question": "HOW MANY PEOPLE FIT ON A CIRCLE BOAT?"
+  }
+ }
+]

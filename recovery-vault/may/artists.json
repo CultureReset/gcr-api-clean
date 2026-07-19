@@ -1,0 +1,4965 @@
+[
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "2 Cahoots",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "2 Cahoots",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "3HG",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "3HG",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Aaron Smithey",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Aaron Smithey",
+  "event_count": 4,
+  "venues": [
+   "Bear Point Harbor",
+   "Doc’s Seafood and Steaks",
+   "Doc's Seafood Shack & Oyster Bar",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Alan Renfroe",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Alan Renfroe",
+  "event_count": 2,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Alastair Greene",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Alastair Greene",
+  "event_count": 1,
+  "venues": [
+   "Paradise Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Alex Vecsey",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Alex Vecsey",
+  "event_count": 16,
+  "venues": [
+   "Lauria's by the Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Amanda Pruitt",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Amanda Pruitt",
+  "event_count": 3,
+  "venues": [
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al",
+   "Perdido Key Sports Bar & Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Amanda Pruitt Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Amanda Pruitt Band",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Amanda Pruitt Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Amanda Pruitt Duo",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Andy Lyle Hall",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Andy Lyle Hall",
+  "event_count": 2,
+  "venues": [
+   "Barometer Waterfront Grille",
+   "Jesses Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Andy Lyle Hall & Clay Watson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Andy Lyle Hall & Clay Watson",
+  "event_count": 2,
+  "venues": [
+   "Ice House Taproom",
+   "Icehouse Tap Room"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ariel Casey Acoustic",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ariel Casey Acoustic",
+  "event_count": 1,
+  "venues": [
+   "Jesses Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Armani Smith",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Armani Smith",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Augie Savage",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Augie Savage",
+  "event_count": 14,
+  "venues": [
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Austin Forman",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Austin Forman",
+  "event_count": 1,
+  "venues": [
+   "Moonshine Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Austin Forman w/ Bryanna Julie",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Austin Forman w/ Bryanna Julie",
+  "event_count": 8,
+  "venues": [
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Austin Gray",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Austin Gray",
+  "event_count": 2,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Austin Thompson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Austin Thompson",
+  "event_count": 2,
+  "venues": [
+   "Doc’s Seafood and Steaks",
+   "Doc's Seafood Shack & Oyster Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "AVINŪ",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "AVINŪ",
+  "event_count": 3,
+  "venues": [
+   "Hub Stacey's",
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Bad Alibi",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Bad Alibi",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Basch Jernigan",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Basch Jernigan",
+  "event_count": 7,
+  "venues": [
+   "GTs On The Bay",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Bell and the Bull",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Bell and the Bull",
+  "event_count": 6,
+  "venues": [
+   "GTs On The Bay"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ben Lake",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ben Lake",
+  "event_count": 3,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "Salty Pearl Raw Bar and Steamer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ben Stack",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ben Stack",
+  "event_count": 2,
+  "venues": [
+   "Bushwacker’s Landing"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Billy Bones",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Billy Bones",
+  "event_count": 3,
+  "venues": [
+   "Bartram Park",
+   "Big Beach Brewing",
+   "Big Beach Brewing Company"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Blackwater Country",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Blackwater Country",
+  "event_count": 4,
+  "venues": [
+   "Angry Crab Shack",
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Bobby Trent Toy Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Bobby Trent Toy Duo",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Bogue Chitto",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Bogue Chitto",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Boukou Groove",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Boukou Groove",
+  "event_count": 1,
+  "venues": [
+   "Sound Wave"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Box Office Giants",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Box Office Giants",
+  "event_count": 2,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brandon Blackburn",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brandon Blackburn",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brandon Blackburn Duo w/ Logan Lassitter",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Brandon Blackburn Duo w/ Logan Lassitter",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brandon Giles",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brandon Giles",
+  "event_count": 10,
+  "venues": [
+   "Bear Point Harbor",
+   "ByWater Beachside Beach Bar & Grill",
+   "Flora-Bama",
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al",
+   "Moonshine Saloon",
+   "OSO at Bear Point Harbor",
+   "Sandshaker Lounge",
+   "The Salty Rose Beach Bar & Grill",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brandon Norris",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Brandon Norris",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brennan Lowery",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brennan Lowery",
+  "event_count": 2,
+  "venues": [
+   "Lillian's Pizza"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brennan Lowery & Ryan Dakota",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Brennan Lowery & Ryan Dakota",
+  "event_count": 1,
+  "venues": [
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brennan Wilson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Brennan Wilson",
+  "event_count": 1,
+  "venues": [
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brent Burns",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brent Burns",
+  "event_count": 3,
+  "venues": [
+   "Tuscany Pizza and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brent Varner",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brent Varner",
+  "event_count": 20,
+  "venues": [
+   "Bear Point Harbor",
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer",
+   "Bushwacker’s Landing",
+   "Flora-Bama",
+   "Flora-Bama Yacht Club",
+   "OSO at Bear Point Harbor",
+   "Papa Rocco's",
+   "Pink Pony Pub",
+   "Shipp’s Dockside Grill",
+   "The Cove Bar and Grill",
+   "The Flora-Bama Yacht Club",
+   "Tiki & Raw Bar",
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brent Varner Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brent Varner Band",
+  "event_count": 4,
+  "venues": [
+   "Flora-Bama",
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brent Varner Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Brent Varner Trio",
+  "event_count": 3,
+  "venues": [
+   "Bushwacker’s Landing",
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brian Hill Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brian Hill Duo",
+  "event_count": 2,
+  "venues": [
+   "Flora-Bama Yacht Club",
+   "The Flora-Bama Yacht Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Broke n’ Done",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Broke n’ Done",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing",
+   "Big Beach Brewing Company"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brooks Johnson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Brooks Johnson",
+  "event_count": 11,
+  "venues": [
+   "Bushwacker’s Landing",
+   "Flora-Bama",
+   "Lillian's Pizza",
+   "Pink Pony Pub",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Brynne and Bones",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Brynne and Bones",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Bubba 'N Them",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Bubba 'N Them",
+  "event_count": 8,
+  "venues": [
+   "The Point Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Buzzcut",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Buzzcut",
+  "event_count": 23,
+  "venues": [
+   "Sandshaker Lounge",
+   "Seville Quarter"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "By The Way",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "By The Way",
+  "event_count": 10,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cade Pierce",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cade Pierce",
+  "event_count": 1,
+  "venues": [
+   "Barometer Waterfront Grille"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cavair Blake",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cavair Blake",
+  "event_count": 6,
+  "venues": [
+   "GTs On The Bay"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cedric Brooks",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cedric Brooks",
+  "event_count": 3,
+  "venues": [
+   "8 Reale OBAL"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chad Wilson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chad Wilson",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Charlie and the Hammerheads",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Charlie and the Hammerheads",
+  "event_count": 2,
+  "venues": [
+   "The Break Beach Bar",
+   "The Sandbar Sunset Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Charlie Wilson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Charlie Wilson",
+  "event_count": 2,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chase Brown",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chase Brown",
+  "event_count": 12,
+  "venues": [
+   "Cosmo's Restaurant & Bar",
+   "Luna's Eat & Drink",
+   "The Galley on the River",
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chase Mitchell",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chase Mitchell",
+  "event_count": 7,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House",
+   "Hideaway Beach Bar",
+   "The Break Beach Bar",
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chase Mitchell Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Chase Mitchell Band",
+  "event_count": 2,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chitlin Switch",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chitlin Switch",
+  "event_count": 2,
+  "venues": [
+   "Heritage Park",
+   "Perdido Key Sports Bar & Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chris Beverly",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chris Beverly",
+  "event_count": 20,
+  "venues": [
+   "Bear Point Harbor",
+   "Ice House Taproom",
+   "Icehouse Tap Room",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chris Hergenroder",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chris Hergenroder",
+  "event_count": 4,
+  "venues": [
+   "Ginny Lane Bar and Grill",
+   "Jesses Restaurant",
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chris Johnson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chris Johnson",
+  "event_count": 6,
+  "venues": [
+   "Angry Crab Shack",
+   "Flora-Bama Ole River Grill",
+   "Flora-Bama Yacht Club",
+   "The Flora-Bama Yacht Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Chris Johnson Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Chris Johnson Duo",
+  "event_count": 2,
+  "venues": [
+   "The Cove Bar and Grill",
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Christina Crystal",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Christina Crystal",
+  "event_count": 9,
+  "venues": [
+   "Moe's Original BBQ",
+   "Woodside Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Clay Connor",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Clay Connor",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cody & Tyler Livingston",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cody & Tyler Livingston",
+  "event_count": 7,
+  "venues": [
+   "Sandshaker Lounge"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cody Copeland",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cody Copeland",
+  "event_count": 2,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Colby Girard",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Colby Girard",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Colleen Sexton",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Colleen Sexton",
+  "event_count": 4,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Colton Wadkins",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Colton Wadkins",
+  "event_count": 1,
+  "venues": [
+   "Pink Pony Pub"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Count The Years",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Count The Years",
+  "event_count": 4,
+  "venues": [
+   "Hideaway Beach Bar",
+   "Sandshaker Lounge",
+   "The Break Beach Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cowboy Johnson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cowboy Johnson",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cowboy Johnson & Jon Cook",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cowboy Johnson & Jon Cook",
+  "event_count": 14,
+  "venues": [
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Crab Riot",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Crab Riot",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Cristi Dee & BAD JUJU",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Cristi Dee & BAD JUJU",
+  "event_count": 8,
+  "venues": [
+   "Angry Crab Shack",
+   "Calvert's in the Heights",
+   "Hub Stacey's",
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point",
+   "Perdido Key Sports Bar & Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dallas Moore",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dallas Moore",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dalton Bush",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dalton Bush",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dalton Bush Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dalton Bush Band",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama",
+   "Hub Stacey's",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dalton Bush Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Dalton Bush Duo",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Damien Lamb",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Damien Lamb",
+  "event_count": 4,
+  "venues": [
+   "GTs On The Bay"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Damien Lamb & Pale Moon Rising",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Damien Lamb & Pale Moon Rising",
+  "event_count": 6,
+  "venues": [
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dangerous Curves",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dangerous Curves",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Danny Grady",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Danny Grady",
+  "event_count": 13,
+  "venues": [
+   "American Legion Post 44",
+   "American Legion Post 99",
+   "Gulf Coast Elks Lodge 2782"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Danny Holland Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Danny Holland Duo",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dark Waters Project",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dark Waters Project",
+  "event_count": 4,
+  "venues": [
+   "Bamboo Willie’s Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Lauria's by the Beach",
+   "The Point Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "David Gautreau & The Delta Current",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "David Gautreau & The Delta Current",
+  "event_count": 3,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "David Wiley",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "David Wiley",
+  "event_count": 5,
+  "venues": [
+   "Doc’s Seafood and Steaks",
+   "Doc's Seafood Shack & Oyster Bar",
+   "Lillian's Pizza",
+   "Pink Pony Pub"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dead Flowers",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dead Flowers",
+  "event_count": 6,
+  "venues": [
+   "Bushwacker’s Landing",
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Deep South Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Deep South Band",
+  "event_count": 6,
+  "venues": [
+   "American Legion Post 99",
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al",
+   "Lillian Community Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Destiny Brown",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Destiny Brown",
+  "event_count": 8,
+  "venues": [
+   "Barometer Waterfront Grille",
+   "Big Beach Brewing",
+   "Big Beach Brewing Company",
+   "Flora-Bama",
+   "Perdido Beach Resort",
+   "Pink Pony Pub"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Disco Kiss",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Disco Kiss",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dixon Darling",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Dixon Darling",
+  "event_count": 6,
+  "venues": [
+   "Flora-Bama",
+   "Flora-Bama Yacht Club",
+   "The Flora-Bama Yacht Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Donna Slater",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Donna Slater",
+  "event_count": 2,
+  "venues": [
+   "Bushwacker’s Landing"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Doug Drake",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Doug Drake",
+  "event_count": 3,
+  "venues": [
+   "American Legion Post 44",
+   "American Legion Post 99",
+   "The Galley on the River"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Doug Drake & Tennessee Tim",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Doug Drake & Tennessee Tim",
+  "event_count": 11,
+  "venues": [
+   "Ginny Lane Bar and Grill",
+   "Moe's Original BBQ",
+   "Papa Rocco's",
+   "Papa Rocco’s",
+   "Salty Pearl Raw Bar and Steamer",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dreezy and The Homies",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Dreezy and The Homies",
+  "event_count": 1,
+  "venues": [
+   "Hub Stacey's"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Drew Howard",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Drew Howard",
+  "event_count": 1,
+  "venues": [
+   "Moonshine Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Drew Howard Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Drew Howard Duo",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dugger Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Dugger Band",
+  "event_count": 8,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Dustin Brown",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Dustin Brown",
+  "event_count": 4,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Elaine Petty & Tyler Ward",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Elaine Petty & Tyler Ward",
+  "event_count": 8,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Emily White",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Emily White",
+  "event_count": 15,
+  "venues": [
+   "Flora-Bama",
+   "Ice House Taproom",
+   "Icehouse Tap Room"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Emily White & Christina Crystal",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Emily White & Christina Crystal",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Eric Woods & The Way Down",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Eric Woods & The Way Down",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Flo Rivers",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Flo Rivers",
+  "event_count": 16,
+  "venues": [
+   "GTs On The Bay"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Frank Fletcher",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Frank Fletcher",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Friends of Paul",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Friends of Paul",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Funkheads",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Funkheads",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Funky Lampshades",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Funky Lampshades",
+  "event_count": 12,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "Sound Wave",
+   "The Undertow",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Fusion Cover Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Fusion Cover Band",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Gage Cowart",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Gage Cowart",
+  "event_count": 1,
+  "venues": [
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Gage Downs",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Gage Downs",
+  "event_count": 12,
+  "venues": [
+   "Perdido Beach Resort"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Garrett Howell Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Garrett Howell Duo",
+  "event_count": 1,
+  "venues": [
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Gary Story & Bad Habit",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Gary Story & Bad Habit",
+  "event_count": 4,
+  "venues": [
+   "Angry Crab Shack",
+   "Lillian Community Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Gavin Southerland",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Gavin Southerland",
+  "event_count": 10,
+  "venues": [
+   "Luna's Eat & Drink"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Get Sideways",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Get Sideways",
+  "event_count": 4,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Goodbye August",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Goodbye August",
+  "event_count": 5,
+  "venues": [
+   "Bamboo Willie’s Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Grayson Capps",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Grayson Capps",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Grayson Culpepper",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Grayson Culpepper",
+  "event_count": 11,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "Shipp’s Dockside Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Greg Mihaly",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Greg Mihaly",
+  "event_count": 1,
+  "venues": [
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Gringo Fife",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Gringo Fife",
+  "event_count": 7,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s",
+   "Pink Pony Pub",
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "GypsyPearl",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "GypsyPearl",
+  "event_count": 2,
+  "venues": [
+   "American Legion Post 99"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "High Cotton",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "High Cotton",
+  "event_count": 12,
+  "venues": [
+   "American Legion Post 99",
+   "Angry Crab Shack",
+   "Bushwacker’s Landing",
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Hip Trip",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Hip Trip",
+  "event_count": 1,
+  "venues": [
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Hippy Jim",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Hippy Jim",
+  "event_count": 21,
+  "venues": [
+   "Khon’s on Palafox",
+   "Lauria's by the Beach",
+   "Salty Pearl Raw Bar and Steamer",
+   "The Point Restaurant",
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Hippy Jim Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Hippy Jim Duo",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Hollard",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Hollard",
+  "event_count": 2,
+  "venues": [
+   "Sandshaker Lounge"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Horseshoe Kitty",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Horseshoe Kitty",
+  "event_count": 39,
+  "venues": [
+   "Bamboo Willie’s Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill",
+   "Flounder's Chowder House",
+   "Flounders Chowder House",
+   "Hideaway Beach Bar",
+   "The Break Beach Bar",
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Howlin' Grace",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Howlin' Grace",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Hunter Myers",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Hunter Myers",
+  "event_count": 18,
+  "venues": [
+   "Lauria's by the Beach",
+   "Luna's Eat & Drink"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "I-10 Bound Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "I-10 Bound Band",
+  "event_count": 2,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Isaac Moore",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Isaac Moore",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Island Ripples",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Island Ripples",
+  "event_count": 1,
+  "venues": [
+   "Paradise Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "J Hawkins Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "J Hawkins Duo",
+  "event_count": 15,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jack Robertson/Big Earl",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jack Robertson/Big Earl",
+  "event_count": 6,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jarred McConnell and The High Aces",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jarred McConnell and The High Aces",
+  "event_count": 3,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House",
+   "Moonshine Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jason Crysell",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jason Crysell",
+  "event_count": 13,
+  "venues": [
+   "Barometer Waterfront Grille",
+   "Pink Pony Pub",
+   "Salty Pearl Raw Bar and Steamer",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jason Sutton",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Jason Sutton",
+  "event_count": 2,
+  "venues": [
+   "Bushwacker’s Landing"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "JB Dyess",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "JB Dyess",
+  "event_count": 16,
+  "venues": [
+   "Ice House Taproom",
+   "Icehouse Tap Room",
+   "The Galley on the River"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jellyfish Cowboys",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Jellyfish Cowboys",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "JERI The Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "JERI The Band",
+  "event_count": 2,
+  "venues": [
+   "Lillian Community Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jesse Branham",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jesse Branham",
+  "event_count": 17,
+  "venues": [
+   "Ice House Taproom",
+   "Icehouse Tap Room",
+   "The Sloop",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jesse Duncan",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jesse Duncan",
+  "event_count": 22,
+  "venues": [
+   "Flora-Bama",
+   "Perdido Beach Resort"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jesse Ritter",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jesse Ritter",
+  "event_count": 16,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House",
+   "Lauria's by the Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "JesseTaylor Perry",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "JesseTaylor Perry",
+  "event_count": 5,
+  "venues": [
+   "Ginny Lane Bar and Grill",
+   "Woodside Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jimmy Lee Hannaford",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jimmy Lee Hannaford",
+  "event_count": 1,
+  "venues": [
+   "Pirates Cove"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "John Hart Project",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "John Hart Project",
+  "event_count": 3,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point",
+   "Paradise Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Johnny Hayes",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Johnny Hayes",
+  "event_count": 10,
+  "venues": [
+   "Bear Point Harbor",
+   "Flora-Bama",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Johnny Hayes Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Johnny Hayes Band",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jon Kott Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jon Kott Band",
+  "event_count": 4,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Jonathan Puzan",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Jonathan Puzan",
+  "event_count": 4,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House",
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Josh Drake",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Josh Drake",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "JoyRide",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "JoyRide",
+  "event_count": 1,
+  "venues": [
+   "Hub Stacey's"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "JT McCaffrey Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "JT McCaffrey Band",
+  "event_count": 2,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "JT McCaffrey Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "JT McCaffrey Duo",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Just Roger",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Just Roger",
+  "event_count": 18,
+  "venues": [
+   "Lauria's by the Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Justin Colvard",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Justin Colvard",
+  "event_count": 2,
+  "venues": [
+   "Barometer Waterfront Grille",
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Justin Colvard Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Justin Colvard Band",
+  "event_count": 4,
+  "venues": [
+   "Bear Point Harbor",
+   "Flora-Bama",
+   "OSO at Bear Point Harbor",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Justin Colvard Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Justin Colvard Duo",
+  "event_count": 10,
+  "venues": [
+   "Bear Point Harbor",
+   "Doc’s Seafood and Steaks",
+   "Doc's Seafood Shack & Oyster Bar",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Justin Colvard w/ Adam Tyler Brown",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Justin Colvard w/ Adam Tyler Brown",
+  "event_count": 7,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Kat Deal Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Kat Deal Band",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Kevin Koontz",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Kevin Koontz",
+  "event_count": 1,
+  "venues": [
+   "Pirates Cove"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Knee Deep Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Knee Deep Band",
+  "event_count": 2,
+  "venues": [
+   "Lillian Community Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Koontz",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Koontz",
+  "event_count": 5,
+  "venues": [
+   "Bushwacker’s Landing",
+   "Pirates Cove"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Koontz Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Koontz Trio",
+  "event_count": 3,
+  "venues": [
+   "Pink Pony Pub"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Kyle Brady",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Kyle Brady",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama",
+   "Flora-Bama Ole River Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Kyle Dorriety",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Kyle Dorriety",
+  "event_count": 1,
+  "venues": [
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Lea Anne Creswell Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Lea Anne Creswell Duo",
+  "event_count": 7,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Lee Alan",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Lee Alan",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Lefty Collins",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Lefty Collins",
+  "event_count": 46,
+  "venues": [
+   "Cosmo's Restaurant & Bar",
+   "GTs On The Bay",
+   "Luna's Eat & Drink"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Lennon Gainey",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Lennon Gainey",
+  "event_count": 2,
+  "venues": [
+   "Groovy Goat"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Les Linton",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Les Linton",
+  "event_count": 1,
+  "venues": [
+   "Pink Pony Pub"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Lisa Christian",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Lisa Christian",
+  "event_count": 31,
+  "venues": [
+   "Cosmo's Restaurant & Bar",
+   "The Gulf Bowl"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Lisa Zanghi",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Lisa Zanghi",
+  "event_count": 32,
+  "venues": [
+   "Perdido Beach Resort"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Logan Lassitter",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Logan Lassitter",
+  "event_count": 23,
+  "venues": [
+   "Groovy Goat",
+   "Ice House Taproom",
+   "Icehouse Tap Room",
+   "Perdido Beach Resort",
+   "Sound Wave",
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Logan Lassitter Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Logan Lassitter Duo",
+  "event_count": 2,
+  "venues": [
+   "Ice House Taproom",
+   "Icehouse Tap Room"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Logan Rhodes",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Logan Rhodes",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mac Walter",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mac Walter",
+  "event_count": 4,
+  "venues": [
+   "Luna's Eat & Drink"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Magnolia Mayfield",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Magnolia Mayfield",
+  "event_count": 14,
+  "venues": [
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mark Sherrill & Friends",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mark Sherrill & Friends",
+  "event_count": 7,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mason Henderson/Chris Beverly",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mason Henderson/Chris Beverly",
+  "event_count": 2,
+  "venues": [
+   "Ice House Taproom",
+   "Icehouse Tap Room"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Matt Erdman",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Matt Erdman",
+  "event_count": 12,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer",
+   "Papa Rocco's",
+   "Papa Rocco’s",
+   "The Sloop",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Matt Wojo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Matt Wojo",
+  "event_count": 12,
+  "venues": [
+   "Flora-Bama",
+   "Perdido Beach Resort"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "McFunk",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "McFunk",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mel Knapp",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mel Knapp",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Melodious Allen",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Melodious Allen",
+  "event_count": 3,
+  "venues": [
+   "The Break Beach Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Midlife Crisis",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Midlife Crisis",
+  "event_count": 8,
+  "venues": [
+   "Angry Crab Shack",
+   "Bear Point Harbor",
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer",
+   "Flora-Bama",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mike Diamond",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mike Diamond",
+  "event_count": 8,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mike Diamond Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mike Diamond Duo",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mike Diamond Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mike Diamond Trio",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mile High Rangers",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Mile High Rangers",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mira Mira and The Walls",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Mira Mira and The Walls",
+  "event_count": 1,
+  "venues": [
+   "Sandshaker Lounge"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mojo Mamas",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Mojo Mamas",
+  "event_count": 1,
+  "venues": [
+   "Moonshine Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Montgomery Highway",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Montgomery Highway",
+  "event_count": 3,
+  "venues": [
+   "Moe's Original BBQ"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Morgan Shades Stevens",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Morgan Shades Stevens",
+  "event_count": 4,
+  "venues": [
+   "Angry Crab Shack",
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Myles Lawson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Myles Lawson",
+  "event_count": 2,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Myles Lawson & Morgan Shades Stevens",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Myles Lawson & Morgan Shades Stevens",
+  "event_count": 1,
+  "venues": [
+   "Sound Wave"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Myles Lawson Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Myles Lawson Band",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Myles Lawson Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Myles Lawson Duo",
+  "event_count": 2,
+  "venues": [
+   "The Sloop",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Mystic Radio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Mystic Radio",
+  "event_count": 5,
+  "venues": [
+   "Angry Crab Shack",
+   "Hub Stacey's",
+   "Moonshine Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Neil Dover",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Neil Dover",
+  "event_count": 7,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Never Ending",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Never Ending",
+  "event_count": 2,
+  "venues": [
+   "Moonshine Saloon",
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Nick Branch Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Nick Branch Duo",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Nigel Dickie",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Nigel Dickie",
+  "event_count": 28,
+  "venues": [
+   "GTs On The Bay",
+   "Luna's Eat & Drink",
+   "Perdido Beach Resort"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "NIGHT STAR",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "NIGHT STAR",
+  "event_count": 1,
+  "venues": [
+   "Gulf Coast Elks Lodge 2782"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ole River String Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ole River String Band",
+  "event_count": 7,
+  "venues": [
+   "The Point Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Oliver's Twist",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Oliver's Twist",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Owen Finley Electric String Band Club",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Owen Finley Electric String Band Club",
+  "event_count": 1,
+  "venues": [
+   "Paradise Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Patrick Cross",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Patrick Cross",
+  "event_count": 6,
+  "venues": [
+   "Flora-Bama",
+   "Flora-Bama Ole River Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Paul Killough",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Paul Killough",
+  "event_count": 8,
+  "venues": [
+   "Sandshaker Lounge"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Paul Killough & Mike Wheeler",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Paul Killough & Mike Wheeler",
+  "event_count": 1,
+  "venues": [
+   "The Sandbar Sunset Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Pearls of Trinity",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Pearls of Trinity",
+  "event_count": 1,
+  "venues": [
+   "Good Time Charley's"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Peoples Friend",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Peoples Friend",
+  "event_count": 16,
+  "venues": [
+   "Cosmo's Restaurant & Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Petty Betty",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Petty Betty",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Phil J Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Phil J Trio",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Pineapple Express",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Pineapple Express",
+  "event_count": 4,
+  "venues": [
+   "The Hangout",
+   "The Salty Rose Beach Bar & Grill",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Platinum Premier Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Platinum Premier Band",
+  "event_count": 1,
+  "venues": [
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Pop Fiction",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Pop Fiction",
+  "event_count": 2,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Rachel Lane",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Rachel Lane",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ragdoll",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ragdoll",
+  "event_count": 1,
+  "venues": [
+   "Moonshine Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Rhonda Hart & Smokey Otis",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Rhonda Hart & Smokey Otis",
+  "event_count": 7,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Rickie Joe Wilson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Rickie Joe Wilson",
+  "event_count": 3,
+  "venues": [
+   "El Paso Tacos & Tequila",
+   "Lauria's by the Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ricky Lamb",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Ricky Lamb",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Riley Lynn",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Riley Lynn",
+  "event_count": 5,
+  "venues": [
+   "Ginny Lane Bar and Grill",
+   "Jesses Restaurant",
+   "The Cove Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Riptide",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Riptide",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Robert Abernathy",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Robert Abernathy",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Rockstarfish",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Rockstarfish",
+  "event_count": 9,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "Sandshaker Lounge",
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Roger & Elaine",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Roger & Elaine",
+  "event_count": 8,
+  "venues": [
+   "American Legion Post 44",
+   "American Legion Post 99"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ronnie Presley",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ronnie Presley",
+  "event_count": 10,
+  "venues": [
+   "50/50 Lounge",
+   "Flora-Bama",
+   "Flora-Bama Yacht Club",
+   "Jesses Restaurant",
+   "The Country Gym",
+   "The Flora-Bama Yacht Club",
+   "Turquoise Place"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Rowdies Rock",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Rowdies Rock",
+  "event_count": 2,
+  "venues": [
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Royal Horses",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Royal Horses",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Russell Emmons & Thomas Jenkins",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Russell Emmons & Thomas Jenkins",
+  "event_count": 2,
+  "venues": [
+   "Bushwacker’s Landing"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Rusty Benefield",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Rusty Benefield",
+  "event_count": 4,
+  "venues": [
+   "American Legion Post 99"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ryan Balthrop",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ryan Balthrop",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing",
+   "Big Beach Brewing Company"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ryan Dakota",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ryan Dakota",
+  "event_count": 1,
+  "venues": [
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ryan Dyer",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ryan Dyer",
+  "event_count": 4,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ryan Dyer Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ryan Dyer Band",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Ryan Dyer Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Ryan Dyer Duo",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Saints Social",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Saints Social",
+  "event_count": 8,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Salt & Soul",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Salt & Soul",
+  "event_count": 16,
+  "venues": [
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Saucy FuzZ",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Saucy FuzZ",
+  "event_count": 19,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "Sound Wave",
+   "The Undertow"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Saucy FuzZ |Tiki & Raw Bar by Barometer",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Saucy FuzZ |Tiki & Raw Bar by Barometer",
+  "event_count": 2,
+  "venues": [
+   "Coastal Orange Beach",
+   "Orange Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Saucy FuzZ w/ Chris Beverly",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Saucy FuzZ w/ Chris Beverly",
+  "event_count": 2,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Schofield",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Schofield",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Shawn Williams",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Shawn Williams",
+  "event_count": 4,
+  "venues": [
+   "Beach Buzz",
+   "Bushwacker’s Landing",
+   "Gary’s Brewery & Biergarten"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Shawn Williams Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Shawn Williams Duo",
+  "event_count": 1,
+  "venues": [
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Shawn Williams Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Shawn Williams Trio",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing",
+   "Big Beach Brewing Company"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Six Piece Suits",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Six Piece Suits",
+  "event_count": 5,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House",
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Slingo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Slingo",
+  "event_count": 1,
+  "venues": [
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Small Town Browns",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Small Town Browns",
+  "event_count": 1,
+  "venues": [
+   "The Point Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Smith & Kern",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Smith & Kern",
+  "event_count": 22,
+  "venues": [
+   "Bear Point Harbor",
+   "Ginny Lane Bar and Grill",
+   "Groovy Goat",
+   "GTs On The Bay",
+   "Hub Stacey's",
+   "Luna's Eat & Drink",
+   "Luna’s Eat & Drink",
+   "Moe's Original BBQ",
+   "OSO at Bear Point Harbor",
+   "The Galley on the River",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Smokey & Veronica Jean",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Smokey & Veronica Jean",
+  "event_count": 18,
+  "venues": [
+   "Fraternal Order Of Eagles",
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Smokey Otis Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Smokey Otis Band",
+  "event_count": 8,
+  "venues": [
+   "American Legion Post 44",
+   "American Legion Post 99",
+   "Flora-Bama",
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Smokey Otis Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Smokey Otis Duo",
+  "event_count": 17,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s",
+   "The Galley on the River"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Smokie & The Freeway 98 Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Smokie & The Freeway 98 Band",
+  "event_count": 4,
+  "venues": [
+   "Calvert's in the Heights"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "South Crow Road",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "South Crow Road",
+  "event_count": 1,
+  "venues": [
+   "The Break Beach Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Southern Breeze",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Southern Breeze",
+  "event_count": 1,
+  "venues": [
+   "The Sandbar Sunset Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Southern Country",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Southern Country",
+  "event_count": 6,
+  "venues": [
+   "American Legion Post 99",
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Spicy Danger",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Spicy Danger",
+  "event_count": 3,
+  "venues": [
+   "Bear Point Harbor",
+   "Hub Stacey's",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Standout",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Standout",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Stephens Bros",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Stephens Bros",
+  "event_count": 3,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Steve & Joe Project w/ Lee Day",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Steve & Joe Project w/ Lee Day",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Steven John",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Steven John",
+  "event_count": 1,
+  "venues": [
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "STORMFOLK",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "STORMFOLK",
+  "event_count": 5,
+  "venues": [
+   "Angry Crab Shack",
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Strickly Rivers",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Strickly Rivers",
+  "event_count": 23,
+  "venues": [
+   "Cosmo's Restaurant & Bar",
+   "GTs On The Bay",
+   "Heritage Park",
+   "Shipp’s Dockside Grill",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Sugarcane Jane",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Sugarcane Jane",
+  "event_count": 6,
+  "venues": [
+   "Angry Crab Shack",
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Swampland Revival",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Swampland Revival",
+  "event_count": 2,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "T-Bird & The Fat Cats",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "T-Bird & The Fat Cats",
+  "event_count": 2,
+  "venues": [
+   "Elks Lodge",
+   "Pensacola Beach Elks Lodge 497"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "T-Bone Montgomery",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "T-Bone Montgomery",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "T-Bone Montgomery/Mark Sherrill/Bo Roberts",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "T-Bone Montgomery/Mark Sherrill/Bo Roberts",
+  "event_count": 6,
+  "venues": [
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Aces",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Aces",
+  "event_count": 1,
+  "venues": [
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "the boxcats",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "the boxcats",
+  "event_count": 4,
+  "venues": [
+   "Barometer Waterfront Grille",
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Cat Daddy Blues Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "The Cat Daddy Blues Band",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Collective",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Collective",
+  "event_count": 3,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "Perdido Key Sports Bar & Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Defrosters",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Defrosters",
+  "event_count": 9,
+  "venues": [
+   "American Legion Post 44",
+   "American Legion Post 99",
+   "The Galley on the River"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Destinations",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Destinations",
+  "event_count": 15,
+  "venues": [
+   "Bear Point Harbor",
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer",
+   "Books on Main",
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Groovinators",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Groovinators",
+  "event_count": 6,
+  "venues": [
+   "American Legion Post 99",
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Heat",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Heat",
+  "event_count": 14,
+  "venues": [
+   "American Legion Post 44",
+   "American Legion Post 99",
+   "Bear Point Harbor",
+   "Ginny Lane Bar and Grill",
+   "Johnny B's Front Porch",
+   "Johnny B’s Front Porch, Lillian,Al",
+   "OSO at Bear Point Harbor",
+   "Shipp’s Dockside Grill",
+   "The Gulf Bowl"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The New Cahoots",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The New Cahoots",
+  "event_count": 1,
+  "venues": [
+   "Hub Stacey's"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Shrimp Shack Shooters",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "The Shrimp Shack Shooters",
+  "event_count": 2,
+  "venues": [
+   "American Legion Post 99"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Southerlies",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Southerlies",
+  "event_count": 2,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Steve & Joe Big Show",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Steve & Joe Big Show",
+  "event_count": 15,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Steve & Joe Big Show w/ Trevor Finlay",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Steve & Joe Big Show w/ Trevor Finlay",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Steve & Joe Piano Show",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Steve & Joe Piano Show",
+  "event_count": 7,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Surfers Club Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Surfers Club Band",
+  "event_count": 2,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Three 57's",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "The Three 57's",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Undertow Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "The Undertow Band",
+  "event_count": 6,
+  "venues": [
+   "Bear Point Harbor",
+   "OSO at Bear Point Harbor",
+   "The Hangout",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "The Wavy Winstons",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "The Wavy Winstons",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing",
+   "Big Beach Brewing Company"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Thin Ice",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Thin Ice",
+  "event_count": 5,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Jubilee Square",
+   "Seville Quarter",
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Thin Ice Acoustic Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Thin Ice Acoustic Duo",
+  "event_count": 2,
+  "venues": [
+   "Sandshaker Lounge"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Thin Red Line",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Thin Red Line",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Thomas Jenkins",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Thomas Jenkins",
+  "event_count": 16,
+  "venues": [
+   "Lauria's by the Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Nowell",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Nowell",
+  "event_count": 16,
+  "venues": [
+   "Doc’s Seafood and Steaks",
+   "Doc's Seafood Shack & Oyster Bar",
+   "Pink Pony Pub",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Nowell & Colton Wadkins",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Tim Nowell & Colton Wadkins",
+  "event_count": 1,
+  "venues": [
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Roberts",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Roberts",
+  "event_count": 21,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Roberts Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Roberts Band",
+  "event_count": 12,
+  "venues": [
+   "Bear Point Harbor",
+   "Flora-Bama",
+   "Ice House Taproom",
+   "Icehouse Tap Room",
+   "OSO at Bear Point Harbor",
+   "Perdido Key Sports Bar & Restaurant"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Roberts Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Roberts Duo",
+  "event_count": 1,
+  "venues": [
+   "Flora-Bama"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Roberts Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Roberts Trio",
+  "event_count": 25,
+  "venues": [
+   "Flora-Bama",
+   "Ice House Taproom",
+   "Icehouse Tap Room"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Robinson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Robinson",
+  "event_count": 14,
+  "venues": [
+   "Papa Rocco's",
+   "Papa Rocco’s"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tim Spencer",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tim Spencer",
+  "event_count": 4,
+  "venues": [
+   "Flounder's Chowder House",
+   "Flounders Chowder House"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Timmi G",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Timmi G",
+  "event_count": 5,
+  "venues": [
+   "Luna's Eat & Drink",
+   "The Galley on the River"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Top Hat & Jackie",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Top Hat & Jackie",
+  "event_count": 46,
+  "venues": [
+   "Cosmo's Restaurant & Bar",
+   "GTs On The Bay",
+   "Luna's Eat & Drink"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Travis Jackson Smith",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Travis Jackson Smith",
+  "event_count": 6,
+  "venues": [
+   "Bushwacker’s Landing",
+   "Shipp’s Dockside Grill",
+   "Wild Greg's Saloon"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Trent Brownlee",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Trent Brownlee",
+  "event_count": 6,
+  "venues": [
+   "Flora-Bama Yacht Club",
+   "Ice House Taproom",
+   "Icehouse Tap Room",
+   "The Flora-Bama Yacht Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Trevor Finlay",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Trevor Finlay",
+  "event_count": 8,
+  "venues": [
+   "Flora-Bama",
+   "Flora-Bama Yacht Club",
+   "The Flora-Bama Yacht Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tribe Zion",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tribe Zion",
+  "event_count": 4,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Troi Atkinson",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Troi Atkinson",
+  "event_count": 2,
+  "venues": [
+   "Big Beach Brewing Company",
+   "Big Beach Tumble + Cheer"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Troy Martin",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Troy Martin",
+  "event_count": 28,
+  "venues": [
+   "Emerald Waterfront",
+   "Emerald Waterfront Bar and Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "True Blue",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "True Blue",
+  "event_count": 1,
+  "venues": [
+   "Paradise Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Truman Holland",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Truman Holland",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Truman Holland Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Truman Holland Trio",
+  "event_count": 2,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tyler Livingston & The Absolutes",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Tyler Livingston & The Absolutes",
+  "event_count": 2,
+  "venues": [
+   "The Break Beach Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tyler Mac",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Tyler Mac",
+  "event_count": 3,
+  "venues": [
+   "Islander",
+   "The Break Beach Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Tyler Ward",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Tyler Ward",
+  "event_count": 25,
+  "venues": [
+   "Flora-Bama",
+   "Flora-Bama Yacht Club",
+   "Perdido Beach Resort",
+   "Shipp’s Dockside Grill",
+   "The Flora-Bama Yacht Club"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Veronica Jean Trio",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Veronica Jean Trio",
+  "event_count": 19,
+  "venues": [
+   "Hub Stacey's at the Point",
+   "Hub Stacey's at The Point",
+   "The Cove Bar and Grill",
+   "The Sloop"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Vibe Irie",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Vibe Irie",
+  "event_count": 6,
+  "venues": [
+   "Bamboo Willie’s Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Seville Quarter"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Vinyl Revival",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Vinyl Revival",
+  "event_count": 4,
+  "venues": [
+   "Bamboo Willie's Beachside Bar",
+   "Bamboo Willie's Beachside Bar on Pensacola Beach",
+   "Sandshaker Lounge"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "W.B. Sims Band",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "W.B. Sims Band",
+  "event_count": 1,
+  "venues": [
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Wayward Sister",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Wayward Sister",
+  "event_count": 1,
+  "venues": [
+   "The Salty Rose Beach Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Webb Dalton",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Webb Dalton",
+  "event_count": 2,
+  "venues": [
+   "Perdido Key Sports Bar & Restaurant",
+   "The Hangout"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Wiley Pete",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Wiley Pete",
+  "event_count": 2,
+  "venues": [
+   "Angry Crab Shack"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Will Gordon",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Will Gordon",
+  "event_count": 4,
+  "venues": [
+   "Lauria's by the Beach"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "William Atkins",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "William Atkins",
+  "event_count": 2,
+  "venues": [
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Willie Traywick",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Willie Traywick",
+  "event_count": 2,
+  "venues": [
+   "Barometer Waterfront Grille",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Zachary Thomas Diedrich",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Zachary Thomas Diedrich",
+  "event_count": 3,
+  "venues": [
+   "Flora-Bama",
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Zachary Thomas Diedrich Duo",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Zachary Thomas Diedrich Duo",
+  "event_count": 3,
+  "venues": [
+   "Grand Lagoon Yacht Club",
+   "The Flora-Bama Yacht Club",
+   "The Sandbar Sunset Bar & Grill"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Zack Chavers",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Zack Chavers",
+  "event_count": 15,
+  "venues": [
+   "Bear Point Harbor",
+   "El Paso Mexican Grill",
+   "OSO at Bear Point Harbor",
+   "The Salty Rose Beach Bar & Grill",
+   "Tiki & Raw Bar"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Zack Miller",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "net_new",
+  "artist_name": "Zack Miller",
+  "event_count": 1,
+  "venues": [
+   "The Country Gym"
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity_events.artist_name",
+  "source_id": "Zoe Burdette",
+  "business_name": null,
+  "match_method": "artist_name_ci",
+  "live_slug": null,
+  "status": "overlap",
+  "artist_name": "Zoe Burdette",
+  "event_count": 7,
+  "venues": [
+   "De Soto’s Seafood Kitchen",
+   "Turquoise Place"
+  ]
+ }
+]

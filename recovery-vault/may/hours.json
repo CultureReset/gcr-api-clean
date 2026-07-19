@@ -1,0 +1,7070 @@
+[
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "2f8eae2d-5014-4068-abe8-f938323ee875",
+  "business_name": "Body Firm",
+  "match_method": "place_id",
+  "live_slug": "body-firm-TJdjRs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 5:00â¯AMâââ12:00â¯AM",
+   "Tuesday: 5:00â¯AMâââ12:00â¯AM",
+   "Wednesday: 5:00â¯AMâââ12:00â¯AM",
+   "Thursday: 5:00â¯AMâââ12:00â¯AM",
+   "Friday: 5:00â¯AMâââ12:00â¯AM",
+   "Saturday: 7:00â¯AMâââ10:00â¯PM",
+   "Sunday: 7:00â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "5:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "5:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "5:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "5:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "5:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "4f14b50b-9f42-4ac6-ac1c-09ddfc3be3d2",
+  "business_name": "Wonderful House",
+  "match_method": "place_id",
+  "live_slug": "wonderful-house-NHFURU",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ9:30â¯PM",
+   "Saturday: 11:00â¯AMâââ9:30â¯PM",
+   "Sunday: 11:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "d6ea7cd6-10c8-4ec1-8146-d81060157259",
+  "business_name": "Indian Delight Ocean Springs",
+  "match_method": "place_id",
+  "live_slug": "indian-delight-ocean-springs-rpmPJs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ9:30â¯PM",
+   "Tuesday: 11:00â¯AMâââ9:30â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:30â¯PM",
+   "Thursday: 11:00â¯AMâââ10:00â¯PM",
+   "Friday: 11:00â¯AMâââ10:00â¯PM",
+   "Saturday: 11:00â¯AMâââ10:00â¯PM",
+   "Sunday: 11:00â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "52534db5-c16f-4fd8-862c-4228198da6b6",
+  "business_name": "Watches Plus",
+  "match_method": "place_id",
+  "live_slug": "watches-plus-OkJBEk",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ7:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ7:00â¯PM",
+   "Thursday: 11:00â¯AMâââ7:00ï¿½ï¿½ï¿½PM",
+   "Friday: 11:00â¯AMâââ7:00â¯PM",
+   "Saturday: 11:00â¯AMâââ7:00â¯PM",
+   "Sunday: 12:00âââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00ï¿½ï¿½ï¿½PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "d562a664-3041-43c6-968f-ec3e15a04edf",
+  "business_name": "Premium Parking - P2851",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2851",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "56d67716-1225-4901-a0b6-9815310a64ff",
+  "business_name": "Xtreme Air Mega Park",
+  "match_method": "place_id",
+  "live_slug": "xtreme-air-mega-park-KOSuDU",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ8:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ8:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ8:00â¯PM",
+   "Thursday: 11:00â¯AMâââ8:00â¯PM",
+   "Friday: 11:00â¯AMâââ10:00â¯PM",
+   "Saturday: 10:00â¯AMâââ10:00â¯PM",
+   "Sunday: 1:00âââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "1:00âââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f2d6dc70-fab9-4b32-af75-28c47862aff5",
+  "business_name": "Perdido Pass Jetty",
+  "match_method": "place_id",
+  "live_slug": "perdido-pass-jetty",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ6:00â¯PM",
+   "Thursday: 10:00â¯AMâââ6:00â¯PM",
+   "Friday: 10:00â¯AMâââ6:00â¯PM",
+   "Saturday: 10:00â¯AMâââ6:00â¯PM",
+   "Sunday: 12:00âââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f0826834-6797-4886-93ab-67e3e5326522",
+  "business_name": "Junavelli Winery LLC",
+  "match_method": "place_id",
+  "live_slug": "junavelli-winery-llc-r0DwHU",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: Closed",
+   "Wednesday: Closed",
+   "Thursday: Closed",
+   "Friday: 4:00âââ7:00â¯PM",
+   "Saturday: 11:00â¯AMâââ6:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:00âââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "86ce1f6e-3029-41b5-b456-b0ca6ed3ad34",
+  "business_name": "Marian Gallaway Theatre",
+  "match_method": "place_id",
+  "live_slug": "marian-gallaway-theatre-tU54-o",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 12:00âââ4:00â¯PM",
+   "Tuesday: 12:00âââ4:00â¯PM",
+   "Wednesday: 12:00âââ4:00â¯PM",
+   "Thursday: 12:00âââ4:00â¯PM",
+   "Friday: 12:00âââ4:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ4:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ4:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ4:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ4:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ4:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "87b4f838-4628-422e-9066-5ab4ce002bb4",
+  "business_name": "CEFCO",
+  "match_method": "place_id",
+  "live_slug": "cefco",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "c1509e56-baec-4197-a62a-3389ff6ee5ed",
+  "business_name": "Coastal Concierge, Santa Rosa Beach FL",
+  "match_method": "place_id",
+  "live_slug": "coastal-concierge-santa-rosa-beach-fl-QK7lb0",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:00â¯PM",
+   "Thursday: 8:00â¯AMâââ8:00â¯PM",
+   "Friday: 8:00â¯AMâââ8:00â¯PM",
+   "Saturday: 8:00â¯AMâââ8:00â¯PM",
+   "Sunday: 8:00â¯AMâââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "9dd9a800-f38c-45d8-bc7f-8300ba3c155f",
+  "business_name": "Premium Parking - P2651",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2651",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "01c3d5b0-2e8c-4e12-b1ad-f9e4dcaf1111",
+  "business_name": "Baumhower's Victory Grille",
+  "match_method": "place_id",
+  "live_slug": "baumhower-s-victory-grille",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ10:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ10:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ10:00â¯PM",
+   "Thursday: 11:00â¯AMâââ10:00â¯PM",
+   "Friday: 11:00â¯AMâââ11:00â¯PM",
+   "Saturday: 11:00â¯AMâââ11:00â¯PM",
+   "Sunday: 11:00â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "b1b6ad2d-c8dc-4d8a-8b9e-9a03e3584b1d",
+  "business_name": "Gulf State Park Beach",
+  "match_method": "place_id",
+  "live_slug": "gulf-state-park-beach",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "523d0ca6-5e46-443d-82c7-82c33e5c18f1",
+  "business_name": "Coinstar LLC",
+  "match_method": "place_id",
+  "live_slug": "coinstar-llc-1euMz8",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ5:00â¯PM",
+   "Thursday: 8:00â¯AMâââ5:00â¯PM",
+   "Friday: 8:00â¯AMâââ5:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "463c7470-357e-4241-a0e6-b32977b26c4a",
+  "business_name": "Hurricane Lanes",
+  "match_method": "place_id",
+  "live_slug": "hurricane-lanes-f7Ng6o",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ2:00â¯AM",
+   "Tuesday: 11:00â¯AMâââ12:00â¯AM",
+   "Wednesday: 11:00â¯AMâââ12:00â¯AM",
+   "Thursday: 11:00â¯AMâââ12:00â¯AM",
+   "Friday: 11:00â¯AMâââ2:00â¯AM",
+   "Saturday: 11:00â¯AMâââ2:00â¯AM",
+   "Sunday: 11:00â¯AMâââ12:00â¯AM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯AM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯AM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ12:00â¯AM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "89578ae2-cc79-435b-afbf-ef78426cca0e",
+  "business_name": "The Hotel Magnolia LLC",
+  "match_method": "place_id",
+  "live_slug": "the-hotel-magnolia-llc",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM",
+   "Saturday: 11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "e8ed0d6c-3c6a-43b9-aa65-7097cdf50c67",
+  "business_name": "Chute Em Up Parasail",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:00â¯AMâââ10:00â¯PM",
+   "Tuesday: 7:00â¯AMâââ10:00â¯PM",
+   "Wednesday: 7:00â¯AMâââ10:00â¯PM",
+   "Thursday: 7:00â¯AMâââ10:00â¯PM",
+   "Friday: 7:00â¯AMâââ10:00â¯PM",
+   "Saturday: 7:00â¯AMâââ10:00â¯PM",
+   "Sunday: 7:00â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "45d58167-b14b-4b05-99c5-5680e1d6af13",
+  "business_name": "HWY TO INDIA",
+  "match_method": "place_id",
+  "live_slug": "hwy-to-india-nhi0aA",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM",
+   "Saturday: 11:00â¯AMâââ2:30â¯PM, 3:30âââ9:00â¯PM",
+   "Sunday: 11:00â¯AMâââ2:30â¯PM, 3:30âââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 3:30âââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 3:30âââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "e5a08ec7-2efc-4eae-9028-4e9ae95cbde6",
+  "business_name": "Biryani Pot",
+  "match_method": "place_id",
+  "live_slug": "biryani-pot-pDv4h4",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ10:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ10:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ10:00â¯PM",
+   "Thursday: 11:00â¯AMâââ10:00â¯PM",
+   "Friday: 11:00â¯AMâââ11:00â¯PM",
+   "Saturday: 11:00â¯AMâââ11:00â¯PM",
+   "Sunday: 11:00â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "cfdce44d-339a-414b-9769-ab4f3fe74a86",
+  "business_name": "Chef's Da Chinese Restaurant",
+  "match_method": "place_id",
+  "live_slug": "chefs-da-chinese-restaurant-ogFNLQ",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ9:30â¯PM",
+   "Saturday: 11:00â¯AMâââ9:30â¯PM",
+   "Sunday: 11:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "794dc541-4ca4-41b2-bd6d-96afca1c8291",
+  "business_name": "DESI TADKA INDIAN RESTAURANT - ALABAMA",
+  "match_method": "place_id",
+  "live_slug": "desi-tadka-indian-restaurant-alabama-zR6JRI",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ9:30â¯PM",
+   "Tuesday: Closed",
+   "Wednesday: 11:00â¯AMâââ9:30â¯PM",
+   "Thursday: 11:00â¯AMâââ9:30â¯PM",
+   "Friday: 11:00â¯AMâââ10:00â¯PM",
+   "Saturday: 11:00â¯AMâââ10:00â¯PM",
+   "Sunday: 11:00â¯AMâââ9:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "b1484fc9-b0fa-4506-bb9d-e76bc1e02ab5",
+  "business_name": "Indian Kitchen",
+  "match_method": "place_id",
+  "live_slug": "indian-kitchen-U2jiqE",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM",
+   "Saturday: 11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM",
+   "Sunday: 11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 4:00âââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "a1ef35d0-7eaf-43a1-a46e-283e615abd79",
+  "business_name": "Local and Company Food+Drink",
+  "match_method": "place_id",
+  "live_slug": "local-and-company-food-drink",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ9:00â¯PM",
+   "Saturday: 11:00â¯AMâââ9:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "1fe79565-c836-4b10-8ae1-91dc24b9d9a8",
+  "business_name": "Taste of India Destin",
+  "match_method": "place_id",
+  "live_slug": "taste-of-india-destin-5Ga0pQ",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM",
+   "Tuesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM",
+   "Thursday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM",
+   "Friday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM",
+   "Saturday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM",
+   "Sunday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "08b6f37e-c69c-4f5e-8a9f-311a8982d601",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-beer-hardees-area-gs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ12:00â¯AM",
+   "Tuesday: 9:00â¯AMâââ12:00â¯AM",
+   "Wednesday: 9:00â¯AMâââ12:00â¯AM",
+   "Thursday: 9:00â¯AMâââ12:00â¯AM",
+   "Friday: 9:00â¯AMâââ12:00â¯AM",
+   "Saturday: 9:00â¯AMâââ12:00â¯AM",
+   "Sunday: 9:00â¯AMâââ12:00â¯AM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "072b5c5e-ae6f-49ed-8f6e-ebe8fb0d2fa7",
+  "business_name": "Barefoot Tours & Charters",
+  "match_method": "phone",
+  "live_slug": "barefoot-private-family-jet-ski-co-orange-beach",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ7:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ7:00â¯PM",
+   "Thursday: 8:00â¯AMâââ7:00â¯PM",
+   "Friday: 8:00â¯AMâââ7:00â¯PM",
+   "Saturday: 8:00â¯AMâââ7:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "fe127f67-a892-4f00-95c6-e764ebe815f7",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "4d5106cb-96cb-464b-b1e0-81187410442f",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "459fa53a-6bd2-40d8-83d3-e3740f514f93",
+  "business_name": "Hudson Marina",
+  "match_method": "phone",
+  "live_slug": "29-dolphin-cruise",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:00â¯AMâââ8:00â¯PM",
+   "Tuesday: 7:00â¯AMâââ8:00â¯PM",
+   "Wednesday: 7:00â¯AMâââ8:00â¯PM",
+   "Thursday: 7:00â¯AMâââ8:00â¯PM",
+   "Friday: 7:00â¯AMâââ8:00â¯PM",
+   "Saturday: 7:00â¯AMâââ8:00â¯PM",
+   "Sunday: 7:00â¯AMâââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "94869be6-75df-445e-8840-6dee63f4b1ae",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-walmart-area-ob",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ12:00â¯AM",
+   "Tuesday: 9:00â¯AMâââ12:00â¯AM",
+   "Wednesday: 9:00â¯AMâââ12:00â¯AM",
+   "Thursday: 9:00â¯AMâââ12:00â¯AM",
+   "Friday: 9:00â¯AMâââ12:00â¯AM",
+   "Saturday: 9:00â¯AMâââ12:00â¯AM",
+   "Sunday: 9:00â¯AMâââ12:00â¯AM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "e7b1ce96-1cf7-4ed4-9712-d906d0e527e2",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "3ff03947-2e52-462a-9821-36103f423b4b",
+  "business_name": "In Too Deep Charters",
+  "match_method": "place_id",
+  "live_slug": "in-too-deep-charters",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 8:00â¯AMâââ8:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:00â¯PM",
+   "Thursday: 8:00â¯AMâââ8:00â¯PM",
+   "Friday: 8:00â¯AMâââ8:00â¯PM",
+   "Saturday: 8:00â¯AMâââ8:00â¯PM",
+   "Sunday: 8:00â¯AMâââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "a576c70a-0580-416b-9b9b-9f055d451427",
+  "business_name": "Premium Parking - P2852",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2852",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "e9983c7d-92df-4a17-ba9f-f60cdabf5960",
+  "business_name": "Looks Good Gulf Karts LLC",
+  "match_method": "place_id",
+  "live_slug": "looks-good-gulf-karts-llc",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "daf18b77-0b4c-450d-b518-698f4ab26aaa",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "71821c86-103d-4d1c-abe2-fc5851510e0b",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-area-gs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ12:00â¯AM",
+   "Tuesday: 9:00â¯AMâââ12:00â¯AM",
+   "Wednesday: 9:00â¯AMâââ12:00â¯AM",
+   "Thursday: 9:00â¯AMâââ12:00â¯AM",
+   "Friday: 9:00â¯AMâââ10:00â¯PM",
+   "Saturday: 9:00â¯AMâââ10:00â¯PM",
+   "Sunday: 9:00â¯AMâââ12:00â¯AM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "35e70680-1dc3-49cc-bb11-ca17b9fb6493",
+  "business_name": "The Home Depot",
+  "match_method": "place_id",
+  "live_slug": "the-home-depot-kFVvJs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 6:00â¯AMâââ10:00â¯PM",
+   "Tuesday: 6:00â¯AMâââ10:00â¯PM",
+   "Wednesday: 6:00â¯AMâââ10:00â¯PM",
+   "Thursday: 6:00â¯AMâââ10:00â¯PM",
+   "Friday: 6:00â¯AMâââ10:00â¯PM",
+   "Saturday: 6:00â¯AMâââ10:00â¯PM",
+   "Sunday: 8:00â¯AMâââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "6:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "6:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "6:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "6:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "6:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "6:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "b3347e94-98d9-4726-9890-1e53a3d35226",
+  "business_name": "Papa John's Pizza",
+  "match_method": "place_id",
+  "live_slug": "papa-john-s-pizza",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:30â¯AMâââ11:00â¯PM",
+   "Tuesday: 10:30â¯AMââï¿½ï¿½ï¿½11:00â¯PM",
+   "Wednesday: 10:30â¯AMâââ11:00â¯PM",
+   "Thursday: 10:30â¯AMâââ11:00â¯PM",
+   "Friday: 10:30â¯AMâââ12:00â¯AM",
+   "Saturday: 10:30â¯AMâââ12:00â¯AM",
+   "Sunday: 10:30â¯AMâââ12:00â¯AM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMââï¿½ï¿½ï¿½11:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ12:00â¯AM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "49a8a6b3-8391-484b-8970-ad21f4dbd3f7",
+  "business_name": "Mr. Action Toys and Collectibles",
+  "match_method": "place_id",
+  "live_slug": "mr-action-toys-and-collectibles",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ3:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ3:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ3:00â¯PM",
+   "Thursday: 11:00â¯AMâââ3:00â¯PM",
+   "Friday: 11:00â¯AMâââ3:00â¯PM",
+   "Saturday: 11:00â¯AMâââ3:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "48bd26f2-7222-42fb-aba3-a997773e4613",
+  "business_name": "Publix Pharmacy at Riviera Square",
+  "match_method": "place_id",
+  "live_slug": "publix-pharmacy-at-riviera-square-rRGL6M",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ9:00â¯PM",
+   "Thursday: 9:00â¯AMâââ9:00â¯PM",
+   "Friday: 9:00â¯AMâââ9:00â¯PM",
+   "Saturday: 9:00â¯AMâââ7:00â¯PM",
+   "Sunday: 11:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "2f4d06c1-b351-4a88-9414-0b395b2d3b67",
+  "business_name": "Sunny Lady Dolphin Cruises at The Wharf",
+  "match_method": "phone",
+  "live_slug": "dolphin-key-1Fdpj8",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ6:00â¯PM",
+   "Thursday: 8:00â¯AMâââ6:00â¯PM",
+   "Friday: 8:00â¯AMâââ6:00â¯PM",
+   "Saturday: 8:00â¯AMâââ6:00â¯PM",
+   "Sunday: 8:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f7cdda3d-162a-43ff-90fc-4ee4be3ed31e",
+  "business_name": "Kristin Pierre Art",
+  "match_method": "place_id",
+  "live_slug": "kristin-pierre-art",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ4:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ4:00â¯PM",
+   "Wednesday: Closed",
+   "Thursday: 11:00â¯AMâââ4:00â¯PM",
+   "Friday: 11:00â¯AMâââ4:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "04d23147-b0b4-47c7-b703-1b5c33357972",
+  "business_name": "Birmingham Botanical Gardens",
+  "match_method": "place_id",
+  "live_slug": "birmingham-botanical-gardens-Ex0yW0",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:00â¯AMâââ7:00â¯PM",
+   "Tuesday: 7:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 7:00â¯AMâââ7:00â¯PM",
+   "Thursday: 7:00â¯AMâââ7:00â¯PM",
+   "Friday: 7:00â¯AMâââ7:00â¯PM",
+   "Saturday: 7:00â¯AMâââ7:00â¯PM",
+   "Sunday: 7:00â¯AMâââ7:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ7:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "5d8bc8ba-a7ce-4fa3-baa6-10af0f2d0244",
+  "business_name": "Island Market",
+  "match_method": "phone",
+  "live_slug": "island-market",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ8:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ8:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ8:00â¯PM",
+   "Thursday: 9:00â¯AMâââ8:00â¯PM",
+   "Friday: 9:00â¯AMâââ8:00â¯PM",
+   "Saturday: 9:00â¯AMâââ8:00â¯PM",
+   "Sunday: 9:00â¯AMâââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "e5b8e9ed-9140-47fe-a781-e4ead7260525",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "1725d35f-ef24-4333-a876-bc66c07e7144",
+  "business_name": "Orange Beach Private Family Dolphin Tours & Boating Safaris",
+  "match_method": "phone",
+  "live_slug": "barefoot-private-family-jet-ski-co-orange-beach",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ7:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ7:00â¯PM",
+   "Thursday: 8:00â¯AMâââ7:00â¯PM",
+   "Friday: 8:00â¯AMâââ7:00â¯PM",
+   "Saturday: 8:00â¯AMâââ7:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "df6fd2fb-b625-4f44-8314-819d524c1c32",
+  "business_name": "Sunny Lady Dolphin Cruises at The Wharf",
+  "match_method": "phone",
+  "live_slug": "dolphin-key-1Fdpj8",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ6:00â¯PM",
+   "Thursday: 8:00â¯AMâââ6:00â¯PM",
+   "Friday: 8:00â¯AMâââ6:00â¯PM",
+   "Saturday: 8:00â¯AMâââ6:00â¯PM",
+   "Sunday: 8:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "6dc7133a-3be1-4575-b87e-5d6621236428",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "730864da-326a-48be-8684-5a58647d93f9",
+  "business_name": "Chute Em Up Parasail Fort Morgan",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ5:00â¯PM",
+   "Thursday: 9:00â¯AMâââ5:00â¯PM",
+   "Friday: 9:00â¯AMâââ5:00â¯PM",
+   "Saturday: 9:00â¯AMâââ5:00â¯PM",
+   "Sunday: 9:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "5df6882f-897d-4604-ba7b-5024a3ebb046",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "7dc13168-9e27-4e84-a214-a05688c95384",
+  "business_name": "Southern Rose Dolphin Trips",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 7:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 7:00â¯AMâââ9:00â¯PM",
+   "Thursday: 7:00â¯AMâââ9:00â¯PM",
+   "Friday: 7:00â¯AMâââ9:00â¯PM",
+   "Saturday: 7:00â¯AMâââ9:00â¯PM",
+   "Sunday: 7:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "8a464c8f-aa1a-48a2-8127-d464bb253ccf",
+  "business_name": "Top Tier Watersports",
+  "match_method": "phone",
+  "live_slug": "alabama-dolphin-cruises-southern-rose",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "0d90673c-63a1-4511-a5bd-6fd907f4f02e",
+  "business_name": "Dolphin Cruises Aboard Cruise Orange Beach",
+  "match_method": "phone",
+  "live_slug": "cruise-orange-beach-dolphin-cruises",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ8:30â¯PM",
+   "Tuesday: 8:00â¯AMâââ8:30â¯PM",
+   "Wednesday: 8:00â¯AMâââ8:30â¯PM",
+   "Thursday: 8:00â¯AMâââ8:30â¯PM",
+   "Friday: 8:00â¯AMâââ8:30â¯PM",
+   "Saturday: 8:00â¯AMâââ8:30â¯PM",
+   "Sunday: 8:00â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "fa458aa5-0fa6-411b-a6ee-eab35a66482c",
+  "business_name": "Paradise Bar & Grill",
+  "match_method": "place_id",
+  "live_slug": "paradise-bar-and-grill",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ10:00â¯PM",
+   "Saturday: 11:00â¯AMâââ10:00â¯PM",
+   "Sunday: 11:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "a1a03c9a-2149-49c0-a1fc-308ee0bfb5bc",
+  "business_name": "Books on Main",
+  "match_method": "place_id",
+  "live_slug": "books-on-main-z4Q9Tk",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 10:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ7:00â¯PM",
+   "Thursday: 10:00â¯AMâââ7:00â¯PM",
+   "Friday: 10:00â¯AMâââ5:00â¯PM",
+   "Saturday: 10:00â¯AMâââ5:00â¯PM",
+   "Sunday: 10:00â¯AMâââ4:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "7b6a7746-6df8-4a6e-9188-37668196e76b",
+  "business_name": "Holi Indian Grill (A Flavor Of Joy)",
+  "match_method": "place_id",
+  "live_slug": "holi-indian-grill-a-flavor-of-joy-44dARw",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Thursday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Friday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Saturday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Sunday: 11:00â¯AMâââ3:00â¯PM, 5:00âââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 5:00âââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "3d4f72c4-2112-448f-be18-a253d3c2d3b4",
+  "business_name": "Circle K | Gas Station",
+  "match_method": "place_id",
+  "live_slug": "circle-k-gas-station-xvS9lU",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "cb6959cd-daec-4636-a5fe-9ee7dfbd16b0",
+  "business_name": "Tequila Mexican Bar & Grill",
+  "match_method": "place_id",
+  "live_slug": "tequila-mexican-bar-grill-Hf4dLs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ10:00â¯PM",
+   "Saturday: 11:00â¯AMâââ10:00â¯PM",
+   "Sunday: 11:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "3cde9cbd-0bcf-46ca-91b5-7e629e73609d",
+  "business_name": "Ozan Winery & YH Distillery",
+  "match_method": "place_id",
+  "live_slug": "ozan-winery-yh-distillery-4AbvWc",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 10:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ6:00â¯PM",
+   "Thursday: 10:00â¯AMâââ6:00â¯PM",
+   "Friday: 10:00â¯AMâââ6:00â¯PM",
+   "Saturday: 10:00â¯AMâââ6:00â¯PM",
+   "Sunday: 12:00âââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "d6dc169a-95a9-41be-895d-4c4810500496",
+  "business_name": "Resilient Fitness formally Rocking boot camp",
+  "match_method": "place_id",
+  "live_slug": "resilient-fitness-formally-rocking-boot-camp-tvdO0Y",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM",
+   "Tuesday: 4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM",
+   "Wednesday: 4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM",
+   "Thursday: 4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM",
+   "Friday: 4:45âââ9:15â¯AM",
+   "Saturday: 8:00âââ9:00â¯AM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:45âââ9:15â¯AM, 3:30âââ6:45â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:45âââ9:15â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00âââ9:00â¯AM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "6338486d-94f7-4860-98d3-35150139b887",
+  "business_name": "Premium Parking - P0145",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p0145-p2qNcw",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "64052a21-4cd3-4470-b38b-340ac7624b75",
+  "business_name": "GOLDEN CHARIOT INDIAN RESTAURANT ( Aventura )",
+  "match_method": "place_id",
+  "live_slug": "golden-chariot-indian-restaurant-aventura--cB7svE",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:30â¯AMâââ10:00â¯PM",
+   "Tuesday: 11:30â¯AMâââ10:00â¯PM",
+   "Wednesday: 11:30â¯AMâââ10:00â¯PM",
+   "Thursday: 11:30â¯AMâââ10:00â¯PM",
+   "Friday: 11:30â¯AMâââ11:00â¯PM",
+   "Saturday: 11:30â¯AMâââ11:00â¯PM",
+   "Sunday: 11:30â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "d9e93f4e-5a84-456f-9138-e1d80fc5dcbc",
+  "business_name": "Sitar Indian Restaurant",
+  "match_method": "place_id",
+  "live_slug": "sitar-indian-restaurant-6Tpwd4",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:30â¯AMâââ8:30â¯PM",
+   "Tuesday: 10:30â¯AMâââ8:30â¯PM",
+   "Wednesday: 10:30â¯AMâââ8:30â¯PM",
+   "Thursday: 10:30â¯AMâââ8:30â¯PM",
+   "Friday: 10:30â¯AMâââ8:30â¯PM",
+   "Saturday: 10:30â¯AMâââ8:30â¯PM",
+   "Sunday: 10:30â¯AMâââ8:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ8:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "09aa84f8-1422-4256-b06b-a01c36e57921",
+  "business_name": "Island View Casino Resort",
+  "match_method": "place_id",
+  "live_slug": "island-view-casino-resort-Bxy1bY",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "d0bdae7e-c8a1-47b9-bcc5-a7ad6132ccb3",
+  "business_name": "Dolphin Key",
+  "match_method": "place_id",
+  "live_slug": "dolphin-key-1Fdpj8",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ6:00â¯PM",
+   "Thursday: 8:00â¯AMâââ6:00â¯PM",
+   "Friday: 8:00â¯AMâââ6:00â¯PM",
+   "Saturday: 8:00â¯AMâââ6:00â¯PM",
+   "Sunday: 8:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "6a8dc8c5-b989-4ba4-81ad-faf53646d66a",
+  "business_name": "Beauty & Bliss",
+  "match_method": "place_id",
+  "live_slug": "beauty-bliss-t9we0U",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:30â¯AMâââ6:00â¯PM",
+   "Tuesday: 7:30â¯AMâââ6:00â¯PM",
+   "Wednesday: 7:30â¯AMâââ6:00â¯PM",
+   "Thursday: 7:30â¯AMâââ6:00â¯PM",
+   "Friday: 7:30â¯AMâââ6:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:30â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:30â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:30â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:30â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:30â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "0e7e5747-dab1-446c-a2ad-7aeb3118f3e6",
+  "business_name": "The Curry Modern Indian",
+  "match_method": "place_id",
+  "live_slug": "the-curry-modern-indian-DM6pdI",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ2:00â¯PM, 5:00âââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:00â¯PM, 5:00âââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ2:00â¯PM, 5:00âââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ2:00â¯PM, 5:00âââ9:30â¯PM",
+   "Saturday: 11:00â¯AMâââ2:00â¯PM, 5:00âââ9:30â¯PM",
+   "Sunday: 11:00â¯AMâââ2:00â¯PM, 5:00âââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 5:00âââ9:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:00â¯PM, 5:00âââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "ec7ead0c-e7c7-4879-a9ae-aa903a2dba81",
+  "business_name": "GLITTER GORGEOUS Day Spa",
+  "match_method": "place_id",
+  "live_slug": "glitter-gorgeous-day-spa-qu32yg",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ6:00â¯PM",
+   "Thursday: 8:00â¯AMâââ6:00â¯PM",
+   "Friday: 8:00â¯AMâââ6:00â¯PM",
+   "Saturday: 8:00â¯AMâââ12:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ12:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "28ec4827-3861-4e7d-83a0-cbc99fb8293e",
+  "business_name": "Alabama Adventure & Splash Adventure",
+  "match_method": "place_id",
+  "live_slug": "alabama-adventure-splash-adventure-eeF9BQ",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: Closed",
+   "Wednesday: Closed",
+   "Thursday: Closed",
+   "Friday: Closed",
+   "Saturday: 10:30â¯AMâââ7:00â¯PM",
+   "Sunday: 10:30â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "ab34e3d2-235a-46dd-ad92-b8dc9286cb98",
+  "business_name": "Winners Sneakers & Clothing",
+  "match_method": "place_id",
+  "live_slug": "winners-sneakers-clothing",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: 9:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ6:00â¯PM",
+   "Thursday: 9:00â¯AMâââ6:00â¯PM",
+   "Friday: 9:00â¯AMâââ6:00â¯PM",
+   "Saturday: 9:00â¯AMâââ6:00â¯PM",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "fcf1f238-fa72-4419-812d-228d9614e40a",
+  "business_name": "Premium Parking - P2854",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2854",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "aaf03b19-654a-44dc-9121-a1596675acf8",
+  "business_name": "Orange Beach Home w/ Hot Tub < 2 Mi to The Wharf",
+  "match_method": "place_id",
+  "live_slug": "orange-beach-home-w-hot-tub-2-mi-to-the-wharf-Y_40wo",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ5:00â¯PM",
+   "Thursday: 9:00â¯AMâââ5:00â¯PM",
+   "Friday: 9:00â¯AMâââ5:00â¯PM",
+   "Saturday: 9:00â¯AMâââ5:00â¯PM",
+   "Sunday: 9:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "0fecf80b-f3ff-4e05-ac40-e88b50cc3a8b",
+  "business_name": "Secret Food Tours Paris",
+  "match_method": "place_id",
+  "live_slug": "secret-food-tours-paris-ByfVkg",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "1d43072a-097a-4ae1-a065-db784cbc526a",
+  "business_name": "Phoenix Orange Beach Vacation Rental Condominiums",
+  "match_method": "phone",
+  "live_slug": "orange-beach-home-w-hot-tub-2-mi-to-the-wharf-Y_40wo",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ5:00â¯PM",
+   "Thursday: 9:00â¯AMâââ5:00â¯PM",
+   "Friday: 9:00â¯AMâââ5:00â¯PM",
+   "Saturday: 9:00â¯AMâââ5:00â¯PM",
+   "Sunday: 9:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f62107c1-15e2-4bc7-8a20-3437ad6d6528",
+  "business_name": "Emerald Coast Zoo",
+  "match_method": "place_id",
+  "live_slug": "emerald-coast-zoo-Hqg83Q",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 10:00â¯AMâââ4:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ4:00â¯PM",
+   "Thursday: 10:00â¯AMâââ4:00â¯PM",
+   "Friday: 10:00â¯AMâââ4:00â¯PM",
+   "Saturday: 10:00â¯AMâââ4:00â¯PM",
+   "Sunday: 10:00â¯AMâââ4:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "99dea5cf-9920-4d89-92be-4683bb776c58",
+  "business_name": "Premium Parking - P2657",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2657",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "0ae9f322-7c86-4985-b9bc-a124f95a53e5",
+  "business_name": "Shell",
+  "match_method": "place_id",
+  "live_slug": "shell",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "8701b5a4-f76c-403a-a641-90d8766455ef",
+  "business_name": "Emerald Coast Wine Cellars",
+  "match_method": "place_id",
+  "live_slug": "emerald-coast-wine-cellars-AEDu6M",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ6:00â¯PM",
+   "Thursday: 10:00â¯AMâââ6:00â¯PM",
+   "Friday: 10:00â¯AMâââ6:00â¯PM",
+   "Saturday: 10:00â¯AMâââ6:00â¯PM",
+   "Sunday: 10:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "dad314aa-1771-4a59-986b-7ea2df484100",
+  "business_name": "El Jacal Mexican Grill",
+  "match_method": "place_id",
+  "live_slug": "el-jacal-mexican-grill-ZFkPg4",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ9:00â¯PM",
+   "Thursday: 9:00â¯AMâââ9:00â¯PM",
+   "Friday: 9:00â¯AMâââ10:00â¯PM",
+   "Saturday: 9:00â¯AMâââ10:00â¯PM",
+   "Sunday: 9:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "56be7641-3ad0-41d0-bc16-9b51c21abca9",
+  "business_name": "Bicycle Adventure",
+  "match_method": "place_id",
+  "live_slug": "bicycle-adventure-UfPSlo",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ5:00â¯PM",
+   "Tuesday: Closed",
+   "Wednesday: 10:00â¯AMâââ5:00â¯PM",
+   "Thursday: 10:00â¯AMâââ5:00â¯PM",
+   "Friday: 10:00â¯AMâââ5:00â¯PM",
+   "Saturday: 10:00â¯AMâââ4:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "c3213ddc-bd7d-4a78-85b5-d09364c114e0",
+  "business_name": "Gulf Specimen Aquarium",
+  "match_method": "place_id",
+  "live_slug": "gulf-specimen-aquarium-GlCBhs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ5:00â¯PM",
+   "Thursday: 9:00â¯AMâââ5:00â¯PM",
+   "Friday: 9:00â¯AMâââ5:00â¯PM",
+   "Saturday: 10:00â¯AMâââ5:00â¯PM",
+   "Sunday: 10:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f1638eb1-2e2c-467d-a81a-d6a3659415a2",
+  "business_name": "McKee Botanical Garden",
+  "match_method": "place_id",
+  "live_slug": "mckee-botanical-garden--CKgx0",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 10:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ5:00â¯PM",
+   "Thursday: 10:00â¯AMâââ5:00â¯PM",
+   "Friday: 10:00â¯AMâââ5:00â¯PM",
+   "Saturday: 10:00â¯AMâââ5:00â¯PM",
+   "Sunday: 10:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "c5695dc4-ac64-4d45-9429-163bb558cffc",
+  "business_name": "Float My Boat Rentals - Pensacola & Pensacola Beach",
+  "match_method": "place_id",
+  "live_slug": "float-my-boat-rentals-pensacola-pensacola-beach-Bly61c",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:00â¯AMâââ9:00â¯PM",
+   "Tuesday: 7:00â¯AMâââ9:00â¯PM",
+   "Wednesday: 7:00â¯AMâââ9:00â¯PM",
+   "Thursday: 7:00â¯AMâââ9:00â¯PM",
+   "Friday: 7:00â¯AMâââ9:00â¯PM",
+   "Saturday: 7:00â¯AMâââ9:00â¯PM",
+   "Sunday: 7:00â¯AMâââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "a97041c2-d557-487d-a998-0fb97d10d64a",
+  "business_name": "Big Mikeâs Smokehouse",
+  "match_method": "place_id",
+  "live_slug": "big-mikes-smokehouse-kKWHVs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 4:00âââ8:00â¯PM",
+   "Wednesday: Closed",
+   "Thursday: 4:00âââ8:00â¯PM",
+   "Friday: 4:00âââ8:00â¯PM",
+   "Saturday: 4:00âââ8:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:00âââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:00âââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:00âââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "4:00âââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "584dd941-b566-4980-8c77-1d2401a542d3",
+  "business_name": "Indian Kitchen House Birmingham",
+  "match_method": "place_id",
+  "live_slug": "indian-kitchen-house-birmingham-SZ-IRs",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ9:30â¯PM",
+   "Wednesday: 11:00â¯AMâââ9:30â¯PM",
+   "Thursday: 11:00â¯AMâââ9:30â¯PM",
+   "Friday: 11:00â¯AMâââ9:30â¯PM",
+   "Saturday: 11:00â¯AMâââ9:30â¯PM",
+   "Sunday: 11:00â¯AMââï¿½ï¿½ï¿½9:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ9:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMââï¿½ï¿½ï¿½9:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "087a16fa-cb68-4ed0-a8f6-73b414790756",
+  "business_name": "Florida Botanical Gardens",
+  "match_method": "place_id",
+  "live_slug": "florida-botanical-gardens-SAS_vg",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 7:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 7:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 7:00â¯AMâââ5:00â¯PM",
+   "Thursday: 7:00â¯AMâââ5:00â¯PM",
+   "Friday: 7:00â¯AMâââ5:00â¯PM",
+   "Saturday: 7:00â¯AMâââ5:00â¯PM",
+   "Sunday: 7:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "7:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "57f2795b-695b-47b7-b4cd-676c7ac1d5bd",
+  "business_name": "Bliss Beauty Salon",
+  "match_method": "place_id",
+  "live_slug": "bliss-beauty-salon-pyox_8",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: 11:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ7:00â¯PM",
+   "Thursday: 10:00â¯AMâââ7:00â¯PM",
+   "Friday: 10:00â¯AMâââ7:00â¯PM",
+   "Saturday: 10:00â¯AMâââ6:00â¯PM",
+   "Sunday: 10:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "effede02-42ee-474a-964e-bd157c301ed5",
+  "business_name": "Island Carpet & Tile Cleaning",
+  "match_method": "place_id",
+  "live_slug": "island-carpet-and-tile-cleaning",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 8:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 8:00â¯AMâââ6:00â¯PM",
+   "Thursday: 8:00â¯AMâââ6:00â¯PM",
+   "Friday: 8:00â¯AMâââ6:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "4a7bccbe-f141-45ba-a316-0e9b7c0fddf6",
+  "business_name": "Peachtree Group",
+  "match_method": "place_id",
+  "live_slug": "peachtree-group-FKYmvk",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ6:00â¯PM",
+   "Thursday: 9:00â¯AMâââ6:00â¯PM",
+   "Friday: 9:00â¯AMâââ6:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "0bce2fc7-1486-4d39-a210-14be094e6882",
+  "business_name": "Birmingham Race Course Casino",
+  "match_method": "place_id",
+  "live_slug": "birmingham-race-course-casino-eN_j20",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "b1e05f73-2bca-4926-9b6c-c0fb7293d9a3",
+  "business_name": "Key West Tropical Forest & Botanical Garden",
+  "match_method": "place_id",
+  "live_slug": "key-west-tropical-forest-botanical-garden-lnAqLc",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ4:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ4:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ4:00â¯PM",
+   "Thursday: 10:00â¯AMâââ4:00â¯PM",
+   "Friday: 10:00â¯AMâââ4:00â¯PM",
+   "Saturday: 10:00â¯AMâââ4:00â¯PM",
+   "Sunday: 10:00â¯AMâââ4:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ4:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "c59fc455-efb1-4369-b729-f5244080e0eb",
+  "business_name": "HairPhix Salon & ColorBar",
+  "match_method": "place_id",
+  "live_slug": "hairphix-salon-colorbar-IhHOGw",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ5:00â¯PM",
+   "Thursday: 9:00â¯AMâââ5:00â¯PM",
+   "Friday: 9:00â¯AMâââ5:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "263f70b8-77f8-4ccd-86ce-27b70c9fe4ad",
+  "business_name": "The Outlets at Orange",
+  "match_method": "place_id",
+  "live_slug": "the-outlets-at-orange-0Etzlw",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ8:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ8:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ8:00â¯PM",
+   "Thursday: 10:00â¯AMâââ8:00â¯PM",
+   "Friday: 10:00â¯AMâââ9:00â¯PM",
+   "Saturday: 10:00â¯AMâââ9:00â¯PM",
+   "Sunday: 11:00â¯AMâââ8:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ9:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ8:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "1147504a-1a5a-4cd2-a623-b6dac163b511",
+  "business_name": "My Beach Getaways",
+  "match_method": "phone",
+  "live_slug": "beach-getaways",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ5:00â¯PM",
+   "Thursday: 9:00â¯AMâââ5:00â¯PM",
+   "Friday: 9:00â¯AMâââ5:00â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f9e42cd1-b71f-40b5-965f-b6e8c38b6df6",
+  "business_name": "Gulfport Premium Outlets",
+  "match_method": "place_id",
+  "live_slug": "gulfport-premium-outlets-wsUTa0",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ7:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ7:00â¯PM",
+   "Thursday: 10:00â¯AMâââ7:00â¯PM",
+   "Friday: 10:00â¯AMâââ8:00â¯PM",
+   "Saturday: 10:00â¯AMâââ8:00â¯PM",
+   "Sunday: 11:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "1391848f-42e9-48ca-839a-15c858c51faa",
+  "business_name": "Holi Indian Kitchen (A Flavor Of Joy)",
+  "match_method": "place_id",
+  "live_slug": "holi-indian-kitchen-a-flavor-of-joy-kpcgo4",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Thursday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Friday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Saturday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Sunday: 11:00â¯AMâââ3:00â¯PM, 5:00âââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ3:00â¯PM, 5:00âââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "70f63318-bd03-43fd-87f0-936b10d0d105",
+  "business_name": "Dâs Sweets Bakery",
+  "match_method": "place_id",
+  "live_slug": "ds-sweets-bakery-EFLLqc",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ5:00â¯PM",
+   "Thursday: 10:00â¯AMâââ5:00â¯PM",
+   "Friday: 10:00â¯AMâââ5:00â¯PM",
+   "Saturday: 8:00â¯AMâââ4:00â¯PM",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:00â¯AMâââ4:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "66c3727b-98ce-405f-9cc3-8eeaa7b4a3b4",
+  "business_name": "Harrahâs Casino Gulf Coast",
+  "match_method": "place_id",
+  "live_slug": "harrahs-casino-gulf-coast-JFHstU",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "33ac2b54-774d-4d83-a0f5-de0c806b8196",
+  "business_name": "Merchants Bank of Alabama, a division of SouthPoint Bank",
+  "match_method": "place_id",
+  "live_slug": "merchants-bank-of-alabama-a-division-of-southpoint-bank-f_Vcuw",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 8:30â¯AMâââ4:30â¯PM",
+   "Tuesday: 8:30â¯AMâââ4:30â¯PM",
+   "Wednesday: 8:30â¯AMâââ4:30â¯PM",
+   "Thursday: 8:30â¯AMâââ4:30â¯PM",
+   "Friday: 8:30â¯AMâââ4:30â¯PM",
+   "Saturday: Closed",
+   "Sunday: Closed"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:30â¯AMâââ4:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:30â¯AMâââ4:30â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:30â¯AMâââ4:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:30â¯AMâââ4:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "8:30â¯AMâââ4:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "a18ce999-14ed-45a7-a334-76212f52e123",
+  "business_name": "Vacasa Headquarters - Portland, Oregon",
+  "match_method": "place_id",
+  "live_slug": "vacasa-headquarters-portland-oregon-IYXlU0",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "8b6e1395-ea59-485e-8c57-24e03275388d",
+  "business_name": "Corbin Farms Winery",
+  "match_method": "place_id",
+  "live_slug": "corbin-farms-winery-uZ9xZc",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Closed",
+   "Tuesday: Closed",
+   "Wednesday: Closed",
+   "Thursday: 12:00âââ6:00â¯PM",
+   "Friday: 12:00âââ6:00â¯PM",
+   "Saturday: 12:00âââ6:00â¯PM",
+   "Sunday: 12:00âââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "bf526384-2cee-44a8-8cdb-c5cbb80caf7a",
+  "business_name": "Premium Parking - P2853",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2853",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "2b98521c-1ec7-4f74-b6b5-be5120994ab7",
+  "business_name": "SITAR INDIAN CUISINE",
+  "match_method": "place_id",
+  "live_slug": "sitar-indian-cuisine-F1WUIQ",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM",
+   "Tuesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM",
+   "Wednesday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM",
+   "Thursday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM",
+   "Friday: 11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM",
+   "Saturday: 11:30â¯AMâââ3:00â¯PM, 5:00âââ10:00â¯PM",
+   "Sunday: 11:30â¯AMâââ3:00â¯PM, 5:00âââ9:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ9:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ3:00â¯PM, 5:00âââ10:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:30â¯AMâââ3:00â¯PM, 5:00âââ9:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "43772927-f7b6-4458-a22f-1ff6e9e5652c",
+  "business_name": "Shell Beach Orange Beach Public Parking",
+  "match_method": "place_id",
+  "live_slug": "shell-beach-orange-beach-public-parking",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "cfdfb903-4310-4b45-b6cd-abc759b02128",
+  "business_name": "Premium Parking - P2658",
+  "match_method": "place_id",
+  "live_slug": "premium-parking-p2658",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "486cee3f-a7a2-492a-adff-355c68630681",
+  "business_name": "Danny C Holland, DO",
+  "match_method": "phone",
+  "live_slug": "hangout-music-festival",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:30â¯AMâââ10:00â¯PM",
+   "Tuesday: 10:30â¯AMâââ10:00â¯PM",
+   "Wednesday: 10:30â¯AMâââ10:00â¯PM",
+   "Thursday: 10:30â¯AMâââ10:00â¯PM",
+   "Friday: 10:30â¯AMâââ11:00â¯PM",
+   "Saturday: 10:30â¯AMâââ11:00â¯PM",
+   "Sunday: 10:30â¯AMâââ10:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ10:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ11:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:30â¯AMâââ10:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "f09f99c2-5765-403f-bb12-1e3dc33b9822",
+  "business_name": "Mississippi Aquarium",
+  "match_method": "place_id",
+  "live_slug": "mississippi-aquarium-idt58c",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 10:00â¯AMâââ5:00â¯PM",
+   "Tuesday: 10:00â¯AMâââ5:00â¯PM",
+   "Wednesday: 10:00â¯AMâââ5:00â¯PM",
+   "Thursday: 10:00â¯AMâââ5:00â¯PM",
+   "Friday: 10:00â¯AMâââ5:00â¯PM",
+   "Saturday: 10:00â¯AMâââ5:00â¯PM",
+   "Sunday: 10:00â¯AMâââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "10:00â¯AMâââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "c22609eb-f02f-4351-ae53-f790d9d24831",
+  "business_name": "Boomtown Casino Biloxi",
+  "match_method": "place_id",
+  "live_slug": "boomtown-casino-biloxi-Ld7MUQ",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: Open 24 hours",
+   "Tuesday: Open 24 hours",
+   "Wednesday: Open 24 hours",
+   "Thursday: Open 24 hours",
+   "Friday: Open 24 hours",
+   "Saturday: Open 24 hours",
+   "Sunday: Open 24 hours"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "open_24": true
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "9a29d83f-296f-4bc9-b20d-fadf3cfeb280",
+  "business_name": "Walmart Vision & Glasses",
+  "match_method": "place_id",
+  "live_slug": "walmart-vision-glasses-ZWO1Og",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ7:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ7:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ7:00â¯PM",
+   "Thursday: 9:00â¯AMâââ7:00â¯PM",
+   "Friday: 9:00â¯AMâââ7:00â¯PM",
+   "Saturday: 9:00â¯AMâââ6:00â¯PM",
+   "Sunday: 12:00âââ5:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ7:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "12:00âââ5:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "0948387b-a538-48e5-84a0-6469e077ea83",
+  "business_name": "Huntsville Botanical Garden",
+  "match_method": "place_id",
+  "live_slug": "huntsville-botanical-garden-YOw7Jw",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ6:00â¯PM",
+   "Thursday: 9:00â¯AMâââ8:00â¯PM",
+   "Friday: 9:00â¯AMâââ8:00â¯PM",
+   "Saturday: 9:00â¯AMâââ8:00â¯PM",
+   "Sunday: 11:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ8:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "4ffc6276-e447-40fe-914f-06dfd3aae149",
+  "business_name": "ALâs Liquor Tobacco Wine",
+  "match_method": "phone",
+  "live_slug": "als-liquor-tobacco-wine-rouses-shopping-center-ob",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ12:00â¯AM",
+   "Tuesday: 9:00â¯AMâââ12:00â¯AM",
+   "Wednesday: 9:00â¯AMâââ12:00â¯AM",
+   "Thursday: 9:00â¯AMâââ12:00â¯AM",
+   "Friday: 9:00â¯AMâââ12:00â¯AM",
+   "Saturday: 9:00â¯AMâââ12:00â¯AM",
+   "Sunday: 9:00â¯AMâââ12:00â¯AM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ12:00â¯AM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "ff81d1f2-c8a1-4f3e-9733-7f2fa0464c64",
+  "business_name": "Kohinoor Indian Cuisine",
+  "match_method": "place_id",
+  "live_slug": "kohinoor-indian-cuisine-IIvPBQ",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM",
+   "Tuesday: Closed",
+   "Wednesday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM",
+   "Thursday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM",
+   "Friday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM",
+   "Saturday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM",
+   "Sunday: 11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "closed": true
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "11:00â¯AMâââ2:30â¯PM, 4:30âââ9:30â¯PM"
+   }
+  ]
+ },
+ {
+  "source_db": "may",
+  "source_table": "entity.hours_text",
+  "source_id": "1381922f-1b00-4e23-b872-372ae656f4d4",
+  "business_name": "Dothan Area Botanical Gardens",
+  "match_method": "place_id",
+  "live_slug": "dothan-area-botanical-gardens-XJFg-4",
+  "status": "net_new",
+  "weekday_text": [
+   "Monday: 9:00â¯AMâââ6:00â¯PM",
+   "Tuesday: 9:00â¯AMâââ6:00â¯PM",
+   "Wednesday: 9:00â¯AMâââ6:00â¯PM",
+   "Thursday: 9:00â¯AMâââ6:00â¯PM",
+   "Friday: 9:00â¯AMâââ6:00â¯PM",
+   "Saturday: 9:00â¯AMâââ6:00â¯PM",
+   "Sunday: 9:00â¯AMâââ6:00â¯PM"
+  ],
+  "parsed": [
+   {
+    "day": "Monday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Tuesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Wednesday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Thursday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Friday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Saturday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   },
+   {
+    "day": "Sunday",
+    "opens": null,
+    "closes": null,
+    "raw": "9:00â¯AMâââ6:00â¯PM"
+   }
+  ]
+ }
+]
