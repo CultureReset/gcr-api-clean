@@ -29,12 +29,23 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     // the modifiers slot below always emitted empty. Serve them.
     const foodItemIds = (menuItems.data || []).map(i => i.id).filter(Boolean);
     const optionsByItem = {};
+    const variationsByItem = {};
+    let menuPeriods = [];
     if (foodItemIds.length) {
-        const { data: opts } = await gcrDb.from('menu_item_options')
-            .select('menu_item_id, group_id, group_label, name, price_delta, sort_order')
-            .in('menu_item_id', foodItemIds)
-            .order('sort_order', { ascending: true });
-        (opts || []).forEach(o => {
+        const [optsRes, varsRes, periodsRes] = await Promise.all([
+            gcrDb.from('menu_item_options')
+                .select('menu_item_id, group_id, group_label, name, price_delta, sort_order')
+                .in('menu_item_id', foodItemIds)
+                .order('sort_order', { ascending: true }),
+            gcrDb.from('menu_item_variations')
+                .select('menu_item_id, variation_name, price, image_url')
+                .in('menu_item_id', foodItemIds),
+            gcrDb.from('menu_periods')
+                .select('name, days_of_week, start_time, end_time, sort_order')
+                .eq('entity_slug', entitySlug)
+                .order('sort_order', { ascending: true }),
+        ]);
+        (optsRes.data || []).forEach(o => {
             if (!optionsByItem[o.menu_item_id]) optionsByItem[o.menu_item_id] = [];
             optionsByItem[o.menu_item_id].push({
                 group: o.group_label || 'Options',
@@ -43,6 +54,15 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 price_delta: parseFloat(o.price_delta) || 0,
             });
         });
+        (varsRes.data || []).forEach(v => {
+            if (!variationsByItem[v.menu_item_id]) variationsByItem[v.menu_item_id] = [];
+            variationsByItem[v.menu_item_id].push({
+                name: v.variation_name,
+                price: parseFloat(v.price) || 0,
+                image_url: v.image_url || '',
+            });
+        });
+        menuPeriods = periodsRes.data || [];
     }
 
     const groupItems = (sections, items, priceField, optionsMap) => {
@@ -61,6 +81,7 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 tags: Array.isArray(i.tags) ? i.tags : [],
                 modifiers: (optionsMap && optionsMap[i.id])
                     || (Array.isArray(i.modifiers) ? i.modifiers : []),
+                variations: variationsByItem[i.id] || [],
             });
         });
         return Object.values(byId).filter(s => s.items.length);
@@ -77,6 +98,7 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     if (entity.social_tiktok) social_links.tiktok = entity.social_tiktok;
 
     return res.json({
+        periods: menuPeriods,
         business_name: entity.name || '',
         logo_url: entity.hero_image_url || '',
         tagline: '',

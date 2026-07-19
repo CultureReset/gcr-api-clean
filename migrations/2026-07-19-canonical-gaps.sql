@@ -177,3 +177,23 @@ CREATE TABLE IF NOT EXISTS entity_hours_exceptions (
 -- boat, the complex's pool shows on each unit, marked so children render
 -- them read-only.
 ALTER TABLE entity_amenities ADD COLUMN IF NOT EXISTS is_inherited boolean NOT NULL DEFAULT false;
+
+
+-- ── 7. SAVED AVAILABILITY SEARCHES ──────────────────────────────────────────
+-- "All the photographers available these days" saved and re-runnable.
+-- The frontend ships a device-local version today; this table makes saves
+-- follow the tourist across devices once approved.
+-- DISPLAYS: saved-search chips on the Search page; re-run alerts later.
+CREATE TABLE IF NOT EXISTS saved_searches (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tourist_id  uuid,                        -- tourist_profiles/users linkage
+  phone       text,                        -- alt key for one-text users
+  label       text NOT NULL,
+  search_type text NOT NULL,               -- charter | photographer | rental | activity | stay | all
+  date_from   date NOT NULL,
+  date_to     date NOT NULL,
+  query       text,
+  coverage    text NOT NULL DEFAULT 'any', -- any | all (stays)
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_saved_searches_tourist ON saved_searches (tourist_id);

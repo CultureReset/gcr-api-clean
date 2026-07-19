@@ -2121,6 +2121,11 @@ router.post('/availability-search', async (req, res) => {
       activity:     ['activity', 'tour', 'parasailing', 'dolphin_cruise', 'sunset_cruise'],
       all:          [],
     };
+    // Stays are an entity_type family, not subtypes — and their availability
+    // semantics differ: a condo must be open EVERY night of the range, while
+    // a charter/photographer just needs ANY open day in it.
+    const STAY_TYPES = ['hotel', 'condo', 'vacation-rental'];
+    const isStaySearch = type === 'stay';
 
     const subtypes = TYPE_FILTERS[type] || [];
 
@@ -2137,11 +2142,13 @@ router.post('/availability-search', async (req, res) => {
       .limit(limit);
 
     // Filter by type
-    if (type !== 'all' && subtypes.length > 0) {
+    if (isStaySearch) {
+      entityQuery = entityQuery.in('entity_type', STAY_TYPES);
+    } else if (type !== 'all' && subtypes.length > 0) {
       entityQuery = entityQuery.in('entity_subtype', subtypes);
     } else if (type === 'all') {
-      // For 'all' with availability — only bookable types
-      entityQuery = entityQuery.in('entity_type', ['activity', 'service']);
+      // For 'all' with availability — bookable types including stays
+      entityQuery = entityQuery.in('entity_type', ['activity', 'service', ...STAY_TYPES]);
     }
 
     // Optional keyword filter
@@ -2155,6 +2162,23 @@ router.post('/availability-search', async (req, res) => {
 
     const userLat = lat ? parseFloat(lat) : null;
     const userLng = lng ? parseFloat(lng) : null;
+
+    // Requested day list — drives per-vertical coverage semantics.
+    // coverage=all: open EVERY day in the range (stays default to this —
+    // a condo has to cover the whole trip). coverage=any: any open day
+    // qualifies (charters, photographers, activities default).
+    const requestedDates = [];
+    {
+      let d = new Date(date_from + 'T00:00:00Z');
+      const endD = new Date(dateTo + 'T00:00:00Z');
+      while (d <= endD && requestedDates.length < 120) {
+        requestedDates.push(d.toISOString().slice(0, 10));
+        d = new Date(d.getTime() + 86400000);
+      }
+    }
+    const coverage = (req.body.coverage === 'all' || req.body.coverage === 'any')
+      ? req.body.coverage
+      : (isStaySearch ? 'all' : 'any');
 
     // 3. Build results — merge entity data with availability slots
     const results = (entities || []).map(e => {
@@ -2170,20 +2194,27 @@ router.post('/availability-search', async (req, res) => {
       // Unique dates with availability
       const availDates = [...new Set(openSlots.map(s => s.availability_date))].sort();
 
+      // A stay that can't cover every requested night has no availability
+      // for THIS trip — demote it to contact-to-book instead of listing it
+      // as open.
+      const coversAll = requestedDates.every(day => availDates.includes(day));
+      const meetsCoverage = coverage === 'all' ? coversAll : availDates.length > 0;
+
       const distance_miles = (userLat && userLng && e.latitude && e.longitude)
         ? haversine(userLat, userLng, e.latitude, e.longitude)
         : null;
 
       return {
         ...e,
-        has_availability: hasAvailability,
+        has_availability: hasAvailability && meetsCoverage,
+        covers_all_days: coversAll,
         available_dates: availDates,
         slots: openSlots,
         lowest_remaining: lowestRemaining,
         distance_miles,
         // Availability confidence for sorting:
-        // 0 = no data, 1 = has entity but no slots, 2 = has slots with data
-        _avail_rank: hasAvailability ? 2 : (e.booking_url ? 1 : 0),
+        // 0 = no data, 1 = has entity but no slots, 2 = has slots meeting coverage
+        _avail_rank: (hasAvailability && meetsCoverage) ? 2 : (e.booking_url ? 1 : 0),
       };
     });
 

@@ -2508,6 +2508,28 @@ router.delete('/gcr/menu-item-options/:id', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
+// Variations (sizes/versions of an item: Small/Large, Cup/Bowl) — same pattern
+router.get('/gcr/menu-items/:id/variations', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('menu_item_variations')
+    .select('*').eq('menu_item_id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/menu-items/:id/variations', authRequired, async (req, res) => {
+  const row = { ...req.body, menu_item_id: req.params.id };
+  delete row.id;
+  const { data, error } = await getDb().from('menu_item_variations').insert(row).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.delete('/gcr/menu-item-variations/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('menu_item_variations').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // ─── PROFILE SECTION ROWS (generic per-entity table CRUD) ─────────────────────
 // Every table the public entity payload displays (gcr.js conditional queries)
 // gets an admin edit path through one whitelisted route family. Keys are the
