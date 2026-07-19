@@ -2531,6 +2531,9 @@ const PROFILE_ROW_TABLES = {
   'facilities': 'facilities',
   'spot-rules': 'spot_rules',
   'announcements': 'announcements',
+  'whats-excluded': 'whats_excluded',
+  'attributes': 'entity_attributes',
+  'nearby-landmarks': 'entity_nearby_landmarks',
 };
 const PROFILE_SINGLETON_TABLES = {
   'activity-details': 'activity_details',
