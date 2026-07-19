@@ -525,7 +525,9 @@ router.post('/state', authRequired, async (req, res) => {
             // the name differently). Check by phone before assuming this is
             // brand new — claiming the real, already-populated profile beats
             // creating an empty duplicate, as long as nobody already owns it.
-            if (!ent && biz.phone) {
+            // Standalone (BookPro) signups NEVER claim existing GCR listings —
+            // the booking platform stays fully separate from directory data.
+            if (!ent && biz.phone && !biz.standalone) {
                 const phoneMatch = await findExistingEntity(supabase, { phone: biz.phone });
                 if (phoneMatch) {
                     const { data: alreadyOwned } = await supabase.from('entity_owners')
@@ -551,7 +553,13 @@ router.post('/state', authRequired, async (req, res) => {
                     slug: slug, name: biz.name || slug,
                     entity_type: (biz.type || 'service').toLowerCase(),
                     subtitle: biz.tagline || null, phone: biz.phone || null,
-                    icon: biz.emoji || '🏪', is_active: true,
+                    email: biz.email || null,
+                    // standalone (BookPro) businesses are hidden from the GCR
+                    // directory (it filters is_active=true); their /p/ page and
+                    // booking engine work regardless — entityBySlug doesn't filter
+                    icon: biz.emoji || '🏪', is_active: !biz.standalone,
+                    hero_image_url: biz.hero || null,
+                    logo_url: biz.logo || null,
                     website_url: biz.website || null,
                     social_instagram: biz.instagram || null,
                     social_facebook: biz.facebook || null,
@@ -568,7 +576,10 @@ router.post('/state', authRequired, async (req, res) => {
                 name: biz.name || undefined,
                 subtitle: biz.tagline != null ? biz.tagline : undefined,
                 phone: biz.phone != null ? biz.phone : undefined,
+                email: biz.email != null ? biz.email : undefined,
                 icon: biz.emoji || undefined,
+                hero_image_url: biz.hero != null ? biz.hero : undefined,
+                logo_url: biz.logo != null ? biz.logo : undefined,
                 theme: biz.accent ? { accent: biz.accent } : undefined,
                 website_url: biz.website != null ? biz.website : undefined,
                 social_instagram: biz.instagram != null ? biz.instagram : undefined,
