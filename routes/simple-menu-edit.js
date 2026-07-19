@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const getGcrDb = require('../db');
+const getGcrDb = () => require('../db'); // db module exports the client itself
 
 const db = () => getGcrDb();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });

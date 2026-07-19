@@ -1,6 +1,6 @@
 const express = require('express');
 const { authRequired } = require('../middleware/auth');
-const getGcrDb = require('../db');
+const getGcrDb = () => require('../db'); // db module exports the client itself
 
 const router = express.Router();
 router.use(authRequired);

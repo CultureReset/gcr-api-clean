@@ -87,6 +87,12 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
 // All public routes need a site_id from domain resolution middleware
 // If no site_id, the request needs a ?subdomain= param as fallback
 function requireSite(req, res, next) {
+    // GCR-keyed requests (?slug= / ?entity_id=) carry no site_id; the handlers
+    // that accept them (e.g. /menu) resolve the entity themselves.
+    if (!req.siteId && (req.query.slug || req.query.entity_id)) {
+        return next();
+    }
+
     // Accept ?site_id= as the simplest fallback (used by qr-menu.html)
     if (!req.siteId && (req.query.site_id || (req.body && req.body.site_id))) {
         req.siteId = req.query.site_id || req.body.site_id;
@@ -2862,8 +2868,7 @@ router.get('/business', async (req, res) => {
 router.get('/menu', async (req, res) => {
     try {
         let siteId = req.siteId; // from domain resolution
-        const getGcrDb = require('../db');
-        const gcrDb = getGcrDb();
+        const gcrDb = require('../db'); // exports the client directly
         const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok';
 
         // 1) Direct GCR lookup — ?entity_id=UUID
@@ -2909,9 +2914,9 @@ router.get('/menu', async (req, res) => {
                 .order('category', { ascending: true }),
             supabase.from('events').select('*').eq('site_id', siteId).order('event_date', { ascending: true }),
             supabase.from('specials').select('*').eq('site_id', siteId),
-            getGcrDb().from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
+            require('../db').from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
                 .then(r => (r.data && r.data.entity_slug)
-                    ? getGcrDb().from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
+                    ? require('../db').from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
                     : { data: null })
                 .catch(() => ({ data: null }))
         ]);
@@ -2949,7 +2954,7 @@ router.get('/menu', async (req, res) => {
         // Get live artist if available via GCR link
         let liveArtist = null;
         if (gcrEntity?.live_artist_id) {
-            const { data: artist } = await getGcrDb()
+            const { data: artist } = await require('../db')
                 .from('artist_profiles')
                 .select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount')
                 .eq('id', gcrEntity.live_artist_id)
@@ -3148,8 +3153,7 @@ router.get('/waivers/send-reminders', async (req, res) => {
 // GET /api/public/gcr-stats — Live GCR business count for home page display
 router.get('/gcr-stats', async (req, res) => {
     try {
-        const getGcrDb = require('../db');
-        const gcrDb = getGcrDb();
+        const gcrDb = require('../db'); // exports the client directly
         const { count, error } = await gcrDb
             .from('entity')
             .select('id', { count: 'exact', head: true })

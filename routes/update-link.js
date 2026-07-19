@@ -33,7 +33,7 @@
 const express  = require('express');
 const crypto   = require('crypto');
 const multer   = require('multer');
-const getGcrDb = require('../db');
+const getGcrDb = () => require('../db'); // db module exports the client itself
 const { adminRequired } = require('../middleware/auth');
 
 const router = express.Router();
