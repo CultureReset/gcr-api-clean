@@ -1416,6 +1416,38 @@ router.post('/search', async (req, res) => {
 });
 
 // ─── GET /api/gcr/sections ────────────────────────────────────────────────────
+// GET /api/gcr/taxonomy — the category system, served from the database.
+// subtype_taxonomy is the single source of truth (293 curated subtypes):
+// frontends hydrate their subtype→section maps and section lists from this
+// instead of hand-maintained copies in code.
+router.get('/taxonomy', async (req, res) => {
+  try {
+    const { data, error } = await db
+      .from('subtype_taxonomy')
+      .select('subtype_key, display_name, entity_type, listing_category, entity_count')
+      .order('entity_count', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const map = {};
+    const sectionCounts = {};
+    (data || []).forEach(row => {
+      if (row.subtype_key && row.listing_category) {
+        map[row.subtype_key] = row.listing_category;
+        sectionCounts[row.listing_category] = (sectionCounts[row.listing_category] || 0) + (row.entity_count || 0);
+      }
+    });
+
+    res.set('Cache-Control', 's-maxage=3600, stale-while-revalidate=600');
+    res.json({
+      map,
+      sections: Object.keys(sectionCounts).map(s => ({ section: s, entity_count: sectionCounts[s] })),
+      subtypes: data || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/sections', async (req, res) => {
   try {
     const sections = [
@@ -1935,14 +1967,72 @@ router.post('/availability-search', async (req, res) => {
       .order('availability_date')
       .order('time_slot');
 
-    const { data: availRows, error: availErr } = await availQuery;
-    if (availErr) return res.status(500).json({ error: availErr.message });
+    // The unified availability read: three sources, one answer.
+    //   business_availability — capacity model fed by the email parser + iCal
+    //   availability          — per-resource slot rows from the booking engine
+    //   booking_calendar      — entity-wide blocks (manual / iCal) that VETO dates
+    const [availRes, resourceRes, blockRes] = await Promise.all([
+      availQuery,
+      db.from('availability')
+        .select('entity_slug, date, start_time, end_time, status, spots_total, spots_remaining')
+        .gte('date', date_from)
+        .lte('date', dateTo)
+        .gt('spots_remaining', 0),
+      db.from('booking_calendar')
+        .select('entity_slug, date, end_date, kind, offering_id, status')
+        .eq('kind', 'block')
+        .is('offering_id', null)
+        .neq('status', 'cancelled')
+        .lte('date', dateTo),
+    ]);
+
+    if (availRes.error) return res.status(500).json({ error: availRes.error.message });
+    const availRows = availRes.data;
 
     // Group availability by entity_slug
     const availMap = {};
     (availRows || []).forEach(row => {
       if (!availMap[row.entity_slug]) availMap[row.entity_slug] = [];
       availMap[row.entity_slug].push(row);
+    });
+
+    // Merge resource-slot rows (booking-engine world) into the same map,
+    // normalized to the business_availability slot shape the response uses
+    (resourceRes.data || []).forEach(r => {
+      if (!availMap[r.entity_slug]) availMap[r.entity_slug] = [];
+      availMap[r.entity_slug].push({
+        entity_slug: r.entity_slug,
+        availability_date: r.date,
+        time_slot: r.start_time || null,
+        end_time: r.end_time || null,
+        status: r.status || 'available',
+        remaining_spots: r.spots_remaining,
+        total_capacity: r.spots_total,
+        booking_type: null,
+      });
+    });
+
+    // Entity-wide calendar blocks veto dates: expand each block row into the
+    // dates it covers inside the requested window
+    const blockedMap = {};
+    (blockRes.data || []).forEach(b => {
+      const start = b.date < date_from ? date_from : b.date;
+      const end = (b.end_date && b.end_date > b.date) ? (b.end_date > dateTo ? dateTo : b.end_date) : b.date;
+      if (end < date_from) return;
+      if (!blockedMap[b.entity_slug]) blockedMap[b.entity_slug] = new Set();
+      let d = new Date(start + 'T00:00:00Z');
+      const endD = new Date(end + 'T00:00:00Z');
+      while (d <= endD) {
+        blockedMap[b.entity_slug].add(d.toISOString().slice(0, 10));
+        d = new Date(d.getTime() + 86400000);
+      }
+    });
+    // Blocked dates drop out of each business's open slots
+    Object.keys(availMap).forEach(slug => {
+      const blocked = blockedMap[slug];
+      if (!blocked) return;
+      availMap[slug] = availMap[slug].filter(s => !blocked.has(s.availability_date));
+      if (!availMap[slug].length) delete availMap[slug];
     });
 
     // Slugs that have availability data

@@ -72,9 +72,18 @@ async function entityBySlug(slug) {
     return data || null;
 }
 async function ownedSlug(req) {
+    // entity_owners.user_id holds TWO conventions: platform signups store the
+    // businesses.id (req.siteId), admin link-user stores the users.id
+    // (req.userId). Accept either — same dual-path the entity resolver uses.
     const { data } = await supabase.from('entity_owners')
         .select('entity_slug').eq('user_id', req.siteId).maybeSingle();
-    return (data && data.entity_slug) || null;
+    if (data && data.entity_slug) return data.entity_slug;
+    if (req.userId && req.userId !== req.siteId) {
+        const { data: byUser } = await supabase.from('entity_owners')
+            .select('entity_slug').eq('user_id', req.userId).maybeSingle();
+        if (byUser && byUser.entity_slug) return byUser.entity_slug;
+    }
+    return null;
 }
 function bizShape(ent) {
     if (!ent) return {};
