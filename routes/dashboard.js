@@ -1,7 +1,7 @@
 const express = require('express');
 const { authRequired } = require('../middleware/auth');
 const supabase = require('../db');
-const getGcrDb = require('../db');
+const getGcrDb = () => require('../db'); // db module exports the client itself
 const { resolveEntityId, resolveEntity } = require('../lib/entity-resolver');
 const menuGcr = require('../lib/menu-gcr');
 const { extractJsonFromImage, getVisionProvidersStatus } = require('./ai-provider');
@@ -3153,6 +3153,71 @@ router.delete('/media/:id', async (req, res) => {
         .eq('id', req.params.id)
         .eq('site_id', req.siteId);
 
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// ============================================
+// MEDIA FILES — server-side upload/delete for the `media` bucket + table.
+// Replaces the browser writing to Supabase Storage with the anon key
+// (js/upload.js, js/website-content.js) — files now flow through the API.
+// ============================================
+const mediaMulter = require('multer')({
+    storage: require('multer').memoryStorage(),
+    limits: { fileSize: 15 * 1024 * 1024 },
+});
+
+// POST /api/dashboard/media/upload — multipart {file, folder?}
+router.post('/media/upload', mediaMulter.single('file'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'file required' });
+    const folder = String(req.body.folder || 'general').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${req.siteId}/${folder}/${Date.now()}-${safeName}`;
+
+    const { data: up, error: upErr } = await supabase.storage.from('media')
+        .upload(path, req.file.buffer, { contentType: req.file.mimetype, cacheControl: '3600', upsert: false });
+    if (upErr) return res.status(500).json({ error: upErr.message });
+
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(up.path);
+    const publicUrl = urlData.publicUrl;
+
+    const { data: row, error: insErr } = await supabase.from('media').insert({
+        site_id: req.siteId,
+        url: publicUrl,
+        filename: req.file.originalname,
+        file_type: req.file.mimetype.startsWith('image/') ? 'image' : req.file.mimetype.split('/')[0],
+        file_size: req.file.size,
+        folder: req.body.folder || 'general',
+        title: req.file.originalname,
+    }).select().single();
+    if (insErr) {
+        await supabase.storage.from('media').remove([up.path]);
+        return res.status(500).json({ error: insErr.message });
+    }
+    res.status(201).json({ url: publicUrl, path: up.path, media: row });
+});
+
+// DELETE /api/dashboard/media/file — body {media_id?, storage_path?, url?}
+// Removes the storage object and/or media row, scoped to the caller's site.
+router.delete('/media/file', async (req, res) => {
+    const { media_id, storage_path, url } = req.body || {};
+    if (!media_id && !storage_path && !url) {
+        return res.status(400).json({ error: 'media_id, storage_path, or url required' });
+    }
+    let path = storage_path;
+    if (!path && url) {
+        const m = url.match(/\/object\/public\/media\/(.+)$/);
+        if (m) path = decodeURIComponent(m[1]);
+    }
+    // Only delete storage objects under this site's own prefix
+    if (path && String(path).startsWith(`${req.siteId}/`)) {
+        await supabase.storage.from('media').remove([path]);
+    }
+    let q = supabase.from('media').delete().eq('site_id', req.siteId);
+    if (media_id) q = q.eq('id', media_id);
+    else if (url) q = q.eq('url', url);
+    else q = q.eq('url', `__path__${path}`); // path-only delete with no row match: no-op
+    const { error } = await q;
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
 });

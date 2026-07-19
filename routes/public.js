@@ -24,7 +24,48 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         entity.live_artist_id ? gcrDb.from('artist_profiles').select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount').eq('id', entity.live_artist_id).eq('is_active', true).maybeSingle() : Promise.resolve({ data: null }),
     ]);
 
-    const groupItems = (sections, items, priceField) => {
+    // Modifier options live in their own table (menu_item_options — real
+    // add-on/prep rows keyed by menu_item_id) and were never joined in;
+    // the modifiers slot below always emitted empty. Serve them.
+    const foodItemIds = (menuItems.data || []).map(i => i.id).filter(Boolean);
+    const optionsByItem = {};
+    const variationsByItem = {};
+    let menuPeriods = [];
+    if (foodItemIds.length) {
+        const [optsRes, varsRes, periodsRes] = await Promise.all([
+            gcrDb.from('menu_item_options')
+                .select('menu_item_id, group_id, group_label, name, price_delta, sort_order')
+                .in('menu_item_id', foodItemIds)
+                .order('sort_order', { ascending: true }),
+            gcrDb.from('menu_item_variations')
+                .select('menu_item_id, variation_name, price, image_url')
+                .in('menu_item_id', foodItemIds),
+            gcrDb.from('menu_periods')
+                .select('name, days_of_week, start_time, end_time, sort_order')
+                .eq('entity_slug', entitySlug)
+                .order('sort_order', { ascending: true }),
+        ]);
+        (optsRes.data || []).forEach(o => {
+            if (!optionsByItem[o.menu_item_id]) optionsByItem[o.menu_item_id] = [];
+            optionsByItem[o.menu_item_id].push({
+                group: o.group_label || 'Options',
+                group_id: o.group_id || null,
+                name: o.name,
+                price_delta: parseFloat(o.price_delta) || 0,
+            });
+        });
+        (varsRes.data || []).forEach(v => {
+            if (!variationsByItem[v.menu_item_id]) variationsByItem[v.menu_item_id] = [];
+            variationsByItem[v.menu_item_id].push({
+                name: v.variation_name,
+                price: parseFloat(v.price) || 0,
+                image_url: v.image_url || '',
+            });
+        });
+        menuPeriods = periodsRes.data || [];
+    }
+
+    const groupItems = (sections, items, priceField, optionsMap) => {
         const byId = {};
         (sections.data || []).forEach(s => { byId[s.id] = { name: s.section_name, items: [] }; });
         (items.data || []).forEach(i => {
@@ -38,13 +79,15 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 photo_url: i.image_url || '',
                 image_url: i.image_url || '',
                 tags: Array.isArray(i.tags) ? i.tags : [],
-                modifiers: Array.isArray(i.modifiers) ? i.modifiers : [],
+                modifiers: (optionsMap && optionsMap[i.id])
+                    || (Array.isArray(i.modifiers) ? i.modifiers : []),
+                variations: variationsByItem[i.id] || [],
             });
         });
         return Object.values(byId).filter(s => s.items.length);
     };
 
-    const foodSections = groupItems(menuSections, menuItems, 'price');
+    const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem);
     const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price');
     const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price');
 
@@ -55,6 +98,7 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     if (entity.social_tiktok) social_links.tiktok = entity.social_tiktok;
 
     return res.json({
+        periods: menuPeriods,
         business_name: entity.name || '',
         logo_url: entity.hero_image_url || '',
         tagline: '',
@@ -87,6 +131,12 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
 // All public routes need a site_id from domain resolution middleware
 // If no site_id, the request needs a ?subdomain= param as fallback
 function requireSite(req, res, next) {
+    // GCR-keyed requests (?slug= / ?entity_id=) carry no site_id; the handlers
+    // that accept them (e.g. /menu) resolve the entity themselves.
+    if (!req.siteId && (req.query.slug || req.query.entity_id)) {
+        return next();
+    }
+
     // Accept ?site_id= as the simplest fallback (used by qr-menu.html)
     if (!req.siteId && (req.query.site_id || (req.body && req.body.site_id))) {
         req.siteId = req.query.site_id || req.body.site_id;
@@ -2862,8 +2912,7 @@ router.get('/business', async (req, res) => {
 router.get('/menu', async (req, res) => {
     try {
         let siteId = req.siteId; // from domain resolution
-        const getGcrDb = require('../db');
-        const gcrDb = getGcrDb();
+        const gcrDb = require('../db'); // exports the client directly
         const ENTITY_COLS = 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, live_artist_id, address_line_1, city, state, phone, national_phone, social_instagram, social_facebook, social_tiktok';
 
         // 1) Direct GCR lookup — ?entity_id=UUID
@@ -2909,9 +2958,9 @@ router.get('/menu', async (req, res) => {
                 .order('category', { ascending: true }),
             supabase.from('events').select('*').eq('site_id', siteId).order('event_date', { ascending: true }),
             supabase.from('specials').select('*').eq('site_id', siteId),
-            getGcrDb().from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
+            require('../db').from('entity_owners').select('entity_slug').eq('user_id', siteId).maybeSingle()
                 .then(r => (r.data && r.data.entity_slug)
-                    ? getGcrDb().from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
+                    ? require('../db').from('entity').select('live_artist_id').eq('slug', r.data.entity_slug).maybeSingle()
                     : { data: null })
                 .catch(() => ({ data: null }))
         ]);
@@ -2949,7 +2998,7 @@ router.get('/menu', async (req, res) => {
         // Get live artist if available via GCR link
         let liveArtist = null;
         if (gcrEntity?.live_artist_id) {
-            const { data: artist } = await getGcrDb()
+            const { data: artist } = await require('../db')
                 .from('artist_profiles')
                 .select('id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount')
                 .eq('id', gcrEntity.live_artist_id)
@@ -3148,8 +3197,7 @@ router.get('/waivers/send-reminders', async (req, res) => {
 // GET /api/public/gcr-stats — Live GCR business count for home page display
 router.get('/gcr-stats', async (req, res) => {
     try {
-        const getGcrDb = require('../db');
-        const gcrDb = getGcrDb();
+        const gcrDb = require('../db'); // exports the client directly
         const { count, error } = await gcrDb
             .from('entity')
             .select('id', { count: 'exact', head: true })

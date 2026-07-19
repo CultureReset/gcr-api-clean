@@ -112,11 +112,18 @@ async function buildFullEntity(slug) {
     // silently had its entity_specials rows ignored no matter what was in
     // the table.
     db.from('entity_specials').select('*').eq('entity_slug', slug).eq('is_active', true),
+    // Structured facts + proximity + exclusions — these tables held tens of
+    // thousands of rows that never reached the payload; the voice AI (and
+    // anything else reading the entity) needs them queryable at the source.
+    db.from('entity_attributes').select('category,key,label,value,value_type,unit,is_filterable').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_nearby_landmarks').select('kind,name,types,spatial_relationship,containment,travel_distance_meters,straight_line_distance_meters').eq('entity_slug', slug).order('sort_order').limit(25),
+    db.from('whats_excluded').select('id,excluded_item,sort_order').eq('entity_slug', slug).order('sort_order'),
   ];
 
   const [
     hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
-    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes, specialsRes
+    aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes, specialsRes,
+    attributesRes, landmarksRes, whatsExcludedRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -408,6 +415,11 @@ async function buildFullEntity(slug) {
     social_posts: socialPostsRes.data || [],
     about_bullets: aboutBulletsRes.data || [],
     perfect_for: perfectForRes.data || [],
+    // distinct key from entity.attributes (the legacy textarea array) so the
+    // admin editor's populate path keeps working untouched
+    structured_attributes: attributesRes.data || [],
+    nearby_landmarks: landmarksRes.data || [],
+    whats_excluded: whatsExcludedRes.data || [],
     child_count: childCountRes?.count || 0,
     parent: parentInfo,
     parent_amenities: parentAmenities,
@@ -1416,6 +1428,99 @@ router.post('/search', async (req, res) => {
 });
 
 // ─── GET /api/gcr/sections ────────────────────────────────────────────────────
+// GET /api/gcr/entity/:slug/availability-month?month=YYYY-MM
+// One business, one month, one merged answer — same three-source union the
+// availability search uses (capacity + resource slots + calendar-block veto),
+// shaped for calendars: the embeddable widget, profile pages, the AI.
+router.get('/entity/:slug/availability-month', async (req, res) => {
+  try {
+    const slug = req.params.slug;
+    const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : new Date().toISOString().slice(0, 7);
+    const from = month + '-01';
+    const lastDay = new Date(Date.UTC(parseInt(month.slice(0, 4)), parseInt(month.slice(5, 7)), 0)).getUTCDate();
+    const to = month + '-' + String(lastDay).padStart(2, '0');
+
+    const [capRes, resRes, blockRes] = await Promise.all([
+      db.from('business_availability')
+        .select('availability_date, remaining_spots, total_capacity, status')
+        .eq('entity_slug', slug).gte('availability_date', from).lte('availability_date', to),
+      db.from('availability')
+        .select('date, spots_remaining, spots_total, status')
+        .eq('entity_slug', slug).gte('date', from).lte('date', to),
+      db.from('booking_calendar')
+        .select('date, end_date, kind, offering_id, status')
+        .eq('entity_slug', slug).eq('kind', 'block').is('offering_id', null)
+        .neq('status', 'cancelled').lte('date', to),
+    ]);
+
+    const days = {};
+    const mergeDay = (date, remaining, total, status) => {
+      const d = days[date] || (days[date] = { date, remaining: null, total: null, status: 'unknown' });
+      if (remaining != null) d.remaining = d.remaining == null ? remaining : Math.max(d.remaining, remaining);
+      if (total != null) d.total = d.total == null ? total : Math.max(d.total, total);
+      if (status && status !== 'unknown' && d.status !== 'blocked') d.status = status;
+    };
+    (capRes.data || []).forEach(r => mergeDay(r.availability_date, r.remaining_spots, r.total_capacity, r.status));
+    (resRes.data || []).forEach(r => mergeDay(r.date, r.spots_remaining, r.spots_total, r.status || 'available'));
+    // capacity-derived status when the row didn't carry one
+    Object.values(days).forEach(d => {
+      if (d.status === 'unknown' && d.remaining != null) {
+        d.status = d.remaining <= 0 ? 'full' : d.remaining <= 3 ? 'limited' : 'available';
+      }
+    });
+    // entity-wide blocks veto everything they cover
+    (blockRes.data || []).forEach(b => {
+      const start = b.date < from ? from : b.date;
+      const end = (b.end_date && b.end_date > b.date) ? (b.end_date > to ? to : b.end_date) : b.date;
+      if (end < from) return;
+      let d = new Date(start + 'T00:00:00Z');
+      const endD = new Date(end + 'T00:00:00Z');
+      while (d <= endD) {
+        const key = d.toISOString().slice(0, 10);
+        days[key] = { date: key, remaining: 0, total: days[key]?.total ?? null, status: 'blocked' };
+        d = new Date(d.getTime() + 86400000);
+      }
+    });
+
+    res.set('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.json({ slug, month, days: Object.values(days).sort((a, b) => a.date < b.date ? -1 : 1) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/gcr/taxonomy — the category system, served from the database.
+// subtype_taxonomy is the single source of truth (293 curated subtypes):
+// frontends hydrate their subtype→section maps and section lists from this
+// instead of hand-maintained copies in code.
+router.get('/taxonomy', async (req, res) => {
+  try {
+    const { data, error } = await db
+      .from('subtype_taxonomy')
+      .select('subtype_key, display_name, entity_type, listing_category, entity_count')
+      .order('entity_count', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const map = {};
+    const sectionCounts = {};
+    (data || []).forEach(row => {
+      if (row.subtype_key && row.listing_category) {
+        map[row.subtype_key] = row.listing_category;
+        sectionCounts[row.listing_category] = (sectionCounts[row.listing_category] || 0) + (row.entity_count || 0);
+      }
+    });
+
+    res.set('Cache-Control', 's-maxage=3600, stale-while-revalidate=600');
+    res.json({
+      map,
+      sections: Object.keys(sectionCounts).map(s => ({ section: s, entity_count: sectionCounts[s] })),
+      subtypes: data || [],
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/sections', async (req, res) => {
   try {
     const sections = [
@@ -1935,14 +2040,72 @@ router.post('/availability-search', async (req, res) => {
       .order('availability_date')
       .order('time_slot');
 
-    const { data: availRows, error: availErr } = await availQuery;
-    if (availErr) return res.status(500).json({ error: availErr.message });
+    // The unified availability read: three sources, one answer.
+    //   business_availability — capacity model fed by the email parser + iCal
+    //   availability          — per-resource slot rows from the booking engine
+    //   booking_calendar      — entity-wide blocks (manual / iCal) that VETO dates
+    const [availRes, resourceRes, blockRes] = await Promise.all([
+      availQuery,
+      db.from('availability')
+        .select('entity_slug, date, start_time, end_time, status, spots_total, spots_remaining')
+        .gte('date', date_from)
+        .lte('date', dateTo)
+        .gt('spots_remaining', 0),
+      db.from('booking_calendar')
+        .select('entity_slug, date, end_date, kind, offering_id, status')
+        .eq('kind', 'block')
+        .is('offering_id', null)
+        .neq('status', 'cancelled')
+        .lte('date', dateTo),
+    ]);
+
+    if (availRes.error) return res.status(500).json({ error: availRes.error.message });
+    const availRows = availRes.data;
 
     // Group availability by entity_slug
     const availMap = {};
     (availRows || []).forEach(row => {
       if (!availMap[row.entity_slug]) availMap[row.entity_slug] = [];
       availMap[row.entity_slug].push(row);
+    });
+
+    // Merge resource-slot rows (booking-engine world) into the same map,
+    // normalized to the business_availability slot shape the response uses
+    (resourceRes.data || []).forEach(r => {
+      if (!availMap[r.entity_slug]) availMap[r.entity_slug] = [];
+      availMap[r.entity_slug].push({
+        entity_slug: r.entity_slug,
+        availability_date: r.date,
+        time_slot: r.start_time || null,
+        end_time: r.end_time || null,
+        status: r.status || 'available',
+        remaining_spots: r.spots_remaining,
+        total_capacity: r.spots_total,
+        booking_type: null,
+      });
+    });
+
+    // Entity-wide calendar blocks veto dates: expand each block row into the
+    // dates it covers inside the requested window
+    const blockedMap = {};
+    (blockRes.data || []).forEach(b => {
+      const start = b.date < date_from ? date_from : b.date;
+      const end = (b.end_date && b.end_date > b.date) ? (b.end_date > dateTo ? dateTo : b.end_date) : b.date;
+      if (end < date_from) return;
+      if (!blockedMap[b.entity_slug]) blockedMap[b.entity_slug] = new Set();
+      let d = new Date(start + 'T00:00:00Z');
+      const endD = new Date(end + 'T00:00:00Z');
+      while (d <= endD) {
+        blockedMap[b.entity_slug].add(d.toISOString().slice(0, 10));
+        d = new Date(d.getTime() + 86400000);
+      }
+    });
+    // Blocked dates drop out of each business's open slots
+    Object.keys(availMap).forEach(slug => {
+      const blocked = blockedMap[slug];
+      if (!blocked) return;
+      availMap[slug] = availMap[slug].filter(s => !blocked.has(s.availability_date));
+      if (!availMap[slug].length) delete availMap[slug];
     });
 
     // Slugs that have availability data
@@ -1958,6 +2121,11 @@ router.post('/availability-search', async (req, res) => {
       activity:     ['activity', 'tour', 'parasailing', 'dolphin_cruise', 'sunset_cruise'],
       all:          [],
     };
+    // Stays are an entity_type family, not subtypes — and their availability
+    // semantics differ: a condo must be open EVERY night of the range, while
+    // a charter/photographer just needs ANY open day in it.
+    const STAY_TYPES = ['hotel', 'condo', 'vacation-rental'];
+    const isStaySearch = type === 'stay';
 
     const subtypes = TYPE_FILTERS[type] || [];
 
@@ -1974,11 +2142,13 @@ router.post('/availability-search', async (req, res) => {
       .limit(limit);
 
     // Filter by type
-    if (type !== 'all' && subtypes.length > 0) {
+    if (isStaySearch) {
+      entityQuery = entityQuery.in('entity_type', STAY_TYPES);
+    } else if (type !== 'all' && subtypes.length > 0) {
       entityQuery = entityQuery.in('entity_subtype', subtypes);
     } else if (type === 'all') {
-      // For 'all' with availability — only bookable types
-      entityQuery = entityQuery.in('entity_type', ['activity', 'service']);
+      // For 'all' with availability — bookable types including stays
+      entityQuery = entityQuery.in('entity_type', ['activity', 'service', ...STAY_TYPES]);
     }
 
     // Optional keyword filter
@@ -1992,6 +2162,23 @@ router.post('/availability-search', async (req, res) => {
 
     const userLat = lat ? parseFloat(lat) : null;
     const userLng = lng ? parseFloat(lng) : null;
+
+    // Requested day list — drives per-vertical coverage semantics.
+    // coverage=all: open EVERY day in the range (stays default to this —
+    // a condo has to cover the whole trip). coverage=any: any open day
+    // qualifies (charters, photographers, activities default).
+    const requestedDates = [];
+    {
+      let d = new Date(date_from + 'T00:00:00Z');
+      const endD = new Date(dateTo + 'T00:00:00Z');
+      while (d <= endD && requestedDates.length < 120) {
+        requestedDates.push(d.toISOString().slice(0, 10));
+        d = new Date(d.getTime() + 86400000);
+      }
+    }
+    const coverage = (req.body.coverage === 'all' || req.body.coverage === 'any')
+      ? req.body.coverage
+      : (isStaySearch ? 'all' : 'any');
 
     // 3. Build results — merge entity data with availability slots
     const results = (entities || []).map(e => {
@@ -2007,20 +2194,27 @@ router.post('/availability-search', async (req, res) => {
       // Unique dates with availability
       const availDates = [...new Set(openSlots.map(s => s.availability_date))].sort();
 
+      // A stay that can't cover every requested night has no availability
+      // for THIS trip — demote it to contact-to-book instead of listing it
+      // as open.
+      const coversAll = requestedDates.every(day => availDates.includes(day));
+      const meetsCoverage = coverage === 'all' ? coversAll : availDates.length > 0;
+
       const distance_miles = (userLat && userLng && e.latitude && e.longitude)
         ? haversine(userLat, userLng, e.latitude, e.longitude)
         : null;
 
       return {
         ...e,
-        has_availability: hasAvailability,
+        has_availability: hasAvailability && meetsCoverage,
+        covers_all_days: coversAll,
         available_dates: availDates,
         slots: openSlots,
         lowest_remaining: lowestRemaining,
         distance_miles,
         // Availability confidence for sorting:
-        // 0 = no data, 1 = has entity but no slots, 2 = has slots with data
-        _avail_rank: hasAvailability ? 2 : (e.booking_url ? 1 : 0),
+        // 0 = no data, 1 = has entity but no slots, 2 = has slots meeting coverage
+        _avail_rank: (hasAvailability && meetsCoverage) ? 2 : (e.booking_url ? 1 : 0),
       };
     });
 

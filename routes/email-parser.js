@@ -397,12 +397,16 @@ const EXTRACTORS = [
       const timeM  = text.match(/(?:Time)[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
       const guestM = text.match(/(?:Party Size|Guests?|Diners?)[:\s]+(\d+)/i);
       const confM  = text.match(/(?:Confirmation|Reservation)\s*#?:?\s*([A-Z0-9]+)/i);
+      // Restaurant-side notifications name the diner — that's the customer
+      // relationship the business gets to keep
+      const nameM  = text.match(/(?:Guest|Diner|Name|Reservation for)[: \t]+([A-Z][A-Za-z'’.-]+(?:[ \t]+[A-Z][A-Za-z'’.-]+){1,2})/);
       return {
         platform: 'opentable',
         booking_type: 'restaurant',
         event_date: dateM ? parseDate(dateM[1]) : null,
         event_time: timeM ? parseTime(timeM[1]) : null,
         party_size: guestM ? parseInt(guestM[1]) : null,
+        customer_name: nameM ? nameM[1] : null,
         activity_name: 'Restaurant Reservation',
         confirmation_no: confM ? confM[1] : null,
         status: /cancel/i.test(subject) ? 'cancelled' : 'confirmed',
@@ -421,12 +425,14 @@ const EXTRACTORS = [
       const timeM  = text.match(/(?:Time)[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
       const guestM = text.match(/(?:Party|Guests?)[:\s]+(\d+)/i);
       const confM  = text.match(/(?:Confirmation|Resy|Ref)\s*#?:?\s*([A-Z0-9]+)/i);
+      const nameM  = text.match(/(?:Guest|Diner|Name|Reservation for)[: \t]+([A-Z][A-Za-z'’.-]+(?:[ \t]+[A-Z][A-Za-z'’.-]+){1,2})/);
       return {
         platform: 'resy',
         booking_type: 'restaurant',
         event_date: dateM ? parseDate(dateM[1]) : null,
         event_time: timeM ? parseTime(timeM[1]) : null,
         party_size: guestM ? parseInt(guestM[1]) : null,
+        customer_name: nameM ? nameM[1] : null,
         activity_name: 'Restaurant Reservation',
         confirmation_no: confM ? confM[1] : null,
         status: /cancel/i.test(subject) ? 'cancelled' : 'confirmed',

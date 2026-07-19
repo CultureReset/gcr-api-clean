@@ -325,6 +325,48 @@ router.post('/login', async (req, res) => {
 // ============================================
 // POST /api/auth/logout — Invalidate session
 // ============================================
+// ============================================
+// POST /api/auth/oauth-sync — exchange a Supabase Auth session (Google OAuth,
+// magic link) for the CyberCheck user + business + JWT. Replaces the browser
+// querying the users/businesses tables directly with the anon key — the
+// server verifies the Supabase access token and does the lookups itself.
+// Header: Authorization: Bearer <supabase access_token>
+// ============================================
+router.post('/oauth-sync', async (req, res) => {
+    try {
+        const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
+        if (!token) return res.status(401).json({ error: 'Supabase access token required' });
+
+        const { data: userData, error: verifyErr } = await supabase.auth.getUser(token);
+        if (verifyErr || !userData?.user) return res.status(401).json({ error: 'Invalid or expired session' });
+
+        const authId = userData.user.id;
+        const email = userData.user.email;
+
+        let { data: user } = await supabase.from('users')
+            .select('id, site_id, name, role, email').eq('auth_id', authId).maybeSingle();
+
+        if (!user && email) {
+            ({ data: user } = await supabase.from('users')
+                .select('id, site_id, name, role, email').eq('email', email).maybeSingle());
+            if (user) await supabase.from('users').update({ auth_id: authId }).eq('id', user.id);
+        }
+        if (!user) return res.status(404).json({ error: 'No CyberCheck account for this login' });
+
+        const { data: business } = await supabase.from('businesses')
+            .select('*').eq('site_id', user.site_id).maybeSingle();
+
+        const ccToken = jwt.sign(
+            { userId: user.id, siteId: user.site_id, role: user.role || 'owner' },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+        res.json({ token: ccToken, user, business: business || null });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 router.post('/logout', (req, res) => {
     res.json({ success: true });
 });
