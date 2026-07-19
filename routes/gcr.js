@@ -50,7 +50,7 @@ function normalizeImageUrl(url) {
 
 // Cache-control for all GETs
 router.use((req, res, next) => {
-  if (req.method === 'GET') res.set('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+  if (req.method === 'GET') res.set('Cache-Control', 'max-age=300, s-maxage=300, stale-while-revalidate=60');
   next();
 });
 
@@ -620,7 +620,7 @@ router.get('/entities', async (req, res) => {
       results.forEach(row => { delete row._score; });
     }
 
-    res.set('Cache-Control', 'public, s-maxage=180, stale-while-revalidate=900');
+    res.set('Cache-Control', 'public, max-age=180, s-maxage=180, stale-while-revalidate=900');
     res.json({ entities: results, total: results.length, offset, limit });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -754,7 +754,7 @@ router.get('/entities/paginated', async (req, res) => {
 
     const page = scored.slice(offset, offset + limit);
 
-    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=300');
     res.json({ entities: page, total, offset, limit, hasMore: offset + limit < total });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -893,7 +893,7 @@ router.get('/page-rails/:page', async (req, res) => {
       })
     );
 
-    res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=300');
     res.json({ rails: resolved.filter(r => r.items.length > 0) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -941,7 +941,7 @@ router.get('/entity/:slug', async (req, res) => {
     const entity = await buildFullEntity(req.params.slug);
     if (!entity) return res.status(404).json({ error: 'Not found' });
     // Cache at Vercel edge for 2 min, allow stale for 10 min while revalidating
-    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');
+    res.set('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=600');
     res.json(entity);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1175,7 +1175,7 @@ router.get('/happy-hours', async (req, res) => {
       };
     });
 
-    res.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=600');
     res.json({ happyHours: results, total: results.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1482,7 +1482,7 @@ router.get('/entity/:slug/availability-month', async (req, res) => {
       }
     });
 
-    res.set('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+    res.set('Cache-Control', 'max-age=300, s-maxage=300, stale-while-revalidate=60');
     res.json({ slug, month, days: Object.values(days).sort((a, b) => a.date < b.date ? -1 : 1) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1510,7 +1510,7 @@ router.get('/taxonomy', async (req, res) => {
       }
     });
 
-    res.set('Cache-Control', 's-maxage=3600, stale-while-revalidate=600');
+    res.set('Cache-Control', 'max-age=3600, s-maxage=3600, stale-while-revalidate=600');
     res.json({
       map,
       sections: Object.keys(sectionCounts).map(s => ({ section: s, entity_count: sectionCounts[s] })),
@@ -1763,7 +1763,7 @@ router.get('/stay-units', async (req, res) => {
       }
     }
 
-    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+    res.set('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300');
     res.json({ units, summary, total_units: units.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1985,7 +1985,7 @@ router.get('/home-feed', async (req, res) => {
       .order('post_date', { ascending: false })
       .limit(30);
 
-    res.set('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=300');
+    res.set('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300');
     res.json({
       events:           eventsRes.data   || [],
       specials:         specialsRes.data || [],
