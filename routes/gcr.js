@@ -1141,27 +1141,36 @@ router.get('/specials', async (req, res) => {
   }
 });
 
+// ─── Shared happy-hour entity resolver ─────────────────────────────────────
+// Single source of truth for "does this business have a happy hour" so the
+// home page badge count and the /happy-hours listing can never drift apart --
+// they used to check different fields (hh_start/hh_end vs. hh_days) and
+// disagreed on the total. A business counts if it has a summary flag
+// (hh_days), a raw time window (hh_start/hh_end), or real content in
+// happy_hour_sections -- any one signal is enough.
+async function getHappyHourEntities(db, cols) {
+  const [entitiesRes, hhEntitySlugsRes] = await Promise.all([
+    db.from('entity').select(cols).eq('is_active', true).order('name'),
+    db.from('happy_hour_sections').select('entity_slug'),
+  ]);
+  if (entitiesRes.error) throw entitiesRes.error;
+
+  const hhContentSlugs = new Set((hhEntitySlugsRes.data || []).map(r => r.entity_slug));
+  return (entitiesRes.data || []).filter(e =>
+    e.hh_days != null ||
+    (e.hh_start != null && e.hh_end != null) ||
+    hhContentSlugs.has(e.slug)
+  );
+}
+
 // ─── GET /api/gcr/happy-hours ─────────────────────────────────────────────────
 router.get('/happy-hours', async (req, res) => {
   try {
-    // Entities with a summary hh_days flag, OR real happy_hour_sections content --
-    // hh_days alone missed every business whose happy hour was entered as real
-    // menu sections/items but never got the summary field filled in.
-    const [entitiesRes, hhEntitySlugsRes] = await Promise.all([
-      db.from('entity')
-        .select(`
-          id, slug, name, icon, hero_image_url, entity_subtype, city,
-          address_line_1, phone, directions_url, call_url, booking_url,
-          reservation_url, rating, hh_days, hh_start, hh_end, hh_description
-        `)
-        .eq('is_active', true)
-        .order('name'),
-      db.from('happy_hour_sections').select('entity_slug'),
-    ]);
-    if (entitiesRes.error) return res.status(500).json({ error: entitiesRes.error.message });
-
-    const hhContentSlugs = new Set((hhEntitySlugsRes.data || []).map(r => r.entity_slug));
-    const entities = (entitiesRes.data || []).filter(e => e.hh_days != null || hhContentSlugs.has(e.slug));
+    const entities = await getHappyHourEntities(db, `
+      id, slug, name, icon, hero_image_url, entity_subtype, city,
+      address_line_1, phone, directions_url, call_url, booking_url,
+      reservation_url, rating, hh_days, hh_start, hh_end, hh_description
+    `);
 
     const slugs = (entities || []).map(e => e.slug);
 
@@ -1961,13 +1970,10 @@ router.get('/home-feed', async (req, res) => {
         .eq('is_active', true)
         .limit(20),
 
-      // 🍺 Happy hours active RIGHT NOW
-      db.from('entity')
-        .select(`id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, rating, city`)
-        .eq('is_active', true)
-        .not('hh_start', 'is', null)
-        .not('hh_end', 'is', null)
-        .limit(50),
+      // 🍺 Happy hours -- same resolver as /happy-hours so the home page
+      // badge count always matches what the listing page actually shows.
+      getHappyHourEntities(db, 'id, slug, name, hero_image_url, hh_days, hh_start, hh_end, hh_description, rating, city')
+        .then(data => ({ data })),
 
       // 🎸 Live music events today
       db.from('entity_events')
