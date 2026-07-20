@@ -1203,7 +1203,8 @@ router.post('/search', async (req, res) => {
     // entity_tags + entity_amenities are included so amenity/feature queries ("hot tub",
     // "sauna", "lazy river", "waterfront", "live music") resolve against structured tag data,
     // not just free-text name/description.
-    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections] = await Promise.all([
+    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections,
+      byPricing, byCharterTrips, byCharterFish, byFishSpecies, byRequirements, byWhatsIncluded, byRoomTypes, byServiceMenu, byServicePackages, byProducts, byMeetingPoints, byActivityOptions, byHighlights, byGoodFor, byKnownFor, byMenuItemDetails] = await Promise.all([
       db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
       db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
       db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
@@ -1223,11 +1224,34 @@ router.post('/search', async (req, res) => {
       db.from('menu_sections').select('entity_slug').or(orFilter('section_name')),
       db.from('drink_sections').select('entity_slug').or(orFilter('section_name')),
       db.from('happy_hour_sections').select('entity_slug').or(orFilter('section_name')),
+      // Activity / charter / rental / service / shopping content — everything a
+      // profile can display is now searchable so the bar and the AI concierge can
+      // answer "fishing charter", "parasailing", "red snapper", "sunset cruise",
+      // "2-bedroom condo", "massage", etc. against structured data, not just names.
+      db.from('pricing_items').select('entity_slug').or(orFilter('item_name', 'description', 'tier_name')),
+      db.from('charter_trips').select('entity_slug').eq('is_active', true).or(orFilter('trip_name', 'description', 'best_for', 'trip_type', 'boat_name')),
+      db.from('charter_trip_fish_species').select('entity_slug').or(orFilter('species')),
+      db.from('fish_species').select('entity_slug').or(orFilter('species')),
+      db.from('requirements').select('entity_slug').or(orFilter('requirement_text', 'requirement_name')),
+      db.from('whats_included').select('entity_slug').or(orFilter('item_name', 'included_item')),
+      db.from('room_types').select('entity_slug').or(orFilter('name', 'description', 'view')),
+      db.from('service_menu').select('entity_slug').or(orFilter('name', 'description')),
+      db.from('service_packages').select('entity_slug').or(orFilter('name', 'description')),
+      db.from('products').select('entity_slug').or(orFilter('name', 'description')),
+      db.from('meeting_points').select('entity_slug').or(orFilter('name', 'meeting_point_name', 'address')),
+      db.from('activity_options').select('entity_slug').or(orFilter('name', 'description', 'vessel_vehicle')),
+      db.from('entity_highlights').select('entity_slug').or(orFilter('highlight')),
+      db.from('entity_good_for').select('entity_slug').or(orFilter('audience')),
+      db.from('entity_known_for').select('entity_slug').or(orFilter('item')),
+      db.from('menu_item_details').select('entity_slug').or(orFilter('marketing_description')),
     ]);
 
     (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
     [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings,
-     byMenuSections, byDrinkSections, byHHSections].forEach(res =>
+     byMenuSections, byDrinkSections, byHHSections,
+     byPricing, byCharterTrips, byCharterFish, byFishSpecies, byRequirements, byWhatsIncluded, byRoomTypes,
+     byServiceMenu, byServicePackages, byProducts, byMeetingPoints, byActivityOptions, byHighlights,
+     byGoodFor, byKnownFor, byMenuItemDetails].forEach(res =>
       (res.data || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug))
     );
     // Section items reference their entity via section_id → entity_sections.entity_slug
