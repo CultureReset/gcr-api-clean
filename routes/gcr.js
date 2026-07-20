@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const { fetchOffers, fetchTypedHours } = require('../lib/offers');
 
 // ─── Central-time helper ────────────────────────────────────────────────────
 // Vercel serverless functions run in UTC. now.toTimeString()/getDay() return
@@ -380,12 +381,26 @@ async function buildFullEntity(slug) {
 
   const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.url), alt_text: p.caption || null }));
 
+  // ── L2 offer model (entity_offer / _price / _section / _inclusion) ─────────
+  // Normalized replacement for menu_items, drink_items, happy_hour_items,
+  // offerings, charter_trips and bookable_resources. Fetched for every entity
+  // type — no per-industry gating.
+  const [l2, typedHours] = await Promise.all([
+    fetchOffers(db, slug),
+    fetchTypedHours(db, slug),
+  ]);
+
   return {
     ...entity,
     hero_image_url: normalizeImageUrl(entity.hero_image_url),
     // Flexible offerings (charters, rentals, tours, services) — universal
     sections: flexSections,
     offerings: offeringRows.map(o => ({ ...o, prices: offeringPrices.filter(p => p.offering_id === o.id) })),
+    // L2 — canonical offers. Prefer these over menu_sections/offerings/etc.
+    offer_sections: l2.offer_sections,
+    offers_unsectioned: l2.offers_unsectioned,
+    price_summary: l2.price_summary,
+    hours_by_type: typedHours,
     // Core
     hours: hours.data || [],
     secondary_hours: secondaryHours.data || [],
