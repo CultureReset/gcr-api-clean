@@ -1065,10 +1065,10 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         slugs.length ? gcrDb.from('drink_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
         slugs.length ? gcrDb.from('drink_items').select('section_id, name:item_name, description, price').limit(2000) : { data: [] },
         slugs.length ? gcrDb.from('entity_specials').select('entity_slug, title:special_name, description, discount_text, days, is_active').in('entity_slug', slugs).eq('is_active', true) : { data: [] },
-        slugs.length ? gcrDb.from('pricing_items').select('entity_id, item_name, price, description, capacity_min, capacity_max, duration_minutes').limit(2000) : { data: [] },
+        slugs.length ? gcrDb.from('pricing_items').select('entity_id, item_name, price, description, tier_name, price_from, price_to, price_label, duration, minimum_age').limit(2000) : { data: [] },
         slugs.length ? gcrDb.from('happy_hour_sections').select('id, entity_slug, name:section_name').in('entity_slug', slugs) : { data: [] },
         slugs.length ? gcrDb.from('happy_hour_items').select('section_id, name:item_name, description, price').limit(1000) : { data: [] },
-        slugs.length ? gcrDb.from('whats_included').select('entity_id, item').limit(2000) : { data: [] },
+        slugs.length ? gcrDb.from('whats_included').select('entity_id, item_name, included_item').limit(2000) : { data: [] },
         // Amenity/feature tags — the structured data behind queries like "condo with a hot
         // tub, sauna, and lazy river". Without these the concierge only sees boolean flags.
         slugs.length ? gcrDb.from('entity_tags').select('entity_slug, tag_name').in('entity_slug', slugs).eq('tag_category', 'amenity') : { data: [] },
@@ -1120,7 +1120,7 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
         const slug = entityIdMap[w.entity_id];
         if (!slug) return;
         if (!whatsIncludedBySlug[slug]) whatsIncludedBySlug[slug] = [];
-        whatsIncludedBySlug[slug].push(w.item);
+        whatsIncludedBySlug[slug].push(w.item_name || w.included_item);
     });
 
     const hhSecMap = {};
@@ -1207,14 +1207,19 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
             lines += `\n  Specials: ${specials.map(s => `${s.title}${s.discount_text ? ` (${s.discount_text})` : ''}${s.description ? ` — ${s.description.slice(0, 60)}` : ''}${s.days ? ` [${s.days}]` : ''}`).join(' | ')}`;
         }
 
-        // Pricing items (activities/tours) with capacity and duration
+        // Pricing items (activities/tours) — each atomic field rendered from its own column:
+        // item_name, tier_name, price / price_from–price_to / price_label, duration, minimum_age.
         const pricing = pricingBySlug[e.slug] || [];
         if (pricing.length) {
             lines += `\n  Pricing: ${pricing.slice(0, 8).map(p => {
-                let s = `${p.item_name} $${p.price}`;
-                if (p.capacity_min && p.capacity_max) s += ` (${p.capacity_min}–${p.capacity_max} people)`;
-                else if (p.capacity_max) s += ` (up to ${p.capacity_max} people)`;
-                if (p.duration_minutes) s += ` · ${p.duration_minutes}min`;
+                const amount = p.price != null ? `$${p.price}`
+                    : (p.price_from != null
+                        ? (p.price_to != null ? `$${p.price_from}–$${p.price_to}` : `$${p.price_from}`)
+                        : (p.price_label || ''));
+                let s = p.tier_name ? `${p.item_name} (${p.tier_name})` : `${p.item_name}`;
+                if (amount) s += ` ${amount}`;
+                if (p.duration) s += ` · ${p.duration}`;
+                if (p.minimum_age) s += ` · ${p.minimum_age}+`;
                 if (p.description) s += ` — ${p.description.slice(0, 50)}`;
                 return s;
             }).join(' | ')}`;
