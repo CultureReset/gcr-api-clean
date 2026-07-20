@@ -1187,6 +1187,84 @@ router.get('/happy-hours', async (req, res) => {
 });
 
 // ─── POST /api/gcr/search ─────────────────────────────────────────────────────
+// Deep multi-table entity search. Returns the set of entity slugs whose name,
+// description, menu / drink / happy-hour items, specials, events, tags, amenities,
+// FAQs, offerings, section content, activity / charter / pricing / rental / service /
+// shopping data, or structured highlights match the term — then a pg_trgm fuzzy
+// name fallback. Shared by BOTH the /search endpoint and the AI concierge's
+// search_businesses tool so the chatbot searches exactly as deeply as the search
+// bar, with no drift. (Exported below as router.searchEntitySlugs.)
+async function searchEntitySlugs(rawTerm) {
+  const term = (rawTerm || '').toLowerCase().trim();
+  if (!term) return { slugs: [], fuzzy: false };
+  const keywords = term.split(/\s+/).filter(k => k.length >= 2);
+  if (!keywords.length) return { slugs: [], fuzzy: false };
+  const orFilter = (...fields) =>
+    keywords.flatMap(k => fields.map(f => `${f}.ilike.%${k}%`)).join(',');
+  const matchedSlugs = new Set();
+
+  const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections,
+    byPricing, byCharterTrips, byCharterFish, byFishSpecies, byRequirements, byWhatsIncluded, byRoomTypes, byServiceMenu, byServicePackages, byProducts, byMeetingPoints, byActivityOptions, byHighlights, byGoodFor, byKnownFor, byMenuItemDetails] = await Promise.all([
+    db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
+    db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
+    db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
+    db.from('happy_hour_items').select('entity_slug').or(orFilter('item_name', 'description')),
+    db.from('entity_specials').select('entity_slug').eq('is_active', true).or(orFilter('special_name', 'description', 'discount_text')),
+    db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'artist_name')),
+    db.from('entity_tags').select('entity_slug').or(orFilter('tag_name')),
+    db.from('entity_amenities').select('entity_slug').or(orFilter('amenity')),
+    db.from('faqs').select('entity_slug').or(orFilter('question', 'answer')),
+    db.from('offerings').select('entity_slug').eq('active', true).or(orFilter('name', 'description', 'section')),
+    db.from('entity_section_items').select('section_id').or(orFilter('item_name', 'description')),
+    db.from('menu_sections').select('entity_slug').or(orFilter('section_name')),
+    db.from('drink_sections').select('entity_slug').or(orFilter('section_name')),
+    db.from('happy_hour_sections').select('entity_slug').or(orFilter('section_name')),
+    db.from('pricing_items').select('entity_slug').or(orFilter('item_name', 'description', 'tier_name')),
+    db.from('charter_trips').select('entity_slug').eq('is_active', true).or(orFilter('trip_name', 'description', 'best_for', 'trip_type', 'boat_name')),
+    db.from('charter_trip_fish_species').select('entity_slug').or(orFilter('species')),
+    db.from('fish_species').select('entity_slug').or(orFilter('species')),
+    db.from('requirements').select('entity_slug').or(orFilter('requirement_text', 'requirement_name')),
+    db.from('whats_included').select('entity_slug').or(orFilter('item_name', 'included_item')),
+    db.from('room_types').select('entity_slug').or(orFilter('name', 'description', 'view')),
+    db.from('service_menu').select('entity_slug').or(orFilter('name', 'description')),
+    db.from('service_packages').select('entity_slug').or(orFilter('name', 'description')),
+    db.from('products').select('entity_slug').or(orFilter('name', 'description')),
+    db.from('meeting_points').select('entity_slug').or(orFilter('name', 'meeting_point_name', 'address')),
+    db.from('activity_options').select('entity_slug').or(orFilter('name', 'description', 'vessel_vehicle')),
+    db.from('entity_highlights').select('entity_slug').or(orFilter('highlight')),
+    db.from('entity_good_for').select('entity_slug').or(orFilter('audience')),
+    db.from('entity_known_for').select('entity_slug').or(orFilter('item')),
+    db.from('menu_item_details').select('entity_slug').or(orFilter('marketing_description')),
+  ]);
+
+  (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
+  [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings,
+   byMenuSections, byDrinkSections, byHHSections,
+   byPricing, byCharterTrips, byCharterFish, byFishSpecies, byRequirements, byWhatsIncluded, byRoomTypes,
+   byServiceMenu, byServicePackages, byProducts, byMeetingPoints, byActivityOptions, byHighlights,
+   byGoodFor, byKnownFor, byMenuItemDetails].forEach(r =>
+    (r.data || []).forEach(row => row.entity_slug && matchedSlugs.add(row.entity_slug))
+  );
+  // Section items reference their entity via section_id → entity_sections.entity_slug
+  if ((bySectionItems.data || []).length) {
+    const secIds = [...new Set(bySectionItems.data.map(r => r.section_id).filter(Boolean))];
+    if (secIds.length) {
+      const { data: secOwners } = await db.from('entity_sections').select('entity_slug').in('id', secIds);
+      (secOwners || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug));
+    }
+  }
+
+  // No exact substring hit anywhere — fall back to pg_trgm fuzzy name match so a
+  // typo ("villagio grill") still resolves; caller can flag these as "did you mean".
+  let fuzzy = false;
+  if (!matchedSlugs.size) {
+    const { data: fuzzyRows } = await db.rpc('fuzzy_entity_search', { search_term: term, match_limit: 20 });
+    (fuzzyRows || []).forEach(r => matchedSlugs.add(r.slug));
+    if (matchedSlugs.size) fuzzy = true;
+  }
+  return { slugs: [...matchedSlugs], fuzzy };
+}
+
 router.post('/search', async (req, res) => {
   try {
     const { query: q, city, limit = 50, lat, lng, radius } = req.body;
@@ -1194,87 +1272,13 @@ router.post('/search', async (req, res) => {
 
     const term = q.toLowerCase().trim();
     const keywords = term.split(/\s+/).filter(k => k.length >= 2);
-    const matchedSlugs = new Set();
-
     const orFilter = (...fields) =>
       keywords.flatMap(k => fields.map(f => `${f}.ilike.%${k}%`)).join(',');
 
-    // Search all tables in parallel — events only matched if query hits event/artist name directly.
-    // entity_tags + entity_amenities are included so amenity/feature queries ("hot tub",
-    // "sauna", "lazy river", "waterfront", "live music") resolve against structured tag data,
-    // not just free-text name/description.
-    const [byEntity, byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings, bySectionItems, byMenuSections, byDrinkSections, byHHSections,
-      byPricing, byCharterTrips, byCharterFish, byFishSpecies, byRequirements, byWhatsIncluded, byRoomTypes, byServiceMenu, byServicePackages, byProducts, byMeetingPoints, byActivityOptions, byHighlights, byGoodFor, byKnownFor, byMenuItemDetails] = await Promise.all([
-      db.from('entity').select('slug').eq('is_active', true).or(orFilter('name', 'description', 'subtitle', 'city', 'entity_subtype')),
-      db.from('menu_items').select('entity_slug').or(orFilter('item_name', 'description')),
-      db.from('drink_items').select('entity_slug').or(orFilter('item_name', 'description')),
-      db.from('happy_hour_items').select('entity_slug').or(orFilter('item_name', 'description')),
-      db.from('entity_specials').select('entity_slug').eq('is_active', true).or(orFilter('special_name', 'description', 'discount_text')),
-      db.from('entity_events').select('entity_slug').eq('is_active', true).or(orFilter('event_name', 'artist_name')),
-      db.from('entity_tags').select('entity_slug').or(orFilter('tag_name')),
-      db.from('entity_amenities').select('entity_slug').or(orFilter('amenity')),
-      // FAQs — the Q&A backbone ("is there parking?", "do you have gluten-free?").
-      db.from('faqs').select('entity_slug').or(orFilter('question', 'answer')),
-      // Offerings + flexible section items — charters, tours, rental packages, service
-      // menus. These are displayed on profiles but were previously unsearchable.
-      db.from('offerings').select('entity_slug').eq('active', true).or(orFilter('name', 'description', 'section')),
-      db.from('entity_section_items').select('section_id').or(orFilter('item_name', 'description')),
-      // Menu/drink/happy-hour SECTION names — dietary and category labels often live at the
-      // section level ("Gluten Free Menu", "Vegan & Keto", "Vegetarian"), not on each item.
-      db.from('menu_sections').select('entity_slug').or(orFilter('section_name')),
-      db.from('drink_sections').select('entity_slug').or(orFilter('section_name')),
-      db.from('happy_hour_sections').select('entity_slug').or(orFilter('section_name')),
-      // Activity / charter / rental / service / shopping content — everything a
-      // profile can display is now searchable so the bar and the AI concierge can
-      // answer "fishing charter", "parasailing", "red snapper", "sunset cruise",
-      // "2-bedroom condo", "massage", etc. against structured data, not just names.
-      db.from('pricing_items').select('entity_slug').or(orFilter('item_name', 'description', 'tier_name')),
-      db.from('charter_trips').select('entity_slug').eq('is_active', true).or(orFilter('trip_name', 'description', 'best_for', 'trip_type', 'boat_name')),
-      db.from('charter_trip_fish_species').select('entity_slug').or(orFilter('species')),
-      db.from('fish_species').select('entity_slug').or(orFilter('species')),
-      db.from('requirements').select('entity_slug').or(orFilter('requirement_text', 'requirement_name')),
-      db.from('whats_included').select('entity_slug').or(orFilter('item_name', 'included_item')),
-      db.from('room_types').select('entity_slug').or(orFilter('name', 'description', 'view')),
-      db.from('service_menu').select('entity_slug').or(orFilter('name', 'description')),
-      db.from('service_packages').select('entity_slug').or(orFilter('name', 'description')),
-      db.from('products').select('entity_slug').or(orFilter('name', 'description')),
-      db.from('meeting_points').select('entity_slug').or(orFilter('name', 'meeting_point_name', 'address')),
-      db.from('activity_options').select('entity_slug').or(orFilter('name', 'description', 'vessel_vehicle')),
-      db.from('entity_highlights').select('entity_slug').or(orFilter('highlight')),
-      db.from('entity_good_for').select('entity_slug').or(orFilter('audience')),
-      db.from('entity_known_for').select('entity_slug').or(orFilter('item')),
-      db.from('menu_item_details').select('entity_slug').or(orFilter('marketing_description')),
-    ]);
-
-    (byEntity.data || []).forEach(r => matchedSlugs.add(r.slug));
-    [byMenuItems, byDrinkItems, byHHItems, bySpecials, byEvents, byTags, byAmenities, byFaqs, byOfferings,
-     byMenuSections, byDrinkSections, byHHSections,
-     byPricing, byCharterTrips, byCharterFish, byFishSpecies, byRequirements, byWhatsIncluded, byRoomTypes,
-     byServiceMenu, byServicePackages, byProducts, byMeetingPoints, byActivityOptions, byHighlights,
-     byGoodFor, byKnownFor, byMenuItemDetails].forEach(res =>
-      (res.data || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug))
-    );
-    // Section items reference their entity via section_id → entity_sections.entity_slug
-    if ((bySectionItems.data || []).length) {
-      const secIds = [...new Set(bySectionItems.data.map(r => r.section_id).filter(Boolean))];
-      if (secIds.length) {
-        const { data: secOwners } = await db.from('entity_sections').select('entity_slug').in('id', secIds);
-        (secOwners || []).forEach(r => r.entity_slug && matchedSlugs.add(r.entity_slug));
-      }
-    }
-
-    // No exact substring hit anywhere — don't just come back empty on a typo or a
-    // slightly-off name ("villagio grill" for Villaggio Grille). Fall back to
-    // trigram similarity on the business name via the fuzzy_entity_search()
-    // Postgres function (pg_trgm) and mark these results as fuzzy so the UI can
-    // say "did you mean" instead of presenting them as exact hits.
-    let fuzzyMatch = false;
-    if (!matchedSlugs.size) {
-      const { data: fuzzyRows } = await db.rpc('fuzzy_entity_search', { search_term: term, match_limit: 20 });
-      (fuzzyRows || []).forEach(r => matchedSlugs.add(r.slug));
-      if (matchedSlugs.size) fuzzyMatch = true;
-      else return res.json({ query: q, results: [], total: 0 });
-    }
+    // Deep multi-table match (shared with the AI concierge) + fuzzy fallback.
+    const { slugs: _matchedList, fuzzy: fuzzyMatch } = await searchEntitySlugs(q);
+    const matchedSlugs = new Set(_matchedList);
+    if (!matchedSlugs.size) return res.json({ query: q, results: [], total: 0 });
 
     // Fetch full entity data for matches
     let entityQuery = db
@@ -2554,5 +2558,6 @@ router.get('/lodging-search', async (req, res) => {
 // tool) can reuse the same full-profile assembler that powers a business's
 // own page, instead of duplicating ~60 tables' worth of query logic.
 router.buildFullEntity = buildFullEntity;
+router.searchEntitySlugs = searchEntitySlugs;
 
 module.exports = router;

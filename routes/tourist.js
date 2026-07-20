@@ -1334,11 +1334,11 @@ HARD RULES:
     const tools = [
         {
             name: 'search_businesses',
-            description: 'Search ALL active Gulf Coast businesses (not just the top ~200 already listed in LIVE GULF COAST DATA) by name, type/subtype, or tag. Use this for "who has X" questions, or when a named business might not be in the pre-loaded list. Returns each match\'s parent hub (e.g. the marina it operates from) so you can answer "where does X depart from" directly.',
+            description: 'Search ALL active Gulf Coast businesses (not just the top ~200 in LIVE GULF COAST DATA) by name OR by any of their content — menu items and dishes, drinks, happy-hour items, specials, events, activities/charters/tours, fish species, pricing tiers, what\'s-included, room types, services, products, amenities, FAQs, and tags. Use this for ANY "who has X / which places do Y / where can I get Z" question (e.g. "who has crab legs", "red snapper fishing charter", "family-friendly", "2-bedroom condo", "live music tonight"). Returns each match\'s parent hub (e.g. the marina it operates from).',
             input_schema: {
                 type: 'object',
                 properties: {
-                    query: { type: 'string', description: 'Name substring to search for, e.g. "Black Flag"' },
+                    query: { type: 'string', description: 'Free-text search — matches business name AND all of their content (dishes, drinks, activities, fish species, amenities, etc.). E.g. "crab legs", "red snapper", "Black Flag", "sunset cruise".' },
                     entity_subtype: { type: 'string', description: 'Exact subtype to filter on, e.g. "dolphin_cruise", "kayak_rental", "fishing_charter", "marina"' },
                     entity_type: { type: 'string', description: 'Exact type to filter on, e.g. "activity", "restaurant", "service"' },
                     tag: { type: 'string', description: 'Substring match against this business\'s tags, e.g. "dolphin" or "kayak" — broader than entity_subtype since tags catch secondary offerings' },
@@ -1467,20 +1467,35 @@ HARD RULES:
         }
         if (name === 'search_businesses') {
             const limit = Math.min(parseInt(input.limit, 10) || 15, 30);
-            let matchSlugs = null;
+            const slugSets = [];
+            // Free-text query → the SAME deep multi-table search the GCR Unified search
+            // bar uses (name + menu items + drinks + activities + fish species + pricing +
+            // amenities + FAQs + …), so the concierge is exactly as capable as the bar.
+            if (input.query) {
+                const { searchEntitySlugs } = require('./gcr');
+                const { slugs } = await searchEntitySlugs(input.query);
+                if (!slugs.length) return { count: 0, results: [] };
+                slugSets.push(new Set(slugs));
+            }
             if (input.tag) {
-                const { data: tagRows, error: tagErr } = await gcrDb.from('entity_tags').select('entity_slug').ilike('tag_name', `%${input.tag}%`).limit(500);
+                const { data: tagRows, error: tagErr } = await gcrDb.from('entity_tags').select('entity_slug').ilike('tag_name', `%${input.tag}%`).limit(1000);
                 if (tagErr) return { error: tagErr.message };
-                matchSlugs = [...new Set((tagRows || []).map(r => r.entity_slug))];
-                if (!matchSlugs.length) return { count: 0, results: [] };
+                const tagSlugs = new Set((tagRows || []).map(r => r.entity_slug).filter(Boolean));
+                if (!tagSlugs.size) return { count: 0, results: [] };
+                slugSets.push(tagSlugs);
+            }
+            // Intersect the provided slug filters (query AND tag both narrow the set).
+            let filterSlugs = null;
+            if (slugSets.length) {
+                filterSlugs = [...slugSets.reduce((acc, s) => new Set([...acc].filter(x => s.has(x))))];
+                if (!filterSlugs.length) return { count: 0, results: [] };
             }
             let q = gcrDb.from('entity')
                 .select('name, slug, entity_type, entity_subtype, parent_entity_slug, city, rating, review_count, description, price_from, price_unit')
                 .eq('is_active', true);
-            if (input.query) q = q.ilike('name', `%${input.query}%`);
             if (input.entity_subtype) q = q.eq('entity_subtype', input.entity_subtype);
             if (input.entity_type) q = q.eq('entity_type', input.entity_type);
-            if (matchSlugs) q = q.in('slug', matchSlugs);
+            if (filterSlugs) q = q.in('slug', filterSlugs);
             q = q.order('rating', { ascending: false, nullsFirst: false }).limit(limit);
             const { data, error } = await q;
             if (error) return { error: error.message };
