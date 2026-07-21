@@ -132,6 +132,7 @@ mount('/api/deals', () => require('./routes/deals'));
 mount('/api/ocr', () => require('./routes/ocr'));
 mount('/api/verify-dns', () => require('./routes/verify-dns'));
 mount('/api/gcr/deep-crawl', () => require('./routes/gcr/deep-crawl'));
+mount('/api/gcr/admin', () => require('./routes/rehost-photos'));
 
 app.use((err, req, res, next) => {
   console.error(err);
