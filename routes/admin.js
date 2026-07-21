@@ -2248,6 +2248,7 @@ router.get('/trip-swipe-button', async (req, res) => {
 // ─── Business claim leads ─────────────────────────────────────────────────────
 router.get('/gcr/claims', authRequired, async (req, res) => {
   try {
+    const db = getDb();
     const { data, error } = await db.from('business_claims').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     res.json(data || []);
@@ -2258,6 +2259,7 @@ router.get('/gcr/claims', authRequired, async (req, res) => {
 
 router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
   try {
+    const db = getDb();
     const { status, notes } = req.body || {};
     const updates = { updated_at: new Date().toISOString() };
     if (status) updates.status = status;

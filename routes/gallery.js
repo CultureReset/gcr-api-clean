@@ -75,13 +75,13 @@ router.post('/:slug', async (req, res) => {
     }
 
     const { data, error } = await db
-      .from('entity_gallery')
+      .from('entity_photos')
       .insert({
         entity_slug: req.params.slug,
-        photo_url: photo_url.trim(),
+        url: photo_url.trim(),
         caption: caption?.trim() || null,
-        category: category || 'general',
-        is_featured: is_featured || false,
+        photo_type: category || null,
+        is_cover: is_featured || false,
         sort_order: sort_order || 0
       })
       .select()
@@ -101,11 +101,11 @@ router.put('/:slug/:id', async (req, res) => {
     const { caption, category, is_featured, sort_order } = req.body;
 
     const { data, error } = await db
-      .from('entity_gallery')
+      .from('entity_photos')
       .update({
         ...(caption !== undefined && { caption: caption?.trim() || null }),
-        ...(category && { category }),
-        ...(is_featured !== undefined && { is_featured }),
+        ...(category && { photo_type: category }),
+        ...(is_featured !== undefined && { is_cover: is_featured }),
         ...(sort_order !== undefined && { sort_order })
       })
       .eq('id', req.params.id)
@@ -125,7 +125,7 @@ router.put('/:slug/:id', async (req, res) => {
 router.delete('/:slug/:id', async (req, res) => {
   try {
     const { error } = await db
-      .from('entity_gallery')
+      .from('entity_photos')
       .delete()
       .eq('id', req.params.id)
       .eq('entity_slug', req.params.slug);

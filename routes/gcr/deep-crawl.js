@@ -337,7 +337,9 @@ router.get('/jobs', async (req, res) => {
  *  4. Mark as 'writing', upsert to entity + related tables
  *  5. Mark as 'done'
  */
-router.post('/run', async (req, res) => {
+// Vercel Cron always fires GET, not POST — this must handle both so the
+// scheduled job in vercel.json ("*/30 * * * *") actually runs instead of 404ing.
+const runDeepCrawl = async (req, res) => {
   const secret = req.headers['x-cron-secret'] || req.body?.secret
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' })
@@ -477,7 +479,10 @@ router.post('/run', async (req, res) => {
     results,
     timestamp: new Date().toISOString(),
   })
-})
+}
+
+router.get('/run', runDeepCrawl)
+router.post('/run', runDeepCrawl)
 
 /**
  * POST /api/gcr/deep-crawl/retry-failed

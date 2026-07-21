@@ -95,7 +95,7 @@ function decrypt(stored) {
   try {
     const [ivH, tagH, encH] = stored.split(':');
     const k   = Buffer.from(key, 'hex');
-    const d   = crypto.createDecipheriv('aes-256-gcm', Buffer.from(ivH,'hex'), Buffer.from(ivH,'hex'));
+    const d   = crypto.createDecipheriv('aes-256-gcm', k, Buffer.from(ivH,'hex'));
     d.setAuthTag(Buffer.from(tagH,'hex'));
     const dec = Buffer.concat([d.update(Buffer.from(encH,'hex')), d.final()]);
     return dec.toString('utf8');

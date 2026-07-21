@@ -27,8 +27,8 @@ const { createClient } = require('@supabase/supabase-js')
 const { callAI } = require('../utils/ai-provider')
 
 const db = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL,
+  process.env.GCR_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 )
 
 // ── GET /api/meta-webhook — Meta verification handshake ───────────────────────
