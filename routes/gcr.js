@@ -27,6 +27,8 @@ const db = createClient(
   process.env.GCR_SUPABASE_SERVICE_KEY
 );
 
+const { getContractForIndustry, getIndustryFacts } = require('../lib/industry-contract');
+
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 3958.8;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -157,12 +159,15 @@ async function buildFullEntity(slug) {
   // Universal offerings (offerings + offering_prices) — trips, rentals, tours,
   // storage tiers, ride tickets. Merged into the same sections shape the page
   // already renders, grouped by offerings.section (fallback: kind).
-  const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes, availTodayRes] = await Promise.all([
+  const [offeringsRes, offeringPricesRes, amenityRowsRes, marinaRes, availTodayRes, industryFacts] = await Promise.all([
     db.from('offerings').select('id,section,name,description,unit,kind,price_from,capacity,duration_minutes,event_date,fee_note,sort_order,image_url').eq('entity_slug', slug).eq('active', true).order('sort_order'),
     db.from('offering_prices').select('id,offering_id,label,price,age_min,age_max,season,duration_label,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_amenities').select('id,amenity,category,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('marina_details').select('*').eq('entity_slug', slug).maybeSingle(),
     db.from('business_availability').select('total_capacity,remaining_spots,status,source_platform,last_updated').eq('entity_slug', slug).eq('availability_date', new Date().toISOString().split('T')[0]).eq('visible_on_profile', true).maybeSingle(),
+    // Industry facts: the entity's direct industry table (industry_<code>),
+    // resolved through the industry_table_contract router
+    getIndustryFacts(db, entity),
   ]);
   const offeringRows = offeringsRes.data || [];
   const offeringPrices = offeringPricesRes.data || [];
@@ -383,6 +388,8 @@ async function buildFullEntity(slug) {
   return {
     ...entity,
     hero_image_url: normalizeImageUrl(entity.hero_image_url),
+    // Structured per-industry facts (industry_<code> row for this business)
+    industry_facts: industryFacts || null,
     // Flexible offerings (charters, rentals, tours, services) — universal
     sections: flexSections,
     offerings: offeringRows.map(o => ({ ...o, prices: offeringPrices.filter(p => p.offering_id === o.id) })),
@@ -938,6 +945,21 @@ router.post('/ads/:id/click', async (req, res) => {
   const { data } = await db.from('ads').select('clicks').eq('id', req.params.id).single();
   if (data) await db.from('ads').update({ clicks: (data.clicks || 0) + 1 }).eq('id', req.params.id);
   res.json({ success: true });
+});
+
+// ─── GET /api/gcr/industry-contract/:code ────────────────────────────────────
+// The table contract for one industry: universal spine rows ('*') plus the
+// tables designated for that type of business, in read order. This is what
+// the AI router and admin tooling consult instead of hardcoded table lists.
+router.get('/industry-contract/:code', async (req, res) => {
+  try {
+    const tables = await getContractForIndustry(db, req.params.code);
+    if (!tables.length) return res.status(404).json({ error: 'Unknown industry code' });
+    res.set('Cache-Control', 'public, max-age=300, s-maxage=300');
+    res.json({ industry_code: req.params.code, tables });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/entity/:slug', async (req, res) => {
