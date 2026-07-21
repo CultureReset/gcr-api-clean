@@ -288,7 +288,7 @@ async function buildFullEntity(slug) {
 
   if (isFood || modules.has('menu') || dataFood) {
     conditionalPromises.push(
-      db.from('menu_sections').select('id,section_name,sort_order,time_range,available_days').eq('entity_slug', slug).order('sort_order'),
+      db.from('menu_sections').select('id,section_name,section_description,sort_order,time_range,available_days,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
       db.from('drink_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
       db.from('happy_hour_sections').select('id,section_name,sort_order,days_of_week,start_time,end_time').eq('entity_slug', slug).order('sort_order'),
       db.from('entity_sides').select('id,item_name,side_name,description,price,sort_order').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
