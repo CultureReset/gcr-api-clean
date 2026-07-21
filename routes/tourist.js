@@ -1324,6 +1324,8 @@ SEARCHING BEYOND THE LIST ABOVE:
 - search_businesses returns each match's parent hub (e.g. the marina a charter boat operates out of), so use it directly to answer "where does X depart from" style questions.
 - Once you know which business the traveler means (from the list above, or from search_businesses), call get_business_details(slug) to read that business's FULL page — menu/drinks/happy hour items, reviews, FAQs, policies, team, hours, offerings/pricing tiers, amenities, parent hub, everything that shows on its real page. Use this whenever a question needs more depth than the one-line summary above gives you (e.g. "what's actually in their spicy tuna roll", "do they have a kids menu", "what does their weekday happy hour include").
 - For "do they have spots/kayaks/units left today" or "any last-minute deals" questions, call check_availability(slug) — never invent a number. Most businesses don't have live availability tracked yet, and the tool will tell you that plainly; pass that along honestly instead of guessing.
+- For "cheapest / best price for X" questions ("cheapest place with crab legs", "cheapest dolphin cruise"), call find_item_prices — it searches every menu item, drink, happy-hour item, and offer by name and returns real prices sorted low to high. Answer from those rows, never from memory.
+- For "what's the difference between A and B" / "which is better" questions, call compare_businesses with both slugs — it returns their structured industry facts (boat size, passengers, trip lengths, price ranges, altitude, amenities), fees, deposits, and cancellation/weather policies side by side. Compare only on what comes back; if a fact is missing for one business, say so.
 
 HARD RULES:
 - Only recommend real places — either from the LIVE GULF COAST DATA above, or from search_businesses results. Never invent a business that isn't returned by one of these.
@@ -1369,6 +1371,30 @@ HARD RULES:
             }
         },
         {
+            name: 'find_item_prices',
+            description: 'Price-sorted search across every structured item on the coast: menu items, drinks, happy-hour items, offers/trips/rentals (with their price tiers), and retail inventory. Use for ANY "cheapest / under $X / best price for Y" question — e.g. "cheapest crab legs", "margarita under $10", "cheapest dolphin cruise for kids". Returns real rows: item, price, and which business, sorted low to high.',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'The item to price-hunt, e.g. "crab legs", "margarita", "dolphin cruise"' },
+                    max_price: { type: 'number', description: 'Optional ceiling — only return items at or under this price' },
+                    limit: { type: 'integer', description: 'Max rows, default 20' }
+                },
+                required: ['query']
+            }
+        },
+        {
+            name: 'compare_businesses',
+            description: 'Side-by-side structured comparison of 2–5 businesses: their industry facts table (boat length, max passengers, trip hours, altitude, units, price range — whatever their industry tracks), cheapest offer prices, fees, deposits, refund/cancellation and weather policies, rating. Use for "what\'s the difference between A and B", "which parasailing company is better", "compare these condos".',
+            input_schema: {
+                type: 'object',
+                properties: {
+                    slugs: { type: 'array', items: { type: 'string' }, description: '2–5 business slugs to compare' }
+                },
+                required: ['slugs']
+            }
+        },
+        {
             name: 'save_memory',
             description: 'Remember a durable fact, preference, or pattern about this traveler. Auto-upserts on (category, key).',
             input_schema: {
@@ -1411,6 +1437,92 @@ HARD RULES:
     ];
 
     async function executeTool(name, input) {
+        if (name === 'find_item_prices') {
+            // Structured price hunt: item name → price → business, low to high.
+            // ilike is sanitized (strip supabase .or() metacharacters).
+            const q = String(input.query || '').replace(/[,()%]/g, ' ').trim();
+            if (!q) return { error: 'query required' };
+            const pat = `%${q}%`;
+            const limit = Math.min(parseInt(input.limit, 10) || 20, 40);
+            const maxPrice = input.max_price != null ? Number(input.max_price) : null;
+            const [menu, drinks, hh, offers, inv] = await Promise.all([
+                gcrDb.from('menu_items').select('item_name,price,description,menu_sections!inner(entity_slug)').ilike('item_name', pat).not('price', 'is', null).limit(80),
+                gcrDb.from('drink_items').select('item_name,price,drink_sections!inner(entity_slug)').ilike('item_name', pat).not('price', 'is', null).limit(40),
+                gcrDb.from('happy_hour_items').select('item_name,price,original_price,happy_hour_sections!inner(entity_slug)').ilike('item_name', pat).not('price', 'is', null).limit(40),
+                gcrDb.from('entity_offer').select('name,entity_slug,entity_offer_price(amount,label,price_unit,age_min,age_max)').ilike('name', pat).limit(60),
+                gcrDb.from('inventory_items').select('name,price,entity_slug').ilike('name', pat).not('price', 'is', null).eq('active', true).limit(40),
+            ]);
+            const rows = [];
+            for (const m of (menu.data || [])) rows.push({ item: m.item_name, price: Number(m.price), entity_slug: m.menu_sections.entity_slug, source: 'menu' });
+            for (const d of (drinks.data || [])) rows.push({ item: d.item_name, price: Number(d.price), entity_slug: d.drink_sections.entity_slug, source: 'drinks' });
+            for (const h of (hh.data || [])) rows.push({ item: h.item_name, price: Number(h.price), entity_slug: h.happy_hour_sections.entity_slug, source: 'happy_hour', regular_price: h.original_price != null ? Number(h.original_price) : undefined });
+            for (const o of (offers.data || [])) {
+                for (const p of (o.entity_offer_price || [])) {
+                    if (p.amount == null) continue;
+                    const ageNote = p.age_max != null && p.age_max <= 17 ? 'kids' : (p.age_min != null && p.age_min >= 55 ? 'senior' : null);
+                    rows.push({ item: o.name + (p.label ? ` (${p.label})` : ''), price: Number(p.amount), entity_slug: o.entity_slug, source: 'offer', unit: p.price_unit || undefined, audience: ageNote || undefined });
+                }
+            }
+            for (const i of (inv.data || [])) rows.push({ item: i.name, price: Number(i.price), entity_slug: i.entity_slug, source: 'product' });
+            let filtered = rows.filter(r => Number.isFinite(r.price) && r.price > 0);
+            if (maxPrice != null) filtered = filtered.filter(r => r.price <= maxPrice);
+            filtered.sort((a, b) => a.price - b.price);
+            filtered = filtered.slice(0, limit);
+            const slugs = [...new Set(filtered.map(r => r.entity_slug))];
+            const { data: ents } = slugs.length
+                ? await gcrDb.from('entity').select('slug,name,city,rating,review_count,is_active').in('slug', slugs)
+                : { data: [] };
+            const eMap = Object.fromEntries((ents || []).filter(e => e.is_active !== false).map(e => [e.slug, e]));
+            const results = filtered.filter(r => eMap[r.entity_slug]).map(r => ({
+                ...r,
+                business: eMap[r.entity_slug].name,
+                city: eMap[r.entity_slug].city,
+                rating: eMap[r.entity_slug].rating,
+            }));
+            if (!results.length) return { results: [], note: `No structured items matched "${q}" — try a broader term or search_businesses.` };
+            return { results, note: 'Sorted cheapest first. Prices are from the structured database, not estimates.' };
+        }
+        if (name === 'compare_businesses') {
+            const slugs = [...new Set((input.slugs || []).filter(Boolean))].slice(0, 5);
+            if (slugs.length < 2) return { error: 'Provide 2-5 slugs to compare.' };
+            const { getIndustryFacts } = require('../lib/industry-contract');
+            const out = [];
+            for (const slug of slugs) {
+                const { data: e } = await gcrDb.from('entity')
+                    .select('slug,name,industry_code,entity_subtype,city,rating,review_count,price_range,phone,booking_url')
+                    .eq('slug', slug).maybeSingle();
+                if (!e) { out.push({ slug, error: 'not found' }); continue; }
+                const [facts, feesR, depR, refR, wxR, offR] = await Promise.all([
+                    getIndustryFacts(gcrDb, e),
+                    gcrDb.from('entity_offer_fee').select('fee_name,fee_type,amount,amount_type,mandatory,description').eq('entity_slug', slug).limit(10),
+                    gcrDb.from('entity_offer_deposit').select('deposit_name,amount,amount_type,refundable').eq('entity_slug', slug).limit(5),
+                    gcrDb.from('entity_refund_policy').select('policy_name,policy_type,full_refund_window_hours,non_refundable,terms').eq('entity_slug', slug).limit(5),
+                    gcrDb.from('weather_rules').select('condition,action,refund_percent,description').eq('entity_slug', slug).limit(5),
+                    gcrDb.from('entity_offer').select('name,entity_offer_price(amount,label,price_unit)').eq('entity_slug', slug).limit(8),
+                ]);
+                const cleanFacts = {};
+                for (const [k, v] of Object.entries(facts || {})) {
+                    if (v == null || ['entity_slug', 'updated_at'].includes(k)) continue;
+                    cleanFacts[k] = v;
+                }
+                const offers = (offR.data || []).map(o => {
+                    const prices = (o.entity_offer_price || []).filter(p => p.amount != null).map(p => Number(p.amount));
+                    return prices.length ? `${o.name}: from $${Math.min(...prices)}` : null;
+                }).filter(Boolean).slice(0, 6);
+                out.push({
+                    slug, name: e.name, type: e.entity_subtype || e.industry_code, city: e.city,
+                    rating: e.rating != null ? `${e.rating} (${e.review_count || 0} reviews)` : null,
+                    price_range: e.price_range,
+                    industry_facts: Object.keys(cleanFacts).length ? cleanFacts : 'no structured facts yet — say so rather than guessing',
+                    offers_from: offers,
+                    fees: (feesR.data || []).map(f => `${f.fee_name}${f.amount != null ? ` $${f.amount}` : ''}${f.description ? ` — ${f.description.slice(0, 80)}` : ''}`),
+                    deposits: (depR.data || []).map(d => `${d.deposit_name}${d.amount != null ? ` $${d.amount}` : ''}${d.refundable ? ' (refundable)' : ''}`),
+                    refund_policies: (refR.data || []).map(p => p.non_refundable ? `${p.policy_name}: non-refundable` : `${p.policy_name}${p.full_refund_window_hours ? `: full refund up to ${p.full_refund_window_hours}h before` : ''}${p.terms ? ` ${p.terms.slice(0, 100)}` : ''}`),
+                    weather_policy: (wxR.data || []).map(w => `${w.condition || ''} → ${w.action || ''}${w.description ? ` (${w.description.slice(0, 80)})` : ''}`),
+                });
+            }
+            return { comparison: out, note: 'Compare only on fields present for both. Missing facts mean the data is not collected yet — say that, never fill the gap with a guess.' };
+        }
         if (name === 'check_availability') {
             const today = new Date().toISOString().split('T')[0];
             const { data, error } = await gcrDb.from('business_availability')
@@ -1452,6 +1564,16 @@ HARD RULES:
                     if (s.items?.length) lines.push(`${s.section_name}: ${s.items.slice(0, 10).map(i => `${i.item_name}${i.price_from != null ? ` from $${i.price_from}` : ''}${i.description ? ` — ${i.description.slice(0, 60)}` : ''}`).join(' | ')}`);
                 });
 
+                if (e.industry_facts) {
+                    const f = Object.entries(e.industry_facts)
+                        .filter(([k, v]) => v != null && !['entity_slug', 'updated_at'].includes(k))
+                        .map(([k, v]) => `${k}=${v}`);
+                    if (f.length) lines.push(`Industry facts (structured, ${e.industry_code}): ${f.join(', ')}`);
+                }
+                if ((e.fees || []).length) lines.push(`Fees: ${e.fees.slice(0, 8).map(f => `${f.fee_name}${f.amount != null ? ` $${f.amount}` : ''}${f.description ? ` — ${f.description.slice(0, 60)}` : ''}`).join(' | ')}`);
+                if ((e.deposits || []).length) lines.push(`Deposits: ${e.deposits.slice(0, 5).map(d => `${d.deposit_name}${d.amount != null ? ` $${d.amount}` : ''}${d.refundable ? ' (refundable)' : ''}`).join(' | ')}`);
+                if ((e.refund_policies || []).length) lines.push(`Refund/cancellation: ${e.refund_policies.slice(0, 5).map(p => p.non_refundable ? `${p.policy_name}: non-refundable` : `${p.policy_name}${p.full_refund_window_hours ? `: full refund up to ${p.full_refund_window_hours}h before` : ''}${p.terms ? ` ${(p.terms || '').slice(0, 80)}` : ''}`).join(' | ')}`);
+                if ((e.weather_rules || []).length) lines.push(`Weather policy: ${e.weather_rules.slice(0, 4).map(w => `${w.condition || ''} → ${w.action || ''}`).join(' | ')}`);
                 if ((e.pricing || []).length) lines.push(`Pricing: ${e.pricing.slice(0, 10).map(p => `${p.item_name || p.name} $${p.price}`).join(' | ')}`);
                 if ((e.whats_included || []).length) lines.push(`Includes: ${e.whats_included.map(w => w.item_name || w.included_item).filter(Boolean).join(', ')}`);
                 if ((e.faqs || []).length) lines.push(`FAQ: ${e.faqs.slice(0, 8).map(f => `Q:${f.question} A:${(f.answer || '').slice(0, 100)}`).join(' | ')}`);
