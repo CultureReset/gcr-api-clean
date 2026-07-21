@@ -124,12 +124,19 @@ async function buildFullEntity(slug) {
     db.from('entity_attributes').select('category,key,label,value,value_type,unit,is_filterable').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_nearby_landmarks').select('kind,name,types,spatial_relationship,containment,travel_distance_meters,straight_line_distance_meters').eq('entity_slug', slug).order('sort_order').limit(25),
     db.from('whats_excluded').select('id,excluded_item,sort_order').eq('entity_slug', slug).order('sort_order'),
+    // Money pack — structured fees / deposits / refund rules / weather rules
+    // (universal: any business can carry these, per industry_table_contract)
+    db.from('entity_offer_fee').select('id,offer_id,resource_id,fee_name,fee_type,amount,amount_type,mandatory,refundable,description,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_offer_deposit').select('id,offer_id,resource_id,deposit_name,deposit_type,amount,amount_type,refundable,due_at,refund_window_days,description,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('entity_refund_policy').select('id,offer_id,policy_name,policy_type,full_refund_window_hours,partial_refund_window_hours,partial_refund_percent,non_refundable,weather_dependent,reschedule_allowed,cancellation_fee,terms,sort_order').eq('entity_slug', slug).order('sort_order'),
+    db.from('weather_rules').select('id,rule_type,condition,threshold,action,refund_percent,description,sort_order').eq('entity_slug', slug).order('sort_order'),
   ];
 
   const [
     hours, photos, tags, events, reviews, faqs, team, policies, blogPosts, secondaryHours, announcements, modulesRes, sectionsRes,
     aboutBulletsRes, perfectForRes, socialPostsRes, childCountRes, specialsRes,
-    attributesRes, landmarksRes, whatsExcludedRes
+    attributesRes, landmarksRes, whatsExcludedRes,
+    offerFeesRes, offerDepositsRes, refundPoliciesRes, weatherRulesRes
   ] = await Promise.all(corePromises);
 
   // Flexible offerings sections (charters, rentals, tours, etc.) — universal across all entity types
@@ -431,6 +438,11 @@ async function buildFullEntity(slug) {
     structured_attributes: attributesRes.data || [],
     nearby_landmarks: landmarksRes.data || [],
     whats_excluded: whatsExcludedRes.data || [],
+    // Money pack (fees / deposits / refund + weather rules)
+    fees: offerFeesRes?.data || [],
+    deposits: offerDepositsRes?.data || [],
+    refund_policies: refundPoliciesRes?.data || [],
+    weather_rules: weatherRulesRes?.data || [],
     child_count: childCountRes?.count || 0,
     parent: parentInfo,
     parent_amenities: parentAmenities,
