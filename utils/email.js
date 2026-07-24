@@ -316,6 +316,48 @@ function ownerNotificationHtml(d) {
 }
 
 /**
+ * Build owner alert email for a new NFC/QR digital business card lead
+ */
+function nfcCardOwnerNotificationHtml(d) {
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+        <tr><td style="background:#16a34a;padding:28px 32px;text-align:center;">
+          <h1 style="margin:0;color:#fff;font-size:22px;">New Card Lead!</h1>
+          <p style="margin:8px 0 0;color:#dcfce7;font-size:14px;">Someone shared their info from your digital business card</p>
+        </td></tr>
+
+        <tr><td style="padding:32px;">
+          <table width="100%" style="background:#f9fafb;border-radius:10px;padding:20px;border:1px solid #e5e7eb;" cellpadding="0" cellspacing="0">
+            ${row('👤 Name', d.name)}
+            ${row('📞 Phone', d.phone)}
+            ${row('📧 Email', d.email)}
+            ${row('🏢 Company', d.business_name)}
+            ${row('📝 Note', d.business_type)}
+            ${row('🌐 Website', d.website)}
+            ${row('📍 Met at', d.met_at)}
+            ${row('🔗 Source', d.source)}
+          </table>
+          <p style="margin:24px 0 0;color:#374151;font-size:15px;">Reach out while it's fresh.</p>
+        </td></tr>
+
+        <tr><td style="background:#f9fafb;padding:16px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:12px;">Sent automatically by your card's lead capture form.</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
  * Build confirmation email for someone who submitted the "share your info"
  * form on an NFC/QR digital business card
  */
@@ -410,4 +452,4 @@ function generateIcsContent(d) {
     ].join('\r\n');
 }
 
-module.exports = { sendEmail, customerConfirmationHtml, gcrReservationConfirmationHtml, ownerNotificationHtml, nfcCardLeadConfirmationHtml, generateIcsContent };
+module.exports = { sendEmail, customerConfirmationHtml, gcrReservationConfirmationHtml, ownerNotificationHtml, nfcCardLeadConfirmationHtml, nfcCardOwnerNotificationHtml, generateIcsContent };

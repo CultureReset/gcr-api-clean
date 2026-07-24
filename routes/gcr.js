@@ -1965,6 +1965,19 @@ router.post('/nfc-card-lead', async (req, res) => {
     }
   }
 
+  try {
+    const ownerEmail = process.env.NFC_CARD_OWNER_EMAIL || 'info@gulfcoastalhub.com';
+    const { sendEmail, nfcCardOwnerNotificationHtml } = require('../utils/email');
+    await sendEmail({
+      to: ownerEmail,
+      subject: `New card lead: ${name || 'Unknown'}`,
+      html: nfcCardOwnerNotificationHtml({ name, phone, email, business_name, business_type, website, met_at, source: source || 'nfc-card-matt' }),
+      replyTo: email || undefined,
+    });
+  } catch (e) {
+    console.error('nfc-card-lead owner notification email failed:', e.message);
+  }
+
   res.json({ success: true, lead: data });
 });
 
