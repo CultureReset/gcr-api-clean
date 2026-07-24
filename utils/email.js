@@ -315,6 +315,48 @@ function ownerNotificationHtml(d) {
 </html>`;
 }
 
+/**
+ * Build confirmation email for someone who submitted the "share your info"
+ * form on an NFC/QR digital business card
+ */
+function nfcCardLeadConfirmationHtml(d) {
+    return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f8;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="100%" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+        <tr><td style="background:#00ada8;padding:32px 32px 24px;text-align:center;">
+          <h1 style="margin:0;color:#fff;font-size:22px;">Thanks for reaching out!</h1>
+          <p style="margin:8px 0 0;color:#e0f7f6;font-size:15px;">${esc(d.owner_name || 'Matt')} got your info and will be in touch soon</p>
+        </td></tr>
+
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 20px;color:#374151;font-size:15px;">Hi <strong>${esc(d.name)}</strong>,</p>
+          <p style="margin:0 0 24px;color:#374151;font-size:15px;">Thanks for dropping your details — here's what we received:</p>
+
+          <table width="100%" style="background:#f9fafb;border-radius:10px;padding:20px;border:1px solid #e5e7eb;" cellpadding="0" cellspacing="0">
+            ${row('📞 Phone', d.phone)}
+            ${row('🏢 Company', d.business_name)}
+            ${row('📝 Note', d.business_type)}
+          </table>
+
+          <p style="margin:24px 0 0;color:#374151;font-size:15px;">Talk soon,<br>${esc(d.owner_name || 'Matt Johnson')}</p>
+        </td></tr>
+
+        <tr><td style="background:#f9fafb;padding:20px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+          <p style="margin:0;color:#9ca3af;font-size:12px;">This confirmation was sent automatically by CyberCheck Inc.</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 function row(label, value) {
     if (!value) return '';
     return `<tr>
@@ -368,4 +410,4 @@ function generateIcsContent(d) {
     ].join('\r\n');
 }
 
-module.exports = { sendEmail, customerConfirmationHtml, gcrReservationConfirmationHtml, ownerNotificationHtml, generateIcsContent };
+module.exports = { sendEmail, customerConfirmationHtml, gcrReservationConfirmationHtml, ownerNotificationHtml, nfcCardLeadConfirmationHtml, generateIcsContent };

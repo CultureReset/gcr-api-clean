@@ -1951,6 +1951,20 @@ router.post('/nfc-card-lead', async (req, res) => {
   }]).select().single();
 
   if (error) return res.status(500).json({ error: error.message });
+
+  if (email) {
+    try {
+      const { sendEmail, nfcCardLeadConfirmationHtml } = require('../utils/email');
+      await sendEmail({
+        to: email,
+        subject: `Thanks for reaching out, ${name || 'there'}!`,
+        html: nfcCardLeadConfirmationHtml({ name, phone, business_name, business_type }),
+      });
+    } catch (e) {
+      console.error('nfc-card-lead confirmation email failed:', e.message);
+    }
+  }
+
   res.json({ success: true, lead: data });
 });
 
