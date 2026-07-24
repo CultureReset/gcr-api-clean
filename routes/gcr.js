@@ -1966,7 +1966,7 @@ router.post('/nfc-card-lead', async (req, res) => {
   }
 
   try {
-    const ownerEmail = process.env.NFC_CARD_OWNER_EMAIL || 'info@gulfcoastalhub.com';
+    const ownerEmail = process.env.NFC_CARD_OWNER_EMAIL || 'info@cybercheckinc.com';
     const { sendEmail, nfcCardOwnerNotificationHtml } = require('../utils/email');
     await sendEmail({
       to: ownerEmail,
