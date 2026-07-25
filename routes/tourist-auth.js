@@ -14,10 +14,6 @@ const crypto  = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { sendEmail } = require('../utils/email');
 
-// Host serving the web app — must match exactly for WebOTP auto-fill to work
-// (Android Chrome only fills the code if the SMS's last line is "@host #code").
-const WEBOTP_HOST = (process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com').replace(/^https?:\/\//, '').replace(/\/$/, '');
-
 // Firebase Admin — verifies Firebase phone auth tokens
 let _firebaseAdmin = null;
 function getFirebaseAdmin() {
@@ -396,20 +392,24 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TWILIO PHONE OTP
-// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Twilio SMS
-// POST /api/tourist-auth/phone-verify { phone, code }  → verify OTP → upsert tourist_profile → return token
+// TWILIO VERIFY — PHONE OTP
+// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Twilio Verify
+// POST /api/tourist-auth/phone-verify { phone, code }  → checks OTP via Twilio Verify → upsert tourist_profile → return token
+//
+// Uses Twilio Verify (not Programmable Messaging) — Verify runs through Twilio's
+// own verified sending infrastructure instead of our long-code number, so it
+// isn't subject to A2P 10DLC campaign registration the way our other SMS
+// (routes/sms.js, live-photo.js, dashboard.js, etc.) is. Requires a Verify
+// Service created in the Twilio Console and its SID set as
+// TWILIO_VERIFY_SERVICE_SID.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const twilio = require('twilio');
 
-async function sendTwilioSMS(phone, body) {
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    return client.messages.create({
-        from: process.env.TWILIO_PHONE_NUMBER || '+12513135464',
-        to:   phone,
-        body,
-    });
+function verifyService() {
+    if (!process.env.TWILIO_VERIFY_SERVICE_SID) throw new Error('TWILIO_VERIFY_SERVICE_SID not configured');
+    return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+        .verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID);
 }
 
 function normalizePhone(raw) {
@@ -419,31 +419,16 @@ function normalizePhone(raw) {
     return `+${digits}`;
 }
 
-// POST /phone — send OTP
+// POST /phone — send OTP via Twilio Verify
 router.post('/phone', async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     if (!phone || phone.length < 10) return res.status(400).json({ error: 'Valid phone number required' });
 
-    const code    = String(Math.floor(100000 + Math.random() * 900000));
-    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
-
-    // Store OTP in tourist_otps (no user_id required — user may not exist yet)
-    const { error: dbErr } = await mainDb
-        .from('tourist_otps')
-        .upsert({ phone, otp_code: code, otp_expires: expires, updated_at: new Date().toISOString() }, { onConflict: 'phone' });
-
-    if (dbErr) {
-        console.error('OTP storage error:', dbErr.message);
-        return res.status(500).json({ error: 'Could not generate code. Try again.' });
-    }
-
     try {
-        // Last line "@host #code" lets Android Chrome auto-fill the code via WebOTP —
-        // no typing needed, the form fills itself the instant the text arrives.
-        await sendTwilioSMS(phone, `Your Gulf Coast Radar code is ${code}\n\nExpires in 10 minutes.\n\n@${WEBOTP_HOST} #${code}`);
+        await verifyService().verifications.create({ to: phone, channel: 'sms' });
     } catch (e) {
-        console.error('Twilio OTP send failed:', e.message);
-        return res.status(500).json({ error: 'Failed to send code. Check Twilio config.' });
+        console.error('Twilio Verify send failed:', e.message);
+        return res.status(500).json({ error: 'Failed to send code. Try again.' });
     }
 
     res.json({ success: true, phone });
@@ -470,16 +455,15 @@ router.post('/phone-verify', async (req, res) => {
             return res.status(401).json({ error: 'Invalid Firebase token: ' + err.message });
         }
     } else if (code) {
-        // Legacy OTP path (Twilio/Supabase)
-        const { data: otpRow } = await mainDb
-            .from('tourist_otps')
-            .select('otp_code, otp_expires')
-            .eq('phone', phone)
-            .maybeSingle();
-
-        if (!otpRow?.otp_code) return res.status(400).json({ error: 'No code found. Request a new one.' });
-        if (otpRow.otp_code !== code) return res.status(400).json({ error: 'Incorrect code' });
-        if (new Date(otpRow.otp_expires) < new Date()) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+        // Twilio Verify path
+        let check;
+        try {
+            check = await verifyService().verificationChecks.create({ to: phone, code });
+        } catch (e) {
+            console.error('Twilio Verify check failed:', e.message);
+            return res.status(400).json({ error: 'Incorrect or expired code' });
+        }
+        if (check.status !== 'approved') return res.status(400).json({ error: 'Incorrect code' });
     } else {
         return res.status(400).json({ error: 'idToken or code required' });
     }
