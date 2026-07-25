@@ -484,7 +484,7 @@ router.put('/gcr/entities/:slug/availability', authRequired, async (req, res) =>
 
 router.post('/gcr/entities/:slug/menu-sections', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { section_name, sort_order, days_of_week, start_time, end_time, is_active, metadata } = req.body;
+  const { section_name, sort_order, days_of_week, start_time, end_time, is_active, metadata, meal_period, description, default_accompaniment, substitution_notes, source } = req.body;
   const { data, error } = await getDb().from('menu_sections').insert({
     entity_slug: slug,
     section_name,
@@ -493,7 +493,12 @@ router.post('/gcr/entities/:slug/menu-sections', authRequired, async (req, res) 
     start_time: start_time || null,
     end_time: end_time || null,
     is_active: is_active !== false,
-    metadata: metadata || {}
+    metadata: metadata || {},
+    meal_period: meal_period || null,
+    description: description || null,
+    default_accompaniment: default_accompaniment || null,
+    substitution_notes: substitution_notes || null,
+    source: source || null,
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
@@ -501,16 +506,14 @@ router.post('/gcr/entities/:slug/menu-sections', authRequired, async (req, res) 
 });
 
 router.put('/gcr/menu-sections/:id', authRequired, async (req, res) => {
-  const { section_name, sort_order, days_of_week, start_time, end_time, is_active, metadata } = req.body;
-  const { data, error } = await getDb().from('menu_sections').update({
-    section_name,
-    sort_order,
-    days_of_week,
-    start_time: start_time || null,
-    end_time: end_time || null,
-    is_active,
-    metadata
-  }).eq('id', req.params.id).select().single();
+  const { section_name, sort_order, days_of_week, start_time, end_time, is_active, metadata, meal_period, description, default_accompaniment, substitution_notes, source } = req.body;
+  const patch = { section_name, sort_order, days_of_week, start_time: start_time || null, end_time: end_time || null, is_active, metadata };
+  if (meal_period !== undefined) patch.meal_period = meal_period;
+  if (description !== undefined) patch.description = description;
+  if (default_accompaniment !== undefined) patch.default_accompaniment = default_accompaniment;
+  if (substitution_notes !== undefined) patch.substitution_notes = substitution_notes;
+  if (source !== undefined) patch.source = source;
+  const { data, error } = await getDb().from('menu_sections').update(patch).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -523,7 +526,7 @@ router.delete('/gcr/menu-sections/:id', authRequired, async (req, res) => {
 
 router.post('/gcr/entities/:slug/menu-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { item_name, description, price, section_id, tags, image_url, image_path, is_available, is_featured, is_catch_of_day, is_on_tap, has_market_price, sort_order, metadata } = req.body;
+  const { item_name, description, price, section_id, tags, image_url, image_path, is_available, is_featured, is_catch_of_day, is_on_tap, has_market_price, sort_order, metadata, source } = req.body;
   const { data, error } = await getDb().from('menu_items').insert({
     entity_slug: slug,
     section_id: section_id || null,
@@ -539,7 +542,8 @@ router.post('/gcr/entities/:slug/menu-items', authRequired, async (req, res) => 
     is_on_tap: is_on_tap || false,
     has_market_price: has_market_price || false,
     sort_order: sort_order || 0,
-    metadata: metadata || {}
+    metadata: metadata || {},
+    source: source || null,
   }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
@@ -547,8 +551,8 @@ router.post('/gcr/entities/:slug/menu-items', authRequired, async (req, res) => 
 });
 
 router.put('/gcr/menu-items/:id', authRequired, async (req, res) => {
-  const { item_name, description, price, section_id, tags, image_url, image_path, is_available, is_featured, is_catch_of_day, is_on_tap, has_market_price, sort_order, metadata } = req.body;
-  const { data, error } = await getDb().from('menu_items').update({
+  const { item_name, description, price, section_id, tags, image_url, image_path, is_available, is_featured, is_catch_of_day, is_on_tap, has_market_price, sort_order, metadata, source } = req.body;
+  const patch = {
     item_name,
     description: description || null,
     price: price != null ? parseFloat(price) : null,
@@ -563,7 +567,9 @@ router.put('/gcr/menu-items/:id', authRequired, async (req, res) => {
     has_market_price,
     sort_order,
     metadata
-  }).eq('id', req.params.id).select().single();
+  };
+  if (source !== undefined) patch.source = source;
+  const { data, error } = await getDb().from('menu_items').update(patch).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -578,25 +584,39 @@ router.delete('/gcr/menu-items/:id', authRequired, async (req, res) => {
 
 router.post('/gcr/entities/:slug/drink-sections', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { section_name, sort_order } = req.body;
-  const { data, error } = await getDb().from('drink_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
+  const { section_name, sort_order, meal_period, description, default_accompaniment, substitution_notes, source } = req.body;
+  const { data, error } = await getDb().from('drink_sections').insert({
+    entity_slug: slug, section_name, sort_order: sort_order || 0,
+    meal_period: meal_period || null, description: description || null,
+    default_accompaniment: default_accompaniment || null, substitution_notes: substitution_notes || null, source: source || null,
+  }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
+router.put('/gcr/drink-sections/:id', authRequired, async (req, res) => {
+  const patch = {};
+  ['section_name','sort_order','meal_period','description','default_accompaniment','substitution_notes','source'].forEach(k => { if (req.body[k] !== undefined) patch[k] = req.body[k]; });
+  const { data, error } = await getDb().from('drink_sections').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 router.post('/gcr/entities/:slug/drink-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { item_name, description, price, section_id, image_url, image_path } = req.body;
-  const { data, error } = await getDb().from('drink_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
+  const { item_name, description, price, section_id, image_url, image_path, source } = req.body;
+  const { data, error } = await getDb().from('drink_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, image_url: image_url || null, image_path: image_path || null, source: source || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
 router.put('/gcr/drink-items/:id', authRequired, async (req, res) => {
-  const { item_name, description, price, section_id, image_url, image_path } = req.body;
-  const { data, error } = await getDb().from('drink_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, section_id: section_id || null, image_url: image_url || null, image_path: image_path || null }).eq('id', req.params.id).select().single();
+  const { item_name, description, price, section_id, image_url, image_path, source } = req.body;
+  const patch = { item_name, description: description || null, price: price != null ? parseFloat(price) : null, section_id: section_id || null, image_url: image_url || null, image_path: image_path || null };
+  if (source !== undefined) patch.source = source;
+  const { data, error } = await getDb().from('drink_items').update(patch).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -620,25 +640,39 @@ router.put('/gcr/entities/:slug/happy-hour', authRequired, async (req, res) => {
 
 router.post('/gcr/entities/:slug/hh-sections', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { section_name, sort_order } = req.body;
-  const { data, error } = await getDb().from('happy_hour_sections').insert({ entity_slug: slug, section_name, sort_order: sort_order || 0 }).select().single();
+  const { section_name, sort_order, meal_period, description, default_accompaniment, substitution_notes, source } = req.body;
+  const { data, error } = await getDb().from('happy_hour_sections').insert({
+    entity_slug: slug, section_name, sort_order: sort_order || 0,
+    meal_period: meal_period || null, description: description || null,
+    default_accompaniment: default_accompaniment || null, substitution_notes: substitution_notes || null, source: source || null,
+  }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
+router.put('/gcr/hh-sections/:id', authRequired, async (req, res) => {
+  const patch = {};
+  ['section_name','sort_order','meal_period','description','default_accompaniment','substitution_notes','source'].forEach(k => { if (req.body[k] !== undefined) patch[k] = req.body[k]; });
+  const { data, error } = await getDb().from('happy_hour_sections').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 router.post('/gcr/entities/:slug/hh-items', authRequired, async (req, res) => {
   const slug = req.params.slug;
-  const { item_name, description, price, original_price, section_id, image_url, image_path } = req.body;
-  const { data, error } = await getDb().from('happy_hour_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null }).select().single();
+  const { item_name, description, price, original_price, section_id, image_url, image_path, source } = req.body;
+  const { data, error } = await getDb().from('happy_hour_items').insert({ entity_slug: slug, section_id: section_id || null, item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null, source: source || null }).select().single();
   if (error) return res.status(500).json({ error: error.message });
   invalidateCache(res, slug);
   res.status(201).json(data);
 });
 
 router.put('/gcr/hh-items/:id', authRequired, async (req, res) => {
-  const { item_name, description, price, original_price, image_url, image_path } = req.body;
-  const { data, error } = await getDb().from('happy_hour_items').update({ item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null }).eq('id', req.params.id).select().single();
+  const { item_name, description, price, original_price, image_url, image_path, source } = req.body;
+  const patch = { item_name, description: description || null, price: price != null ? parseFloat(price) : null, original_price: original_price != null ? parseFloat(original_price) : null, image_url: image_url || null, image_path: image_path || null };
+  if (source !== undefined) patch.source = source;
+  const { data, error } = await getDb().from('happy_hour_items').update(patch).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -2619,6 +2653,198 @@ Object.entries(DIETARY_ITEM_TABLES).forEach(([urlKey, { itemTable, joinTable, fk
     if (!item) return res.status(404).json({ error: 'Item not found' });
     if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
     const { error } = await db.from(joinTable).delete().eq(fk, req.params.id).eq('dietary_tag_id', req.params.tagId);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  });
+});
+
+// ─── MODIFIER OPTION GROUPS (required / pick-exactly-N rules) ──────────────────
+// Sits on top of the existing menu_item_options table (286 real rows already
+// in prod) — a group is either scoped to one menu_item_id or left NULL to be
+// a reusable business-level group ("Pick your sides" defined once).
+router.get('/gcr/entities/:slug/option-groups', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { data, error } = await getDb().from('menu_item_option_groups').select('*').eq('entity_slug', req.params.slug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/option-groups', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { menu_item_id, label, required, min_picks, max_picks, sort_order } = req.body;
+  if (!label) return res.status(400).json({ error: 'label required' });
+  const { data, error } = await getDb().from('menu_item_option_groups').insert({
+    entity_slug: req.params.slug, menu_item_id: menu_item_id || null, label,
+    required: required || false, min_picks: min_picks || 0, max_picks: max_picks ?? null, sort_order: sort_order || 0,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/option-groups/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: group } = await db.from('menu_item_option_groups').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!group) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, group.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const patch = {};
+  ['label','required','min_picks','max_picks','sort_order','menu_item_id'].forEach(k => { if (req.body[k] !== undefined) patch[k] = req.body[k]; });
+  const { data, error } = await db.from('menu_item_option_groups').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/option-groups/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: group } = await db.from('menu_item_option_groups').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!group) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, group.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { error } = await db.from('menu_item_option_groups').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── MEAL PERIODS (daypart schedule — Breakfast Mon-Fri 6:30-11am, etc.) ───────
+router.get('/gcr/entities/:slug/meal-periods', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { data, error } = await getDb().from('menu_periods').select('*').eq('entity_slug', req.params.slug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/meal-periods', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { name, days_of_week, start_time, end_time, sort_order } = req.body;
+  if (!name || !days_of_week || !start_time || !end_time) return res.status(400).json({ error: 'name, days_of_week, start_time, end_time required' });
+  const { data, error } = await getDb().from('menu_periods').insert({
+    entity_slug: req.params.slug, name, days_of_week, start_time, end_time, sort_order: sort_order || 0,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/meal-periods/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: period } = await db.from('menu_periods').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!period) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, period.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const patch = {};
+  ['name','days_of_week','start_time','end_time','sort_order'].forEach(k => { if (req.body[k] !== undefined) patch[k] = req.body[k]; });
+  const { data, error } = await db.from('menu_periods').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/meal-periods/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: period } = await db.from('menu_periods').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!period) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, period.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { error } = await db.from('menu_periods').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── DRESSINGS (+ which menu items each one applies to) ────────────────────────
+router.get('/gcr/entities/:slug/dressings', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { data, error } = await getDb().from('dressings').select('*').eq('entity_slug', req.params.slug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/dressings', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { name, price, sort_order } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const { data, error } = await getDb().from('dressings').insert({ entity_slug: req.params.slug, name, price: price != null ? parseFloat(price) : 0, sort_order: sort_order || 0 }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/dressings/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: dressing } = await db.from('dressings').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!dressing) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, dressing.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const patch = {};
+  ['name','price','sort_order'].forEach(k => { if (req.body[k] !== undefined) patch[k] = k === 'price' ? parseFloat(req.body[k]) : req.body[k]; });
+  const { data, error } = await db.from('dressings').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/dressings/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: dressing } = await db.from('dressings').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!dressing) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, dressing.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { error } = await db.from('dressings').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// Which menu items a dressing applies to
+router.get('/gcr/menu-items/:id/dressings', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('menu_item_dressings').select('dressing_id, dressing:dressing_id(id, name, price)').eq('menu_item_id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json((data || []).map(r => r.dressing));
+});
+
+router.post('/gcr/menu-items/:id/dressings', authRequired, async (req, res) => {
+  const { dressing_id } = req.body;
+  if (!dressing_id) return res.status(400).json({ error: 'dressing_id required' });
+  const db = getDb();
+  const { data: item } = await db.from('menu_items').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { data, error } = await db.from('menu_item_dressings').upsert({ menu_item_id: req.params.id, dressing_id }, { onConflict: 'menu_item_id,dressing_id' }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.delete('/gcr/menu-items/:id/dressings/:dressingId', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: item } = await db.from('menu_items').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!item) return res.status(404).json({ error: 'Item not found' });
+  if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { error } = await db.from('menu_item_dressings').delete().eq('menu_item_id', req.params.id).eq('dressing_id', req.params.dressingId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── CHANNEL-SPECIFIC PRICING (in-store vs. online/delivery) ───────────────────
+const CHANNEL_PRICE_TABLES = {
+  'menu-items': { itemTable: 'menu_items', priceTable: 'menu_item_channel_prices', fk: 'menu_item_id' },
+  'drink-items': { itemTable: 'drink_items', priceTable: 'drink_item_channel_prices', fk: 'drink_item_id' },
+  'hh-items': { itemTable: 'happy_hour_items', priceTable: 'happy_hour_item_channel_prices', fk: 'happy_hour_item_id' },
+};
+
+Object.entries(CHANNEL_PRICE_TABLES).forEach(([urlKey, { itemTable, priceTable, fk }]) => {
+  router.get(`/gcr/${urlKey}/:id/channel-prices`, authRequired, async (req, res) => {
+    const { data, error } = await getDb().from(priceTable).select('*').eq(fk, req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  });
+
+  router.post(`/gcr/${urlKey}/:id/channel-prices`, authRequired, async (req, res) => {
+    const { channel, price, source } = req.body;
+    if (!channel || price == null) return res.status(400).json({ error: 'channel and price required' });
+    const db = getDb();
+    const { data: item } = await db.from(itemTable).select('entity_slug').eq('id', req.params.id).maybeSingle();
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+    const row = { [fk]: req.params.id, channel, price: parseFloat(price), source: source || null };
+    const { data, error } = await db.from(priceTable).upsert(row, { onConflict: `${fk},channel` }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+  });
+
+  router.delete(`/gcr/${urlKey}/:id/channel-prices/:priceId`, authRequired, async (req, res) => {
+    const db = getDb();
+    const { data: item } = await db.from(itemTable).select('entity_slug').eq('id', req.params.id).maybeSingle();
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+    const { error } = await db.from(priceTable).delete().eq('id', req.params.priceId).eq(fk, req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
   });

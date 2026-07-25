@@ -30,9 +30,13 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     const foodItemIds = (menuItems.data || []).map(i => i.id).filter(Boolean);
     const optionsByItem = {};
     const variationsByItem = {};
+    const channelPricesByMenuItem = {};
+    const dressingsByMenuItem = {};
     let menuPeriods = [];
+    let dressingsList = [];
+    let optionGroupsById = {};
     if (foodItemIds.length) {
-        const [optsRes, varsRes, periodsRes] = await Promise.all([
+        const [optsRes, varsRes, periodsRes, groupsRes, channelRes, dressingsRes, dressingLinksRes] = await Promise.all([
             gcrDb.from('menu_item_options')
                 .select('menu_item_id, group_id, group_label, name, price_delta, sort_order')
                 .in('menu_item_id', foodItemIds)
@@ -44,12 +48,25 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 .select('name, days_of_week, start_time, end_time, sort_order')
                 .eq('entity_slug', entitySlug)
                 .order('sort_order', { ascending: true }),
+            // Required/min-max rules for the option groups above — the group
+            // itself may be reusable across items (menu_item_id NULL), so this
+            // is fetched by entity_slug, not by item id.
+            gcrDb.from('menu_item_option_groups').select('id, label, required, min_picks, max_picks').eq('entity_slug', entitySlug),
+            gcrDb.from('menu_item_channel_prices').select('menu_item_id, channel, price, source').in('menu_item_id', foodItemIds),
+            gcrDb.from('dressings').select('id, name, price, sort_order').eq('entity_slug', entitySlug).order('sort_order'),
+            gcrDb.from('menu_item_dressings').select('menu_item_id, dressing_id').in('menu_item_id', foodItemIds),
         ]);
+        optionGroupsById = {};
+        (groupsRes.data || []).forEach(g => { optionGroupsById[g.id] = g; });
         (optsRes.data || []).forEach(o => {
             if (!optionsByItem[o.menu_item_id]) optionsByItem[o.menu_item_id] = [];
+            const group = o.group_id ? optionGroupsById[o.group_id] : null;
             optionsByItem[o.menu_item_id].push({
-                group: o.group_label || 'Options',
+                group: o.group_label || (group && group.label) || 'Options',
                 group_id: o.group_id || null,
+                required: group ? group.required : false,
+                min_picks: group ? group.min_picks : 0,
+                max_picks: group ? group.max_picks : null,
                 name: o.name,
                 price_delta: parseFloat(o.price_delta) || 0,
             });
@@ -62,7 +79,20 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 image_url: v.image_url || '',
             });
         });
+        (channelRes.data || []).forEach(c => {
+            if (!channelPricesByMenuItem[c.menu_item_id]) channelPricesByMenuItem[c.menu_item_id] = [];
+            channelPricesByMenuItem[c.menu_item_id].push({ channel: c.channel, price: parseFloat(c.price) || 0, source: c.source || null });
+        });
+        const dressingsById = {};
+        (dressingsRes.data || []).forEach(d => { dressingsById[d.id] = d; });
+        (dressingLinksRes.data || []).forEach(l => {
+            const dressing = dressingsById[l.dressing_id];
+            if (!dressing) return;
+            if (!dressingsByMenuItem[l.menu_item_id]) dressingsByMenuItem[l.menu_item_id] = [];
+            dressingsByMenuItem[l.menu_item_id].push(dressing);
+        });
         menuPeriods = periodsRes.data || [];
+        dressingsList = dressingsRes.data || [];
     }
 
     // Dietary tags — real relation via dietary_tags + one join table per item
@@ -71,23 +101,41 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     // the same way options/variations are above, keyed by item id.
     const drinkItemIds = (drinkItems.data || []).map(i => i.id).filter(Boolean);
     const hhItemIds = (hhItems.data || []).map(i => i.id).filter(Boolean);
-    const [menuDietaryRes, drinkDietaryRes, hhDietaryRes] = await Promise.all([
+    const [menuDietaryRes, drinkDietaryRes, hhDietaryRes, drinkChannelRes, hhChannelRes] = await Promise.all([
         foodItemIds.length ? gcrDb.from('menu_item_dietary_tags').select('menu_item_id, tag:dietary_tag_id(id, name, icon)').in('menu_item_id', foodItemIds) : Promise.resolve({ data: [] }),
         drinkItemIds.length ? gcrDb.from('drink_item_dietary_tags').select('drink_item_id, tag:dietary_tag_id(id, name, icon)').in('drink_item_id', drinkItemIds) : Promise.resolve({ data: [] }),
         hhItemIds.length ? gcrDb.from('happy_hour_item_dietary_tags').select('happy_hour_item_id, tag:dietary_tag_id(id, name, icon)').in('happy_hour_item_id', hhItemIds) : Promise.resolve({ data: [] }),
+        drinkItemIds.length ? gcrDb.from('drink_item_channel_prices').select('drink_item_id, channel, price, source').in('drink_item_id', drinkItemIds) : Promise.resolve({ data: [] }),
+        hhItemIds.length ? gcrDb.from('happy_hour_item_channel_prices').select('happy_hour_item_id, channel, price, source').in('happy_hour_item_id', hhItemIds) : Promise.resolve({ data: [] }),
     ]);
     const buildDietaryMap = (rows, fk) => {
         const map = {};
         (rows || []).forEach(r => { (map[r[fk]] = map[r[fk]] || []).push(r.tag); });
         return map;
     };
+    const buildChannelMap = (rows, fk) => {
+        const map = {};
+        (rows || []).forEach(r => { (map[r[fk]] = map[r[fk]] || []).push({ channel: r.channel, price: parseFloat(r.price) || 0, source: r.source || null }); });
+        return map;
+    };
     const menuDietaryByItem = buildDietaryMap(menuDietaryRes.data, 'menu_item_id');
     const drinkDietaryByItem = buildDietaryMap(drinkDietaryRes.data, 'drink_item_id');
     const hhDietaryByItem = buildDietaryMap(hhDietaryRes.data, 'happy_hour_item_id');
+    const drinkChannelByItem = buildChannelMap(drinkChannelRes.data, 'drink_item_id');
+    const hhChannelByItem = buildChannelMap(hhChannelRes.data, 'happy_hour_item_id');
 
-    const groupItems = (sections, items, priceField, optionsMap, dietaryMap) => {
+    const groupItems = (sections, items, priceField, optionsMap, dietaryMap, channelMap, dressingMap) => {
         const byId = {};
-        (sections.data || []).forEach(s => { byId[s.id] = { name: s.section_name, items: [] }; });
+        (sections.data || []).forEach(s => {
+            byId[s.id] = {
+                name: s.section_name, items: [],
+                meal_period: s.meal_period || null,
+                description: s.description || null,
+                default_accompaniment: s.default_accompaniment || null,
+                substitution_notes: s.substitution_notes || null,
+                source: s.source || null,
+            };
+        });
         (items.data || []).forEach(i => {
             const bucket = byId[i.section_id];
             if (!bucket) return;
@@ -103,14 +151,17 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                     || (Array.isArray(i.modifiers) ? i.modifiers : []),
                 variations: variationsByItem[i.id] || [],
                 dietary_tags: (dietaryMap && dietaryMap[i.id]) || [],
+                channel_prices: (channelMap && channelMap[i.id]) || [],
+                dressings: (dressingMap && dressingMap[i.id]) || [],
+                source: i.source || null,
             });
         });
         return Object.values(byId).filter(s => s.items.length);
     };
 
-    const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem, menuDietaryByItem);
-    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price', null, drinkDietaryByItem);
-    const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price', null, hhDietaryByItem);
+    const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem, menuDietaryByItem, channelPricesByMenuItem, dressingsByMenuItem);
+    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price', null, drinkDietaryByItem, drinkChannelByItem);
+    const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price', null, hhDietaryByItem, hhChannelByItem);
 
     const social_links = {};
     (social.data || []).forEach(s => { if (s.account_url) social_links[s.platform] = s.account_url; });
@@ -131,11 +182,12 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         address: entity.address_line_1 || '',
         phone: entity.phone || entity.national_phone || '',
         sections: {
-            food: foodSections.map(s => ({ name: s.name, items: s.items })),
-            drink: drinkSectionsOut.map(s => ({ name: s.name, items: s.items })),
-            happy_hour: hhSectionsOut.map(s => ({ name: s.name, items: s.items })),
+            food: foodSections.map(s => ({ name: s.name, items: s.items, meal_period: s.meal_period, description: s.description, default_accompaniment: s.default_accompaniment, substitution_notes: s.substitution_notes, source: s.source })),
+            drink: drinkSectionsOut.map(s => ({ name: s.name, items: s.items, meal_period: s.meal_period, description: s.description, default_accompaniment: s.default_accompaniment, substitution_notes: s.substitution_notes, source: s.source })),
+            happy_hour: hhSectionsOut.map(s => ({ name: s.name, items: s.items, meal_period: s.meal_period, description: s.description, default_accompaniment: s.default_accompaniment, substitution_notes: s.substitution_notes, source: s.source })),
         },
         menu: foodSections.map(s => ({ category: s.name, items: s.items })),
+        dressings: dressingsList.map(d => ({ id: d.id, name: d.name, price: parseFloat(d.price) || 0 })),
         events: events.data || [],
         specials: specials.data || [],
         photos: photos.data || [],
