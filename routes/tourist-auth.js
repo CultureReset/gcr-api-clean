@@ -477,11 +477,45 @@ async function twilioClient() {
     throw new Error('Twilio auth failed for every credential combination (last error: ' + (lastErr?.message || 'unknown') + ')');
 }
 
-async function verifyService() {
+// The Verify service SID has the same problem as the account SID: the env var
+// has held an AC... (account SID) instead of a VA... (Verify service SID),
+// which 404s on every send. Resolve it defensively: take the first VA-shaped
+// value from env or platform_config; failing that, ask Twilio for the
+// account's Verify services and use the first one, creating one if the
+// account has none. Discovered SIDs are written back to platform_config so
+// later cold starts skip discovery.
+let cachedVerifyServiceSid = null;
+
+async function resolveVerifyServiceSid(client) {
+    if (cachedVerifyServiceSid) return cachedVerifyServiceSid;
+
     const cfg = await dbTwilioConfig();
-    const serviceSid = (process.env.TWILIO_VERIFY_SERVICE_SID || '').trim() || cfg.twilio_verify_service_sid || '';
-    if (!serviceSid) throw new Error('TWILIO_VERIFY_SERVICE_SID not configured (env or platform_config)');
-    return (await twilioClient()).verify.v2.services(serviceSid);
+    for (const sid of [(process.env.TWILIO_VERIFY_SERVICE_SID || '').trim(), cfg.twilio_verify_service_sid || '']) {
+        if (sid.startsWith('VA')) {
+            cachedVerifyServiceSid = sid;
+            return sid;
+        }
+    }
+
+    const services = await client.verify.v2.services.list({ limit: 20 });
+    let svc = services[0];
+    if (!svc) svc = await client.verify.v2.services.create({ friendlyName: 'Gulf Coast Radar' });
+    cachedVerifyServiceSid = svc.sid;
+
+    Promise.resolve(
+        mainDb.from('platform_config').upsert(
+            { key: 'twilio_verify_service_sid', value: svc.sid, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+        )
+    ).catch(() => {});
+
+    return svc.sid;
+}
+
+async function verifyService() {
+    const client = await twilioClient();
+    const serviceSid = await resolveVerifyServiceSid(client);
+    return client.verify.v2.services(serviceSid);
 }
 
 // TEMP (branch-only): GET /phone-diag — confirms the configured Twilio
@@ -503,6 +537,7 @@ router.get('/phone-diag', async (req, res) => {
         const svc = await (await verifyService()).fetch();
         out.result = 'ok';
         out.verifyServiceName = svc.friendlyName;
+        out.resolvedVerifyServiceSid = mask(svc.sid);
         out.activeAccountSid = mask((await twilioClient()).accountSid);
     } catch (e) {
         out.result = 'error';
