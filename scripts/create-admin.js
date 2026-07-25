@@ -4,8 +4,13 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
 
-const email = process.argv[2] || 'info@cybercheckinc.com';
-const password = process.argv[3] || 'Cybercheckinc!';
+const email = process.argv[2];
+const password = process.argv[3];
+
+if (!email || !password) {
+  console.error('Usage: node scripts/create-admin.js <email> <password>');
+  process.exit(1);
+}
 
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
@@ -36,8 +41,7 @@ async function createAdmin() {
 
     console.log('✅ Admin user created successfully!');
     console.log(`Email: ${email}`);
-    console.log(`Password: ${password}`);
-    console.log('\nYou can now login to cybercheck-login with these credentials.');
+    console.log('\nYou can now login to cybercheck-login with the password you provided.');
   } catch (err) {
     console.error('Fatal error:', err.message);
     process.exit(1);
