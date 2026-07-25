@@ -50,6 +50,36 @@ function normalizeImageUrl(url) {
   return url;
 }
 
+// A business with any uploaded photo should never show as photo-less on
+// listing/profile pages just because nobody set hero_image_url — fall back to
+// the designated cover photo, then whichever photo sorts first. Photos passed
+// in are expected already-normalized (already run through normalizeImageUrl).
+function pickHeroFromPhotos(photos) {
+  if (!photos || !photos.length) return null;
+  const cover = photos.find(p => p.is_cover);
+  return (cover || photos[0])?.url || null;
+}
+
+// Google's Places API (v1) photo media endpoint 403s on every request unless
+// a `key=` is attached to the URL — a large batch of imported entity rows
+// stored the bare media URL with no key, so it's a guaranteed-broken image
+// forever (the rehost tool fixes this at the data level by copying the photo
+// into permanent storage; until that's run for a given entity, treat the URL
+// as unusable rather than serving something we know will never load).
+function isKnownBrokenHeroUrl(url) {
+  if (!url) return false;
+  return /places\.googleapis\.com/i.test(url) && !/[?&]key=/.test(url);
+}
+
+// Single source of truth for "what image represents this business": an
+// explicit, working hero_image_url wins; otherwise fall back to any photo on
+// file rather than showing nothing (or a URL already known to be dead).
+function resolveHero(rawHeroUrl, photos) {
+  const hero = normalizeImageUrl(rawHeroUrl);
+  if (hero && !isKnownBrokenHeroUrl(hero)) return hero;
+  return pickHeroFromPhotos(photos || []);
+}
+
 // Cache-control for all GETs
 router.use((req, res, next) => {
   if (req.method === 'GET') res.set('Cache-Control', 'max-age=300, s-maxage=300, stale-while-revalidate=60');
@@ -394,7 +424,7 @@ async function buildFullEntity(slug) {
 
   return {
     ...entity,
-    hero_image_url: normalizeImageUrl(entity.hero_image_url),
+    hero_image_url: resolveHero(entity.hero_image_url, normalizedPhotos),
     // Structured per-industry facts (industry_<code> row for this business)
     industry_facts: industryFacts || null,
     // Flexible offerings (charters, rentals, tours, services) — universal
@@ -600,7 +630,7 @@ router.get('/entities', async (req, res) => {
       const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
       const avail = availMap[e.slug] || null;
       const row = {
-        ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url),
+        ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: resolveHero(e.hero_image_url, photos),
         // Flat field so GCRCard's existing (previously dead — the column
         // never existed) "🔴 Last spot!" badge logic just works.
         spots_remaining: avail ? avail.remaining_spots : null,
@@ -722,11 +752,15 @@ router.get('/entities/paginated', async (req, res) => {
 
     const [tagRows2, photoRows] = await Promise.all([
       slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption').in('entity_slug', slugs).eq('is_cover', true).limit(3000) : { data: [] },
+      // Fetch every photo per slug (not just the one flagged is_cover) so a
+      // business whose photos were never explicitly marked as cover still has
+      // something to fall back to below — pickHeroFromPhotos re-derives the
+      // is_cover preference itself.
+      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
     ]);
     const tagMap = {}, photoMap = {};
     (tagRows2.data || []).forEach(r => { if (!tagMap[r.entity_slug]) tagMap[r.entity_slug] = []; tagMap[r.entity_slug].push(r); });
-    (photoRows.data || []).forEach(r => { photoMap[r.entity_slug] = r; });
+    (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
 
     const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
@@ -741,10 +775,11 @@ router.get('/entities/paginated', async (req, res) => {
     const hasPrefSignal = Object.keys(prefScoreByTag).length > 0;
 
     const scored = (allMatching || []).map(e => {
+      const photosForSlug = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
       const row = {
         ...e,
         tags: tagMap[e.slug] || [],
-        hero_image_url: normalizeImageUrl(photoMap[e.slug]?.url || e.hero_image_url),
+        hero_image_url: resolveHero(e.hero_image_url, photosForSlug),
       };
       if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
         row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
