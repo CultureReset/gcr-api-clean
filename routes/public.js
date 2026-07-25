@@ -65,7 +65,27 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
         menuPeriods = periodsRes.data || [];
     }
 
-    const groupItems = (sections, items, priceField, optionsMap) => {
+    // Dietary tags — real relation via dietary_tags + one join table per item
+    // type (menu_item_dietary_tags / drink_item_dietary_tags /
+    // happy_hour_item_dietary_tags), not the old flat tags[] string. Fetched
+    // the same way options/variations are above, keyed by item id.
+    const drinkItemIds = (drinkItems.data || []).map(i => i.id).filter(Boolean);
+    const hhItemIds = (hhItems.data || []).map(i => i.id).filter(Boolean);
+    const [menuDietaryRes, drinkDietaryRes, hhDietaryRes] = await Promise.all([
+        foodItemIds.length ? gcrDb.from('menu_item_dietary_tags').select('menu_item_id, tag:dietary_tag_id(id, name, icon)').in('menu_item_id', foodItemIds) : Promise.resolve({ data: [] }),
+        drinkItemIds.length ? gcrDb.from('drink_item_dietary_tags').select('drink_item_id, tag:dietary_tag_id(id, name, icon)').in('drink_item_id', drinkItemIds) : Promise.resolve({ data: [] }),
+        hhItemIds.length ? gcrDb.from('happy_hour_item_dietary_tags').select('happy_hour_item_id, tag:dietary_tag_id(id, name, icon)').in('happy_hour_item_id', hhItemIds) : Promise.resolve({ data: [] }),
+    ]);
+    const buildDietaryMap = (rows, fk) => {
+        const map = {};
+        (rows || []).forEach(r => { (map[r[fk]] = map[r[fk]] || []).push(r.tag); });
+        return map;
+    };
+    const menuDietaryByItem = buildDietaryMap(menuDietaryRes.data, 'menu_item_id');
+    const drinkDietaryByItem = buildDietaryMap(drinkDietaryRes.data, 'drink_item_id');
+    const hhDietaryByItem = buildDietaryMap(hhDietaryRes.data, 'happy_hour_item_id');
+
+    const groupItems = (sections, items, priceField, optionsMap, dietaryMap) => {
         const byId = {};
         (sections.data || []).forEach(s => { byId[s.id] = { name: s.section_name, items: [] }; });
         (items.data || []).forEach(i => {
@@ -82,14 +102,15 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
                 modifiers: (optionsMap && optionsMap[i.id])
                     || (Array.isArray(i.modifiers) ? i.modifiers : []),
                 variations: variationsByItem[i.id] || [],
+                dietary_tags: (dietaryMap && dietaryMap[i.id]) || [],
             });
         });
         return Object.values(byId).filter(s => s.items.length);
     };
 
-    const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem);
-    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price');
-    const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price');
+    const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem, menuDietaryByItem);
+    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price', null, drinkDietaryByItem);
+    const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price', null, hhDietaryByItem);
 
     const social_links = {};
     (social.data || []).forEach(s => { if (s.account_url) social_links[s.platform] = s.account_url; });
@@ -2902,6 +2923,21 @@ router.get('/business', async (req, res) => {
         });
     } catch (err) {
         console.error('business error:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET /api/public/dietary-tags — the shared catalog (no auth: just reference
+// data, same list every business/editor/consumer app picks from).
+// ============================================
+router.get('/dietary-tags', async (req, res) => {
+    try {
+        const gcrDb = require('../db');
+        const { data, error } = await gcrDb.from('dietary_tags').select('*').order('sort_order');
+        if (error) return res.status(500).json({ error: error.message });
+        res.json(data || []);
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });

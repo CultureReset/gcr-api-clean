@@ -219,13 +219,30 @@ router.get('/:slug/data', pinAuth, async (req, res) => {
     (hhSections.data || []).length ? db.from('happy_hour_items').select('*').in('section_id', (hhSections.data || []).map(s => s.id)).order('id') : { data: [] },
   ]);
 
+  // Dietary tags per item, so the editor shows current state without an
+  // extra round trip per row. Keyed by fk column so each item type's tags
+  // attach to the right rows below.
+  const [menuTagRows, drinkTagRows, hhTagRows] = await Promise.all([
+    (menuItems.data || []).length ? db.from('menu_item_dietary_tags').select('menu_item_id, tag:dietary_tag_id(id, name, icon)').in('menu_item_id', menuItems.data.map(i => i.id)) : { data: [] },
+    (drinkItems.data || []).length ? db.from('drink_item_dietary_tags').select('drink_item_id, tag:dietary_tag_id(id, name, icon)').in('drink_item_id', drinkItems.data.map(i => i.id)) : { data: [] },
+    (hhItems.data || []).length ? db.from('happy_hour_item_dietary_tags').select('happy_hour_item_id, tag:dietary_tag_id(id, name, icon)').in('happy_hour_item_id', hhItems.data.map(i => i.id)) : { data: [] },
+  ]);
+  const tagsByFk = (rows, fk) => {
+    const map = {};
+    (rows || []).forEach(r => { (map[r[fk]] = map[r[fk]] || []).push(r.tag); });
+    return map;
+  };
+  const menuTagsById = tagsByFk(menuTagRows.data, 'menu_item_id');
+  const drinkTagsById = tagsByFk(drinkTagRows.data, 'drink_item_id');
+  const hhTagsById = tagsByFk(hhTagRows.data, 'happy_hour_item_id');
+
   res.json({
     entity,
     tabs: buildTabManifest(entity),
     hours: hours.data || [],
-    menu_sections: (menuSections.data || []).map(s => ({ ...s, items: (menuItems.data || []).filter(i => i.section_id === s.id) })),
-    drink_sections: (drinkSections.data || []).map(s => ({ ...s, items: (drinkItems.data || []).filter(i => i.section_id === s.id) })),
-    happy_hour_sections: (hhSections.data || []).map(s => ({ ...s, items: (hhItems.data || []).filter(i => i.section_id === s.id) })),
+    menu_sections: (menuSections.data || []).map(s => ({ ...s, items: (menuItems.data || []).filter(i => i.section_id === s.id).map(i => ({ ...i, dietary_tags: menuTagsById[i.id] || [] })) })),
+    drink_sections: (drinkSections.data || []).map(s => ({ ...s, items: (drinkItems.data || []).filter(i => i.section_id === s.id).map(i => ({ ...i, dietary_tags: drinkTagsById[i.id] || [] })) })),
+    happy_hour_sections: (hhSections.data || []).map(s => ({ ...s, items: (hhItems.data || []).filter(i => i.section_id === s.id).map(i => ({ ...i, dietary_tags: hhTagsById[i.id] || [] })) })),
     specials: specials.data || [],
     events: events.data || [],
     sides: sides.data || [],
@@ -354,6 +371,49 @@ router.delete('/:slug/menu-items/:id', pinAuth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   log(req, { action: 'delete', table_name: 'menu_items', record_id: req.params.id });
   res.json({ success: true });
+});
+
+// ─── DIETARY TAGS ─────────────────────────────────────────────────────────────
+// Same catalog + join tables as /api/admin/gcr/dietary-tags — this is just the
+// PIN-scoped write path onto the identical tables, so a business editing
+// through its own PIN link and an admin editing through the dashboard are
+// changing the exact same rows, not two different systems.
+const DIETARY_ITEM_TABLES = {
+  'menu-items': { itemTable: 'menu_items', joinTable: 'menu_item_dietary_tags', fk: 'menu_item_id' },
+  'drink-items': { itemTable: 'drink_items', joinTable: 'drink_item_dietary_tags', fk: 'drink_item_id' },
+  'hh-items': { itemTable: 'happy_hour_items', joinTable: 'happy_hour_item_dietary_tags', fk: 'happy_hour_item_id' },
+};
+
+router.get('/:slug/dietary-tags', pinAuth, async (req, res) => {
+  const { data, error } = await db.from('dietary_tags').select('*').order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+Object.entries(DIETARY_ITEM_TABLES).forEach(([urlKey, { itemTable, joinTable, fk }]) => {
+  router.post(`/:slug/${urlKey}/:id/dietary-tags`, pinAuth, async (req, res) => {
+    const { dietary_tag_id } = req.body;
+    if (!dietary_tag_id) return res.status(400).json({ error: 'dietary_tag_id required' });
+    // Same ownership guard as every other route in this file — confirm the
+    // item actually belongs to the entity this PIN token is scoped to before
+    // touching the join table (it has no entity_slug column of its own).
+    const { data: item } = await db.from(itemTable).select('entity_slug').eq('id', req.params.id).maybeSingle();
+    if (!item || item.entity_slug !== req.entitySlug) return res.status(404).json({ error: 'Item not found' });
+    const row = { [fk]: req.params.id, dietary_tag_id };
+    const { data, error } = await db.from(joinTable).upsert(row, { onConflict: `${fk},dietary_tag_id` }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    log(req, { action: 'create', table_name: joinTable, record_id: data.id, new_value: data });
+    res.status(201).json(data);
+  });
+
+  router.delete(`/:slug/${urlKey}/:id/dietary-tags/:tagId`, pinAuth, async (req, res) => {
+    const { data: item } = await db.from(itemTable).select('entity_slug').eq('id', req.params.id).maybeSingle();
+    if (!item || item.entity_slug !== req.entitySlug) return res.status(404).json({ error: 'Item not found' });
+    const { error } = await db.from(joinTable).delete().eq(fk, req.params.id).eq('dietary_tag_id', req.params.tagId);
+    if (error) return res.status(500).json({ error: error.message });
+    log(req, { action: 'delete', table_name: joinTable, record_id: req.params.id });
+    res.json({ success: true });
+  });
 });
 
 // ─── DRINK SECTIONS + ITEMS ───────────────────────────────────────────────────

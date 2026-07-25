@@ -2530,6 +2530,100 @@ router.delete('/gcr/menu-item-variations/:id', authRequired, async (req, res) =>
   res.json({ success: true });
 });
 
+// ─── DIETARY TAGS (catalog + per-item relations) ───────────────────────────────
+// Same shape as menu_item_options: a shared catalog table (dietary_tags) plus
+// one join table per item type (menu/drink/happy-hour), so "Gluten-Free" is
+// one canonical row every item links to instead of a re-typed tags[] string.
+//
+// The catalog is admin-curated (adminRequired) so it can't fork into
+// "Gluten-Free" / "gluten-free" / "GF" duplicates. Assigning a tag to an
+// item is authRequired + an ownership check: an admin token can tag any
+// entity's items; a business-account token (role != 'admin') can only tag
+// items belonging to an entity it's linked to via entity_owners. This mirrors
+// exactly how the menu-editor's PIN-token routes scope every write to
+// req.entitySlug — same access model, different token type.
+async function verifyEntityAccess(req, entitySlug) {
+  if (req.role === 'admin') return true;
+  if (!entitySlug) return false;
+  const uid = req.userId || req.gcrUserId;
+  if (!uid) return false;
+  const { data } = await getDb().from('entity_owners').select('id').eq('user_id', uid).eq('entity_slug', entitySlug).maybeSingle();
+  return !!data;
+}
+
+// Catalog
+router.get('/gcr/dietary-tags', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('dietary_tags').select('*').order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/dietary-tags', adminRequired, async (req, res) => {
+  const { name, icon, sort_order } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const { data, error } = await getDb().from('dietary_tags').insert({ name, icon: icon || null, sort_order: sort_order || 0 }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/dietary-tags/:id', adminRequired, async (req, res) => {
+  const { name, icon, sort_order } = req.body;
+  const patch = {};
+  if (name !== undefined) patch.name = name;
+  if (icon !== undefined) patch.icon = icon;
+  if (sort_order !== undefined) patch.sort_order = sort_order;
+  const { data, error } = await getDb().from('dietary_tags').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/dietary-tags/:id', adminRequired, async (req, res) => {
+  const { error } = await getDb().from('dietary_tags').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// Per-item assignment — one route family per item type, same pattern each time.
+const DIETARY_ITEM_TABLES = {
+  'menu-items':      { itemTable: 'menu_items',        joinTable: 'menu_item_dietary_tags',        fk: 'menu_item_id' },
+  'drink-items':      { itemTable: 'drink_items',        joinTable: 'drink_item_dietary_tags',       fk: 'drink_item_id' },
+  'hh-items':        { itemTable: 'happy_hour_items',  joinTable: 'happy_hour_item_dietary_tags',  fk: 'happy_hour_item_id' },
+};
+
+Object.entries(DIETARY_ITEM_TABLES).forEach(([urlKey, { itemTable, joinTable, fk }]) => {
+  // GET current tags on an item
+  router.get(`/gcr/${urlKey}/:id/dietary-tags`, authRequired, async (req, res) => {
+    const { data, error } = await getDb().from(joinTable).select('dietary_tag_id, tag:dietary_tag_id(id, name, icon)').eq(fk, req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json((data || []).map(r => r.tag));
+  });
+
+  // POST assign a tag — body: { dietary_tag_id }
+  router.post(`/gcr/${urlKey}/:id/dietary-tags`, authRequired, async (req, res) => {
+    const { dietary_tag_id } = req.body;
+    if (!dietary_tag_id) return res.status(400).json({ error: 'dietary_tag_id required' });
+    const db = getDb();
+    const { data: item } = await db.from(itemTable).select('entity_slug').eq('id', req.params.id).maybeSingle();
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+    const row = { [fk]: req.params.id, dietary_tag_id };
+    const { data, error } = await db.from(joinTable).upsert(row, { onConflict: `${fk},dietary_tag_id` }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.status(201).json(data);
+  });
+
+  // DELETE unassign a tag
+  router.delete(`/gcr/${urlKey}/:id/dietary-tags/:tagId`, authRequired, async (req, res) => {
+    const db = getDb();
+    const { data: item } = await db.from(itemTable).select('entity_slug').eq('id', req.params.id).maybeSingle();
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!(await verifyEntityAccess(req, item.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+    const { error } = await db.from(joinTable).delete().eq(fk, req.params.id).eq('dietary_tag_id', req.params.tagId);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  });
+});
+
 // ─── PROFILE SECTION ROWS (generic per-entity table CRUD) ─────────────────────
 // Every table the public entity payload displays (gcr.js conditional queries)
 // gets an admin edit path through one whitelisted route family. Keys are the
