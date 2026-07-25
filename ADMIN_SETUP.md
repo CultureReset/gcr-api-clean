@@ -31,17 +31,9 @@ This installs:
 
 ## Step 3: Create an admin user
 
-Run the script to create your admin account:
+Run the script to create your admin account, passing the email and password
+you want to use (both are required — there is no default):
 
-```bash
-node scripts/create-admin.js
-```
-
-This creates admin with:
-- Email: `info@cybercheckinc.com`
-- Password: `Cybercheckinc!`
-
-Or customize:
 ```bash
 node scripts/create-admin.js your-email@example.com your-password
 ```
@@ -61,8 +53,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ## Step 5: Login to cybercheck-login
 
 1. Go to `https://cybercheck-login.vercel.app/login.html` (or local)
-2. Email: `info@cybercheckinc.com`
-3. Password: `Cybercheckinc!`
+2. Email: the email you created in Step 3
+3. Password: the password you created in Step 3
 4. Click "Sign In"
 
 You should now have access to the admin dashboard connected to gcr-api-clean-fresh!
@@ -72,7 +64,7 @@ You should now have access to the admin dashboard connected to gcr-api-clean-fre
 ```bash
 curl -X POST https://gcr-api-clean-fresh.vercel.app/api/admin/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"info@cybercheckinc.com","password":"Cybercheckinc!"}'
+  -d '{"email":"your-email@example.com","password":"your-password"}'
 ```
 
 Response should be:

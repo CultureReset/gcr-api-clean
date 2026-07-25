@@ -485,10 +485,8 @@ CREATE TABLE IF NOT EXISTS admin_users (
 
 CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
 
--- Insert default admin (password: Cybercheckinc!)
-INSERT INTO admin_users (email, password_hash, role)
-VALUES ('info@cybercheckinc.com', '$2b$10$7/kZVTKxJMQqzfVx8vfM/.7Hy.5l.xHMuR8qVm0VlKjZ7VzKRkVpm', 'admin')
-ON CONFLICT (email) DO NOTHING;
+-- To create the initial admin account, run: node scripts/create-admin.js <email> <password>
+-- (do not hardcode credentials or password hashes in this file)
 
 -- ============================================================
 -- MISSING TABLES FOR MINI-SITE COMPLETION
