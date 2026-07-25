@@ -406,10 +406,43 @@ router.post('/reset-password', async (req, res) => {
 
 const twilio = require('twilio');
 
-function verifyService() {
-    if (!process.env.TWILIO_VERIFY_SERVICE_SID) throw new Error('TWILIO_VERIFY_SERVICE_SID not configured');
-    return twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-        .verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID);
+// TWILIO_ACCOUNT_SID may hold either the real Account SID (AC...) or an API
+// Key SID (SK...) — the Twilio Console pushes API keys, so SK + secret is what
+// often ends up pasted into Vercel. The twilio() constructor rejects SK unless
+// the owning account's AC SID is passed alongside it, so for SK credentials we
+// look the account up once via the REST API (API keys are authorized to list
+// their own account) and cache it for the life of the lambda.
+let cachedAccountSid = null;
+
+async function twilioClient() {
+    const sid    = (process.env.TWILIO_ACCOUNT_SID || '').trim();
+    const secret = (process.env.TWILIO_AUTH_TOKEN || '').trim();
+    if (!sid || !secret) throw new Error('TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not configured');
+
+    if (sid.startsWith('AC')) return twilio(sid, secret);
+
+    if (sid.startsWith('SK')) {
+        if (!cachedAccountSid) {
+            const resp = await fetch('https://api.twilio.com/2010-04-01/Accounts.json?PageSize=1', {
+                headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${secret}`).toString('base64') },
+            });
+            if (!resp.ok) {
+                throw new Error(`Twilio API key auth failed while resolving account SID (HTTP ${resp.status}) — check that TWILIO_AUTH_TOKEN is this API key's secret`);
+            }
+            const data = await resp.json();
+            cachedAccountSid = data?.accounts?.[0]?.sid || null;
+            if (!cachedAccountSid) throw new Error('Could not resolve account SID from Twilio API key');
+        }
+        return twilio(sid, secret, { accountSid: cachedAccountSid });
+    }
+
+    throw new Error('TWILIO_ACCOUNT_SID must be an Account SID (AC...) or an API Key SID (SK...)');
+}
+
+async function verifyService() {
+    const serviceSid = (process.env.TWILIO_VERIFY_SERVICE_SID || '').trim();
+    if (!serviceSid) throw new Error('TWILIO_VERIFY_SERVICE_SID not configured');
+    return (await twilioClient()).verify.v2.services(serviceSid);
 }
 
 function normalizePhone(raw) {
@@ -425,7 +458,7 @@ router.post('/phone', async (req, res) => {
     if (!phone || phone.length < 10) return res.status(400).json({ error: 'Valid phone number required' });
 
     try {
-        await verifyService().verifications.create({ to: phone, channel: 'sms' });
+        await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
     } catch (e) {
         console.error('Twilio Verify send failed:', e.message);
         // TEMPORARY: surfacing e.message to the client to diagnose the live
@@ -461,7 +494,7 @@ router.post('/phone-verify', async (req, res) => {
         // Twilio Verify path
         let check;
         try {
-            check = await verifyService().verificationChecks.create({ to: phone, code });
+            check = await (await verifyService()).verificationChecks.create({ to: phone, code });
         } catch (e) {
             console.error('Twilio Verify check failed:', e.message);
             return res.status(400).json({ error: 'Incorrect or expired code' });
