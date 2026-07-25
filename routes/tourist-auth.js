@@ -445,6 +445,31 @@ async function verifyService() {
     return (await twilioClient()).verify.v2.services(serviceSid);
 }
 
+// TEMP (branch-only): GET /phone-diag — confirms the configured Twilio
+// credentials authenticate and the Verify service SID resolves, without
+// sending anything or exposing secrets (SIDs are masked). The sandbox this
+// branch is being debugged from can't POST to the deployment directly, so
+// this is the only way to exercise the live env vars. Remove before merge.
+router.get('/phone-diag', async (req, res) => {
+    const mask = s => (s ? `${s.slice(0, 2)}…${s.slice(-4)}` : null);
+    const out = {
+        accountSidShape: ((process.env.TWILIO_ACCOUNT_SID || '').trim().slice(0, 2)) || 'missing',
+        accountSid: mask((process.env.TWILIO_ACCOUNT_SID || '').trim()),
+        verifyServiceSid: mask((process.env.TWILIO_VERIFY_SERVICE_SID || '').trim()),
+        hasAuthToken: !!(process.env.TWILIO_AUTH_TOKEN || '').trim(),
+    };
+    try {
+        const svc = await (await verifyService()).fetch();
+        out.result = 'ok';
+        out.verifyServiceName = svc.friendlyName;
+    } catch (e) {
+        out.result = 'error';
+        out.error = e.message;
+        out.twilioStatus = e.status || null;
+    }
+    res.json(out);
+});
+
 function normalizePhone(raw) {
     const digits = (raw || '').replace(/\D/g, '');
     if (digits.length === 10) return `+1${digits}`;
