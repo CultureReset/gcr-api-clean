@@ -406,42 +406,81 @@ router.post('/reset-password', async (req, res) => {
 
 const twilio = require('twilio');
 
-// TWILIO_ACCOUNT_SID may hold either the real Account SID (AC...) or an API
-// Key SID (SK...) — the Twilio Console pushes API keys, so SK + secret is what
-// often ends up pasted into Vercel. The twilio() constructor rejects SK unless
-// the owning account's AC SID is passed alongside it, so for SK credentials we
-// look the account up once via the REST API (API keys are authorized to list
-// their own account) and cache it for the life of the lambda.
-let cachedAccountSid = null;
+// Twilio credential resolution that does not depend on the Vercel env vars
+// being right. The env's TWILIO_ACCOUNT_SID has held an API Key SID (SK...)
+// instead of the Account SID (AC...), which the twilio() constructor rejects
+// outright — so the platform_config table in the GCR Supabase (RLS enabled,
+// no policies: service-key access only, never exposed to the anon key) is a
+// second source of truth under the keys twilio_account_sid /
+// twilio_auth_token / twilio_verify_service_sid. Secrets stay out of this
+// public repo — GitHub push protection blocks them and Twilio revokes any
+// token it finds on GitHub.
+//
+// Every plausible (sid, token) pairing from env + DB is built into a client
+// candidate, each is probed with a cheap authenticated account fetch, and the
+// first that authenticates is cached for the life of the lambda.
+let cachedClient = null;
+let dbConfigPromise = null;
+
+function dbTwilioConfig() {
+    if (!dbConfigPromise) {
+        dbConfigPromise = Promise.resolve(
+            mainDb.from('platform_config')
+                .select('key, value')
+                .in('key', ['twilio_account_sid', 'twilio_auth_token', 'twilio_verify_service_sid'])
+        ).then(({ data }) => Object.fromEntries((data || []).map(r => [r.key, (r.value || '').trim()])))
+         .catch(() => ({}));
+    }
+    return dbConfigPromise;
+}
 
 async function twilioClient() {
-    const sid    = (process.env.TWILIO_ACCOUNT_SID || '').trim();
-    const secret = (process.env.TWILIO_AUTH_TOKEN || '').trim();
-    if (!sid || !secret) throw new Error('TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not configured');
+    if (cachedClient) return cachedClient;
 
-    if (sid.startsWith('AC')) return twilio(sid, secret);
+    const envSid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
+    const envTok = (process.env.TWILIO_AUTH_TOKEN || '').trim();
+    const cfg    = await dbTwilioConfig();
+    const dbSid  = (cfg.twilio_account_sid || '');
+    const dbTok  = (cfg.twilio_auth_token || '');
 
-    if (sid.startsWith('SK')) {
-        if (!cachedAccountSid) {
-            const resp = await fetch('https://api.twilio.com/2010-04-01/Accounts.json?PageSize=1', {
-                headers: { Authorization: 'Basic ' + Buffer.from(`${sid}:${secret}`).toString('base64') },
-            });
-            if (!resp.ok) {
-                throw new Error(`Twilio API key auth failed while resolving account SID (HTTP ${resp.status}) — check that TWILIO_AUTH_TOKEN is this API key's secret`);
-            }
-            const data = await resp.json();
-            cachedAccountSid = data?.accounts?.[0]?.sid || null;
-            if (!cachedAccountSid) throw new Error('Could not resolve account SID from Twilio API key');
-        }
-        return twilio(sid, secret, { accountSid: cachedAccountSid });
+    // Best AC-shaped account SID available (DB wins — it's curated)
+    const acSid = dbSid.startsWith('AC') ? dbSid : (envSid.startsWith('AC') ? envSid : '');
+
+    const candidates = [];
+    const seen = new Set();
+    const push = (sid, tok, opts) => {
+        if (!sid || !tok) return;
+        const k = `${sid}:${tok}:${opts?.accountSid || ''}`;
+        if (seen.has(k)) return;
+        seen.add(k);
+        try { candidates.push(twilio(sid, tok, opts)); } catch (_) { /* malformed pair — skip */ }
+    };
+
+    for (const tok of [envTok, dbTok]) {
+        if (envSid.startsWith('AC')) push(envSid, tok);                          // classic config
+        if (envSid.startsWith('SK') && acSid) push(envSid, tok, { accountSid: acSid }); // API key pair
+        if (acSid) push(acSid, tok);                                             // curated AC + token
     }
 
-    throw new Error('TWILIO_ACCOUNT_SID must be an Account SID (AC...) or an API Key SID (SK...)');
+    if (!candidates.length) throw new Error('No usable Twilio credentials found in env or platform_config');
+
+    let lastErr = null;
+    for (const client of candidates) {
+        try {
+            await client.api.v2010.accounts(client.accountSid).fetch();
+            cachedClient = client;
+            return client;
+        } catch (e) {
+            lastErr = e;
+        }
+    }
+    throw new Error('Twilio auth failed for every credential combination (last error: ' + (lastErr?.message || 'unknown') + ')');
 }
 
 async function verifyService() {
-    const serviceSid = (process.env.TWILIO_VERIFY_SERVICE_SID || '').trim();
-    if (!serviceSid) throw new Error('TWILIO_VERIFY_SERVICE_SID not configured');
+    const cfg = await dbTwilioConfig();
+    const serviceSid = (process.env.TWILIO_VERIFY_SERVICE_SID || '').trim() || cfg.twilio_verify_service_sid || '';
+    if (!serviceSid) throw new Error('TWILIO_VERIFY_SERVICE_SID not configured (env or platform_config)');
     return (await twilioClient()).verify.v2.services(serviceSid);
 }
 
@@ -452,16 +491,19 @@ async function verifyService() {
 // this is the only way to exercise the live env vars. Remove before merge.
 router.get('/phone-diag', async (req, res) => {
     const mask = s => (s ? `${s.slice(0, 2)}…${s.slice(-4)}` : null);
+    const cfg = await dbTwilioConfig();
     const out = {
-        accountSidShape: ((process.env.TWILIO_ACCOUNT_SID || '').trim().slice(0, 2)) || 'missing',
-        accountSid: mask((process.env.TWILIO_ACCOUNT_SID || '').trim()),
-        verifyServiceSid: mask((process.env.TWILIO_VERIFY_SERVICE_SID || '').trim()),
-        hasAuthToken: !!(process.env.TWILIO_AUTH_TOKEN || '').trim(),
+        envAccountSidShape: ((process.env.TWILIO_ACCOUNT_SID || '').trim().slice(0, 2)) || 'missing',
+        envAccountSid: mask((process.env.TWILIO_ACCOUNT_SID || '').trim()),
+        envVerifyServiceSid: mask((process.env.TWILIO_VERIFY_SERVICE_SID || '').trim()),
+        envHasAuthToken: !!(process.env.TWILIO_AUTH_TOKEN || '').trim(),
+        dbConfigKeys: Object.keys(cfg),
     };
     try {
         const svc = await (await verifyService()).fetch();
         out.result = 'ok';
         out.verifyServiceName = svc.friendlyName;
+        out.activeAccountSid = mask((await twilioClient()).accountSid);
     } catch (e) {
         out.result = 'error';
         out.error = e.message;
