@@ -428,7 +428,10 @@ router.post('/phone', async (req, res) => {
         await verifyService().verifications.create({ to: phone, channel: 'sms' });
     } catch (e) {
         console.error('Twilio Verify send failed:', e.message);
-        return res.status(500).json({ error: 'Failed to send code. Try again.' });
+        // TEMPORARY: surfacing e.message to the client to diagnose the live
+        // failure without log access. Revert to the generic message once
+        // resolved -- don't leave raw provider errors exposed long-term.
+        return res.status(500).json({ error: 'Failed to send code: ' + e.message });
     }
 
     res.json({ success: true, phone });
