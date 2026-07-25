@@ -1309,9 +1309,30 @@ router.post('/search', async (req, res) => {
     const orFilter = (...fields) =>
       keywords.flatMap(k => fields.map(f => `${f}.ilike.%${k}%`)).join(',');
 
-    // Deep multi-table match (shared with the AI concierge) + fuzzy fallback.
-    const { slugs: _matchedList, fuzzy: fuzzyMatch } = await searchEntitySlugs(q);
+    // Deep multi-table match (shared with the AI concierge) + fuzzy fallback
+    // (searchEntitySlugs only reaches for pg_trgm when substring matching comes
+    // up completely empty — a good default for the AI concierge, which wants
+    // precise matches, not lookalikes).
+    const { slugs: _matchedList, fuzzy: fuzzyFallbackUsed } = await searchEntitySlugs(q);
     const matchedSlugs = new Set(_matchedList);
+
+    // The user-facing search box needs more forgiveness than that: typing one
+    // mistyped word ("Bellagio" for "Villagio Grill") can still substring-match
+    // plenty of *other* unrelated entities on the rest of the query, so the
+    // all-zero-hits fallback above never fires and the typo's real target never
+    // shows up. Always blend in trigram-fuzzy name matches alongside whatever
+    // substring matching already found, and remember each one's similarity so
+    // ranking below can weigh a strong exact/substring hit over a loose fuzzy
+    // one instead of treating them the same.
+    const fuzzySimilarity = {};
+    const { data: fuzzyRows } = await db.rpc('fuzzy_entity_search', { search_term: term, match_limit: 30 });
+    let fuzzyMatch = fuzzyFallbackUsed;
+    (fuzzyRows || []).forEach(r => {
+      fuzzySimilarity[r.slug] = r.similarity;
+      if (!matchedSlugs.has(r.slug)) fuzzyMatch = true;
+      matchedSlugs.add(r.slug);
+    });
+
     if (!matchedSlugs.size) return res.json({ query: q, results: [], total: 0 });
 
     // Fetch full entity data for matches
@@ -1416,7 +1437,11 @@ router.post('/search', async (req, res) => {
       // keyword match (60-100) or feature match (40 each) still dominates; this only
       // breaks ties and gives "closer" a real, bounded say in "smart" ranking.
       const proximityScore = distance_miles != null ? Math.max(0, 20 - distance_miles) : 0;
-      const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0) + proximityScore;
+      // pg_trgm similarity is 0..1 — scaled well below a real substring/name hit
+      // (worth up to 60-100) so a typo-only match still surfaces but never
+      // outranks something that actually matched the typed text.
+      const fuzzyScore = (fuzzySimilarity[e.slug] || 0) * 30;
+      const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0) + proximityScore + fuzzyScore;
 
       return {
         ...e,
@@ -1488,6 +1513,54 @@ router.post('/search', async (req, res) => {
       total_items: flattenedItems.length,
       fuzzy_match: fuzzyMatch,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gcr/search/suggest ──────────────────────────────────────────────
+// Autocomplete for the search box: a handful of business names to tap while
+// still typing, so the visitor doesn't have to finish (or correctly spell) the
+// query by hand. Ranks prefix matches first, then substring matches, then
+// pg_trgm fuzzy matches (so a mid-word typo like "bellagio" still surfaces
+// "Villagio Grill"). Fetches full display fields in one follow-up query keyed
+// by slug rather than trusting fuzzy_entity_search's own return columns, so
+// the response shape doesn't depend on that RPC's definition.
+router.get('/search/suggest', async (req, res) => {
+  try {
+    const q = (req.query.q || '').toString().trim();
+    const limit = Math.min(parseInt(req.query.limit) || 8, 20);
+    if (q.length < 2) return res.json({ query: q, suggestions: [] });
+    const term = q.toLowerCase();
+
+    const rankBySlug = new Map();
+    const { data: nameRows } = await db
+      .from('entity').select('slug, name')
+      .eq('is_active', true).ilike('name', `%${term}%`).limit(limit * 3);
+    (nameRows || []).forEach(r => {
+      const rank = (r.name || '').toLowerCase().startsWith(term) ? 0 : 1;
+      if (!rankBySlug.has(r.slug) || rankBySlug.get(r.slug) > rank) rankBySlug.set(r.slug, rank);
+    });
+
+    // Not enough exact/substring hits — blend in fuzzy matches so a misspelled
+    // query still fills the dropdown instead of coming up short or empty.
+    if (rankBySlug.size < limit) {
+      const { data: fuzzyRows } = await db.rpc('fuzzy_entity_search', { search_term: term, match_limit: limit * 2 });
+      (fuzzyRows || []).forEach(r => { if (!rankBySlug.has(r.slug)) rankBySlug.set(r.slug, 2); });
+    }
+
+    if (!rankBySlug.size) return res.json({ query: q, suggestions: [] });
+
+    const { data: entities, error } = await db
+      .from('entity').select('slug, name, city, icon, entity_subtype, hero_image_url')
+      .eq('is_active', true).in('slug', [...rankBySlug.keys()]);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const suggestions = (entities || [])
+      .sort((a, b) => rankBySlug.get(a.slug) - rankBySlug.get(b.slug))
+      .slice(0, limit);
+
+    res.json({ query: q, suggestions });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
