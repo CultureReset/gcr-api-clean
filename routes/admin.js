@@ -3662,3 +3662,245 @@ router.delete('/social-posts/:id', authRequired, async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ─── APP CATALOG (App Manager tab) ─────────────────────────────────────────
+// GET /api/admin/apps — full catalog for editing (all statuses, not just active)
+router.get('/apps', authRequired, async (req, res) => {
+  try {
+    const { data, error } = await getDb().from('apps').select('*').order('category', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json((data || []).map(a => ({ ...a, active: a.status !== 'inactive' })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/apps — create a new app
+router.post('/apps', authRequired, async (req, res) => {
+  try {
+    const { app_id, name, description, category, type, monthly_price, icon, script_url, business_types, active } = req.body;
+    if (!app_id || !name) return res.status(400).json({ error: 'app_id and name required' });
+    const { data, error } = await getDb().from('apps').insert({
+      app_id, name,
+      description: description || null,
+      category: category || null,
+      type: type || 'dashboard',
+      monthly_price: monthly_price || 0,
+      icon: icon || null,
+      script_url: script_url || null,
+      business_types: business_types || [],
+      status: active === false ? 'inactive' : 'active'
+    }).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, app: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/admin/apps/:appId — update an app
+router.put('/apps/:appId', authRequired, async (req, res) => {
+  try {
+    const { name, description, category, type, monthly_price, icon, script_url, business_types, active } = req.body;
+    const { data, error } = await getDb().from('apps').update({
+      name,
+      description: description || null,
+      category: category || null,
+      type: type || 'dashboard',
+      monthly_price: monthly_price || 0,
+      icon: icon || null,
+      script_url: script_url || null,
+      business_types: business_types || [],
+      status: active === false ? 'inactive' : 'active'
+    }).eq('app_id', req.params.appId).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, app: data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/apps/:appId — delete an app and uninstall it from every business
+router.delete('/apps/:appId', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    await db.from('site_apps').delete().eq('app_id', req.params.appId);
+    const { error } = await db.from('apps').delete().eq('app_id', req.params.appId);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── BUSINESS APPS (assign catalog apps to specific businesses) ────────────
+// GET /api/admin/businesses?include_apps=true
+router.get('/businesses', authRequired, async (req, res) => {
+  try {
+    const db = getDb();
+    const { data: bizList, error } = await db.from('businesses')
+      .select('id, slug, name, category, is_active')
+      .order('name', { ascending: true });
+    if (error) return res.status(500).json({ error: error.message });
+
+    if (req.query.include_apps !== 'true') {
+      return res.json((bizList || []).map(b => ({ site_id: b.id, subdomain: b.slug, name: b.name, type: b.category })));
+    }
+
+    const { data: installs } = await db.from('site_apps').select('site_id, app_id').eq('enabled', true);
+    const bySite = {};
+    (installs || []).forEach(i => { (bySite[i.site_id] = bySite[i.site_id] || []).push({ app_id: i.app_id }); });
+
+    res.json((bizList || []).map(b => ({
+      site_id: b.id,
+      subdomain: b.slug,
+      name: b.name,
+      type: b.category,
+      installed_apps: bySite[b.id] || []
+    })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/admin/site-apps — install an app for a business
+router.post('/site-apps', authRequired, async (req, res) => {
+  try {
+    const { site_id, app_id } = req.body;
+    if (!site_id || !app_id) return res.status(400).json({ error: 'site_id and app_id required' });
+    const { error } = await getDb().from('site_apps')
+      .upsert({ site_id, app_id, enabled: true }, { onConflict: 'site_id,app_id' });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/admin/site-apps — uninstall an app for a business
+router.delete('/site-apps', authRequired, async (req, res) => {
+  try {
+    const { site_id, app_id } = req.body;
+    if (!site_id || !app_id) return res.status(400).json({ error: 'site_id and app_id required' });
+    const { error } = await getDb().from('site_apps').delete().eq('site_id', site_id).eq('app_id', app_id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── RAW DATA AI PARSE (entity editor "Raw Data Paste" tab) ────────────────
+// POST /api/admin/gcr/parse-raw-data — AI-parse pasted text into a flat item list
+router.post('/gcr/parse-raw-data', authRequired, async (req, res) => {
+  try {
+    const { data_type, raw_data } = req.body;
+    if (!raw_data || !raw_data.trim()) return res.status(400).json({ error: 'raw_data required' });
+
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const fieldHints = {
+      menu: 'item_name, description (optional), price (optional number)',
+      drinks: 'item_name, description (optional), price (optional number)',
+      happy_hour: 'item_name, description (optional), price (optional number), original_price (optional number)',
+      specials: 'item_name (the special\'s name), description (optional), discount_text (optional)',
+      events: 'item_name (the event name), description (optional), event_date (optional, YYYY-MM-DD)'
+    }[data_type] || 'item_name, description (optional), price (optional number)';
+
+    const prompt = `Parse the following raw text into a flat JSON array of "${data_type}" items.
+Each item should only have these fields: ${fieldHints}.
+Extract ONLY what's actually present in the text — do not invent data. Return ONLY a valid JSON array, no markdown fencing, no wrapping object.
+
+RAW TEXT:
+${raw_data}`;
+
+    const message = await client.messages.create({
+      model: 'claude-opus-4-7',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const responseText = message.content[0]?.type === 'text' ? message.content[0].text : '[]';
+    let items;
+    try {
+      items = JSON.parse(responseText);
+    } catch (e) {
+      const match = responseText.match(/\[[\s\S]*\]/);
+      if (!match) return res.status(400).json({ error: 'AI did not return valid JSON' });
+      items = JSON.parse(match[0]);
+    }
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'Expected a JSON array of items' });
+
+    res.json({ parsed_items: items });
+  } catch (e) {
+    res.status(500).json({ error: 'Parse failed: ' + e.message });
+  }
+});
+
+// POST /api/admin/gcr/save-parsed-items — save AI-parsed items into the entity's real tables
+router.post('/gcr/save-parsed-items', authRequired, async (req, res) => {
+  try {
+    const { entity_id, data_type, items } = req.body;
+    if (!entity_id || !data_type || !Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: 'entity_id, data_type, and items required' });
+    }
+    const db = getDb();
+    const { data: entity, error: entErr } = await db.from('entity').select('slug').eq('id', entity_id).single();
+    if (entErr || !entity) return res.status(404).json({ error: 'Entity not found' });
+    const slug = entity.slug;
+
+    async function getOrCreateSection(sectionsTable, name) {
+      const { data: existing } = await db.from(sectionsTable).select('id').eq('entity_slug', slug).eq('section_name', name).maybeSingle();
+      if (existing) return existing.id;
+      const { data: created, error } = await db.from(sectionsTable).insert({ entity_slug: slug, section_name: name }).select('id').single();
+      if (error) throw new Error(error.message);
+      return created.id;
+    }
+
+    let saved = 0;
+    if (data_type === 'menu' || data_type === 'drinks' || data_type === 'happy_hour') {
+      const table = { menu: 'menu', drinks: 'drink', happy_hour: 'happy_hour' }[data_type];
+      const sectionId = await getOrCreateSection(table + '_sections', 'Imported Items');
+      const rows = items.map(i => ({
+        entity_slug: slug,
+        section_id: sectionId,
+        item_name: i.item_name || i.name,
+        description: i.description || null,
+        price: i.price != null && i.price !== '' ? parseFloat(i.price) : null,
+        ...(data_type === 'happy_hour' ? { original_price: i.original_price != null && i.original_price !== '' ? parseFloat(i.original_price) : null } : {})
+      }));
+      const { error } = await db.from(table + '_items').insert(rows);
+      if (error) return res.status(500).json({ error: error.message });
+      saved = rows.length;
+    } else if (data_type === 'specials') {
+      const rows = items.map(i => ({
+        entity_slug: slug,
+        special_name: i.item_name || i.name,
+        description: i.description || null,
+        discount_text: i.discount_text || null,
+        is_active: true
+      }));
+      const { error } = await db.from('entity_specials').insert(rows);
+      if (error) return res.status(500).json({ error: error.message });
+      saved = rows.length;
+    } else if (data_type === 'events') {
+      const rows = items.map(i => ({
+        entity_slug: slug,
+        event_name: i.item_name || i.name,
+        description: i.description || null,
+        event_date: i.event_date || null,
+        is_active: true
+      }));
+      const { error } = await db.from('entity_events').insert(rows);
+      if (error) return res.status(500).json({ error: error.message });
+      saved = rows.length;
+    } else {
+      return res.status(400).json({ error: 'Unknown data_type: ' + data_type });
+    }
+
+    res.json({ success: true, saved });
+  } catch (e) {
+    res.status(500).json({ error: 'Save failed: ' + e.message });
+  }
+});
