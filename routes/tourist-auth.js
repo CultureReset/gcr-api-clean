@@ -108,12 +108,15 @@ async function backfillAnonymousActivity(userId, visitorId) {
         const { data: guestSaves } = await mainDb.from('tourist_saves').select('*').eq('user_id', visitorId);
         for (const s of (guestSaves || [])) {
             const { id, user_id, ...rest } = s;
-            await mainDb.from('tourist_saves')
-                .upsert({ ...rest, user_id: userId }, { onConflict: 'user_id,entity_slug' })
+            // Supabase query builders are thenable but have no .catch method —
+            // wrap in Promise.resolve() before chaining, or the call crashes
+            // with "…catch is not a function" as an unhandled rejection.
+            await Promise.resolve(mainDb.from('tourist_saves')
+                .upsert({ ...rest, user_id: userId }, { onConflict: 'user_id,entity_slug' }))
                 .catch(err => console.warn('[Backfill] save upsert failed:', err.message));
         }
         if (guestSaves?.length) {
-            await mainDb.from('tourist_saves').delete().eq('user_id', visitorId).catch(() => {});
+            await Promise.resolve(mainDb.from('tourist_saves').delete().eq('user_id', visitorId)).catch(() => {});
         }
 
         // Preference scores aren't safe to merge row-by-row (the guest and
@@ -122,7 +125,7 @@ async function backfillAnonymousActivity(userId, visitorId) {
         // the real user id, wipe any stray guest-keyed scores and rebuild
         // clean from the now-unified history instead of trying to combine
         // two conflicting sets of numbers.
-        await mainDb.from('user_preference_scores').delete().eq('user_id', visitorId).catch(() => {});
+        await Promise.resolve(mainDb.from('user_preference_scores').delete().eq('user_id', visitorId)).catch(() => {});
         await _recomputeAllPreferences(userId).catch(err =>
             console.warn('[Backfill] preference recompute failed:', err.message));
 
@@ -674,11 +677,14 @@ async function establishPhoneSession(phone, anonymous_visitor_id) {
         });
     }
 
-    // Clear OTP/token from tourist_otps now that it's been used
-    await mainDb.from('tourist_otps')
-        .update({ otp_code: null, otp_expires: null })
-        .eq('phone', phone)
-        .catch(() => {});
+    // Clear OTP/token from tourist_otps now that it's been used.
+    // (Promise.resolve wrapper: Supabase builders are thenable but have no
+    // .catch method — chaining it directly crashes the whole request.)
+    await Promise.resolve(
+        mainDb.from('tourist_otps')
+            .update({ otp_code: null, otp_expires: null })
+            .eq('phone', phone)
+    ).catch(() => {});
 
     // Sign in to get a real access token
     const { data: signIn, error: signInErr } = await sb.auth.signInWithPassword({
