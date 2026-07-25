@@ -455,8 +455,10 @@ async function updatePreferenceScores(touristId, swipeRows) {
 async function recomputeAllPreferences(touristId) {
     if (!touristId) return;
 
-    // Wipe existing scores so we recompute clean
-    await mainDb.from('user_preference_scores').delete().eq('user_id', touristId).catch(() => {});
+    // Wipe existing scores so we recompute clean. (Promise.resolve wrapper:
+    // Supabase builders are thenable but have no .catch method — chaining it
+    // directly throws "…catch is not a function".)
+    await Promise.resolve(mainDb.from('user_preference_scores').delete().eq('user_id', touristId)).catch(() => {});
 
     // Load full swipe history
     const { data: events } = await mainDb
