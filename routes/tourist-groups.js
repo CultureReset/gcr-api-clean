@@ -266,7 +266,9 @@ router.post('/:slug/create-invite', touristAuth, async (req, res) => {
     });
     if (error) return res.status(500).json({ error: error.message });
 
-    const base = process.env.TRIP_SWIPE_URL || 'http://localhost:5173';
+    // GCR unified has swipe/join/everything built in natively -- "Trip Swipe"
+    // as a separate deployment is legacy, invite links belong on the real app.
+    const base = process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com';
     res.json({ token, url: `${base}/join?t=${token}`, expires_at });
 });
 
