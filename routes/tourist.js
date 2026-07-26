@@ -127,6 +127,12 @@ router.get('/setup-questions', (req, res) => {
                 { value: 'family', label: 'Family', icon: '👨‍👩‍👧' },
                 { value: 'friends', label: 'Friends', icon: '👯' },
             ]},
+            { key: 'stay_status', field_name: 'stay_status', label: 'Do you have a place to stay yet?', input_type: 'radio', required: false, options: [
+                { value: 'yes', label: 'Yes, already booked', icon: '✅' },
+                { value: 'looking', label: 'Still looking', icon: '🔍' },
+                { value: 'no', label: "No, help me find one", icon: '🏨' },
+            ]},
+            { key: 'hotel_name', field_name: 'hotel_name', label: 'Where are you staying?', input_type: 'text', required: false, placeholder: 'Search hotels or rentals...' },
             { key: 'interests', field_name: 'interests', label: 'What are you into?', input_type: 'tags', required: false, options: [
                 { value: 'food', label: '🍽️ Food & Dining' },
                 { value: 'nightlife', label: '🍻 Nightlife' },
