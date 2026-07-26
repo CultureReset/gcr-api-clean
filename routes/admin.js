@@ -2542,6 +2542,38 @@ router.delete('/gcr/menu-item-options/:id', authRequired, async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── DRINK ITEM OPTIONS (modifiers: milk, foam, flavor, size) ────────────────
+// Same shape as menu_item_options above, for drink_items instead — added
+// alongside the schema so drink modifiers/sizing have an edit path too.
+router.get('/gcr/drink-items/:id/options', authRequired, async (req, res) => {
+  const { data, error } = await getDb().from('drink_item_options')
+    .select('*').eq('drink_item_id', req.params.id).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/drink-items/:id/options', authRequired, async (req, res) => {
+  const row = { ...req.body, drink_item_id: req.params.id };
+  delete row.id;
+  const { data, error } = await getDb().from('drink_item_options').insert(row).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/drink-item-options/:id', authRequired, async (req, res) => {
+  const patch = { ...req.body };
+  delete patch.id; delete patch.drink_item_id;
+  const { data, error } = await getDb().from('drink_item_options').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/drink-item-options/:id', authRequired, async (req, res) => {
+  const { error } = await getDb().from('drink_item_options').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
 // Variations (sizes/versions of an item: Small/Large, Cup/Bowl) — same pattern
 router.get('/gcr/menu-items/:id/variations', authRequired, async (req, res) => {
   const { data, error } = await getDb().from('menu_item_variations')
@@ -2699,6 +2731,52 @@ router.delete('/gcr/option-groups/:id', authRequired, async (req, res) => {
   if (!group) return res.status(404).json({ error: 'Not found' });
   if (!(await verifyEntityAccess(req, group.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
   const { error } = await db.from('menu_item_option_groups').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// ─── DRINK OPTION GROUPS (required / pick-exactly-N rules, e.g. Size) ─────────
+// Same shape as the menu-item option groups above, for drink_items instead.
+// Unlike menu_item_option_groups, drink_item_id is NOT NULL here — every
+// group scopes to one drink item, there's no reusable business-level group.
+router.get('/gcr/entities/:slug/drink-option-groups', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { data, error } = await getDb().from('drink_item_option_groups').select('*').eq('entity_slug', req.params.slug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/gcr/entities/:slug/drink-option-groups', authRequired, async (req, res) => {
+  if (!(await verifyEntityAccess(req, req.params.slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { drink_item_id, label, required, min_picks, max_picks, sort_order } = req.body;
+  if (!drink_item_id) return res.status(400).json({ error: 'drink_item_id required' });
+  if (!label) return res.status(400).json({ error: 'label required' });
+  const { data, error } = await getDb().from('drink_item_option_groups').insert({
+    entity_slug: req.params.slug, drink_item_id, label,
+    required: required || false, min_picks: min_picks || 0, max_picks: max_picks ?? null, sort_order: sort_order || 0,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(data);
+});
+
+router.put('/gcr/drink-option-groups/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: group } = await db.from('drink_item_option_groups').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!group) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, group.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const patch = {};
+  ['label','required','min_picks','max_picks','sort_order'].forEach(k => { if (req.body[k] !== undefined) patch[k] = req.body[k]; });
+  const { data, error } = await db.from('drink_item_option_groups').update(patch).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/gcr/drink-option-groups/:id', authRequired, async (req, res) => {
+  const db = getDb();
+  const { data: group } = await db.from('drink_item_option_groups').select('entity_slug').eq('id', req.params.id).maybeSingle();
+  if (!group) return res.status(404).json({ error: 'Not found' });
+  if (!(await verifyEntityAccess(req, group.entity_slug))) return res.status(403).json({ error: 'Not authorized for this business' });
+  const { error } = await db.from('drink_item_option_groups').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });

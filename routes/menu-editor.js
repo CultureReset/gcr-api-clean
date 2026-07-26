@@ -458,6 +458,45 @@ router.delete('/:slug/option-groups/:id', pinAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ─── DRINK OPTION GROUPS (Size, and any other required pick-one/pick-N rule) ──
+// Same shape as menu_item_option_groups above, for drink_items instead.
+// drink_item_id is required — unlike menu_item_option_groups there's no
+// reusable business-level (item-less) group on the drinks side.
+router.get('/:slug/drink-option-groups', pinAuth, async (req, res) => {
+  const { data, error } = await db.from('drink_item_option_groups').select('*').eq('entity_slug', req.entitySlug).order('sort_order');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+router.post('/:slug/drink-option-groups', pinAuth, async (req, res) => {
+  const { drink_item_id, label, required, min_picks, max_picks, sort_order } = req.body;
+  if (!drink_item_id) return res.status(400).json({ error: 'drink_item_id required' });
+  if (!label) return res.status(400).json({ error: 'label required' });
+  const { data, error } = await db.from('drink_item_option_groups').insert({
+    entity_slug: req.entitySlug, drink_item_id, label,
+    required: required || false, min_picks: min_picks || 0, max_picks: max_picks ?? null, sort_order: sort_order || 0,
+  }).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'create', table_name: 'drink_item_option_groups', record_id: data.id, new_value: data });
+  res.status(201).json(data);
+});
+
+router.put('/:slug/drink-option-groups/:id', pinAuth, async (req, res) => {
+  const patch = {};
+  ['label','required','min_picks','max_picks','sort_order'].forEach(k => { if (req.body[k] !== undefined) patch[k] = req.body[k]; });
+  const { data, error } = await db.from('drink_item_option_groups').update(patch).eq('id', req.params.id).eq('entity_slug', req.entitySlug).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'update', table_name: 'drink_item_option_groups', record_id: req.params.id, new_value: data });
+  res.json(data);
+});
+
+router.delete('/:slug/drink-option-groups/:id', pinAuth, async (req, res) => {
+  const { error } = await db.from('drink_item_option_groups').delete().eq('id', req.params.id).eq('entity_slug', req.entitySlug);
+  if (error) return res.status(500).json({ error: error.message });
+  log(req, { action: 'delete', table_name: 'drink_item_option_groups', record_id: req.params.id });
+  res.json({ success: true });
+});
+
 // ─── MEAL PERIODS ──────────────────────────────────────────────────────────────
 router.get('/:slug/meal-periods', pinAuth, async (req, res) => {
   const { data, error } = await db.from('menu_periods').select('*').eq('entity_slug', req.entitySlug).order('sort_order');

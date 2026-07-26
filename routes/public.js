@@ -101,12 +101,18 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     // the same way options/variations are above, keyed by item id.
     const drinkItemIds = (drinkItems.data || []).map(i => i.id).filter(Boolean);
     const hhItemIds = (hhItems.data || []).map(i => i.id).filter(Boolean);
-    const [menuDietaryRes, drinkDietaryRes, hhDietaryRes, drinkChannelRes, hhChannelRes] = await Promise.all([
+    const [menuDietaryRes, drinkDietaryRes, hhDietaryRes, drinkChannelRes, hhChannelRes, drinkOptsRes, drinkGroupsRes] = await Promise.all([
         foodItemIds.length ? gcrDb.from('menu_item_dietary_tags').select('menu_item_id, tag:dietary_tag_id(id, name, icon)').in('menu_item_id', foodItemIds) : Promise.resolve({ data: [] }),
         drinkItemIds.length ? gcrDb.from('drink_item_dietary_tags').select('drink_item_id, tag:dietary_tag_id(id, name, icon)').in('drink_item_id', drinkItemIds) : Promise.resolve({ data: [] }),
         hhItemIds.length ? gcrDb.from('happy_hour_item_dietary_tags').select('happy_hour_item_id, tag:dietary_tag_id(id, name, icon)').in('happy_hour_item_id', hhItemIds) : Promise.resolve({ data: [] }),
         drinkItemIds.length ? gcrDb.from('drink_item_channel_prices').select('drink_item_id, channel, price, source').in('drink_item_id', drinkItemIds) : Promise.resolve({ data: [] }),
         hhItemIds.length ? gcrDb.from('happy_hour_item_channel_prices').select('happy_hour_item_id, channel, price, source').in('happy_hour_item_id', hhItemIds) : Promise.resolve({ data: [] }),
+        // Drink-side modifiers/sizing (drink_item_option_groups / drink_item_options) —
+        // same shape as menu_item_option_groups/menu_item_options above, but this
+        // table pair never had a read path here; the modifiers slot on every
+        // drink item always emitted empty regardless of what was in the DB.
+        drinkItemIds.length ? gcrDb.from('drink_item_options').select('drink_item_id, group_id, group_label, name, price_delta, sort_order').in('drink_item_id', drinkItemIds).order('sort_order', { ascending: true }) : Promise.resolve({ data: [] }),
+        drinkItemIds.length ? gcrDb.from('drink_item_option_groups').select('id, label, required, min_picks, max_picks').eq('entity_slug', entitySlug) : Promise.resolve({ data: [] }),
     ]);
     const buildDietaryMap = (rows, fk) => {
         const map = {};
@@ -123,6 +129,23 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     const hhDietaryByItem = buildDietaryMap(hhDietaryRes.data, 'happy_hour_item_id');
     const drinkChannelByItem = buildChannelMap(drinkChannelRes.data, 'drink_item_id');
     const hhChannelByItem = buildChannelMap(hhChannelRes.data, 'happy_hour_item_id');
+
+    const drinkOptionGroupsById = {};
+    (drinkGroupsRes.data || []).forEach(g => { drinkOptionGroupsById[g.id] = g; });
+    const optionsByDrinkItem = {};
+    (drinkOptsRes.data || []).forEach(o => {
+        if (!optionsByDrinkItem[o.drink_item_id]) optionsByDrinkItem[o.drink_item_id] = [];
+        const group = o.group_id ? drinkOptionGroupsById[o.group_id] : null;
+        optionsByDrinkItem[o.drink_item_id].push({
+            group: o.group_label || (group && group.label) || 'Options',
+            group_id: o.group_id || null,
+            required: group ? group.required : false,
+            min_picks: group ? group.min_picks : 0,
+            max_picks: group ? group.max_picks : null,
+            name: o.name,
+            price_delta: parseFloat(o.price_delta) || 0,
+        });
+    });
 
     const groupItems = (sections, items, priceField, optionsMap, dietaryMap, channelMap, dressingMap) => {
         const byId = {};
@@ -160,7 +183,7 @@ async function serveMenuFromGcr(res, gcrDb, entity) {
     };
 
     const foodSections = groupItems(menuSections, menuItems, 'price', optionsByItem, menuDietaryByItem, channelPricesByMenuItem, dressingsByMenuItem);
-    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price', null, drinkDietaryByItem, drinkChannelByItem);
+    const drinkSectionsOut = groupItems(drinkSections, drinkItems, 'price', optionsByDrinkItem, drinkDietaryByItem, drinkChannelByItem);
     const hhSectionsOut = groupItems(hhSections, hhItems, 'hh_price', null, hhDietaryByItem, hhChannelByItem);
 
     const social_links = {};
