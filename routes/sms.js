@@ -150,6 +150,13 @@ async function issueMagicToken(phone) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // POST /api/sms/inbound — Twilio webhook
+// Outbound replies from this number are suppressed for now (A2P 10DLC
+// campaign registration is still pending, so the carrier silently drops
+// them anyway — no point spending on sends that never land). Every
+// inbound text is still received, logged, and turned into a saved
+// tourist_profiles row / state update exactly as before; only the
+// twiml.message(...) reply calls are skipped. Re-enable by restoring
+// those calls once A2P 10DLC is approved.
 router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSignature, async (req, res) => {
   const twiml = new twilio.twiml.MessagingResponse();
   const from  = req.body?.From;
@@ -157,7 +164,6 @@ router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSig
   const upper = body.toUpperCase();
 
   if (!from) {
-    twiml.message('Something went wrong. Please try again.');
     return res.type('text/xml').send(twiml.toString());
   }
 
@@ -218,25 +224,15 @@ router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSig
           updated_at: new Date().toISOString(),
         }).eq('user_id', existing.user_id);
 
-        const token = await issueMagicToken(phone);
-        twiml.message(
-          `Perfect! We'll text you deals, happy hours & specials while you're in town 🌊\n\nTap to sign in — you're in instantly, no code to type:\n${GCR_URL}/auth?token=${token}`
-        );
-      } else {
-        twiml.message(
-          `We couldn't read that. Try something like:\n"June 5-8" or "6/5 to 6/8"\n\nWhat dates are you visiting?`
-        );
+        await issueMagicToken(phone); // stored for later use; not texted back right now
       }
 
       return res.type('text/xml').send(twiml.toString());
     }
 
-    // ── Already signed up — re-send a fresh tap-to-sign-in link ───────────────
+    // ── Already signed up ──────────────────────────────────────────────────────
     if (existing?.sms_opt_in) {
-      const token = await issueMagicToken(phone);
-      twiml.message(
-        `Welcome back to Gulf Coast Radar! 🌊\n\nTap to sign in — no code needed:\n${GCR_URL}/auth?token=${token}\n\nReply DATES to update your visit dates anytime.`
-      );
+      await issueMagicToken(phone); // stored for later use; not texted back right now
       return res.type('text/xml').send(twiml.toString());
     }
 
@@ -248,14 +244,10 @@ router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSig
       updated_at: new Date().toISOString(),
     }).eq('user_id', profile.user_id);
 
-    const token = await issueMagicToken(phone);
-    twiml.message(
-      `You're in! 🎉 Welcome to Gulf Coast Radar.\n\nSave our contact (1 tap):\n${GCR_URL}/gcr.vcf\n\nTap to sign in — you're in instantly, no code to type:\n${GCR_URL}/auth?token=${token}\n\nWhat dates are you visiting the Gulf Coast? (e.g. "June 5-8")\nWe'll send you deals & specials while you're in town!\n\nReply STOP to opt out anytime.`
-    );
+    await issueMagicToken(phone); // stored for later use; not texted back right now
 
   } catch (e) {
     console.error('SMS inbound error:', e.message);
-    twiml.message('Something went wrong. Text us again in a moment!');
   }
 
   res.type('text/xml').send(twiml.toString());

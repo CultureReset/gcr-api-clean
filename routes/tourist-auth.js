@@ -14,10 +14,6 @@ const crypto  = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { sendEmail } = require('../utils/email');
 
-// Host serving the web app — must match exactly for WebOTP auto-fill to work
-// (Android Chrome only fills the code if the SMS's last line is "@host #code").
-const WEBOTP_HOST = (process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com').replace(/^https?:\/\//, '').replace(/\/$/, '');
-
 // Firebase Admin — verifies Firebase phone auth tokens
 let _firebaseAdmin = null;
 function getFirebaseAdmin() {
@@ -112,12 +108,15 @@ async function backfillAnonymousActivity(userId, visitorId) {
         const { data: guestSaves } = await mainDb.from('tourist_saves').select('*').eq('user_id', visitorId);
         for (const s of (guestSaves || [])) {
             const { id, user_id, ...rest } = s;
-            await mainDb.from('tourist_saves')
-                .upsert({ ...rest, user_id: userId }, { onConflict: 'user_id,entity_slug' })
+            // Supabase query builders are thenable but have no .catch method —
+            // wrap in Promise.resolve() before chaining, or the call crashes
+            // with "…catch is not a function" as an unhandled rejection.
+            await Promise.resolve(mainDb.from('tourist_saves')
+                .upsert({ ...rest, user_id: userId }, { onConflict: 'user_id,entity_slug' }))
                 .catch(err => console.warn('[Backfill] save upsert failed:', err.message));
         }
         if (guestSaves?.length) {
-            await mainDb.from('tourist_saves').delete().eq('user_id', visitorId).catch(() => {});
+            await Promise.resolve(mainDb.from('tourist_saves').delete().eq('user_id', visitorId)).catch(() => {});
         }
 
         // Preference scores aren't safe to merge row-by-row (the guest and
@@ -126,7 +125,7 @@ async function backfillAnonymousActivity(userId, visitorId) {
         // the real user id, wipe any stray guest-keyed scores and rebuild
         // clean from the now-unified history instead of trying to combine
         // two conflicting sets of numbers.
-        await mainDb.from('user_preference_scores').delete().eq('user_id', visitorId).catch(() => {});
+        await Promise.resolve(mainDb.from('user_preference_scores').delete().eq('user_id', visitorId)).catch(() => {});
         await _recomputeAllPreferences(userId).catch(err =>
             console.warn('[Backfill] preference recompute failed:', err.message));
 
@@ -422,20 +421,130 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TWILIO PHONE OTP
-// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Twilio SMS
-// POST /api/tourist-auth/phone-verify { phone, code }  → verify OTP → upsert tourist_profile → return token
+// TWILIO VERIFY — PHONE OTP
+// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Twilio Verify
+// POST /api/tourist-auth/phone-verify { phone, code }  → checks OTP via Twilio Verify → upsert tourist_profile → return token
+//
+// Uses Twilio Verify (not Programmable Messaging) — Verify runs through Twilio's
+// own verified sending infrastructure instead of our long-code number, so it
+// isn't subject to A2P 10DLC campaign registration the way our other SMS
+// (routes/sms.js, live-photo.js, dashboard.js, etc.) is. Requires a Verify
+// Service created in the Twilio Console and its SID set as
+// TWILIO_VERIFY_SERVICE_SID.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const twilio = require('twilio');
 
-async function sendTwilioSMS(phone, body) {
-    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    return client.messages.create({
-        from: process.env.TWILIO_PHONE_NUMBER || '+12513135464',
-        to:   phone,
-        body,
-    });
+// Twilio credential resolution that does not depend on the Vercel env vars
+// being right. The env's TWILIO_ACCOUNT_SID has held an API Key SID (SK...)
+// instead of the Account SID (AC...), which the twilio() constructor rejects
+// outright — so the platform_config table in the GCR Supabase (RLS enabled,
+// no policies: service-key access only, never exposed to the anon key) is a
+// second source of truth under the keys twilio_account_sid /
+// twilio_auth_token / twilio_verify_service_sid. Secrets stay out of this
+// public repo — GitHub push protection blocks them and Twilio revokes any
+// token it finds on GitHub.
+//
+// Every plausible (sid, token) pairing from env + DB is built into a client
+// candidate, each is probed with a cheap authenticated account fetch, and the
+// first that authenticates is cached for the life of the lambda.
+let cachedClient = null;
+let dbConfigPromise = null;
+
+function dbTwilioConfig() {
+    if (!dbConfigPromise) {
+        dbConfigPromise = Promise.resolve(
+            mainDb.from('platform_config')
+                .select('key, value')
+                .in('key', ['twilio_account_sid', 'twilio_auth_token', 'twilio_verify_service_sid'])
+        ).then(({ data }) => Object.fromEntries((data || []).map(r => [r.key, (r.value || '').trim()])))
+         .catch(() => ({}));
+    }
+    return dbConfigPromise;
+}
+
+async function twilioClient() {
+    if (cachedClient) return cachedClient;
+
+    const envSid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
+    const envTok = (process.env.TWILIO_AUTH_TOKEN || '').trim();
+    const cfg    = await dbTwilioConfig();
+    const dbSid  = (cfg.twilio_account_sid || '');
+    const dbTok  = (cfg.twilio_auth_token || '');
+
+    // Best AC-shaped account SID available (DB wins — it's curated)
+    const acSid = dbSid.startsWith('AC') ? dbSid : (envSid.startsWith('AC') ? envSid : '');
+
+    const candidates = [];
+    const seen = new Set();
+    const push = (sid, tok, opts) => {
+        if (!sid || !tok) return;
+        const k = `${sid}:${tok}:${opts?.accountSid || ''}`;
+        if (seen.has(k)) return;
+        seen.add(k);
+        try { candidates.push(twilio(sid, tok, opts)); } catch (_) { /* malformed pair — skip */ }
+    };
+
+    for (const tok of [envTok, dbTok]) {
+        if (envSid.startsWith('AC')) push(envSid, tok);                          // classic config
+        if (envSid.startsWith('SK') && acSid) push(envSid, tok, { accountSid: acSid }); // API key pair
+        if (acSid) push(acSid, tok);                                             // curated AC + token
+    }
+
+    if (!candidates.length) throw new Error('No usable Twilio credentials found in env or platform_config');
+
+    let lastErr = null;
+    for (const client of candidates) {
+        try {
+            await client.api.v2010.accounts(client.accountSid).fetch();
+            cachedClient = client;
+            return client;
+        } catch (e) {
+            lastErr = e;
+        }
+    }
+    throw new Error('Twilio auth failed for every credential combination (last error: ' + (lastErr?.message || 'unknown') + ')');
+}
+
+// The Verify service SID has the same problem as the account SID: the env var
+// has held an AC... (account SID) instead of a VA... (Verify service SID),
+// which 404s on every send. Resolve it defensively: take the first VA-shaped
+// value from env or platform_config; failing that, ask Twilio for the
+// account's Verify services and use the first one, creating one if the
+// account has none. Discovered SIDs are written back to platform_config so
+// later cold starts skip discovery.
+let cachedVerifyServiceSid = null;
+
+async function resolveVerifyServiceSid(client) {
+    if (cachedVerifyServiceSid) return cachedVerifyServiceSid;
+
+    const cfg = await dbTwilioConfig();
+    for (const sid of [(process.env.TWILIO_VERIFY_SERVICE_SID || '').trim(), cfg.twilio_verify_service_sid || '']) {
+        if (sid.startsWith('VA')) {
+            cachedVerifyServiceSid = sid;
+            return sid;
+        }
+    }
+
+    const services = await client.verify.v2.services.list({ limit: 20 });
+    let svc = services[0];
+    if (!svc) svc = await client.verify.v2.services.create({ friendlyName: 'Gulf Coast Radar' });
+    cachedVerifyServiceSid = svc.sid;
+
+    Promise.resolve(
+        mainDb.from('platform_config').upsert(
+            { key: 'twilio_verify_service_sid', value: svc.sid, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+        )
+    ).catch(() => {});
+
+    return svc.sid;
+}
+
+async function verifyService() {
+    const client = await twilioClient();
+    const serviceSid = await resolveVerifyServiceSid(client);
+    return client.verify.v2.services(serviceSid);
 }
 
 function normalizePhone(raw) {
@@ -445,31 +554,16 @@ function normalizePhone(raw) {
     return `+${digits}`;
 }
 
-// POST /phone — send OTP
+// POST /phone — send OTP via Twilio Verify
 router.post('/phone', async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     if (!phone || phone.length < 10) return res.status(400).json({ error: 'Valid phone number required' });
 
-    const code    = String(Math.floor(100000 + Math.random() * 900000));
-    const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min
-
-    // Store OTP in tourist_otps (no user_id required — user may not exist yet)
-    const { error: dbErr } = await mainDb
-        .from('tourist_otps')
-        .upsert({ phone, otp_code: code, otp_expires: expires, updated_at: new Date().toISOString() }, { onConflict: 'phone' });
-
-    if (dbErr) {
-        console.error('OTP storage error:', dbErr.message);
-        return res.status(500).json({ error: 'Could not generate code. Try again.' });
-    }
-
     try {
-        // Last line "@host #code" lets Android Chrome auto-fill the code via WebOTP —
-        // no typing needed, the form fills itself the instant the text arrives.
-        await sendTwilioSMS(phone, `Your Gulf Coast Radar code is ${code}\n\nExpires in 10 minutes.\n\n@${WEBOTP_HOST} #${code}`);
+        await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
     } catch (e) {
-        console.error('Twilio OTP send failed:', e.message);
-        return res.status(500).json({ error: 'Failed to send code. Check Twilio config.' });
+        console.error('Twilio Verify send failed:', e.message);
+        return res.status(500).json({ error: 'Could not send code — please try again.' });
     }
 
     res.json({ success: true, phone });
@@ -496,16 +590,15 @@ router.post('/phone-verify', async (req, res) => {
             return res.status(401).json({ error: 'Invalid Firebase token: ' + err.message });
         }
     } else if (code) {
-        // Legacy OTP path (Twilio/Supabase)
-        const { data: otpRow } = await mainDb
-            .from('tourist_otps')
-            .select('otp_code, otp_expires')
-            .eq('phone', phone)
-            .maybeSingle();
-
-        if (!otpRow?.otp_code) return res.status(400).json({ error: 'No code found. Request a new one.' });
-        if (otpRow.otp_code !== code) return res.status(400).json({ error: 'Incorrect code' });
-        if (new Date(otpRow.otp_expires) < new Date()) return res.status(400).json({ error: 'Code expired. Request a new one.' });
+        // Twilio Verify path
+        let check;
+        try {
+            check = await (await verifyService()).verificationChecks.create({ to: phone, code });
+        } catch (e) {
+            console.error('Twilio Verify check failed:', e.message);
+            return res.status(400).json({ error: 'Incorrect or expired code' });
+        }
+        if (check.status !== 'approved') return res.status(400).json({ error: 'Incorrect code' });
     } else {
         return res.status(400).json({ error: 'idToken or code required' });
     }
@@ -578,11 +671,14 @@ async function establishPhoneSession(phone, anonymous_visitor_id) {
         });
     }
 
-    // Clear OTP/token from tourist_otps now that it's been used
-    await mainDb.from('tourist_otps')
-        .update({ otp_code: null, otp_expires: null })
-        .eq('phone', phone)
-        .catch(() => {});
+    // Clear OTP/token from tourist_otps now that it's been used.
+    // (Promise.resolve wrapper: Supabase builders are thenable but have no
+    // .catch method — chaining it directly crashes the whole request.)
+    await Promise.resolve(
+        mainDb.from('tourist_otps')
+            .update({ otp_code: null, otp_expires: null })
+            .eq('phone', phone)
+    ).catch(() => {});
 
     // Sign in to get a real access token
     const { data: signIn, error: signInErr } = await sb.auth.signInWithPassword({
