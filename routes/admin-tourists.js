@@ -10,14 +10,20 @@
  */
 
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Service-role client for admin access (bypasses RLS, can list auth users)
+// Reuse the same GCR Supabase client every write path (tourist-auth.js,
+// sms.js, tourist.js) already uses -- service-role, so it can also do
+// sb.auth.admin.* calls. This used to build its own client from
+// SUPABASE_URL/SUPABASE_SERVICE_KEY, which aren't the env vars actually
+// configured for this project (GCR_SUPABASE_URL/GCR_SUPABASE_SERVICE_KEY
+// are, per .env.example and every other file in this repo), so every
+// route below was very likely failing to connect at all.
 function admin() {
-    return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    return mainDb;
 }
 
 router.get('/', adminRequired, async (req, res) => {
@@ -57,6 +63,9 @@ router.get('/', adminRequired, async (req, res) => {
                 created_at: u.created_at,
                 last_sign_in_at: u.last_sign_in_at,
                 name: p.name || null,
+                phone: p.phone || null,
+                sms_opt_in: !!p.sms_opt_in,
+                signup_channel: p.phone ? 'phone' : 'email',
                 destination: p.destination || null,
                 arrival: p.arrival || null,
                 departure: p.departure || null,

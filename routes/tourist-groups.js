@@ -156,9 +156,10 @@ router.get('/:slug', touristAuth, async (req, res) => {
         ? await mainDb.from('tourist_saves').select('*').in('user_id', memberIds).order('saved_at', { ascending: false })
         : { data: [] };
 
-    const { createClient } = require('@supabase/supabase-js');
-    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const { data: authList } = await sb.auth.admin.listUsers({ perPage: 1000 });
+    // Reuse the already-configured GCR client (mainDb) instead of building a
+    // new one from SUPABASE_URL/SUPABASE_SERVICE_KEY -- those aren't the env
+    // vars actually set for this project, so this was failing to connect.
+    const { data: authList } = await mainDb.auth.admin.listUsers({ perPage: 1000 });
     const emailById = {};
     (authList?.users || []).forEach(u => { emailById[u.id] = u.email; });
     const membersOut = (members || []).map(m => ({
