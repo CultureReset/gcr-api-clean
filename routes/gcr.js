@@ -2027,6 +2027,92 @@ router.post('/nfc-card-lead', async (req, res) => {
   res.json({ success: true, lead: data });
 });
 
+// ─── POST /api/gcr/sales-lead ────────────────────────────────────────────────
+// Public form handler for the CyberCheck sales site (index.html + the
+// per-industry pages under /industries/). Writes the real `leads` table, which
+// the admin dashboard's Sales Leads panel reads via GET /api/admin/sales-leads.
+//
+// Kept separate from /nfc-card-lead: that one hardcodes its own source and
+// carries a narrower field set. This accepts everything the leads table holds
+// and everything the admin panel displays (interest, notes, sms_consent).
+//
+// Body: { name, business_name, email, phone, website?, business_type?,
+//         industry?, interest?, notes?, sms_consent?, source }
+router.post('/sales-lead', async (req, res) => {
+  const b = req.body || {};
+
+  // Trim to the column widths the table expects and drop anything unexpected —
+  // this endpoint is public, so never spread req.body straight into the insert.
+  const str = (v, max) => {
+    const s = (v == null ? '' : String(v)).trim();
+    return s ? s.slice(0, max) : null;
+  };
+
+  const name = str(b.name, 200);
+  const email = str(b.email, 200);
+  const phone = str(b.phone, 40);
+  const business_name = str(b.business_name || b.business, 200);
+
+  // A lead with no way to reach them is not a lead.
+  if (!email && !phone) {
+    return res.status(400).json({ error: 'Email or phone is required.' });
+  }
+
+  const row = {
+    name,
+    email,
+    phone,
+    business_name,
+    website: str(b.website, 300),
+    business_type: str(b.business_type || b.industry, 100),
+    industry: str(b.industry || b.business_type, 100),
+    category: str(b.category || b.industry || b.business_type, 100),
+    interest: str(b.interest, 300),
+    notes: str(b.notes || b.goal || b.message, 4000),
+    met_at: str(b.met_at, 200),
+    source: str(b.source, 100) || 'sales-site',
+    sms_consent: b.sms_consent === true || b.sms_consent === 'true',
+    status: 'new',
+  };
+
+  const { data, error } = await db.from('leads').insert([row]).select().single();
+
+  if (error) {
+    console.error('[sales-lead] insert failed:', error.message);
+    return res.status(500).json({ error: 'Could not save that — please try again.' });
+  }
+
+  // Notify the team, but never fail the submission on a mail hiccup — the lead
+  // is already safely in the table and visible in the dashboard either way.
+  try {
+    const { sendEmail } = require('../utils/email');
+    const to = process.env.SALES_LEAD_NOTIFY_EMAIL || process.env.FROM_EMAIL;
+    if (to) {
+      const line = (k, v) => (v ? `<p style="margin:4px 0"><b>${k}:</b> ${v}</p>` : '');
+      sendEmail({
+        to,
+        subject: `New CyberCheck lead — ${row.business_name || row.name || row.email || 'unknown'}`,
+        html: [
+          '<h2 style="margin:0 0 12px">New lead from the sales site</h2>',
+          line('Name', row.name),
+          line('Business', row.business_name),
+          line('Email', row.email),
+          line('Phone', row.phone),
+          line('Website', row.website),
+          line('Industry', row.industry),
+          line('Interested in', row.interest),
+          line('Source', row.source),
+          row.notes ? `<p style="margin:12px 0 4px"><b>Notes:</b></p><p style="margin:0;white-space:pre-wrap">${row.notes}</p>` : '',
+        ].join(''),
+      }).catch((e) => console.error('[sales-lead] notify failed:', e.message));
+    }
+  } catch (e) {
+    console.error('[sales-lead] notify skipped:', e.message);
+  }
+
+  res.json({ success: true, lead_id: data.id });
+});
+
 // ─── GET /api/gcr/home-feed ───────────────────────────────────────────────────
 // Returns all sliding card rows for the home page in one request
 router.get('/home-feed', async (req, res) => {
