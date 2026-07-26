@@ -565,18 +565,48 @@ router.get('/entities', async (req, res) => {
 
     const slugs = (entities || []).map(e => e.slug);
 
-    // Batch fetch tags, photos, hours, today's availability for all entities
+    // A flat .limit(10000) on these joins silently truncated them: the platform
+    // has ~83k tags / ~52k photos / ~15k hours rows across ~4k entities, so a
+    // single capped query covered only a fraction of the entities asked for —
+    // and entity_tags had no .order() at all, so *which* fraction was arbitrary.
+    // That's why cards rendered with no tags and no gallery photo to fall back
+    // on when hero_image_url was missing. Fetch in slug chunks (in parallel)
+    // instead, so every requested entity gets its own complete set.
+    const SLUG_CHUNK = 300;
+    const slugChunks = [];
+    for (let i = 0; i < slugs.length; i += SLUG_CHUNK) slugChunks.push(slugs.slice(i, i + SLUG_CHUNK));
+
+    async function fetchChunked(table, columns, orderCol) {
+      if (!slugs.length) return [];
+      const batches = await Promise.all(slugChunks.map(batch => {
+        let q = db.from(table).select(columns).in('entity_slug', batch);
+        if (orderCol) q = q.order(orderCol);
+        return q.limit(10000).then(({ data }) => data || []);
+      }));
+      return batches.flat();
+    }
+
     const today = new Date().toISOString().split('T')[0];
-    const [tagRows, photoRows, hourRows, availRows] = await Promise.all([
-      slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
+    const [tagData, photoData, hourData, availRows] = await Promise.all([
+      fetchChunked('entity_tags', 'entity_slug, tag_name, tag_category'),
+      fetchChunked('entity_photos', 'entity_slug, url, is_cover, sort_order, caption, usage_note', 'sort_order'),
+      fetchChunked('entity_hours', 'entity_slug, day_of_week, opens_at, closes_at, is_closed', 'day_of_week'),
       slugs.length ? db.from('business_availability').select('entity_slug, total_capacity, remaining_spots, status, source_platform, last_updated, last_minute_deal, last_minute_price, original_price').in('entity_slug', slugs).eq('availability_date', today).eq('visible_on_profile', true) : { data: [] },
     ]);
+    const tagRows = { data: tagData }, photoRows = { data: photoData }, hourRows = { data: hourData };
 
     const tagMap = {}, photoMap = {}, hourMap = {}, availMap = {};
     (tagRows.data || []).forEach(r => { if (!tagMap[r.entity_slug]) tagMap[r.entity_slug] = []; tagMap[r.entity_slug].push(r); });
-    (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
+    // Cap per entity: listing/swipe cards only ever need a hero plus a couple of
+    // gallery fallbacks, and now that the fetch above is no longer silently
+    // truncated, returning all ~13 photos per entity for a 2000-entity request
+    // would balloon the response for no visible benefit. Full galleries still
+    // come from the per-entity profile endpoint, which isn't capped.
+    const MAX_PHOTOS_PER_ENTITY = 6;
+    (photoRows.data || []).forEach(r => {
+      if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = [];
+      if (photoMap[r.entity_slug].length < MAX_PHOTOS_PER_ENTITY) photoMap[r.entity_slug].push(r);
+    });
     (hourRows.data || []).forEach(r => { if (!hourMap[r.entity_slug]) hourMap[r.entity_slug] = []; hourMap[r.entity_slug].push(r); });
     (availRows.data || []).forEach(r => { availMap[r.entity_slug] = r; });
 
