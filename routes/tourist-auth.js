@@ -305,6 +305,32 @@ router.post('/signin', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /refresh — { refresh_token } → new session, so a tourist's access
+// token (short-lived) can be silently renewed instead of forcing a full
+// re-login every time it expires.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/refresh', async (req, res) => {
+    const refresh_token = req.body?.refresh_token;
+    if (!refresh_token) return res.status(400).json({ error: 'refresh_token required' });
+
+    try {
+        const { data, error } = await admin().auth.refreshSession({ refresh_token });
+        if (error || !data?.session) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+
+        res.json({
+            session: {
+                access_token: data.session.access_token,
+                refresh_token: data.session.refresh_token,
+                expires_at: data.session.expires_at,
+            },
+            user: { id: data.user?.id, email: data.user?.email, role: 'tourist' },
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Refresh failed: ' + err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /resend
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/resend', async (req, res) => {
