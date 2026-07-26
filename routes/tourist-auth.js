@@ -344,7 +344,9 @@ router.post('/forgot-password', async (req, res) => {
         user_metadata: { ...(user.user_metadata || {}), reset_token: token, reset_expires_at: expiresAt },
     });
 
-    const appUrl = process.env.TRIP_SWIPE_URL || 'https://trip-swipe.vercel.app';
+    // GCR unified has /reset built in natively -- "Trip Swipe" as a separate
+    // deployment is legacy, this link belongs on the real app.
+    const appUrl = process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com';
     const resetHref = `${appUrl}/reset?token=${token}&email=${encodeURIComponent(email)}`;
     const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,sans-serif;">
