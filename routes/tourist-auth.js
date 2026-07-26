@@ -521,35 +521,6 @@ async function verifyService() {
     return client.verify.v2.services(serviceSid);
 }
 
-// TEMP (branch-only): GET /phone-diag — confirms the configured Twilio
-// credentials authenticate and the Verify service SID resolves, without
-// sending anything or exposing secrets (SIDs are masked). The sandbox this
-// branch is being debugged from can't POST to the deployment directly, so
-// this is the only way to exercise the live env vars. Remove before merge.
-router.get('/phone-diag', async (req, res) => {
-    const mask = s => (s ? `${s.slice(0, 2)}…${s.slice(-4)}` : null);
-    const cfg = await dbTwilioConfig();
-    const out = {
-        envAccountSidShape: ((process.env.TWILIO_ACCOUNT_SID || '').trim().slice(0, 2)) || 'missing',
-        envAccountSid: mask((process.env.TWILIO_ACCOUNT_SID || '').trim()),
-        envVerifyServiceSid: mask((process.env.TWILIO_VERIFY_SERVICE_SID || '').trim()),
-        envHasAuthToken: !!(process.env.TWILIO_AUTH_TOKEN || '').trim(),
-        dbConfigKeys: Object.keys(cfg),
-    };
-    try {
-        const svc = await (await verifyService()).fetch();
-        out.result = 'ok';
-        out.verifyServiceName = svc.friendlyName;
-        out.resolvedVerifyServiceSid = mask(svc.sid);
-        out.activeAccountSid = mask((await twilioClient()).accountSid);
-    } catch (e) {
-        out.result = 'error';
-        out.error = e.message;
-        out.twilioStatus = e.status || null;
-    }
-    res.json(out);
-});
-
 function normalizePhone(raw) {
     const digits = (raw || '').replace(/\D/g, '');
     if (digits.length === 10) return `+1${digits}`;
@@ -566,10 +537,7 @@ router.post('/phone', async (req, res) => {
         await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
     } catch (e) {
         console.error('Twilio Verify send failed:', e.message);
-        // TEMPORARY: surfacing e.message to the client to diagnose the live
-        // failure without log access. Revert to the generic message once
-        // resolved -- don't leave raw provider errors exposed long-term.
-        return res.status(500).json({ error: 'Failed to send code: ' + e.message });
+        return res.status(500).json({ error: 'Could not send code — please try again.' });
     }
 
     res.json({ success: true, phone });
