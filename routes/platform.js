@@ -852,6 +852,21 @@ function slotPast(ds, t, when) {
     return new Date(ds + 'T00:00:00Z').getTime() + mins * 60e3 < when.getTime();
 }
 
+// Per-day booking cap, as configured on whichever installed app owns the
+// 'blocks' dataKey. Same derivation getAvailability() does internally —
+// pulled out so the atomic booking RPC can be handed the same number.
+function dayCapacity(installed) {
+    let capacity = null;
+    Object.keys(installed || {}).forEach(function (id) {
+        const inst = installed[id];
+        if (inst && inst.manifest && inst.manifest.dataKey === 'blocks' && inst.config && inst.config.capacity) {
+            const c = parseInt(inst.config.capacity, 10);
+            if (c > 0) capacity = c;
+        }
+    });
+    return capacity;
+}
+
 async function getAvailability(slug, installed, month, opts) {
     opts = opts || {};
     // ONE source of truth: booking_calendar.
@@ -1696,14 +1711,69 @@ router.post('/page/:slug/submit/:appId', async (req, res) => {
         // checkout submissions land in the ONE bookings table; content
         // submissions (song requests, leads) land in their own stream.
         const dataKey = inst.manifest.checkout ? 'bookings' : inst.manifest.dataKey;
-        const inserted = await insertRecord(ent.slug, dataKey, record);
+
+        // A real booking goes through platform_create_booking, which re-checks
+        // availability inside a per-(entity,date) advisory lock and writes the
+        // bookings row and its booking_calendar claim in one transaction.
+        //
+        // The checks above still run first — they produce the friendlier,
+        // field-specific messages. This is the authority: without it, two people
+        // checking out for the last seat at the same moment both pass the check
+        // above and both get booked.
+        let inserted;
+        if (dataKey === 'bookings' && bc.mode !== 'none' && calDate(record.date)) {
+            const bookingRow = toBookingRow(ent.slug, record);
+            const calendarRow = {
+                entity_slug: ent.slug,
+                date: calDate(record.date),
+                end_date: calDate(record.end_date),
+                start_time: slotToTime(record.time || record.departure),
+                kind: 'booking',
+                source: record.source === 'public_page' ? 'direct' : 'manual',
+                status: 'active',
+                title: record.service || record.trip || record.boat || record.session || record.item || record.title || (record.customer || 'booking'),
+                party: parseInt(record.party || record.guests || record.adults, 10) || null,
+                offering_id: record.resource_id || null,
+                details: record
+            };
+
+            const { data: outcome, error: rpcErr } = await supabase.rpc('platform_create_booking', {
+                p_entity_slug: ent.slug,
+                p_booking: bookingRow,
+                p_calendar: calendarRow,
+                p_mode: bc.mode,
+                p_capacity: dayCapacity(st.installed),
+                p_slot_cap: bc.slotCap || null,
+                p_resource_id: record.resource_id || null
+            });
+
+            // Never fall back to an unlocked insert — that is the overbooking
+            // this exists to prevent.
+            if (rpcErr) {
+                console.error('[platform] booking rpc failed:', rpcErr.message);
+                return res.status(503).json({ error: 'Booking is temporarily unavailable — please try again in a moment.' });
+            }
+            if (!outcome || !outcome.success) {
+                return res.status(409).json({ error: (outcome && outcome.error) || 'That slot was just taken — please pick another.' });
+            }
+            // atomic: true tells the calendar-sync step below to stand down —
+            // the RPC already wrote the claim inside its transaction.
+            inserted = { id: outcome.booking_id, table: 'bookings', atomic: true };
+            ragFact(ent.slug, dataKey, record).catch(function () {});
+        } else {
+            inserted = await insertRecord(ent.slug, dataKey, record);
+        }
 
         runAutomations(ent.slug, inst.manifest.dataKey, record, { installed: st.installed, business: bizShape(ent) }).catch(function () {});
         if (inst.manifest.checkout) {
             record._mid = inserted.id;
             runUserAutomations(ent.slug, 'new_booking', record).catch(function () {});
         }
-        if (inst.manifest.checkout && bc.mode !== 'none') calendarSyncBooking(ent.slug, inserted.id, record).catch(function () {});
+        // Only needed for the non-atomic path — platform_create_booking already
+        // wrote the calendar claim inside its transaction.
+        if (inst.manifest.checkout && bc.mode !== 'none' && !inserted.atomic) {
+            calendarSyncBooking(ent.slug, inserted.id, record).catch(function () {});
+        }
 
         // Notify the owner by SMS
         try {
