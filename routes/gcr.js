@@ -50,6 +50,26 @@ function normalizeImageUrl(url) {
   return url;
 }
 
+// A Google Places *new*-API photo link ("places.googleapis.com/v1/.../media")
+// is only fetchable with an API key appended. ~19.8k of these were imported
+// without one, so they always 404 — but because the column is non-empty, every
+// consumer happily used it as the hero and rendered a broken image instead of
+// falling back. Treat those as unusable so pickHero() reaches for a real photo.
+function isUnusableImageUrl(url) {
+  if (!url) return true;
+  return url.includes('places.googleapis.com') && !url.includes('key=');
+}
+
+// Choose the best hero: the stored one when it's actually fetchable, otherwise
+// the first gallery photo that is. 727 active entities had a broken/missing
+// hero while a perfectly good photo sat in entity_photos unused.
+function pickHero(heroUrl, photos) {
+  const hero = normalizeImageUrl(heroUrl);
+  if (!isUnusableImageUrl(hero)) return hero;
+  const usable = (photos || []).find(p => !isUnusableImageUrl(p.url));
+  return usable ? usable.url : hero;
+}
+
 // Cache-control for all GETs
 router.use((req, res, next) => {
   if (req.method === 'GET') res.set('Cache-Control', 'max-age=300, s-maxage=300, stale-while-revalidate=60');
@@ -394,7 +414,7 @@ async function buildFullEntity(slug) {
 
   return {
     ...entity,
-    hero_image_url: normalizeImageUrl(entity.hero_image_url),
+    hero_image_url: pickHero(entity.hero_image_url, normalizedPhotos),
     // Structured per-industry facts (industry_<code> row for this business)
     industry_facts: industryFacts || null,
     // Flexible offerings (charters, rentals, tours, services) — universal
@@ -630,7 +650,7 @@ router.get('/entities', async (req, res) => {
       const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
       const avail = availMap[e.slug] || null;
       const row = {
-        ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url),
+        ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: pickHero(e.hero_image_url, photos),
         // Flat field so GCRCard's existing (previously dead — the column
         // never existed) "🔴 Last spot!" badge logic just works.
         spots_remaining: avail ? avail.remaining_spots : null,
@@ -774,7 +794,9 @@ router.get('/entities/paginated', async (req, res) => {
       const row = {
         ...e,
         tags: tagMap[e.slug] || [],
-        hero_image_url: normalizeImageUrl(photoMap[e.slug]?.url || e.hero_image_url),
+        // Keeps this endpoint's original preference (the is_cover photo ahead of
+        // the stored hero) while skipping either if it isn't actually fetchable.
+        hero_image_url: pickHero(photoMap[e.slug]?.url || e.hero_image_url, [{ url: e.hero_image_url }]),
       };
       if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
         row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
