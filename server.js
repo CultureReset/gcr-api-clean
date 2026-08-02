@@ -66,6 +66,11 @@ mount('/api/admin/platform', () => require('./routes/admin-platform'));
 // Composio connections — the tool catalog and which business connected what.
 mount('/api/admin/connections', () => require('./routes/composio'));
 
+// Admin settings, business leads, guest photos, category cards. Mounted at
+// /api/admin alongside routes/admin.js — Express runs both routers in order,
+// so these paths are additive and nothing in admin.js is shadowed.
+mount('/api/admin', () => require('./routes/admin-settings'));
+
 // Apps & Modules
 mount('/api/apps', () => require('./routes/apps'));
 //mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
