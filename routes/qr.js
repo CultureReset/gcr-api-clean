@@ -12,6 +12,10 @@ const router = express.Router();
 
 const CHARS = 'abcdefghjkmnpqrstuvwxyz23456789'; // no ambiguous 0/O/1/I/l
 
+// Where a scan lands when the code is unknown, disabled, or has no destination set.
+const FALLBACK_URL   = process.env.QR_FALLBACK_URL || 'https://gulfcoastradar.com';
+const REDIRECT_BASE  = (process.env.QR_REDIRECT_BASE || 'https://gcr-api-clean.vercel.app').replace(/\/$/, '');
+
 function makeCode(len = 8) {
     const bytes = crypto.randomBytes(len);
     return Array.from(bytes).map(b => CHARS[b % CHARS.length]).join('');
@@ -25,6 +29,95 @@ async function uniqueCode() {
     }
     throw new Error('Could not generate unique code');
 }
+
+// The URL the printed QR encodes. This never changes for a given code — only the
+// destination behind it does — so it stays valid for the life of the sticker.
+function scanUrlFor(code) {
+    return `${REDIRECT_BASE}/api/qr/r/${code}`;
+}
+
+// Destinations are free text typed into the dashboard. Only ever hand the browser
+// an absolute http(s) URL, so a typo can't produce a broken redirect and a pasted
+// javascript:/data: URL can't turn the redirect into an XSS vector.
+function safeDestination(url) {
+    if (!url) return null;
+    let parsed;
+    try { parsed = new URL(String(url).trim()); } catch (e) { return null; }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+    return parsed.href;
+}
+
+// Log the scan, bump the counter, fire the SMS alert. Shared by the redirect route
+// below and the POST /scan/:code endpoint that q.html still calls.
+async function recordScan(qr, req) {
+    const ua  = req.headers['user-agent'] || '';
+    const ip  = (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+    const mob = /mobile|android|iphone|ipad/i.test(ua);
+
+    const { data: scanRow } = await supabase.from('qr_scans').insert({
+        qr_code_id:  qr.id,
+        device_type: mob ? 'mobile' : 'desktop',
+        ip_address:  ip,
+        user_agent:  ua,
+        scanned_at:  new Date().toISOString(),
+    }).select('id').single();
+
+    const newScanCount = (qr.scan_count || 0) + 1;
+    supabase.from('qr_codes')
+        .update({ scan_count: newScanCount })
+        .eq('id', qr.id)
+        .then(() => {});
+
+    // ── Instant SMS alert (non-blocking) ──────────────────────────────────────
+    const alertPhone = qr.alert_phone || (qr.metadata && qr.metadata.alert_phone);
+    if (alertPhone) {
+        try {
+            const { sendSms } = require('../utils/sms');
+            const dt = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+            const locLine = qr.location ? `\n📍 ${qr.location}` : '';
+            const body = `🔔 QR Scanned!\n#${qr.seq_number} — ${qr.label}${locLine}\n📱 ${mob ? 'Mobile' : 'Desktop'} · ${dt} CT\nTotal scans: ${newScanCount}`;
+            sendSms(alertPhone, body, qr.site_id, 'qr_alert').catch(() => {});
+        } catch (e) {}
+    }
+
+    return { scanId: scanRow?.id || null, scanCount: newScanCount };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/qr/r/:code — the URL the printed QR actually encodes.
+//
+// A real server-side 302, so the scan resolves with no page load, no JavaScript,
+// and no cross-origin fetch. That matters because plenty of scanner apps and
+// in-app browsers (Instagram, Facebook, some Android cameras) either don't run
+// the q.html bootstrap or block its fetch — those scans would otherwise dead-end.
+//
+// Registered ahead of the /:id routes so a code can never be shadowed by one.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/r/:code', async (req, res) => {
+    let dest = FALLBACK_URL;
+
+    try {
+        const { data: qr } = await supabase
+            .from('qr_codes')
+            .select('*')
+            .eq('code', req.params.code)
+            .maybeSingle();
+
+        if (qr && qr.active) {
+            dest = safeDestination(qr.destination_url) || FALLBACK_URL;
+            await recordScan(qr, req).catch(() => {});
+        }
+    } catch (e) {
+        // Never strand someone holding a phone on an error page — fall through
+        // to the fallback URL instead.
+        console.error('[qr] redirect error:', e.message);
+    }
+
+    // Must not be cached: editing the destination in the dashboard has to take
+    // effect on the very next scan, and browsers happily cache a bare 302.
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.redirect(302, dest);
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin / Dashboard — authenticated
@@ -80,7 +173,7 @@ router.post('/batch', authRequired, async (req, res) => {
             label: `${label_prefix} #${seq}`,
             destination_url: destination_url || null,
             location: location || null,
-            scan_url: `https://gcr-unified.vercel.app/q.html?c=${code}`,
+            scan_url: scanUrlFor(code),
             scan_count: 0,
             active: true,
         });
@@ -117,7 +210,7 @@ router.post('/', authRequired, async (req, res) => {
             site_id: assignedSiteId,
             label,
             destination_url: destination_url || null,
-            scan_url: `https://gcr-unified.vercel.app/q.html?c=${code}`,
+            scan_url: scanUrlFor(code),
             metadata: metadata || {},
             notes: notes || null,
             location: location || null,
@@ -254,45 +347,18 @@ router.post('/scan/:code', async (req, res) => {
 
     if (error || !qr) return res.status(404).json({ error: 'QR code not found' });
 
-    const ua  = req.headers['user-agent'] || '';
-    const ip  = (req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
-    const mob = /mobile|android|iphone|ipad/i.test(ua);
-
-    // Log scan + increment counter
-    const { data: scanRow } = await supabase.from('qr_scans').insert({
-        qr_code_id:  qr.id,
-        device_type: mob ? 'mobile' : 'desktop',
-        ip_address:  ip,
-        user_agent:  ua,
-        scanned_at:  new Date().toISOString(),
-    }).select('id').single();
-
-    const newScanCount = (qr.scan_count || 0) + 1;
-    supabase.from('qr_codes')
-        .update({ scan_count: newScanCount })
-        .eq('id', qr.id)
-        .then(() => {});
-
-    // ── Instant SMS alert (non-blocking) ──────────────────────────────────────
-    const alertPhone = qr.alert_phone || (qr.metadata && qr.metadata.alert_phone);
-    if (alertPhone) {
-        try {
-            const { sendSms } = require('../utils/sms');
-            const dt = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
-            const locLine = qr.location ? `\n📍 ${qr.location}` : '';
-            const body = `🔔 QR Scanned!\n#${qr.seq_number} — ${qr.label}${locLine}\n📱 ${mob ? 'Mobile' : 'Desktop'} · ${dt} CT\nTotal scans: ${newScanCount}`;
-            sendSms(alertPhone, body, qr.site_id, 'qr_alert').catch(() => {});
-        } catch (e) {}
-    }
+    const { scanId } = await recordScan(qr, req);
 
     res.json({
         type:            qr.type,
         seq_number:      qr.seq_number,
         label:           qr.label,
-        destination_url: qr.destination_url,
+        // Same validation the 302 route applies, so q.html and the redirect can
+        // never send the same code to two different places.
+        destination_url: safeDestination(qr.destination_url) || FALLBACK_URL,
         metadata:        qr.metadata || {},
         site_id:         qr.site_id,
-        scan_id:         scanRow?.id || null,
+        scan_id:         scanId,
         code:            qr.code,
     });
 });
@@ -415,7 +481,7 @@ router.post('/partners', async (req, res) => {
         code: qrCode, type: 'referral', label: name,
         location: type, active: true,
         metadata: { partner_id: data.id, partner_type: type, partner_name: name },
-        scan_url: `https://gcr-unified.vercel.app/q.html?c=${qrCode}`,
+        scan_url: scanUrlFor(qrCode),
     }).catch(() => {});
 
     res.status(201).json(data);
