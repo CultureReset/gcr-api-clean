@@ -58,6 +58,14 @@ mount('/api/admin/tourists', () => require('./routes/admin-tourists'));
 // Setup questions
 mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 
+// Admin view over the universal booking engine. Same tables as /api/platform,
+// but scoped by an admin token across every business instead of resolving one
+// business from entity_owners. Every route is adminRequired.
+mount('/api/admin/platform', () => require('./routes/admin-platform'));
+
+// Composio connections — the tool catalog and which business connected what.
+mount('/api/admin/connections', () => require('./routes/composio'));
+
 // Apps & Modules
 mount('/api/apps', () => require('./routes/apps'));
 //mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
