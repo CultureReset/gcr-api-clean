@@ -91,8 +91,18 @@ CREATE TABLE IF NOT EXISTS ledger_accounts (
   unit_id      uuid,
   jurisdiction_id uuid,                     -- per-jurisdiction tax payable
   is_active    boolean NOT NULL DEFAULT true,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (entity_slug, code, owner_id, unit_id, jurisdiction_id)
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+-- Uniqueness must treat NULL as a real value here: a platform-level account
+-- has NULL entity_slug/owner_id/unit_id/jurisdiction_id, and a plain
+-- UNIQUE(...) would let the same account be inserted repeatedly because
+-- NULL <> NULL. COALESCE keys it properly and keeps ON CONFLICT working.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_accounts_key ON ledger_accounts (
+  COALESCE(entity_slug, ''),
+  code,
+  COALESCE(owner_id,        '00000000-0000-0000-0000-000000000000'::uuid),
+  COALESCE(unit_id,         '00000000-0000-0000-0000-000000000000'::uuid),
+  COALESCE(jurisdiction_id, '00000000-0000-0000-0000-000000000000'::uuid)
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_accounts_entity ON ledger_accounts (entity_slug, code);
 
@@ -356,4 +366,10 @@ INSERT INTO ledger_accounts (entity_slug, code, name, account_type) VALUES
   (NULL, 'processor_fees',      'Payment processor fees',   'expense'),
   (NULL, 'maintenance_expense', 'Maintenance expense',      'expense'),
   (NULL, 'refunds_issued',      'Refunds issued',           'expense')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (
+  COALESCE(entity_slug, ''),
+  code,
+  COALESCE(owner_id,        '00000000-0000-0000-0000-000000000000'::uuid),
+  COALESCE(unit_id,         '00000000-0000-0000-0000-000000000000'::uuid),
+  COALESCE(jurisdiction_id, '00000000-0000-0000-0000-000000000000'::uuid)
+) DO NOTHING;
