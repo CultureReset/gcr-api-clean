@@ -7,13 +7,17 @@
  *
  * The flow, end to end:
  *   email arrives  →  first matching rule wins  →  extract fields via your
- *   regexes  →  POST the webhook  →  send the text
+ *   regexes  →  run whatever actions THAT rule declares
+ *
+ * Reading an email does not imply sending a text. A rule runs exactly the
+ * actions listed in its `actions` array and nothing else — so one sender can
+ * trigger a webhook only, another a text only, another both, another neither
+ * (parse and log). Different sender, different rule, different behavior.
  *
  * You define the rules. A rule says:
  *   - which emails it matches   (match_from / match_subject / match_to)
  *   - what to pull out of them  (extract: { field: "regex with (capture)" })
- *   - where to POST             (webhook_url)
- *   - what text to send, to who (sms_template + sms_to[])
+ *   - what to do about it       (actions: [{type:'webhook'...},{type:'sms'...}])
  *
  * ENDPOINTS
  *   POST   /api/inbound/email          ← point your email provider here
@@ -92,14 +96,14 @@ function fillTemplate(template, vars) {
 
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
 
-async function fireWebhook(rule, payload) {
-  if (!rule.webhook_url) return null;
+async function fireWebhook(action, payload) {
+  if (!action.url) return { ok: false, error: 'webhook action has no url' };
 
   const bodyStr = JSON.stringify(payload);
   const headers = { 'Content-Type': 'application/json' };
-  if (rule.webhook_secret) {
+  if (action.secret) {
     headers['x-gcr-signature'] = crypto
-      .createHmac('sha256', rule.webhook_secret)
+      .createHmac('sha256', action.secret)
       .update(bodyStr)
       .digest('hex');
   }
@@ -107,7 +111,7 @@ async function fireWebhook(rule, payload) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(rule.webhook_url, {
+    const res = await fetch(action.url, {
       method: 'POST', headers, body: bodyStr, signal: controller.signal,
     });
     return { ok: res.ok, status: res.status };
@@ -127,9 +131,12 @@ function normalizePhone(phone) {
   return null;
 }
 
-async function sendTexts(rule, message) {
-  const numbers = (rule.sms_to || []).map(normalizePhone).filter(Boolean);
-  if (!numbers.length || !message) return { sent: 0, failed: 0, results: [] };
+async function sendTexts(action, vars) {
+  const numbers = (action.to || []).map(normalizePhone).filter(Boolean);
+  const message = fillTemplate(action.template, vars);
+
+  if (!numbers.length) return { sent: 0, failed: 0, message, results: [], skipped: 'no recipients' };
+  if (!message)        return { sent: 0, failed: 0, message, results: [], skipped: 'template rendered empty' };
 
   const results = [];
   let sent = 0, failed = 0;
@@ -144,7 +151,55 @@ async function sendTexts(rule, message) {
       failed++;
     }
   }
-  return { sent, failed, results };
+  return { sent, failed, message, results };
+}
+
+/**
+ * Run exactly the actions a rule declares, in order. An empty/absent actions
+ * array means the email is parsed and logged and nothing else happens — that is
+ * a valid, useful configuration, not a misconfiguration.
+ */
+async function runActions(rule, vars, payload) {
+  const actions = Array.isArray(rule.actions) ? rule.actions : [];
+  const outcomes = [];
+
+  for (const action of actions) {
+    if (action.enabled === false) {
+      outcomes.push({ type: action.type, status: 'disabled' });
+      continue;
+    }
+
+    switch ((action.type || '').toLowerCase()) {
+      case 'webhook': {
+        const r = await fireWebhook(action, payload);
+        outcomes.push({
+          type: 'webhook',
+          target: action.url,
+          status: r.ok ? 'ok' : 'failed',
+          error: r.ok ? null : (r.error || `HTTP ${r.status}`),
+        });
+        break;
+      }
+      case 'sms': {
+        const r = await sendTexts(action, vars);
+        outcomes.push({
+          type: 'sms',
+          target: action.to || [],
+          status: r.skipped ? 'skipped' : (r.failed ? 'partial' : 'ok'),
+          sent: r.sent,
+          failed: r.failed,
+          message: r.message,
+          error: r.skipped || null,
+          results: r.results,
+        });
+        break;
+      }
+      default:
+        outcomes.push({ type: action.type || 'unknown', status: 'unsupported_action_type' });
+    }
+  }
+
+  return outcomes;
 }
 
 // ─── INBOUND ─────────────────────────────────────────────────────────────────
@@ -208,7 +263,6 @@ router.post('/email',
       from: email.from, to: email.to, subject: email.subject, body: email.text,
     };
 
-    const message = fillTemplate(rule.sms_template, vars);
     const payload = {
       rule: rule.name,
       rule_id: rule.id,
@@ -217,9 +271,8 @@ router.post('/email',
       email: { from: email.from, to: email.to, subject: email.subject },
     };
 
-    // Webhook first, then the text — the user's stated order: process, then send.
-    const hookResult = await fireWebhook(rule, payload);
-    const smsResult  = await sendTexts(rule, message);
+    // Only what this rule declares. No actions → parsed and logged, nothing sent.
+    const outcomes = await runActions(rule, vars, payload);
 
     await db.from('inbound_parser_log').insert({
       rule_id: rule.id,
@@ -227,13 +280,8 @@ router.post('/email',
       from_email: email.from, to_email: email.to, subject: email.subject,
       raw_text: (email.text || '').slice(0, 5000),
       extracted: fields,
-      sms_message: message || null,
-      sms_sent: smsResult.sent,
-      sms_failed: smsResult.failed,
-      sms_results: smsResult.results,
-      webhook_url: rule.webhook_url || null,
-      webhook_status: hookResult ? (hookResult.ok ? 'ok' : (hookResult.error || `HTTP ${hookResult.status}`)) : null,
-      status: 'processed',
+      actions_run: outcomes,
+      status: outcomes.length ? 'processed' : 'parsed_no_actions',
       created_at: new Date().toISOString(),
     }).catch(() => {});
 
@@ -246,14 +294,45 @@ router.post('/email',
 
 const RULE_FIELDS = [
   'name', 'match_from', 'match_to', 'match_subject', 'match_body',
-  'extract', 'webhook_url', 'webhook_secret', 'sms_to', 'sms_template',
-  'priority', 'is_active',
+  'extract', 'actions', 'priority', 'is_active',
 ];
+
+const SUPPORTED_ACTIONS = ['webhook', 'sms'];
+
+// Catch a malformed action at write time — otherwise it fails silently at 3am
+// when the email actually arrives.
+function validateActions(actions) {
+  if (actions === undefined || actions === null) return { ok: true };
+  if (!Array.isArray(actions)) return { error: 'actions must be an array' };
+
+  for (const [i, a] of actions.entries()) {
+    if (!a || typeof a !== 'object') return { error: `actions[${i}] must be an object` };
+    const type = (a.type || '').toLowerCase();
+    if (!SUPPORTED_ACTIONS.includes(type)) {
+      return { error: `actions[${i}].type must be one of: ${SUPPORTED_ACTIONS.join(', ')}` };
+    }
+    if (type === 'webhook' && !a.url) {
+      return { error: `actions[${i}] (webhook) requires a url` };
+    }
+    if (type === 'webhook' && !/^https?:\/\//i.test(a.url)) {
+      return { error: `actions[${i}].url must be http(s)` };
+    }
+    if (type === 'sms') {
+      if (!Array.isArray(a.to) || !a.to.length) {
+        return { error: `actions[${i}] (sms) requires a non-empty "to" array` };
+      }
+      if (!a.template) {
+        return { error: `actions[${i}] (sms) requires a "template"` };
+      }
+    }
+  }
+  return { ok: true };
+}
 
 router.get('/rules', adminRequired, async (req, res) => {
   const { data, error } = await db
     .from('inbound_rules')
-    .select('id, name, match_from, match_to, match_subject, match_body, extract, webhook_url, sms_to, sms_template, priority, is_active, created_at')
+    .select('id, name, match_from, match_to, match_subject, match_body, extract, actions, priority, is_active, created_at')
     .order('priority', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
@@ -261,15 +340,15 @@ router.get('/rules', adminRequired, async (req, res) => {
 });
 
 router.post('/rules', adminRequired, async (req, res) => {
-  const { name, sms_to } = req.body;
+  const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
 
   if (!req.body.match_from && !req.body.match_subject && !req.body.match_to && !req.body.match_body) {
     return res.status(400).json({ error: 'at least one match_* field required, or the rule catches every email' });
   }
-  if (sms_to !== undefined && !Array.isArray(sms_to)) {
-    return res.status(400).json({ error: 'sms_to must be an array of phone numbers' });
-  }
+
+  const check = validateActions(req.body.actions);
+  if (check.error) return res.status(400).json({ error: check.error });
 
   const row = { created_at: new Date().toISOString() };
   for (const f of RULE_FIELDS) if (req.body[f] !== undefined) row[f] = req.body[f];
@@ -280,9 +359,8 @@ router.post('/rules', adminRequired, async (req, res) => {
 });
 
 router.put('/rules/:id', adminRequired, async (req, res) => {
-  if (req.body.sms_to !== undefined && !Array.isArray(req.body.sms_to)) {
-    return res.status(400).json({ error: 'sms_to must be an array of phone numbers' });
-  }
+  const check = validateActions(req.body.actions);
+  if (check.error) return res.status(400).json({ error: check.error });
 
   const patch = { updated_at: new Date().toISOString() };
   for (const f of RULE_FIELDS) if (req.body[f] !== undefined) patch[f] = req.body[f];
@@ -318,22 +396,37 @@ router.post('/rules/:id/test', adminRequired, async (req, res) => {
 
   const matched = ruleMatches(rule, email);
   const fields  = extractFields(rule, email);
-  const message = fillTemplate(rule.sms_template, {
+  const vars = {
     ...fields, from: email.from, to: email.to, subject: email.subject, body: email.text,
+  };
+
+  // What WOULD run, rendered but not executed.
+  const planned = (Array.isArray(rule.actions) ? rule.actions : []).map(a => {
+    const type = (a.type || '').toLowerCase();
+    if (type === 'sms') {
+      return { type: 'sms', to: a.to || [], text: fillTemplate(a.template, vars), enabled: a.enabled !== false };
+    }
+    if (type === 'webhook') {
+      return { type: 'webhook', url: a.url, signed: !!a.secret, enabled: a.enabled !== false };
+    }
+    return { type: a.type || 'unknown', enabled: a.enabled !== false };
   });
 
-  let sent = null;
+  let executed = null;
   if (req.body.send === true && matched) {
-    sent = await sendTexts(rule, message);
+    executed = await runActions(rule, vars, {
+      rule: rule.name, rule_id: rule.id, test: true,
+      received_at: new Date().toISOString(), fields,
+      email: { from: email.from, to: email.to, subject: email.subject },
+    });
   }
 
   res.json({
     matched,
     extracted: fields,
-    would_send_to: rule.sms_to || [],
-    would_send_text: message,
-    would_post_to: rule.webhook_url || null,
-    sent,
+    would_run: planned,
+    note: planned.length ? undefined : 'This rule has no actions — it parses and logs only.',
+    executed,
   });
 });
 
