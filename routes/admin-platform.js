@@ -437,6 +437,165 @@ router.get('/integrations', adminRequired, async (req, res) => {
     }
 });
 
+/* ── booking sources (email parser) ──────────────────────────────────── */
+//
+// Where the bookings actually come from.
+//
+// The platform does not hold live API connections to Peek Pro, FareHarbor,
+// Thoroughbred and the rest — it receives their confirmation emails at
+// gcr-<slug>@parse.gulfcoastradar.com and parses them. routes/email-parser.js
+// recognises 24 platforms and writes every attempt to email_parser_log.
+//
+// That log is therefore the honest answer to "what is this business attached
+// to?" — not a field someone remembered to fill in, but what has actually
+// arrived. These routes aggregate it.
+//
+// NOTE: routes/email-parser.js has no auth at all, and its GET /log returns
+// raw_text, customer_name, from_email and confirmation_no. These routes are
+// adminRequired and omit raw_text by default, so the dashboard never needs the
+// open one.
+
+/**
+ * The extractor list is read lazily from routes/email-parser.js. A top-level
+ * require would mean a problem in that 1,400-line module takes this whole
+ * router down with it, and everything else here works without it.
+ */
+function extractorNames() {
+    try {
+        const { EXTRACTORS } = require('./email-parser');
+        return (EXTRACTORS || []).map((e) => e.name).filter(Boolean);
+    } catch (err) {
+        console.error('[admin-platform] could not read extractors:', err.message);
+        return [];
+    }
+}
+
+/** Human labels for the platforms the parser recognises. */
+const PLATFORM_LABELS = {
+    fareharbor: 'FareHarbor', peekpro: 'Peek Pro', boatbooker: 'BoatBooker',
+    waverez: 'WaveRez', rezdy: 'Rezdy', bokun: 'Bókun', viator: 'Viator',
+    getyourguide: 'GetYourGuide', airbnb: 'Airbnb', vrbo: 'VRBO',
+    booking_com: 'Booking.com', opentable: 'OpenTable', resy: 'Resy',
+    toast: 'Toast POS', vagaro: 'Vagaro', mindbody: 'MindBody',
+    square: 'Square Appointments', honeybook: 'HoneyBook', acuity: 'Acuity',
+    calendly: 'Calendly', booksy: 'Booksy', glossgenius: 'GlossGenius',
+    yelp: 'Yelp Reservations', generic: 'Generic', unknown: 'Unrecognised',
+};
+
+router.get('/parser/platforms', adminRequired, (_req, res) => {
+    const found = extractorNames();
+    const names = found.length ? found : Object.keys(PLATFORM_LABELS);
+    res.json({
+        platforms: names.map((name) => ({ name, label: PLATFORM_LABELS[name] || name })),
+        total: names.length,
+    });
+});
+
+/**
+ * Which platforms each business is actually attached to, derived from what has
+ * arrived rather than from a field someone set.
+ *
+ * Returns one row per business with the platforms seen, volume, last received,
+ * and how many failed to parse — plus every active business that has sent
+ * nothing at all, which is the list worth acting on.
+ */
+router.get('/parser/sources', adminRequired, async (req, res) => {
+    try {
+        const since = req.query.since || null;
+
+        let logQuery = supabase
+            .from('email_parser_log')
+            .select('entity_slug, platform, parsed, created_at, event_date')
+            .order('created_at', { ascending: false })
+            .limit(Math.min(parseInt(req.query.scan, 10) || 5000, 20000));
+        if (since) logQuery = logQuery.gte('created_at', since);
+
+        const [logs, entities] = await Promise.all([
+            logQuery,
+            supabase.from('entity').select('slug, name, entity_type, is_active').eq('is_active', true),
+        ]);
+
+        if (logs.error) return fail(res, 500, logs.error.message);
+
+        const bySlug = new Map();
+        for (const row of logs.data || []) {
+            const slug = row.entity_slug || '(unaddressed)';
+            if (!bySlug.has(slug)) {
+                bySlug.set(slug, { entity_slug: slug, total: 0, failed: 0, last_seen: null, platforms: new Map() });
+            }
+            const entry = bySlug.get(slug);
+            entry.total += 1;
+            // `parsed` false means an email arrived that no extractor understood.
+            if (row.parsed === false) entry.failed += 1;
+            if (!entry.last_seen || row.created_at > entry.last_seen) entry.last_seen = row.created_at;
+
+            const platform = row.platform || 'unknown';
+            if (!entry.platforms.has(platform)) {
+                entry.platforms.set(platform, { platform, label: PLATFORM_LABELS[platform] || platform, count: 0, last_seen: null });
+            }
+            const p = entry.platforms.get(platform);
+            p.count += 1;
+            if (!p.last_seen || row.created_at > p.last_seen) p.last_seen = row.created_at;
+        }
+
+        const nameBySlug = Object.fromEntries((entities.data || []).map((e) => [e.slug, e]));
+
+        const sources = [...bySlug.values()].map((entry) => ({
+            ...entry,
+            entity_name: nameBySlug[entry.entity_slug]?.name || null,
+            entity_type: nameBySlug[entry.entity_slug]?.entity_type || null,
+            bcc_email: `gcr-${entry.entity_slug}@parse.gulfcoastradar.com`,
+            platforms: [...entry.platforms.values()].sort((a, b) => b.count - a.count),
+        })).sort((a, b) => b.total - a.total);
+
+        // Active businesses the parser has never heard from.
+        const seen = new Set(sources.map((s) => s.entity_slug));
+        const unattached = (entities.data || [])
+            .filter((e) => !seen.has(e.slug))
+            .map((e) => ({
+                entity_slug: e.slug,
+                entity_name: e.name,
+                entity_type: e.entity_type,
+                bcc_email: `gcr-${e.slug}@parse.gulfcoastradar.com`,
+            }));
+
+        res.json({
+            sources,
+            unattached,
+            scanned: (logs.data || []).length,
+            active_businesses: (entities.data || []).length,
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/**
+ * The parse log, admin-scoped. `raw_text` is omitted unless explicitly asked
+ * for — it holds the whole email body, which is customer correspondence.
+ */
+router.get('/parser/log', adminRequired, async (req, res) => {
+    const columns = req.query.include_raw === 'true'
+        ? '*'
+        : 'id, entity_slug, platform, booking_type, event_date, event_time, party_size, customer_name, activity_name, confirmation_no, parsed, manual, subject, from_email, created_at';
+
+    let query = supabase
+        .from('email_parser_log')
+        .select(columns)
+        .order('created_at', { ascending: false })
+        .limit(Math.min(parseInt(req.query.limit, 10) || 200, 1000));
+
+    if (req.query.slug) query = query.eq('entity_slug', req.query.slug);
+    if (req.query.platform) query = query.eq('platform', req.query.platform);
+    if (req.query.parsed === 'false') query = query.eq('parsed', false);
+    if (req.query.parsed === 'true') query = query.eq('parsed', true);
+    if (req.query.from) query = query.gte('created_at', req.query.from);
+
+    const { data, error } = await query;
+    if (error) return fail(res, 500, error.message);
+    res.json({ logs: await withBusinessNames(data), total: (data || []).length });
+});
+
 /* ── summary ─────────────────────────────────────────────────────────── */
 //
 // One call for the dashboard's headline numbers, so it doesn't need six.
