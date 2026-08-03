@@ -11,10 +11,14 @@
 --   entity_external_calendars   routes/dashboard.js (owner-side iCal setup)
 --   gcr_deals                   routes/deals.js, routes/email-parser.js
 --
--- None of those are created here. They exist in the live database, none of
--- them has a definition checked into this repo, and guessing a CREATE TABLE
--- for a table that is already in production is a good way to end up with a
--- shape that disagrees with the code writing to it.
+-- None of those are created here — see sql/booking_ingestion_tables.sql.
+--
+-- CORRECTION: this file used to say those five tables "exist in the live
+-- database" and therefore did not define them. That was wrong. Checked against
+-- the live GCR project, all five were absent, so the parser could never have
+-- written a row and every screen reading them came back empty.
+-- sql/booking_ingestion_tables.sql now creates them, with columns taken from
+-- the code that reads and writes them rather than guessed.
 --
 -- What IS here: the two columns on `entity` that capacity depends on. The
 -- parser reads and writes them (routes/email-parser.js), so they should
