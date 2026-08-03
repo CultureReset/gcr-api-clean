@@ -71,6 +71,12 @@ mount('/api/admin/connections', () => require('./routes/composio'));
 // so these paths are additive and nothing in admin.js is shadowed.
 mount('/api/admin', () => require('./routes/admin-settings'));
 
+// One business seen the way its own dashboard would show it: every slug-keyed
+// table that actually has rows for it, discovered from the schema per request.
+// No table list lives in code, so a new table with data becomes a new section
+// with no deploy.
+mount('/api/admin/gcr', () => require('./routes/business-profile'));
+
 // The embeddable availability calendar a business drops into its own website,
 // plus the JSON it reads. Public and unauthenticated by design — it runs on
 // anonymous visitors' browsers on other people's domains — and returns only
