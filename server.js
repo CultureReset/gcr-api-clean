@@ -92,6 +92,12 @@ mount('/api/admin/gcr', () => require('./routes/ingest'));
 mount('/api/intake', () => require('./routes/intake'));
 mount('/api/admin/intake', () => require('./routes/intake'));
 
+// Text the dashboard a question, get an answer from real data. A SEPARATE
+// system from routes/sms.js — that one is the customer pipeline (tourist
+// signup, staff commands, blasts) and is untouched by this. Brevo only, no
+// Twilio, and the allowlist is the authentication.
+mount('/api/dashboard-sms', () => require('./routes/dashboard-sms'));
+
 // The embeddable availability calendar a business drops into its own website,
 // plus the JSON it reads. Public and unauthenticated by design — it runs on
 // anonymous visitors' browsers on other people's domains — and returns only
