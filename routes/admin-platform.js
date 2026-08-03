@@ -1607,6 +1607,382 @@ router.get('/industry-calendar', adminRequired, async (req, res) => {
     }
 });
 
+/* ── industry blueprints & structured listing data ───────────────────── */
+//
+// "A two bedroom two bath at Phoenix East on these dates."
+// "A charter for eight people, at least eight hours, a 45ft boat with AC."
+//
+// Neither question can be answered from `entity` — those are facts about a
+// specific unit or a specific boat, and nothing stored them. routes/
+// industry-blueprints.js defines what each industry would store if you built
+// its platform from scratch; `entity_attributes` holds the values; and
+// /match below joins them to the availability engine so the answer is
+// "matches the description AND is actually free".
+
+const BP = require('./industry-blueprints');
+
+/** Every field an industry defines. The dashboard renders its form from this. */
+router.get('/blueprints', adminRequired, (_req, res) => {
+    const out = {};
+    for (const id of Object.keys(BP.BLUEPRINTS)) {
+        const spec = AVAIL.verticalSpec(id);
+        out[id] = {
+            id,
+            label: spec ? spec.label : id,
+            unit_label: BP.BLUEPRINTS[id].unit_label,
+            listing_fields: BP.BLUEPRINTS[id].listing.length,
+            unit_fields: BP.BLUEPRINTS[id].unit.length,
+        };
+    }
+    res.json({ blueprints: out });
+});
+
+router.get('/blueprint/:vertical', adminRequired, (req, res) => {
+    const vertical = String(req.params.vertical);
+    if (!BP.BLUEPRINTS[vertical]) return fail(res, 404, `No blueprint for "${vertical}"`);
+    const spec = AVAIL.verticalSpec(vertical);
+    res.json({
+        vertical,
+        label: spec ? spec.label : vertical,
+        unit_label: BP.BLUEPRINTS[vertical].unit_label,
+        fields: BP.fieldsFor(vertical),
+        searchable: BP.searchableFor(vertical).map((f) => ({
+            key: f.key, label: f.label, type: f.type, search: f.search,
+            unit: f.unit, options: f.options, applies: f.applies,
+        })),
+    });
+});
+
+/**
+ * One listing's stored attributes, with the blueprint for its industry so the
+ * caller does not have to make a second request to know what the keys mean.
+ * Unit children come along, because a condo building's answer is mostly its
+ * units' answers.
+ */
+router.get('/attributes/:slug', adminRequired, async (req, res) => {
+    try {
+        const slug = String(req.params.slug);
+        const { data: entity, error } = await supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, parent_slug:parent_entity_slug')
+            .eq('slug', slug)
+            .maybeSingle();
+        if (error) return fail(res, 500, error.message);
+        if (!entity) return fail(res, 404, 'Business not found');
+
+        const { data: units } = await supabase
+            .from('entity')
+            .select('slug, name, entity_subtype')
+            .eq('parent_entity_slug', slug)
+            .eq('is_active', true)
+            .order('name')
+            .limit(500);
+
+        const slugs = [slug, ...(units || []).map((u) => u.slug)];
+        const { data: rows } = await supabase
+            .from('entity_attributes')
+            .select('entity_slug, attr_key, value_text, value_num, value_bool, value_list')
+            .in('entity_slug', slugs)
+            .limit(5000);
+
+        // A unit inherits its industry from its parent: a condo unit's
+        // entity_subtype is 'condo_unit', which classifies as a stay, but the
+        // parent is the authority on which blueprint applies.
+        const vertical = AVAIL.verticalOf(entity);
+        const flatten = (forSlug) => {
+            const out = {};
+            for (const r of rows || []) {
+                if (r.entity_slug !== forSlug) continue;
+                out[r.attr_key] = r.value_num ?? r.value_bool ?? r.value_list ?? r.value_text ?? null;
+            }
+            return out;
+        };
+
+        res.json({
+            entity_slug: slug,
+            entity_name: entity.name,
+            vertical,
+            unit_label: (BP.BLUEPRINTS[vertical] || BP.BLUEPRINTS.other).unit_label,
+            fields: BP.fieldsFor(vertical),
+            attributes: flatten(slug),
+            units: (units || []).map((u) => ({
+                entity_slug: u.slug,
+                entity_name: u.name,
+                entity_subtype: u.entity_subtype,
+                attributes: flatten(u.slug),
+            })),
+            // Which required fields are still blank. A listing missing these
+            // cannot be matched on the thing guests actually ask for.
+            missing_required: BP.fieldsFor(vertical)
+                .filter((f) => f.required && f.applies === 'listing')
+                .filter((f) => flatten(slug)[f.key] == null)
+                .map((f) => ({ key: f.key, label: f.label })),
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/**
+ * Write attributes for one listing. The body is `{ key: value }`; every key is
+ * validated against the blueprint and coerced to its declared type before it
+ * is stored, because `bedrooms` landing in the text column would make every
+ * `>= 2` filter silently match nothing.
+ *
+ * A null clears the attribute rather than storing a null row.
+ */
+router.put('/attributes/:slug', adminRequired, async (req, res) => {
+    try {
+        const slug = String(req.params.slug);
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const patch = body.attributes && typeof body.attributes === 'object' ? body.attributes : body;
+
+        const { data: entity } = await supabase
+            .from('entity')
+            .select('slug, entity_type, entity_subtype, parent_slug:parent_entity_slug')
+            .eq('slug', slug)
+            .maybeSingle();
+        if (!entity) return fail(res, 404, 'Business not found');
+
+        // A unit is described by its parent's blueprint — a condo unit holds
+        // bedrooms and bathrooms, which only the stay blueprint defines.
+        let vertical = AVAIL.verticalOf(entity);
+        if (entity.parent_slug) {
+            const { data: parent } = await supabase
+                .from('entity')
+                .select('entity_type, entity_subtype')
+                .eq('slug', entity.parent_slug)
+                .maybeSingle();
+            if (parent) vertical = AVAIL.verticalOf(parent);
+        }
+
+        const writes = [];
+        const clears = [];
+        const errors = [];
+
+        for (const [key, raw] of Object.entries(patch)) {
+            const field = BP.fieldFor(vertical, key);
+            if (!field) { errors.push(`Unknown field "${key}" for ${vertical}`); continue; }
+            const result = BP.coerce(field, raw);
+            if (result.error) { errors.push(result.error); continue; }
+            if (result.cleared) { clears.push(key); continue; }
+
+            writes.push({
+                entity_slug: slug,
+                attr_key: key,
+                value_text: result.column === 'value_text' ? result.value : null,
+                value_num: result.column === 'value_num' ? result.value : null,
+                value_bool: result.column === 'value_bool' ? result.value : null,
+                value_list: result.column === 'value_list' ? result.value : null,
+                updated_at: new Date().toISOString(),
+            });
+        }
+
+        if (errors.length) return fail(res, 400, errors.join('; '));
+
+        if (clears.length) {
+            await supabase.from('entity_attributes').delete().eq('entity_slug', slug).in('attr_key', clears);
+        }
+        if (writes.length) {
+            const { error } = await supabase
+                .from('entity_attributes')
+                .upsert(writes, { onConflict: 'entity_slug,attr_key' });
+            if (error) return fail(res, 400, error.message);
+        }
+
+        res.json({ entity_slug: slug, vertical, written: writes.length, cleared: clears.length });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── match: description + dates ──────────────────────────────────────── */
+//
+// The whole point. A guest describes what they want and when; this returns
+// what matches BOTH — the attributes and the calendar. Either half alone is
+// useless: a 2-bed 2-bath that is booked all week is not an answer, and a
+// free week in a studio is not an answer either.
+//
+// POST body:
+//   { vertical, from, to, coverage?, filters: { bedrooms: 2, has_ac: true,
+//     boat_length: 45, species: ['red_snapper'] }, q?, limit? }
+//
+// Numeric filters read as "at least" or "at most" from the field's own
+// `search` rule, so the caller sends `{ bedrooms: 2 }` and gets `>= 2` for
+// bedrooms and `<= 400` for nightly_rate without having to know which is
+// which.
+
+router.post('/match', adminRequired, async (req, res) => {
+    try {
+        const body = req.body || {};
+        const vertical = String(body.vertical || '');
+        if (!BP.BLUEPRINTS[vertical]) return fail(res, 400, `Unknown industry "${vertical}"`);
+
+        const from = /^\d{4}-\d{2}-\d{2}$/.test(body.from || '') ? body.from : null;
+        const to = /^\d{4}-\d{2}-\d{2}$/.test(body.to || '') ? body.to : from;
+        const filters = body.filters && typeof body.filters === 'object' ? body.filters : {};
+        const limit = Math.min(parseInt(body.limit, 10) || 200, 1000);
+
+        /* 1. Which listings match the description? */
+        const active = Object.entries(filters).filter(([, v]) => v !== null && v !== undefined && v !== '');
+        let matchedSlugs = null;   // null means "no attribute filter applied"
+        const applied = [];
+
+        for (const [key, value] of active) {
+            const field = BP.fieldFor(vertical, key);
+            if (!field || !field.search) return fail(res, 400, `"${key}" is not searchable for ${vertical}`);
+
+            let query = supabase.from('entity_attributes').select('entity_slug').eq('attr_key', key).limit(5000);
+            if (field.search === 'min') query = query.gte('value_num', Number(value));
+            else if (field.search === 'max') query = query.lte('value_num', Number(value));
+            else if (field.search === 'has') query = query.eq('value_bool', true);
+            else if (field.search === 'eq') query = query.eq('value_text', String(value));
+            else if (field.search === 'any') {
+                const wanted = Array.isArray(value) ? value : [value];
+                // `contains` is array containment: the listing must offer ALL
+                // of what was asked for, which is the honest reading of
+                // "8 hour trips targeting red snapper".
+                query = field.type === 'multi'
+                    ? query.contains('value_list', wanted)
+                    : query.in('value_text', wanted.map(String));
+            }
+
+            const { data, error } = await query;
+            if (error) return fail(res, 500, error.message);
+
+            const found = new Set((data || []).map((r) => r.entity_slug));
+            // Intersect, never union: every filter narrows. A guest asking for
+            // 2 bedrooms AND air conditioning does not want either/or.
+            matchedSlugs = matchedSlugs === null ? found : new Set([...matchedSlugs].filter((s) => found.has(s)));
+            applied.push({ key, label: field.label, rule: field.search, value });
+            if (matchedSlugs.size === 0) break;
+        }
+
+        /* 2. Which of those are in this industry, and what are they? */
+        let entityQuery = supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, city, phone, email, hero_image_url, booking_url, rating, price_from, price_unit, daily_capacity, parent_slug:parent_entity_slug')
+            .eq('is_active', true)
+            .limit(limit * 4);
+        if (matchedSlugs) {
+            if (matchedSlugs.size === 0) {
+                return res.json({ vertical, from, to, filters: applied, results: [], total: 0, reason: 'no listing matches the description' });
+            }
+            entityQuery = entityQuery.in('slug', [...matchedSlugs]);
+        }
+        if (body.q) {
+            const q = String(body.q).replace(/[%,()]/g, '');
+            entityQuery = entityQuery.or(`name.ilike.%${q}%,city.ilike.%${q}%`);
+        }
+        if (body.city) entityQuery = entityQuery.eq('city', body.city);
+
+        const { data: entities, error: entError } = await entityQuery;
+        if (entError) return fail(res, 500, entError.message);
+
+        // A matched UNIT belongs to its parent's industry, so classify by the
+        // parent when there is one — otherwise "2 bed 2 bath" matches unit
+        // 1204 and then throws it away because a condo_unit isn't a condo.
+        const rows = entities || [];
+        const parentSlugs = [...new Set(rows.map((e) => e.parent_slug).filter(Boolean))];
+        const { data: parents } = parentSlugs.length
+            ? await supabase.from('entity').select('slug, name, entity_type, entity_subtype').in('slug', parentSlugs)
+            : { data: [] };
+        const parentBySlug = Object.fromEntries((parents || []).map((p) => [p.slug, p]));
+
+        const inIndustry = rows.filter((e) => {
+            const owner = e.parent_slug ? parentBySlug[e.parent_slug] : null;
+            return AVAIL.verticalOf(owner || e) === vertical;
+        });
+
+        /* 3. Of those, which are actually free? */
+        let withAvailability = inIndustry;
+        let dates = [];
+        let coverage = null;
+
+        if (from) {
+            dates = AVAIL.datesBetween(from, to, 120);
+            coverage = body.coverage === 'all' || body.coverage === 'any'
+                ? body.coverage
+                : AVAIL.coverageFor(vertical);
+
+            const availability = await AVAIL.readAvailability({
+                from, to, slugs: inIndustry.map((e) => e.slug), publicOnly: false,
+            });
+
+            const isStay = ['condo', 'hotel'].includes(vertical);
+            withAvailability = inIndustry.map((e) => {
+                const fallback = e.daily_capacity ?? (e.parent_slug && isStay ? 1 : null);
+                const summary = AVAIL.summarise(availability.get(e.slug), dates, coverage, fallback);
+                return { entity: e, ...summary };
+            });
+            if (body.only_available !== false) {
+                withAvailability = withAvailability.filter((r) => r.meets_coverage);
+            }
+        } else {
+            withAvailability = inIndustry.map((e) => ({ entity: e }));
+        }
+
+        /* 4. Attach the attributes that were asked about, so the answer shows
+              its work rather than asserting a match. */
+        const finalSlugs = withAvailability.map((r) => r.entity.slug).slice(0, limit);
+        const { data: attrRows } = finalSlugs.length
+            ? await supabase.from('entity_attributes')
+                .select('entity_slug, attr_key, value_text, value_num, value_bool, value_list')
+                .in('entity_slug', finalSlugs)
+                .limit(5000)
+            : { data: [] };
+
+        const attrsBySlug = {};
+        for (const r of attrRows || []) {
+            (attrsBySlug[r.entity_slug] ||= {})[r.attr_key] =
+                r.value_num ?? r.value_bool ?? r.value_list ?? r.value_text ?? null;
+        }
+
+        const results = withAvailability.slice(0, limit).map((r) => {
+            const e = r.entity;
+            const parent = e.parent_slug ? parentBySlug[e.parent_slug] : null;
+            return {
+                entity_slug: e.slug,
+                entity_name: e.name,
+                entity_subtype: e.entity_subtype,
+                city: e.city,
+                phone: e.phone,
+                email: e.email,
+                image_url: e.hero_image_url,
+                booking_url: e.booking_url,
+                rating: e.rating,
+                price_from: e.price_from,
+                price_unit: e.price_unit,
+                // For a unit, the building it belongs to — "unit 1204" alone
+                // does not tell anyone it is at Phoenix West.
+                parent_slug: e.parent_slug || null,
+                parent_name: parent ? parent.name : null,
+                attributes: attrsBySlug[e.slug] || {},
+                available_dates: r.available_dates || [],
+                open_days: r.open_days ?? null,
+                covers_all_days: r.covers_all_days ?? null,
+                has_data: r.has_data ?? null,
+                capacity_known: r.capacity_known ?? null,
+            };
+        });
+
+        res.json({
+            vertical,
+            from,
+            to,
+            dates,
+            coverage,
+            filters: applied,
+            results,
+            total: results.length,
+            described: matchedSlugs ? matchedSlugs.size : null,
+            in_industry: inIndustry.length,
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
 /* ── summary ─────────────────────────────────────────────────────────── */
 //
 // One call for the dashboard's headline numbers, so it doesn't need six.
