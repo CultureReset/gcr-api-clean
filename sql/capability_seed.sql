@@ -1,40 +1,16 @@
--- Catalog rows for the industry tables.
+-- Catalog rows for the capability tables.
 --
--- Amenities are grouped the way Airbnb groups them, because that is the
--- grouping guests already recognise and the one a business is transcribing
--- from. Species and watersport activities are catalogs for the same reason
--- charter species is a join and not free text: "who targets red snapper"
--- should be an index lookup, not a LIKE over a comma-separated string.
+-- `category` on each catalog is a plain grouping column so a form can show
+-- amenities in the order a person expects them. It scopes nothing: any slug
+-- can attach any amenity to itself, to a unit, to a boat or to a space.
 --
--- Every insert is `on conflict do nothing`, so this is safe to re-run and
--- safe to run after someone has already added their own rows.
+--   psql "$DATABASE_URL" -f sql/capability_seed.sql
 --
---   psql "$DATABASE_URL" -f sql/industry_seed.sql
+-- Every insert is `on conflict do nothing`, so it is safe to re-run and safe
+-- after someone has added their own rows.
 
-/* ── amenity sections ────────────────────────────────────────────────── */
-
-insert into public.amenity_sections (key, label, sort_order) values
-  ('bathroom',       'Bathroom',                 10),
-  ('bedroom',        'Bedroom & laundry',        20),
-  ('entertainment',  'Entertainment',            30),
-  ('family',         'Family',                   40),
-  ('climate',        'Heating & cooling',        50),
-  ('safety',         'Home safety',              60),
-  ('internet',       'Internet & office',        70),
-  ('kitchen',        'Kitchen & dining',         80),
-  ('location',       'Location features',        90),
-  ('outdoor',        'Outdoor',                 100),
-  ('parking',        'Parking & facilities',    110),
-  ('services',       'Services',                120),
-  ('accessibility',  'Accessibility',           130),
-  ('vessel',         'On the boat',             140),
-  ('beach',          'Beach & water',           150)
-on conflict (key) do nothing;
-
-/* ── amenities ───────────────────────────────────────────────────────── */
-
-insert into public.amenities (key, label, section_key, sort_order) values
-  -- Bathroom
+insert into public.amenities (key, label, category, sort_order) values
+  -- bathroom
   ('hair_dryer','Hair dryer','bathroom',10),
   ('shampoo','Shampoo','bathroom',20),
   ('hot_water','Hot water','bathroom',30),
@@ -42,8 +18,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('walk_in_shower','Walk-in shower','bathroom',50),
   ('outdoor_shower','Outdoor shower','bathroom',60),
   ('beach_towels','Beach towels','bathroom',70),
-
-  -- Bedroom & laundry
+  -- bedroom & laundry
   ('washer','Washer','bedroom',10),
   ('dryer','Dryer','bedroom',20),
   ('linens','Linens provided','bedroom',30),
@@ -52,8 +27,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('hangers','Hangers','bedroom',60),
   ('blackout_curtains','Blackout curtains','bedroom',70),
   ('safe','In-room safe','bedroom',80),
-
-  -- Entertainment
+  -- entertainment
   ('tv','TV','entertainment',10),
   ('smart_tv','Smart TV','entertainment',20),
   ('cable','Cable / satellite','entertainment',30),
@@ -61,8 +35,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('game_console','Game console','entertainment',50),
   ('books_games','Books & board games','entertainment',60),
   ('pool_table','Pool table','entertainment',70),
-
-  -- Family
+  -- family
   ('crib','Crib','family',10),
   ('pack_n_play','Pack ''n play','family',20),
   ('high_chair','High chair','family',30),
@@ -70,29 +43,25 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('outlet_covers','Outlet covers','family',50),
   ('kids_dinnerware','Children''s dinnerware','family',60),
   ('beach_toys','Beach toys','family',70),
-
-  -- Heating & cooling
+  -- heating & cooling
   ('air_conditioning','Air conditioning','climate',10),
   ('central_air','Central air','climate',20),
   ('heating','Heating','climate',30),
   ('ceiling_fan','Ceiling fan','climate',40),
   ('portable_fan','Portable fan','climate',50),
-
-  -- Home safety
+  -- safety
   ('smoke_alarm','Smoke alarm','safety',10),
   ('co_alarm','Carbon monoxide alarm','safety',20),
   ('fire_extinguisher','Fire extinguisher','safety',30),
   ('first_aid','First aid kit','safety',40),
   ('exterior_cameras','Exterior security cameras','safety',50),
   ('life_jackets','Life jackets','safety',60),
-
-  -- Internet & office
+  -- internet & office
   ('wifi','Wifi','internet',10),
   ('dedicated_workspace','Dedicated workspace','internet',20),
   ('ethernet','Ethernet','internet',30),
   ('printer','Printer','internet',40),
-
-  -- Kitchen & dining
+  -- kitchen & dining
   ('full_kitchen','Full kitchen','kitchen',10),
   ('kitchenette','Kitchenette','kitchen',20),
   ('refrigerator','Refrigerator','kitchen',30),
@@ -107,8 +76,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('cooking_basics','Cooking basics','kitchen',120),
   ('wine_glasses','Wine glasses','kitchen',130),
   ('dining_table','Dining table','kitchen',140),
-
-  -- Location features
+  -- location
   ('gulf_front','Gulf front','location',10),
   ('beach_access','Private beach access','location',20),
   ('waterfront','Waterfront','location',30),
@@ -116,8 +84,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('lake_access','Lake access','location',50),
   ('golf_course_view','Golf course view','location',60),
   ('resort_access','Resort access','location',70),
-
-  -- Outdoor
+  -- outdoor
   ('outdoor_pool','Outdoor pool','outdoor',10),
   ('indoor_pool','Indoor pool','outdoor',20),
   ('heated_pool','Heated pool','outdoor',30),
@@ -131,8 +98,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('tennis','Tennis court','outdoor',110),
   ('pickleball','Pickleball court','outdoor',120),
   ('playground','Playground','outdoor',130),
-
-  -- Parking & facilities
+  -- parking & facilities
   ('free_parking','Free parking','parking',10),
   ('covered_parking','Covered parking','parking',20),
   ('garage','Garage','parking',30),
@@ -142,8 +108,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('sauna','Sauna','parking',70),
   ('gated_entry','Gated entry','parking',80),
   ('conference_room','Conference room','parking',90),
-
-  -- Services
+  -- services
   ('self_checkin','Self check-in','services',10),
   ('keypad','Keypad entry','services',20),
   ('front_desk','Front desk','services',30),
@@ -154,15 +119,13 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('onsite_restaurant','On-site restaurant','services',80),
   ('bar','Bar','services',90),
   ('long_term_stays','Long-term stays allowed','services',100),
-
-  -- Accessibility
+  -- accessibility
   ('step_free_entry','Step-free entrance','accessibility',10),
   ('wide_doorway','Wide doorway','accessibility',20),
   ('roll_in_shower','Roll-in shower','accessibility',30),
   ('grab_bars','Shower grab bars','accessibility',40),
   ('accessible_parking','Accessible parking','accessibility',50),
-
-  -- On the boat
+  -- on a vessel
   ('boat_head','Head (toilet)','vessel',10),
   ('boat_ac','Air conditioning','vessel',20),
   ('boat_cabin','Enclosed cabin','vessel',30),
@@ -177,8 +140,7 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('boat_cooler','Cooler','vessel',120),
   ('boat_bimini','Bimini top','vessel',130),
   ('boat_ladder','Swim ladder','vessel',140),
-
-  -- Beach & water
+  -- beach & water gear
   ('beach_chairs','Beach chairs','beach',10),
   ('beach_umbrella','Beach umbrella','beach',20),
   ('kayaks','Kayaks','beach',30),
@@ -188,11 +150,9 @@ insert into public.amenities (key, label, section_key, sort_order) values
   ('bikes','Bicycles','beach',70)
 on conflict (key) do nothing;
 
-/* ── fish species ────────────────────────────────────────────────────── */
--- Seasons are months. Red snapper's federal season moves every year, so the
--- months here are the usual window and not a legal reference.
-
-insert into public.fish_species (key, label, category, season_start, season_end, sort_order) values
+-- Seasons are months and reflect the usual window, not a legal reference —
+-- the federal red snapper season moves every year.
+insert into public.species (key, label, category, season_start, season_end, sort_order) values
   ('red_snapper','Red snapper','reef',6,8,10),
   ('vermilion_snapper','Vermilion snapper','reef',1,12,20),
   ('grouper','Grouper','reef',6,12,30),
@@ -215,31 +175,33 @@ insert into public.fish_species (key, label, category, season_start, season_end,
   ('pompano','Pompano','inshore',3,10,200)
 on conflict (key) do nothing;
 
-/* ── watersport activities ───────────────────────────────────────────── */
-
-insert into public.watersport_activities (key, label, sort_order) values
-  ('parasailing','Parasailing',10),
-  ('jet_ski','Jet ski',20),
-  ('wave_runner','Wave runner',30),
-  ('banana_boat','Banana boat',40),
-  ('tubing','Tubing',50),
-  ('kayak','Kayaking',60),
-  ('paddleboard','Paddleboarding',70),
-  ('snorkel','Snorkelling',80),
-  ('scuba','Scuba diving',90),
-  ('wakeboard','Wakeboarding',100),
-  ('water_ski','Water skiing',110),
-  ('flyboard','Flyboarding',120),
-  ('kiteboard','Kiteboarding',130),
-  ('surf_lesson','Surf lessons',140)
+insert into public.activities (key, label, category, sort_order) values
+  ('parasailing','Parasailing','water',10),
+  ('jet_ski','Jet ski','water',20),
+  ('wave_runner','Wave runner','water',30),
+  ('banana_boat','Banana boat','water',40),
+  ('tubing','Tubing','water',50),
+  ('kayak','Kayaking','water',60),
+  ('paddleboard','Paddleboarding','water',70),
+  ('snorkel','Snorkelling','water',80),
+  ('scuba','Scuba diving','water',90),
+  ('wakeboard','Wakeboarding','water',100),
+  ('water_ski','Water skiing','water',110),
+  ('flyboard','Flyboarding','water',120),
+  ('kiteboard','Kiteboarding','water',130),
+  ('surf_lesson','Surf lessons','water',140),
+  ('deep_sea_fishing','Deep sea fishing','fishing',150),
+  ('inshore_fishing','Inshore fishing','fishing',160),
+  ('dolphin_watching','Dolphin watching','sightseeing',170),
+  ('sunset_cruise','Sunset cruise','sightseeing',180),
+  ('golf','Golf','land',190),
+  ('horseback','Horseback riding','land',200)
 on conflict (key) do nothing;
 
 do $$
-declare a int; s int; w int;
 begin
-  select count(*) into a from public.amenities;
-  select count(*) into s from public.fish_species;
-  select count(*) into w from public.watersport_activities;
-  raise notice 'seeded: % amenities in % sections, % species, % activities',
-    a, (select count(*) from public.amenity_sections), s, w;
+  raise notice 'seeded: % amenities, % species, % activities',
+    (select count(*) from public.amenities),
+    (select count(*) from public.species),
+    (select count(*) from public.activities);
 end $$;

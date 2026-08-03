@@ -1607,429 +1607,232 @@ router.get('/industry-calendar', adminRequired, async (req, res) => {
     }
 });
 
-/* ── industry tables: the structured listing data ────────────────────── */
+/* ── capabilities: the structured listing data ───────────────────────── */
 //
-// "A two bedroom two bath at Phoenix West on these dates."
-// "A charter for eight, at least eight hours, a 45ft boat with AC and a head."
+// A capability is a THING a business can have — units, boats, trips, gear,
+// packages, spaces, plus one row of operating details. Not an industry.
 //
-// `entity` holds what every business has — name, slug, phone, hours, hero
-// image. What it cannot hold is bedrooms, boat length, or whether there is a
-// head on board, because those belong to an industry. sql/industry_tables.sql
-// creates a real table per real thing, with real typed columns:
+//   ANY slug can have ANY capability.
 //
-//   stay_properties / stay_units / stay_unit_beds     the building, the unit, the beds
-//   charter_operators / charter_boats / charter_trips the operation, the boat, the trip
-//   cruise_operators / cruise_vessels / cruise_trips
-//   rental_operators / rental_items
-//   watersport_operators, session_providers / session_packages, venue_spaces
-//   amenities + amenity_sections, joined per thing
-//   fish_species, watersport_activities — catalogs, joined, never free text
+// `entity` already says what a business is; nothing here re-states it and
+// nothing here gates on it. A marina that runs charters, rents pontoons and
+// has a restaurant uses boats + trips + gear + spaces. So does a hotel that
+// owns one boat, runs one sunset cruise, lends bikes and has a ballroom.
 //
-// routes/industry-blueprints.js maps those tables so a form and a search can
-// be generated from them, and scripts/check-blueprint-columns.mjs fails the
-// build if the map ever names a column the SQL does not create.
+// Tables: sql/capability_tables.sql. Column map: routes/capabilities.js.
+// scripts/check-capability-columns.mjs fails the build if the map ever names
+// a column the SQL does not create.
 //
-// A condo complex is one entity and each unit is its own entity with
-// parent_entity_slug set — the separation that already exists. The building
-// row lives in stay_properties keyed to the building's slug; each unit's row
-// lives in stay_units keyed to its own.
+// No jsonb, no key/value rows, no comma-separated lists anywhere in it.
 
-const BP = require('./industry-blueprints');
+const CAP = require('./capabilities');
 
-/** Which table applies to this entity: the listing level, or the unit level. */
-async function resolveLevel(slug) {
-    const { data: entity } = await supabase
-        .from('entity')
-        .select('slug, name, entity_type, entity_subtype, is_active, parent_slug:parent_entity_slug')
-        .eq('slug', slug)
-        .maybeSingle();
-    if (!entity) return { error: 'Business not found' };
-
-    let parent = null;
-    if (entity.parent_slug) {
-        const { data } = await supabase
-            .from('entity')
-            .select('slug, name, entity_type, entity_subtype')
-            .eq('slug', entity.parent_slug)
-            .maybeSingle();
-        parent = data || null;
-    }
-
-    // A unit inherits its industry from its parent. A condo unit's own subtype
-    // is 'condo_unit', which would classify it as a stay by luck rather than
-    // by design, and a charter boat listed separately would classify as
-    // nothing at all.
-    const vertical = AVAIL.verticalOf(parent || entity);
-    const schema = BP.schemaFor(vertical);
-    const level = parent && schema.unit ? 'unit' : 'listing';
-
-    return { entity, parent, vertical, schema, level, spec: schema[level] };
-}
-
-/** The amenity catalog, grouped the way a guest sees it. */
-router.get('/amenities', adminRequired, async (_req, res) => {
+/** Every capability, with the ones worth opening first for this business. */
+router.get('/capabilities', adminRequired, async (req, res) => {
     try {
-        const [sections, amenities] = await Promise.all([
-            supabase.from('amenity_sections').select('key, label, sort_order').order('sort_order'),
-            supabase.from('amenities').select('id, key, label, section_key, sort_order').eq('is_active', true).order('sort_order').limit(2000),
-        ]);
-        if (sections.error) return fail(res, 500, sections.error.message);
-
-        const bySection = {};
-        for (const a of amenities.data || []) {
-            (bySection[a.section_key || 'other'] ||= []).push(a);
+        let entity = null;
+        if (req.query.slug) {
+            const { data } = await supabase
+                .from('entity')
+                .select('slug, name, entity_type, entity_subtype')
+                .eq('slug', req.query.slug)
+                .maybeSingle();
+            entity = data || null;
         }
+
+        const describe = (key, c) => ({
+            key,
+            table: c.table,
+            label: c.label,
+            hint: c.hint,
+            single: !!c.single,
+            columns: CAP.columnList(c),
+            children: (c.children || []).map((child) => ({
+                table: child.table,
+                fk: child.fk,
+                label: child.label,
+                no_id: !!child.noId,
+                columns: Object.entries(child.columns).map(([name, def]) => ({ name, ...def })),
+            })),
+            amenities: c.amenities || null,
+        });
+
         res.json({
-            sections: (sections.data || []).map((s) => ({ ...s, amenities: bySection[s.key] || [] })),
-            total: (amenities.data || []).length,
+            capabilities: Object.entries(CAP.CAPABILITIES).map(([key, c]) => describe(key, c)),
+            entity_lists: Object.entries(CAP.ENTITY_LISTS).map(([key, l]) => ({ key, ...l })),
+            // A hint about which to open first, never a restriction. Every
+            // capability is offered to every business.
+            suggested: entity ? CAP.suggestedFor(entity) : ['operations'],
+            entity: entity && { slug: entity.slug, name: entity.name, type: entity.entity_type, subtype: entity.entity_subtype },
+            searchable: CAP.searchable(),
         });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
 
-/** One industry's tables and columns — what the dashboard builds a form from. */
-router.get('/blueprint/:vertical', adminRequired, (req, res) => {
-    const vertical = String(req.params.vertical);
-    const schema = BP.SCHEMAS[vertical];
-    if (!schema) return fail(res, 404, `No blueprint for "${vertical}"`);
-    const spec = AVAIL.verticalSpec(vertical);
+/** A catalog — amenities, species, activities — grouped for a form. */
+router.get('/catalog/:name', adminRequired, async (req, res) => {
+    const name = String(req.params.name);
+    if (!['amenities', 'species', 'activities'].includes(name)) {
+        return fail(res, 404, `No catalog "${name}"`);
+    }
+    const { data, error } = await supabase
+        .from(name)
+        .select('*')
+        .order('sort_order')
+        .limit(3000);
+    if (error) return fail(res, 500, error.message);
 
-    const describe = (s) => (s ? {
-        table: s.table,
-        key: s.key,
-        label: s.label,
-        managed_by: s.managedBy || 'owner',
-        managed_note: s.managedNote || null,
-        multiple: !!s.multiple,
-        columns: BP.columnList(s),
-        collections: (s.collections || []).map((c) => ({
-            table: c.table, fk: c.fk, label: c.label,
-            columns: Object.entries(c.columns).map(([name, def]) => ({ name, ...def })),
-        })),
-        tags: s.tags || [],
-        amenities: s.amenities || null,
-    } : null);
+    const rows = (data || []).filter((r) => r.is_active !== false);
+    const groups = {};
+    for (const row of rows) (groups[row.category || 'other'] ||= []).push(row);
 
     res.json({
-        vertical,
-        label: spec ? spec.label : vertical,
-        unit_label: schema.unit_label,
-        listing: describe(schema.listing),
-        unit: describe(schema.unit),
-        searchable: BP.searchableFor(vertical),
+        catalog: name,
+        rows,
+        groups: Object.entries(groups).map(([category, items]) => ({ category, items })),
+        total: rows.length,
     });
 });
 
-router.get('/blueprints', adminRequired, (_req, res) => {
-    const out = [];
-    for (const [id, schema] of Object.entries(BP.SCHEMAS)) {
-        const spec = AVAIL.verticalSpec(id);
-        out.push({
-            id,
-            label: spec ? spec.label : id,
-            unit_label: schema.unit_label,
-            listing_table: schema.listing ? schema.listing.table : null,
-            unit_table: schema.unit ? schema.unit.table : null,
-            listing_columns: schema.listing ? Object.keys(schema.listing.columns).length : 0,
-            unit_columns: schema.unit ? Object.keys(schema.unit.columns).length : 0,
-            collections: [
-                ...(schema.listing?.collections || []).map((c) => c.table),
-                ...(schema.unit?.collections || []).map((c) => c.table),
-            ],
-        });
-    }
-    res.json({ blueprints: out });
-});
-
 /**
- * Everything stored about one listing: its own row, its amenities, its tags,
- * its collections, and — for a building — a summary row per unit so the
- * dashboard can show which units are still blank without N requests.
+ * Everything this business has, capability by capability.
+ *
+ * One request rather than seven, because the editor needs all of it and a
+ * business rarely has more than a handful of rows in any of them.
  */
 router.get('/listing/:slug', adminRequired, async (req, res) => {
     try {
-        const ctx = await resolveLevel(String(req.params.slug));
-        if (ctx.error) return fail(res, 404, ctx.error);
-        const { entity, parent, vertical, schema, level, spec } = ctx;
+        const slug = String(req.params.slug);
+        const { data: entity } = await supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, parent_slug:parent_entity_slug')
+            .eq('slug', slug)
+            .maybeSingle();
+        if (!entity) return fail(res, 404, 'Business not found');
 
-        if (!spec) {
-            return res.json({
-                entity_slug: entity.slug, entity_name: entity.name, vertical, level,
-                supported: false,
-                reason: `No industry tables for "${vertical}" yet.`,
-            });
+        const out = {};
+        for (const [key, capability] of Object.entries(CAP.CAPABILITIES)) {
+            const { data } = await supabase
+                .from(capability.table)
+                .select('*')
+                .eq(capability.key, slug)
+                .order(capability.single ? capability.key : 'sort_order')
+                .limit(capability.single ? 1 : 500);
+            const rows = data || [];
+
+            const amenities = {};
+            if (capability.amenities && rows.length) {
+                const { data: joins } = await supabase
+                    .from(capability.amenities.join)
+                    .select(`${capability.amenities.fk}, amenity_id`)
+                    .in(capability.amenities.fk, rows.map((r) => r.id))
+                    .limit(5000);
+                for (const j of joins || []) {
+                    (amenities[j[capability.amenities.fk]] ||= []).push(j.amenity_id);
+                }
+            }
+
+            const children = {};
+            for (const child of capability.children || []) {
+                if (!rows.length) continue;
+                const { data: kids } = await supabase
+                    .from(child.table)
+                    .select('*')
+                    .in(child.fk, rows.map((r) => r.id))
+                    .limit(2000);
+                for (const kid of kids || []) {
+                    ((children[kid[child.fk]] ||= {})[child.table] ||= []).push(kid);
+                }
+            }
+
+            out[key] = {
+                table: capability.table,
+                single: !!capability.single,
+                rows: capability.single ? undefined : rows,
+                row: capability.single ? rows[0] || null : undefined,
+                count: rows.length,
+                amenities,
+                children,
+            };
         }
 
-        const { data: rows } = await supabase
-            .from(spec.table)
-            .select('*')
-            .eq(spec.key, entity.slug)
-            .limit(spec.multiple ? 200 : 1);
-        const record = spec.multiple ? null : (rows || [])[0] || null;
+        // The lists attached to the business itself.
+        const lists = {};
+        for (const [key, list] of Object.entries(CAP.ENTITY_LISTS)) {
+            const { data } = await supabase
+                .from(list.join)
+                .select(list.catalogFk)
+                .eq('entity_slug', slug)
+                .limit(2000);
+            lists[key] = (data || []).map((r) => r[list.catalogFk]);
+        }
 
-        const [amenities, tags, collections, units, inherited] = await Promise.all([
-            readAmenities(spec, record),
-            readTags(spec, record),
-            readCollections(spec, record),
-            level === 'listing' && schema.unit ? readUnitSummaries(entity.slug, schema.unit) : Promise.resolve(null),
-            // A unit inherits its building. Returned read-only so the owner
-            // can see the pool and the lazy river without being asked to
-            // re-enter them, and so nothing has to guess whether a blank
-            // field on the unit means "no" or "ask upstairs".
-            level === 'unit' && parent ? readInherited(schema.listing, parent) : Promise.resolve(null),
-        ]);
+        // Children of this business, if it has any — a condo building's units
+        // are separate entities, so the editor can jump straight to them.
+        const { data: children } = await supabase
+            .from('entity')
+            .select('slug, name, entity_subtype')
+            .eq('parent_entity_slug', slug)
+            .eq('is_active', true)
+            .order('name')
+            .limit(500);
 
         res.json({
-            entity_slug: entity.slug,
+            entity_slug: slug,
             entity_name: entity.name,
-            parent_slug: parent ? parent.slug : null,
-            parent_name: parent ? parent.name : null,
-            vertical,
-            unit_label: schema.unit_label,
-            level,
-            supported: true,
-            table: spec.table,
-            record,
-            records: spec.multiple ? rows || [] : undefined,
-            amenities,
-            tags,
-            collections,
-            units,
-            inherited,
-            managed_by: spec.managedBy || 'owner',
-            managed_note: spec.managedNote || null,
-            missing_required: BP.columnList(spec)
-                .filter((c) => c.required && (!record || record[c.name] === null || record[c.name] === undefined))
-                .map((c) => ({ name: c.name, label: c.label })),
+            entity_type: entity.entity_type,
+            entity_subtype: entity.entity_subtype,
+            parent_slug: entity.parent_slug || null,
+            suggested: CAP.suggestedFor(entity),
+            capabilities: out,
+            lists,
+            children: children || [],
+            // Which capabilities this business actually uses, so the editor
+            // can open those and collapse the rest.
+            in_use: Object.entries(out).filter(([, v]) => (v.single ? v.row : v.count)).map(([k]) => k),
         });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
 
-/** The building's own row and amenities, labelled, for a unit to display. */
-async function readInherited(listingSpec, parent) {
-    if (!listingSpec) return null;
-    const { data: record } = await supabase
-        .from(listingSpec.table)
-        .select('*')
-        .eq(listingSpec.key, parent.slug)
-        .maybeSingle();
-    if (!record) {
-        return { entity_slug: parent.slug, entity_name: parent.name, table: listingSpec.table, record: null, amenities: [] };
-    }
-    return {
-        entity_slug: parent.slug,
-        entity_name: parent.name,
-        table: listingSpec.table,
-        managed_by: listingSpec.managedBy || 'owner',
-        columns: BP.columnList(listingSpec),
-        record,
-        amenities: await readAmenities(listingSpec, record),
-    };
-}
-
-async function readAmenities(spec, record) {
-    if (!spec.amenities || !record) return [];
-    const { data } = await supabase
-        .from(spec.amenities.join)
-        .select('amenity_id')
-        .eq(spec.amenities.fk, record.id)
-        .limit(500);
-    return (data || []).map((r) => r.amenity_id);
-}
-
-async function readTags(spec, record) {
-    if (!spec.tags || !record) return {};
-    const out = {};
-    for (const tag of spec.tags) {
-        const { data } = await supabase
-            .from(tag.join)
-            .select(tag.catalogFk)
-            .eq(tag.fk, record.id)
-            .limit(500);
-        out[tag.catalog] = (data || []).map((r) => r[tag.catalogFk]);
-    }
-    return out;
-}
-
-async function readCollections(spec, record) {
-    if (!spec.collections || !record) return {};
-    const out = {};
-    for (const coll of spec.collections) {
-        const { data } = await supabase
-            .from(coll.table)
-            .select('*')
-            .eq(coll.fk, record.id)
-            .limit(500);
-        out[coll.table] = data || [];
-    }
-    return out;
-}
-
-/** One line per unit: is its row there, and are the required fields filled? */
-async function readUnitSummaries(parentSlug, unitSpec) {
-    const { data: children } = await supabase
-        .from('entity')
-        .select('slug, name, entity_subtype')
-        .eq('parent_entity_slug', parentSlug)
-        .eq('is_active', true)
-        .order('name')
-        .limit(500);
-    if (!children || children.length === 0) return [];
-
-    const { data: rows } = await supabase
-        .from(unitSpec.table)
-        .select('*')
-        .in(unitSpec.key, children.map((c) => c.slug))
-        .limit(500);
-    const bySlug = Object.fromEntries((rows || []).map((r) => [r[unitSpec.key], r]));
-    const required = BP.columnList(unitSpec).filter((c) => c.required);
-
-    return children.map((c) => {
-        const row = bySlug[c.slug] || null;
-        return {
-            entity_slug: c.slug,
-            entity_name: c.name,
-            entity_subtype: c.entity_subtype,
-            has_row: !!row,
-            record: row,
-            missing_required: required
-                .filter((col) => !row || row[col.name] === null || row[col.name] === undefined)
-                .map((col) => col.label),
-        };
-    });
-}
-
-/**
- * Write one listing's row. Upsert on the entity slug, because there is exactly
- * one row per listing and the caller should not have to know whether it exists.
- * Every value is checked against the blueprint's column list first, so a
- * misspelled field is a 400 here rather than a Postgres error later.
- */
-router.put('/listing/:slug', adminRequired, async (req, res) => {
+/** Write the single row of operating details. Upsert on the slug. */
+router.put('/listing/:slug/operations', adminRequired, async (req, res) => {
     try {
-        const ctx = await resolveLevel(String(req.params.slug));
-        if (ctx.error) return fail(res, 404, ctx.error);
-        const { entity, parent, schema, level, spec } = ctx;
-        if (!spec) return fail(res, 400, `No industry tables for this business's industry`);
-        if (spec.multiple) return fail(res, 400, `${spec.table} holds many rows per business — use the collection routes`);
-
-        const { row, errors } = BP.coerceRow(spec, req.body?.record || req.body || {});
+        const capability = CAP.CAPABILITIES.operations;
+        const { row, errors } = CAP.coerceRow(capability, req.body?.record || req.body || {});
         if (errors.length) return fail(res, 400, errors.join('; '));
-        if (Object.keys(row).length === 0) return fail(res, 400, 'Nothing to update');
 
-        row[spec.key] = entity.slug;
+        row.entity_slug = String(req.params.slug);
         row.updated_at = new Date().toISOString();
 
-        // A unit's row points at its building's row. Resolve that here rather
-        // than making the caller send an id it has no way to know.
-        if (level === 'unit' && spec.parentFk && parent) {
-            const { data: parentRow } = await supabase
-                .from(spec.parentTable)
-                .select('id')
-                .eq(schema.listing.key, parent.slug)
-                .maybeSingle();
-            if (parentRow) row[spec.parentFk] = parentRow.id;
-        }
-
         const { data, error } = await supabase
-            .from(spec.table)
-            .upsert(row, { onConflict: spec.key })
+            .from(capability.table)
+            .upsert(row, { onConflict: 'entity_slug' })
             .select()
             .single();
         if (error) return fail(res, 400, error.message);
-
-        res.json({ entity_slug: entity.slug, table: spec.table, record: data });
+        res.json({ record: data });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
 
-/**
- * Replace this listing's amenities. A full replace rather than add/remove:
- * the form sends the state of every checkbox, and reconciling that into deltas
- * client-side is how a checkbox ends up out of step with the database.
- */
-router.put('/listing/:slug/amenities', adminRequired, async (req, res) => {
+/** Add one row of a capability — a boat, a unit, a trip. */
+router.post('/listing/:slug/:capability', adminRequired, async (req, res) => {
     try {
-        const ctx = await resolveLevel(String(req.params.slug));
-        if (ctx.error) return fail(res, 404, ctx.error);
-        const { entity, spec } = ctx;
-        if (!spec || !spec.amenities) return fail(res, 400, 'This industry does not record amenities at this level');
+        const key = String(req.params.capability);
+        const capability = CAP.CAPABILITIES[key];
+        if (!capability) return fail(res, 404, `No capability "${key}"`);
+        if (capability.single) return fail(res, 400, `${key} is one row per business — use PUT`);
 
-        const ids = Array.isArray(req.body?.amenity_ids) ? req.body.amenity_ids.map(String) : null;
-        if (!ids) return fail(res, 400, 'amenity_ids must be an array');
-
-        const { data: record } = await supabase
-            .from(spec.table).select('id').eq(spec.key, entity.slug).maybeSingle();
-        if (!record) return fail(res, 400, `Save the ${spec.label.toLowerCase()} details first — amenities attach to that row`);
-
-        await supabase.from(spec.amenities.join).delete().eq(spec.amenities.fk, record.id);
-        if (ids.length) {
-            const { error } = await supabase.from(spec.amenities.join).insert(
-                ids.map((amenity_id) => ({ [spec.amenities.fk]: record.id, amenity_id })),
-            );
-            if (error) return fail(res, 400, error.message);
-        }
-        res.json({ entity_slug: entity.slug, amenities: ids.length });
-    } catch (err) {
-        fail(res, 500, err.message);
-    }
-});
-
-/** Replace a controlled-vocabulary join — species, activities. */
-router.put('/listing/:slug/tags/:catalog', adminRequired, async (req, res) => {
-    try {
-        const ctx = await resolveLevel(String(req.params.slug));
-        if (ctx.error) return fail(res, 404, ctx.error);
-        const { entity, spec } = ctx;
-        const tag = (spec?.tags || []).find((t) => t.catalog === req.params.catalog);
-        if (!tag) return fail(res, 404, `No "${req.params.catalog}" list for this industry`);
-
-        const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : null;
-        if (!ids) return fail(res, 400, 'ids must be an array');
-
-        const { data: record } = await supabase
-            .from(spec.table).select('id').eq(spec.key, entity.slug).maybeSingle();
-        if (!record) return fail(res, 400, 'Save the details first — this list attaches to that row');
-
-        await supabase.from(tag.join).delete().eq(tag.fk, record.id);
-        if (ids.length) {
-            const { error } = await supabase.from(tag.join).insert(
-                ids.map((id) => ({ [tag.fk]: record.id, [tag.catalogFk]: id })),
-            );
-            if (error) return fail(res, 400, error.message);
-        }
-        res.json({ entity_slug: entity.slug, catalog: tag.catalog, count: ids.length });
-    } catch (err) {
-        fail(res, 500, err.message);
-    }
-});
-
-/* ── collections: beds, trips, packages ──────────────────────────────── */
-
-function findCollection(spec, table) {
-    return (spec?.collections || []).find((c) => c.table === table) || null;
-}
-
-router.post('/listing/:slug/collection/:table', adminRequired, async (req, res) => {
-    try {
-        const ctx = await resolveLevel(String(req.params.slug));
-        if (ctx.error) return fail(res, 404, ctx.error);
-        const coll = findCollection(ctx.spec, req.params.table);
-        if (!coll) return fail(res, 404, `No "${req.params.table}" list for this industry`);
-
-        const { data: record } = await supabase
-            .from(ctx.spec.table).select('id').eq(ctx.spec.key, ctx.entity.slug).maybeSingle();
-        if (!record) return fail(res, 400, 'Save the details first — this list attaches to that row');
-
-        const { row, errors } = BP.coerceRow(coll, req.body || {});
+        const { row, errors } = CAP.coerceRow(capability, req.body || {});
         if (errors.length) return fail(res, 400, errors.join('; '));
-        row[coll.fk] = record.id;
+        row[capability.key] = String(req.params.slug);
 
-        const { data, error } = await supabase.from(coll.table).insert(row).select().single();
+        const { data, error } = await supabase.from(capability.table).insert(row).select().single();
         if (error) return fail(res, 400, error.message);
         res.status(201).json({ record: data });
     } catch (err) {
@@ -2037,15 +1840,17 @@ router.post('/listing/:slug/collection/:table', adminRequired, async (req, res) 
     }
 });
 
-router.patch('/collection/:table/:id', adminRequired, async (req, res) => {
+router.patch('/row/:capability/:id', adminRequired, async (req, res) => {
     try {
-        const coll = allCollections().find((c) => c.table === req.params.table);
-        if (!coll) return fail(res, 404, `"${req.params.table}" is not a collection table`);
-        const { row, errors } = BP.coerceRow(coll, req.body || {});
+        const capability = CAP.CAPABILITIES[String(req.params.capability)];
+        if (!capability) return fail(res, 404, `No capability "${req.params.capability}"`);
+        const { row, errors } = CAP.coerceRow(capability, req.body || {});
         if (errors.length) return fail(res, 400, errors.join('; '));
         if (Object.keys(row).length === 0) return fail(res, 400, 'Nothing to update');
+        row.updated_at = new Date().toISOString();
 
-        const { data, error } = await supabase.from(coll.table).update(row).eq('id', req.params.id).select();
+        const { data, error } = await supabase
+            .from(capability.table).update(row).eq('id', req.params.id).select();
         if (error) return fail(res, 400, error.message);
         if (!data || !data.length) return fail(res, 404, 'Row not found');
         res.json({ record: data[0] });
@@ -2054,147 +1859,196 @@ router.patch('/collection/:table/:id', adminRequired, async (req, res) => {
     }
 });
 
-router.delete('/collection/:table/:id', adminRequired, async (req, res) => {
-    const coll = allCollections().find((c) => c.table === req.params.table);
-    if (!coll) return fail(res, 404, `"${req.params.table}" is not a collection table`);
+router.delete('/row/:capability/:id', adminRequired, async (req, res) => {
+    const capability = CAP.CAPABILITIES[String(req.params.capability)];
+    if (!capability) return fail(res, 404, `No capability "${req.params.capability}"`);
     const { error, count } = await supabase
-        .from(coll.table).delete({ count: 'exact' }).eq('id', req.params.id);
+        .from(capability.table).delete({ count: 'exact' }).eq('id', req.params.id);
     if (error) return fail(res, 400, error.message);
     if (!count) return fail(res, 404, 'Row not found');
     res.json({ success: true });
 });
 
-/** Every collection any industry declares — the allow-list for the two routes above. */
-function allCollections() {
-    const out = [];
-    for (const schema of Object.values(BP.SCHEMAS)) {
-        for (const level of ['listing', 'unit']) {
-            for (const coll of schema[level]?.collections || []) out.push(coll);
+/** Amenities on one capability row — a unit, a boat, a space. */
+router.put('/row/:capability/:id/amenities', adminRequired, async (req, res) => {
+    try {
+        const capability = CAP.CAPABILITIES[String(req.params.capability)];
+        if (!capability || !capability.amenities) {
+            return fail(res, 404, `${req.params.capability} does not carry amenities`);
         }
+        const ids = Array.isArray(req.body?.amenity_ids) ? req.body.amenity_ids.map(String) : null;
+        if (!ids) return fail(res, 400, 'amenity_ids must be an array');
+
+        // Replace rather than diff: the form sends the state of every
+        // checkbox, and reconciling that into deltas on the client is how a
+        // checkbox ends up out of step with the database.
+        await supabase.from(capability.amenities.join).delete().eq(capability.amenities.fk, req.params.id);
+        if (ids.length) {
+            const { error } = await supabase.from(capability.amenities.join).insert(
+                ids.map((amenity_id) => ({ [capability.amenities.fk]: req.params.id, amenity_id })),
+            );
+            if (error) return fail(res, 400, error.message);
+        }
+        res.json({ count: ids.length });
+    } catch (err) {
+        fail(res, 500, err.message);
     }
-    return out;
-}
+});
+
+/** A child row of a capability row — a bed in a unit, an event type on a space. */
+router.post('/row/:capability/:id/:childTable', adminRequired, async (req, res) => {
+    try {
+        const capability = CAP.CAPABILITIES[String(req.params.capability)];
+        const child = (capability?.children || []).find((c) => c.table === req.params.childTable);
+        if (!child) return fail(res, 404, `No "${req.params.childTable}" on ${req.params.capability}`);
+
+        const { row, errors } = CAP.coerceRow(child, req.body || {});
+        if (errors.length) return fail(res, 400, errors.join('; '));
+        row[child.fk] = req.params.id;
+
+        const { data, error } = await supabase.from(child.table).insert(row).select();
+        if (error) return fail(res, 400, error.message);
+        res.status(201).json({ record: (data || [])[0] || row });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+router.delete('/child/:childTable/:id', adminRequired, async (req, res) => {
+    const table = String(req.params.childTable);
+    const known = Object.values(CAP.CAPABILITIES)
+        .flatMap((c) => c.children || [])
+        .find((c) => c.table === table);
+    if (!known) return fail(res, 404, `"${table}" is not a child table`);
+    if (known.noId) return fail(res, 400, `${table} has no id — delete by its own key`);
+
+    const { error, count } = await supabase.from(table).delete({ count: 'exact' }).eq('id', req.params.id);
+    if (error) return fail(res, 400, error.message);
+    if (!count) return fail(res, 404, 'Row not found');
+    res.json({ success: true });
+});
+
+/** A list attached to the business itself — its amenities, species, activities. */
+router.put('/listing/:slug/list/:name', adminRequired, async (req, res) => {
+    try {
+        const list = CAP.ENTITY_LISTS[String(req.params.name)];
+        if (!list) return fail(res, 404, `No list "${req.params.name}"`);
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : null;
+        if (!ids) return fail(res, 400, 'ids must be an array');
+
+        const slug = String(req.params.slug);
+        await supabase.from(list.join).delete().eq('entity_slug', slug);
+        if (ids.length) {
+            const { error } = await supabase.from(list.join).insert(
+                ids.map((id) => ({ entity_slug: slug, [list.catalogFk]: id })),
+            );
+            if (error) return fail(res, 400, error.message);
+        }
+        res.json({ list: req.params.name, count: ids.length });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
 
 /* ── match: description + dates ──────────────────────────────────────── */
 //
-// The point of all of it. A guest describes what they want and when, and this
-// returns what satisfies both — a 2-bed 2-bath booked all week is not an
-// answer, and a free week in a studio is not either.
+// A guest describes what they want and when; this returns what satisfies both.
+// A two-bed two-bath booked all week is not an answer, and a free week in a
+// studio is not either.
 //
-// Filters are real WHERE clauses on real columns: `bedrooms >= 2`,
-// `length_ft >= 45`, `has_ac = true`. The blueprint says which comparison a
-// column wants, so the caller sends `{ bedrooms: 2, nightly_rate: 400 }` and
-// gets `>= 2` for one and `<= 400` for the other without knowing which is
-// which.
+// Filters are named `capability.column` — `units.bedrooms`, `boats.length_ft`,
+// `trips.duration_hours` — so the same column name on two capabilities is two
+// different filters rather than one ambiguous one. No industry is named
+// anywhere: a filter on `boats.length_ft` finds any business with a boat that
+// long, whatever the directory calls it.
 
 router.post('/match', adminRequired, async (req, res) => {
     try {
         const body = req.body || {};
-        const vertical = String(body.vertical || '');
-        const schema = BP.SCHEMAS[vertical];
-        if (!schema) return fail(res, 400, `Unknown industry "${vertical}"`);
-
+        const filters = body.filters && typeof body.filters === 'object' ? body.filters : {};
         const from = /^\d{4}-\d{2}-\d{2}$/.test(body.from || '') ? body.from : null;
         const to = /^\d{4}-\d{2}-\d{2}$/.test(body.to || '') ? body.to : from;
-        const filters = body.filters && typeof body.filters === 'object' ? body.filters : {};
         const limit = Math.min(parseInt(body.limit, 10) || 200, 1000);
-        const searchable = BP.searchableFor(vertical);
 
-        // The level that carries the searchable columns is the level that
-        // produces candidate slugs — units for a condo, boats for a charter.
         const applied = [];
-        let candidateSlugs = null;
+        let candidates = null;
 
-        for (const [name, raw] of Object.entries(filters)) {
+        for (const [id, raw] of Object.entries(filters)) {
             if (raw === null || raw === undefined || raw === '' || raw === false) continue;
             if (Array.isArray(raw) && raw.length === 0) continue;
-            const field = searchable.find((s) => s.name === name);
-            if (!field) return fail(res, 400, `"${name}" is not searchable for ${vertical}`);
+            const field = CAP.fieldById(id);
+            if (!field) return fail(res, 400, `"${id}" is not a searchable field`);
 
-            let found = await slugsMatching(schema, field, raw);
-            if (found === null) return fail(res, 400, `Cannot filter on "${name}"`);
+            let found = await slugsMatching(field, raw);
 
-            // A unit inherits its building. The lazy river is on the property
-            // and the two bedrooms are on the unit, so without this a search
-            // for "two bed two bath with a lazy river" intersects a set of
-            // unit slugs with a set of building slugs and comes back empty —
-            // which is the single most obvious question anyone would ask.
-            if (field.level === 'listing' && schema.unit) {
-                found = await withChildren(found);
-            }
+            // A child entity inherits its parent — a condo unit is at a
+            // beachfront building. Without this, "two bed two bath with a
+            // lazy river" intersects unit slugs with building slugs and comes
+            // back empty, which is the most obvious question anyone asks.
+            if (body.inherit !== false) found = await withChildren(found);
 
-            candidateSlugs = candidateSlugs === null
+            candidates = candidates === null
                 ? found
                 // Intersect, never union: two bedrooms AND air conditioning.
-                : new Set([...candidateSlugs].filter((s) => found.has(s)));
-            applied.push({ name, label: field.label, rule: field.search, value: raw, table: field.table });
-            if (candidateSlugs.size === 0) break;
+                : new Set([...candidates].filter((s) => found.has(s)));
+            applied.push({ id, label: field.label, capability: field.capability, rule: field.search, value: raw, table: field.table });
+            if (candidates.size === 0) break;
         }
 
-        if (candidateSlugs && candidateSlugs.size === 0) {
-            return res.json({
-                vertical, from, to, filters: applied, results: [], total: 0,
-                described: 0, reason: 'nothing matches the description',
-            });
+        if (candidates && candidates.size === 0) {
+            return res.json({ from, to, filters: applied, results: [], total: 0, described: 0, reason: 'nothing matches the description' });
         }
 
-        /* Which entities are those, and are they in this industry? */
         let entityQuery = supabase
             .from('entity')
             .select('slug, name, entity_type, entity_subtype, city, phone, email, hero_image_url, booking_url, rating, daily_capacity, parent_slug:parent_entity_slug')
             .eq('is_active', true)
-            .limit(limit * 4);
-        if (candidateSlugs) entityQuery = entityQuery.in('slug', [...candidateSlugs]);
+            .limit(limit * 3);
+        if (candidates) entityQuery = entityQuery.in('slug', [...candidates]);
         if (body.q) {
             const q = String(body.q).replace(/[%,()]/g, '');
             entityQuery = entityQuery.or(`name.ilike.%${q}%,city.ilike.%${q}%`);
         }
         if (body.city) entityQuery = entityQuery.eq('city', body.city);
+        if (body.type) entityQuery = entityQuery.eq('entity_type', body.type);
 
         const { data: entities, error } = await entityQuery;
         if (error) return fail(res, 500, error.message);
 
-        const rows = entities || [];
-        const parentSlugs = [...new Set(rows.map((e) => e.parent_slug).filter(Boolean))];
-        const { data: parents } = parentSlugs.length
-            ? await supabase.from('entity').select('slug, name, entity_type, entity_subtype').in('slug', parentSlugs)
-            : { data: [] };
-        const parentBySlug = Object.fromEntries((parents || []).map((p) => [p.slug, p]));
-        const inIndustry = rows.filter((e) =>
-            AVAIL.verticalOf(e.parent_slug ? parentBySlug[e.parent_slug] || e : e) === vertical);
-
-        /* Of those, which are free? */
-        let ranked = inIndustry.map((e) => ({ entity: e }));
+        let ranked = (entities || []).map((e) => ({ entity: e }));
         let dates = [];
         let coverage = null;
 
         if (from) {
             dates = AVAIL.datesBetween(from, to, 120);
-            coverage = body.coverage === 'all' || body.coverage === 'any' ? body.coverage : AVAIL.coverageFor(vertical);
+            coverage = body.coverage === 'all' ? 'all' : 'any';
             const availability = await AVAIL.readAvailability({
-                from, to, slugs: inIndustry.map((e) => e.slug), publicOnly: false,
+                from, to, slugs: ranked.map((r) => r.entity.slug), publicOnly: false,
             });
-            const isStay = vertical === 'condo' || vertical === 'hotel';
-            ranked = inIndustry.map((e) => ({
-                entity: e,
-                ...AVAIL.summarise(
-                    availability.get(e.slug), dates, coverage,
-                    e.daily_capacity ?? (e.parent_slug && isStay ? 1 : null),
-                ),
+            ranked = ranked.map((r) => ({
+                entity: r.entity,
+                ...AVAIL.summarise(availability.get(r.entity.slug), dates, coverage, r.entity.daily_capacity ?? null),
             }));
             if (body.only_available !== false) ranked = ranked.filter((r) => r.meets_coverage);
         }
 
-        /* Attach the actual rows, so the answer shows its work. */
+        // Attach the rows that matched, so the answer shows its work.
         const finalSlugs = ranked.slice(0, limit).map((r) => r.entity.slug);
-        const detail = await detailFor(schema, finalSlugs);
+        const matchedCapabilities = [...new Set(applied.map((a) => a.capability))].filter((c) => c !== 'entity');
+        const detail = await detailFor(matchedCapabilities, finalSlugs);
+
+        const parentSlugs = [...new Set(ranked.map((r) => r.entity.parent_slug).filter(Boolean))];
+        const { data: parents } = parentSlugs.length
+            ? await supabase.from('entity').select('slug, name').in('slug', parentSlugs)
+            : { data: [] };
+        const parentBySlug = Object.fromEntries((parents || []).map((p) => [p.slug, p.name]));
 
         const results = ranked.slice(0, limit).map((r) => {
             const e = r.entity;
-            const parent = e.parent_slug ? parentBySlug[e.parent_slug] : null;
             return {
                 entity_slug: e.slug,
                 entity_name: e.name,
+                entity_type: e.entity_type,
                 entity_subtype: e.entity_subtype,
                 city: e.city,
                 phone: e.phone,
@@ -2203,8 +2057,8 @@ router.post('/match', adminRequired, async (req, res) => {
                 booking_url: e.booking_url,
                 rating: e.rating,
                 parent_slug: e.parent_slug || null,
-                parent_name: parent ? parent.name : null,
-                record: detail[e.slug] || null,
+                parent_name: e.parent_slug ? parentBySlug[e.parent_slug] || null : null,
+                matched: detail[e.slug] || {},
                 available_dates: r.available_dates || [],
                 open_days: r.open_days ?? null,
                 covers_all_days: r.covers_all_days ?? null,
@@ -2214,131 +2068,106 @@ router.post('/match', adminRequired, async (req, res) => {
         });
 
         res.json({
-            vertical, from, to, dates, coverage,
+            from, to, dates, coverage,
             filters: applied,
             results,
             total: results.length,
-            described: candidateSlugs ? candidateSlugs.size : null,
-            in_industry: inIndustry.length,
+            described: candidates ? candidates.size : null,
         });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
 
-/**
- * The entity slugs whose row satisfies one filter.
- *
- * Every branch resolves to a set of slugs, so the caller can intersect filters
- * that live on different tables — bedrooms on stay_units, an amenity on
- * stay_unit_amenities — without a join it would have to write per industry.
- */
-async function slugsMatching(schema, field, raw) {
-    const spec = field.level === 'unit' ? schema.unit : schema.listing;
-    if (!spec) return null;
-
-    // Amenities and tags are joins: find the row ids, then map back to slugs.
-    if (field.type === 'amenities' || field.type === 'tags') {
+/** The entity slugs whose row satisfies one filter. */
+async function slugsMatching(field, raw) {
+    // A catalog join — amenities, species, activities.
+    if (field.type === 'catalog') {
         const wanted = (Array.isArray(raw) ? raw : [raw]).map(String);
-        const fkColumn = field.type === 'amenities' ? 'amenity_id' : field.catalogFk;
-        const { data } = await supabase
-            .from(field.table)
-            .select(`${field.fk}, ${fkColumn}`)
-            .in(fkColumn, wanted)
-            .limit(20000);
+        const idColumn = field.catalogFk || 'amenity_id';
 
-        // Every requested amenity, not any — someone asking for a washer AND a
-        // dishwasher does not want a place with only one of them.
-        const counts = {};
-        for (const r of data || []) {
-            (counts[r[field.fk]] ||= new Set()).add(r[fkColumn]);
+        if (field.capability === 'entity') {
+            const { data } = await supabase
+                .from(field.table).select(`entity_slug, ${idColumn}`).in(idColumn, wanted).limit(20000);
+            const counts = {};
+            for (const r of data || []) (counts[r.entity_slug] ||= new Set()).add(r[idColumn]);
+            // Every requested one, not any — a washer AND a dishwasher.
+            return new Set(Object.keys(counts).filter((s) => counts[s].size >= wanted.length));
         }
+
+        const { data } = await supabase
+            .from(field.table).select(`${field.fk}, ${idColumn}`).in(idColumn, wanted).limit(20000);
+        const counts = {};
+        for (const r of data || []) (counts[r[field.fk]] ||= new Set()).add(r[idColumn]);
         const ids = Object.keys(counts).filter((id) => counts[id].size >= wanted.length);
-        if (ids.length === 0) return new Set();
-        return rowIdsToSlugs(spec, ids);
+        if (!ids.length) return new Set();
+        return rowIdsToSlugs(CAP.CAPABILITIES[field.capability], ids);
     }
 
-    // A collection filter — trip duration, package price — matches the parent
-    // row, then the parent row maps to a slug.
-    if (field.level === 'collection') {
+    // A child table — beds, event types.
+    if (field.fk) {
         let query = supabase.from(field.table).select(field.fk).limit(20000);
-        query = applyComparison(query, field, raw);
+        query = compare(query, field, raw);
         const { data } = await query;
         const ids = [...new Set((data || []).map((r) => r[field.fk]))];
-        if (ids.length === 0) return new Set();
-        // Collections hang off whichever level declared them.
-        const owner = (schema.listing?.collections || []).some((c) => c.table === field.table)
-            ? schema.listing : schema.unit;
-        return rowIdsToSlugs(owner, ids);
+        if (!ids.length) return new Set();
+        return rowIdsToSlugs(CAP.CAPABILITIES[field.capability], ids);
     }
 
-    let query = supabase.from(spec.table).select(spec.key).limit(20000);
-    query = applyComparison(query, field, raw);
+    const capability = CAP.CAPABILITIES[field.capability];
+    let query = supabase.from(capability.table).select(capability.key).limit(20000);
+    query = compare(query, field, raw);
     const { data } = await query;
-    return new Set((data || []).map((r) => r[spec.key]).filter(Boolean));
+    return new Set((data || []).map((r) => r[capability.key]).filter(Boolean));
 }
 
-function applyComparison(query, field, raw) {
+function compare(query, field, raw) {
     switch (field.search) {
         case 'min': return query.gte(field.name, Number(raw));
         case 'max': return query.lte(field.name, Number(raw));
         case 'has': return query.eq(field.name, true);
-        case 'eq': return query.eq(field.name, String(raw));
-        case 'any': {
-            const list = (Array.isArray(raw) ? raw : [raw]).map(String);
-            return query.in(field.name, list);
-        }
+        case 'eq': return query.in(field.name, (Array.isArray(raw) ? raw : [raw]).map(String));
         default: return query;
     }
 }
 
+async function rowIdsToSlugs(capability, ids) {
+    if (!capability) return new Set();
+    const { data } = await supabase
+        .from(capability.table).select(`id, ${capability.key}`).in('id', ids).limit(20000);
+    return new Set((data || []).map((r) => r[capability.key]).filter(Boolean));
+}
+
 /**
- * A set of building slugs, plus every unit that belongs to them.
+ * A set of slugs, plus every child entity belonging to them.
  *
- * The building stays in the set as well as its children: a whole-house rental
- * has no children and is itself the bookable thing, and dropping it would make
- * "beachfront" find nothing for those.
+ * The parent stays in the set: a whole-house rental has no children and is
+ * itself the bookable thing, so dropping it would make "beachfront" find
+ * nothing for those.
  */
 async function withChildren(slugs) {
     if (slugs.size === 0) return slugs;
     const { data } = await supabase
-        .from('entity')
-        .select('slug')
-        .in('parent_entity_slug', [...slugs])
-        .eq('is_active', true)
-        .limit(5000);
+        .from('entity').select('slug').in('parent_entity_slug', [...slugs]).eq('is_active', true).limit(5000);
     const out = new Set(slugs);
     for (const row of data || []) out.add(row.slug);
     return out;
 }
 
-/** Row ids on an industry table → the entity slugs they belong to. */
-async function rowIdsToSlugs(spec, ids) {
-    if (!spec) return new Set();
-    const { data } = await supabase
-        .from(spec.table)
-        .select(`id, ${spec.key}`)
-        .in('id', ids)
-        .limit(20000);
-    return new Set((data || []).map((r) => r[spec.key]).filter(Boolean));
-}
-
-/** The industry row for each result, so the UI can show what matched. */
-async function detailFor(schema, slugs) {
-    if (slugs.length === 0) return {};
+/** The rows that matched, per slug, for the capabilities that were filtered. */
+async function detailFor(capabilityKeys, slugs) {
+    if (!slugs.length || !capabilityKeys.length) return {};
     const out = {};
-    for (const level of ['unit', 'listing']) {
-        const spec = schema[level];
-        if (!spec || spec.multiple) continue;
+    for (const key of capabilityKeys) {
+        const capability = CAP.CAPABILITIES[key];
+        if (!capability) continue;
         const { data } = await supabase
-            .from(spec.table)
-            .select('*')
-            .in(spec.key, slugs)
-            .limit(1000);
+            .from(capability.table).select('*').in(capability.key, slugs).limit(2000);
         for (const row of data || []) {
-            // The unit's own row wins over the building's — a search result IS
-            // the unit, and its bedrooms are the interesting number.
-            if (!out[row[spec.key]]) out[row[spec.key]] = row;
+            const slug = row[capability.key];
+            (out[slug] ||= {});
+            if (capability.single) out[slug][key] = row;
+            else (out[slug][key] ||= []).push(row);
         }
     }
     return out;
