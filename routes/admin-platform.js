@@ -1699,6 +1699,8 @@ router.get('/blueprint/:vertical', adminRequired, (req, res) => {
         table: s.table,
         key: s.key,
         label: s.label,
+        managed_by: s.managedBy || 'owner',
+        managed_note: s.managedNote || null,
         multiple: !!s.multiple,
         columns: BP.columnList(s),
         collections: (s.collections || []).map((c) => ({
@@ -1766,11 +1768,16 @@ router.get('/listing/:slug', adminRequired, async (req, res) => {
             .limit(spec.multiple ? 200 : 1);
         const record = spec.multiple ? null : (rows || [])[0] || null;
 
-        const [amenities, tags, collections, units] = await Promise.all([
+        const [amenities, tags, collections, units, inherited] = await Promise.all([
             readAmenities(spec, record),
             readTags(spec, record),
             readCollections(spec, record),
             level === 'listing' && schema.unit ? readUnitSummaries(entity.slug, schema.unit) : Promise.resolve(null),
+            // A unit inherits its building. Returned read-only so the owner
+            // can see the pool and the lazy river without being asked to
+            // re-enter them, and so nothing has to guess whether a blank
+            // field on the unit means "no" or "ask upstairs".
+            level === 'unit' && parent ? readInherited(schema.listing, parent) : Promise.resolve(null),
         ]);
 
         res.json({
@@ -1789,6 +1796,9 @@ router.get('/listing/:slug', adminRequired, async (req, res) => {
             tags,
             collections,
             units,
+            inherited,
+            managed_by: spec.managedBy || 'owner',
+            managed_note: spec.managedNote || null,
             missing_required: BP.columnList(spec)
                 .filter((c) => c.required && (!record || record[c.name] === null || record[c.name] === undefined))
                 .map((c) => ({ name: c.name, label: c.label })),
@@ -1797,6 +1807,28 @@ router.get('/listing/:slug', adminRequired, async (req, res) => {
         fail(res, 500, err.message);
     }
 });
+
+/** The building's own row and amenities, labelled, for a unit to display. */
+async function readInherited(listingSpec, parent) {
+    if (!listingSpec) return null;
+    const { data: record } = await supabase
+        .from(listingSpec.table)
+        .select('*')
+        .eq(listingSpec.key, parent.slug)
+        .maybeSingle();
+    if (!record) {
+        return { entity_slug: parent.slug, entity_name: parent.name, table: listingSpec.table, record: null, amenities: [] };
+    }
+    return {
+        entity_slug: parent.slug,
+        entity_name: parent.name,
+        table: listingSpec.table,
+        managed_by: listingSpec.managedBy || 'owner',
+        columns: BP.columnList(listingSpec),
+        record,
+        amenities: await readAmenities(listingSpec, record),
+    };
+}
 
 async function readAmenities(spec, record) {
     if (!spec.amenities || !record) return [];
@@ -2079,8 +2111,18 @@ router.post('/match', adminRequired, async (req, res) => {
             const field = searchable.find((s) => s.name === name);
             if (!field) return fail(res, 400, `"${name}" is not searchable for ${vertical}`);
 
-            const found = await slugsMatching(schema, field, raw);
+            let found = await slugsMatching(schema, field, raw);
             if (found === null) return fail(res, 400, `Cannot filter on "${name}"`);
+
+            // A unit inherits its building. The lazy river is on the property
+            // and the two bedrooms are on the unit, so without this a search
+            // for "two bed two bath with a lazy river" intersects a set of
+            // unit slugs with a set of building slugs and comes back empty —
+            // which is the single most obvious question anyone would ask.
+            if (field.level === 'listing' && schema.unit) {
+                found = await withChildren(found);
+            }
+
             candidateSlugs = candidateSlugs === null
                 ? found
                 // Intersect, never union: two bedrooms AND air conditioning.
@@ -2248,6 +2290,26 @@ function applyComparison(query, field, raw) {
         }
         default: return query;
     }
+}
+
+/**
+ * A set of building slugs, plus every unit that belongs to them.
+ *
+ * The building stays in the set as well as its children: a whole-house rental
+ * has no children and is itself the bookable thing, and dropping it would make
+ * "beachfront" find nothing for those.
+ */
+async function withChildren(slugs) {
+    if (slugs.size === 0) return slugs;
+    const { data } = await supabase
+        .from('entity')
+        .select('slug')
+        .in('parent_entity_slug', [...slugs])
+        .eq('is_active', true)
+        .limit(5000);
+    const out = new Set(slugs);
+    for (const row of data || []) out.add(row.slug);
+    return out;
 }
 
 /** Row ids on an industry table → the entity slugs they belong to. */

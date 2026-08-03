@@ -64,6 +64,12 @@ const STAY_PROPERTY = {
     table: 'stay_properties',
     key: 'entity_slug',
     label: 'The property',
+    // The operator fills the building in once — pool, lazy river, floors,
+    // parking — and every unit inherits it. A unit owner adding their listing
+    // is only ever asked about their own unit, which is why nothing here is
+    // `required` and why the unit form does not nag about it.
+    managedBy: 'operator',
+    managedNote: 'Filled in once for the whole building. Unit owners never see this.',
     amenities: { join: 'stay_property_amenities', fk: 'property_id' },
     columns: {
         property_type: en('Property type', ['condo_complex', 'hotel', 'resort', 'house', 'duplex'], { group: 'The property' }),
