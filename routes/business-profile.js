@@ -207,4 +207,125 @@ router.get('/profile-schema', adminRequired, async (_req, res) => {
     }
 });
 
+/* ══════════════════════════════════════════════════════════════════════
+   WRITES
+   ══════════════════════════════════════════════════════════════════════ */
+//
+// Editing an arbitrary table is only safe if the table and the columns are
+// both checked against the live schema, and the row is always pinned to the
+// slug in the URL. All three happen here, on every write:
+//
+//   1. The table must appear in the discovered slug-keyed set. A name that is
+//      not in that set is rejected — so a caller cannot reach `admin_users`
+//      or anything else that is not part of a business profile.
+//   2. Every field must be a real column of that table, per the same schema
+//      read. Unknown keys are dropped rather than passed through.
+//   3. Update and delete are filtered by BOTH the row id AND entity_slug, so
+//      a mistyped id belonging to another business matches nothing instead of
+//      editing someone else's row.
+//
+// Identity and bookkeeping columns are never writable.
+
+const IMMUTABLE = new Set(['id', 'entity_slug', 'entity_id', 'site_id', 'created_at']);
+
+/** Resolve a table name against the live schema, or throw. */
+async function resolveTable(name) {
+    const schema = await loadSchema();
+    const found = schema.find((t) => t.table === name);
+    if (!found) {
+        const err = new Error(`"${name}" is not a slug-keyed table in this schema`);
+        err.status = 400;
+        throw err;
+    }
+    return found;
+}
+
+/** Keep only real, writable columns. Returns [cleanBody, ignoredKeys]. */
+function sanitise(table, body) {
+    const allowed = new Set(table.columns.map((c) => c.name));
+    const out = {};
+    const ignored = [];
+    for (const [k, v] of Object.entries(body || {})) {
+        if (IMMUTABLE.has(k)) { ignored.push(k); continue; }
+        if (!allowed.has(k)) { ignored.push(k); continue; }
+        out[k] = v === '' ? null : v;
+    }
+    return [out, ignored];
+}
+
+/* ── PATCH /api/admin/gcr/profile/:slug/:table/:id ───────────────────────── */
+
+router.patch('/profile/:slug/:table/:id', adminRequired, async (req, res) => {
+    const { slug, table: tableName, id } = req.params;
+    try {
+        const table = await resolveTable(tableName);
+        const [patch, ignored] = sanitise(table, req.body);
+        if (!Object.keys(patch).length) {
+            return res.status(400).json({ error: 'No writable fields supplied', ignored });
+        }
+
+        // Pinned to the slug as well as the id — a row belonging to another
+        // business simply does not match.
+        const { data, error } = await db
+            .from(tableName)
+            .update(patch)
+            .eq('id', id)
+            .eq('entity_slug', slug)
+            .select();
+
+        if (error) return res.status(400).json({ error: error.message });
+        if (!data || !data.length) {
+            return res.status(404).json({ error: `No row ${id} in ${tableName} for "${slug}"` });
+        }
+        res.json({ row: data[0], ignored });
+    } catch (e) {
+        res.status(e.status || 500).json({ error: e.message });
+    }
+});
+
+/* ── POST /api/admin/gcr/profile/:slug/:table ────────────────────────────── */
+
+router.post('/profile/:slug/:table', adminRequired, async (req, res) => {
+    const { slug, table: tableName } = req.params;
+    try {
+        const table = await resolveTable(tableName);
+        const [row, ignored] = sanitise(table, req.body);
+
+        // The slug comes from the URL, never from the body, so a new row
+        // cannot be filed under a different business.
+        const { data, error } = await db
+            .from(tableName)
+            .insert({ ...row, entity_slug: slug })
+            .select();
+
+        if (error) return res.status(400).json({ error: error.message });
+        res.status(201).json({ row: data?.[0] || null, ignored });
+    } catch (e) {
+        res.status(e.status || 500).json({ error: e.message });
+    }
+});
+
+/* ── DELETE /api/admin/gcr/profile/:slug/:table/:id ──────────────────────── */
+
+router.delete('/profile/:slug/:table/:id', adminRequired, async (req, res) => {
+    const { slug, table: tableName, id } = req.params;
+    try {
+        await resolveTable(tableName);
+        const { data, error } = await db
+            .from(tableName)
+            .delete()
+            .eq('id', id)
+            .eq('entity_slug', slug)
+            .select();
+
+        if (error) return res.status(400).json({ error: error.message });
+        if (!data || !data.length) {
+            return res.status(404).json({ error: `No row ${id} in ${tableName} for "${slug}"` });
+        }
+        res.json({ deleted: data[0] });
+    } catch (e) {
+        res.status(e.status || 500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

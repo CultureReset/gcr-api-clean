@@ -21,17 +21,24 @@
 //
 //   tourist_swipe_events / tourist_seen / tourist_saves   Trip Swipe.
 //
-// ── The gap, stated plainly ─────────────────────────────────────────────
+//   page_views            POST /api/gcr/track, the full event: path, title,
+//                         referrer, session, device, browser, OS and UTM, on
+//                         EVERY page rather than only business profiles.
 //
-// routes/analytics.js already accepts UTM, referrer, device, session duration
-// and conversions, and writes them to `page_views` and `conversions`. Both
-// tables are EMPTY, because gcr-unified never calls those endpoints — it calls
-// /api/gcr/track instead. So the capability exists and is simply unfed.
+// ── History, so the numbers are read correctly ──────────────────────────
 //
-// Until that changes, sessions, referrers, devices, funnels and time-on-page
-// cannot be reported, and no endpoint here pretends otherwise. Every response
-// carries `coverage`, so a small number reads as "barely tracked yet" rather
-// than "nobody came".
+// gcr-unified was already sending referrer, session, device and UTM on every
+// page. The old /api/gcr/track handler destructured only { page_path,
+// entity_slug } and dropped the rest, incrementing a daily counter. So the
+// data was being collected and thrown away.
+//
+// routes/analytics.js looked like the place it should have gone, but it could
+// never have worked: it resolves a site by `businesses.subdomain`, and that
+// column does not exist. That is why `page_views` was empty.
+//
+// /api/gcr/track now writes the whole event. Everything derived from it —
+// sessions, referrers, devices, browsers, campaigns — is therefore EMPTY FOR
+// ANY WINDOW BEFORE THAT DEPLOY, and empty means unrecorded, not zero.
 
 const express = require('express');
 const db = require('../db');
@@ -69,8 +76,10 @@ const COVERAGE = {
     clicks: 'Outbound clicks from a business profile: book, reserve, order, transportation.',
     swipes: 'Trip Swipe left/right events.',
     saves: 'Businesses a tourist kept.',
+    events:
+        'Full page events — path, referrer, session, device, browser, OS and UTM — on every page, not just business profiles.',
     not_tracked:
-        'Sessions, referrers, devices, time on page and funnels are NOT recorded. routes/analytics.js can accept them but gcr-unified does not send them, so page_views and conversions are empty.',
+        'Time on page and multi-step funnels are still not recorded. Event capture only began when the fixed /api/gcr/track deployed, so any window reaching back before that will show empty referrers, devices and sessions — that means unrecorded, not zero.',
 };
 
 /* ── GET /api/admin/analytics/entity/:slug ───────────────────────────────── */
@@ -86,7 +95,7 @@ router.get('/entity/:slug', adminRequired, async (req, res) => {
         if (entErr) return res.status(500).json({ error: entErr.message });
         if (!entity) return res.status(404).json({ error: `No business with slug "${slug}"` });
 
-        const [views, clicks, swipes, saves, seen] = await Promise.all([
+        const [views, clicks, swipes, saves, seen, events] = await Promise.all([
             db.from('gcr_page_views').select('view_date, view_count')
                 .eq('entity_id', entity.id).gte('view_date', from).order('view_date'),
             db.from('tourist_click_events').select('click_type, target_url, created_at, converted, user_id')
@@ -97,6 +106,11 @@ router.get('/entity/:slug', adminRequired, async (req, res) => {
                 .eq('entity_slug', slug).gte('saved_at', from),
             db.from('tourist_seen').select('created_at')
                 .eq('entity_slug', slug).gte('created_at', from),
+            // The rich event log. Empty until the deployed front end starts
+            // filling it, which is why every field below is optional.
+            db.from('page_views')
+                .select('page_path, referrer, utm_source, utm_medium, utm_campaign, device_type, browser, os, session_id, created_at')
+                .eq('entity_slug', slug).gte('created_at', from).limit(20000),
         ]);
 
         const viewRows = views.data || [];
@@ -133,6 +147,16 @@ router.get('/entity/:slug', adminRequired, async (req, res) => {
             views_by_day: viewRows.map((r) => ({ date: r.view_date, views: r.view_count || 0 })),
             clicks_by_type: tally(clickRows, 'click_type'),
             recent_clicks: clickRows.slice(0, 50),
+
+            // Present only once the event log has rows. An empty array here
+            // means untracked, not zero — the coverage note says which.
+            sessions: new Set((events.data || []).map((e) => e.session_id).filter(Boolean)).size,
+            referrers: tally((events.data || []).filter((e) => e.referrer), 'referrer').slice(0, 15),
+            devices: tally(events.data, 'device_type'),
+            browsers: tally(events.data, 'browser'),
+            campaigns: tally((events.data || []).filter((e) => e.utm_source), 'utm_source').slice(0, 15),
+            events_recorded: (events.data || []).length,
+
             coverage: COVERAGE,
         });
     } catch (e) {

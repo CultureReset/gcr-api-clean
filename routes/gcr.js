@@ -1936,8 +1936,41 @@ router.get('/live-now', async (req, res) => {
 // ─── Page view tracking ───────────────────────────────────────────────────────
 router.post('/track', async (req, res) => {
   try {
-    const { page_path, entity_slug } = req.body;
+    const {
+      page_path, entity_slug,
+      // Everything below is optional and additive. Older clients send only the
+      // first two and keep working exactly as before.
+      page_title, referrer, session_id,
+      utm_source, utm_medium, utm_campaign, utm_term, utm_content,
+      device_type, browser, os,
+    } = req.body;
     if (!page_path && !entity_slug) return res.status(200).json({ ok: true });
+
+    // Full event row. `gcr_page_views` below is a per-entity daily counter and
+    // cannot answer "where did they come from" or "what else did they look
+    // at"; `page_views` can, and it records EVERY path rather than only
+    // business profiles, so search and category browsing finally show up.
+    //
+    // site_id stays null: that column belongs to the CyberCheck white-label
+    // model and GCR is keyed by slug.
+    try {
+      await db.from('page_views').insert({
+        entity_slug: entity_slug || null,
+        page_path: page_path || '/',
+        page_title: page_title || null,
+        referrer: referrer || null,
+        utm_source: utm_source || null,
+        utm_medium: utm_medium || null,
+        utm_campaign: utm_campaign || null,
+        utm_term: utm_term || null,
+        utm_content: utm_content || null,
+        device_type: device_type || null,
+        browser: browser || null,
+        os: os || null,
+        session_id: session_id || null,
+        ip_address: (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || null,
+      });
+    } catch { /* analytics must never break a page load */ }
 
     // gcr_page_views is a daily rollup table (entity_id, view_date, view_count),
     // not a raw event log — only entity profile views are tracked here.
