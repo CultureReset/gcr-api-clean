@@ -82,6 +82,10 @@ mount('/api/admin/gcr', () => require('./routes/business-profile'));
 // reports what is NOT tracked alongside what is.
 mount('/api/admin/analytics', () => require('./routes/admin-analytics'));
 
+// Read a business's own links and propose real column values for any
+// slug-keyed table. Proposes only — nothing is written without review.
+mount('/api/admin/gcr', () => require('./routes/ingest'));
+
 // The embeddable availability calendar a business drops into its own website,
 // plus the JSON it reads. Public and unauthenticated by design — it runs on
 // anonymous visitors' browsers on other people's domains — and returns only
