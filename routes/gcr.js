@@ -519,6 +519,7 @@ router.get('/entities', async (req, res) => {
         featured, is_active, description,
         social_instagram, social_facebook, social_tiktok,
         duration_text, price_from, price_unit,
+        capacity_max, sleeps_min, sleeps_max,
         known_for, highlights, good_for,
         what_makes_it_different, secondary_subtypes, seo_keywords,
         latitude, longitude,
