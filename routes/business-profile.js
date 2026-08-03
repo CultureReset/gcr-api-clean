@@ -137,9 +137,21 @@ router.get('/profile/:slug', adminRequired, async (req, res) => {
     const includeEmpty = String(req.query.include_empty || '') === 'true';
 
     try {
-        const [schema, entityRead] = await Promise.all([
+        // `entity_modules` is the business's OWN declared structure, with the
+        // order the public site renders it in. routes/gcr.js already reads it
+        // to decide what to load, so this is not a second opinion — it is the
+        // same source of truth, surfaced to the admin.
+        //
+        // Discovery still runs underneath it. A module says what a business
+        // means to show; rows say what it actually has, and the two disagree
+        // often enough that hiding either would be a lie.
+        const [schema, entityRead, modulesRead] = await Promise.all([
             loadSchema(),
             db.from('entity').select('*').eq('slug', slug).maybeSingle(),
+            db.from('entity_modules')
+                .select('module_key, enabled, sort_order')
+                .eq('entity_slug', slug)
+                .order('sort_order'),
         ]);
 
         if (entityRead.error) {
@@ -177,9 +189,19 @@ router.get('/profile/:slug', adminRequired, async (req, res) => {
             }))
             .sort((a, b) => b.count - a.count || a.table.localeCompare(b.table));
 
+        const modules = (modulesRead.data || []).map((m) => ({
+            key: m.module_key,
+            enabled: m.enabled !== false,
+            sort_order: m.sort_order ?? 999,
+        }));
+
         res.json({
             slug,
             entity: entityRead.data,
+            // What the business declares it has, in its own order. Empty for a
+            // business that has never had modules set — which is itself worth
+            // seeing, so it is reported rather than defaulted.
+            modules,
             tables_scanned: schema.length,
             sections_with_data: sections.filter((s) => s.count > 0).length,
             total_rows: sections.reduce((n, s) => n + s.count, 0),
