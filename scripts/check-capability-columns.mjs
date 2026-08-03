@@ -13,7 +13,7 @@
  *   node scripts/check-capability-columns.mjs
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -24,7 +24,14 @@ const CAP = require_(join(here, '..', 'routes', 'capabilities.js'));
 
 /* ── parse the SQL for `create table X ( … )` blocks ─────────────────── */
 
-const sql = readFileSync(join(here, '..', 'sql', 'capability_tables.sql'), 'utf8');
+// Every SQL file, not just one: a capability's tables can be split across
+// files — service periods live in menu_normalization.sql because they belong
+// with the menu — and reading one file would report those as missing.
+const sqlDir = join(here, '..', 'sql');
+const sql = readdirSync(sqlDir)
+  .filter((f) => f.endsWith('.sql'))
+  .map((f) => readFileSync(join(sqlDir, f), 'utf8'))
+  .join('\n');
 const tables = new Map();
 
 for (const match of sql.matchAll(/create table if not exists public\.(\w+)\s*\(([\s\S]*?)\n\);/g)) {
@@ -44,7 +51,7 @@ for (const match of sql.matchAll(/create table if not exists public\.(\w+)\s*\((
 }
 
 if (tables.size === 0) {
-  console.error('Parsed no tables from sql/capability_tables.sql — has its shape changed?');
+  console.error('Parsed no tables from sql/*.sql — has their shape changed?');
   process.exit(1);
 }
 

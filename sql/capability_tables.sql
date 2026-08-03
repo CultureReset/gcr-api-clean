@@ -2,7 +2,7 @@
 -- CAPABILITY TABLES — named after the thing, not the industry
 -- ============================================================
 --
--- A table is named after WHAT IT IS. A boat is a boat whether a fishing
+-- A table is named after WHAT IT IS. A vessel is a vessel whether a fishing
 -- charter, a dolphin cruise or a pontoon rental owns it. There is no
 -- `charter_boats` and no `cruise_vessels`, because that would mean a marina
 -- running charters AND renting pontoons could not use the same table for its
@@ -16,7 +16,7 @@
 -- Repeating that in a table name locks a business into one industry and buys
 -- nothing. A restaurant with a private dining room uses `spaces`. A condo
 -- complex that also rents bikes uses `gear`. A charter that also runs sunset
--- cruises uses one `boats` row and two `trips` rows.
+-- cruises uses one `vessels` row and two `trips` rows.
 --
 -- ── No JSON ─────────────────────────────────────────────────────────────
 --
@@ -142,19 +142,20 @@ create index if not exists entity_operations_min_age_idx
   on public.entity_operations (min_age);
 
 /* ══════════════════════════════════════════════════════════════════════
-   BOATS — anything that floats and carries people
+   VESSELS — anything that floats and carries people
    ══════════════════════════════════════════════════════════════════════ */
 --
--- A fishing charter's 48-footer, a dolphin cruise's catamaran, a rental
--- pontoon, a jet ski. Same facts, same table. `boat_type` says which; it is
--- data, not a table name.
+-- A fishing charter's 65ft Viking, a rental company's 22ft double-deck
+-- tritoon, a dolphin cruise's 56-footer. Same facts, same table.
+-- `vessel_type` says which, and it is data rather than a table name — the
+-- business already knows what it is.
 
-create table if not exists public.boats (
+create table if not exists public.vessels (
   id                uuid primary key default gen_random_uuid(),
   entity_slug       text not null,
 
   name              text,
-  boat_type         text,          -- sportfish | center_console | pontoon | deck_boat
+  vessel_type       text,          -- sportfish | center_console | pontoon | deck_boat
                                    -- catamaran | sailboat | yacht | jet_ski | kayak | paddleboard
   make              text,
   model             text,
@@ -170,7 +171,7 @@ create table if not exists public.boats (
   fuel_capacity_gal integer,
   max_range_mi      integer,
 
-  -- The first three questions anyone asks about a boat.
+  -- The first three questions anyone asks about a vessel.
   has_head          boolean,
   has_ac            boolean,
   has_cabin         boolean,
@@ -200,9 +201,9 @@ create table if not exists public.boats (
   updated_at        timestamptz default now()
 );
 
-create index if not exists boats_entity_idx on public.boats (entity_slug);
-create index if not exists boats_search_idx on public.boats (length_ft, max_passengers);
-create index if not exists boats_type_idx on public.boats (boat_type);
+create index if not exists vessels_entity_idx on public.vessels (entity_slug);
+create index if not exists vessels_search_idx on public.vessels (length_ft, max_passengers);
+create index if not exists vessels_type_idx on public.vessels (vessel_type);
 
 /* ══════════════════════════════════════════════════════════════════════
    UNITS — anything with bedrooms
@@ -282,12 +283,12 @@ create index if not exists unit_beds_unit_idx on public.unit_beds (unit_id);
    ══════════════════════════════════════════════════════════════════════ */
 --
 -- An 8-hour offshore charter, a sunset dolphin cruise, a parasail flight, a
--- kayak tour. `boat_id` is optional, because a walking tour has no boat.
+-- kayak tour. `vessel_id` is optional, because a walking tour has no boat.
 
 create table if not exists public.trips (
   id                uuid primary key default gen_random_uuid(),
   entity_slug       text not null,
-  boat_id           uuid references public.boats(id) on delete set null,
+  vessel_id           uuid references public.vessels(id) on delete set null,
 
   name              text,
   trip_type         text,          -- inshore | nearshore | offshore | deep_sea | bottom | trolling
@@ -455,10 +456,10 @@ create table if not exists public.unit_amenities (
   primary key (unit_id, amenity_id)
 );
 
-create table if not exists public.boat_amenities (
-  boat_id     uuid not null references public.boats(id) on delete cascade,
+create table if not exists public.vessel_amenities (
+  vessel_id     uuid not null references public.vessels(id) on delete cascade,
   amenity_id  uuid not null references public.amenities(id) on delete cascade,
-  primary key (boat_id, amenity_id)
+  primary key (vessel_id, amenity_id)
 );
 
 create table if not exists public.space_amenities (
@@ -469,7 +470,7 @@ create table if not exists public.space_amenities (
 
 create index if not exists entity_amenities_amenity_idx on public.entity_amenities (amenity_id);
 create index if not exists unit_amenities_amenity_idx on public.unit_amenities (amenity_id);
-create index if not exists boat_amenities_amenity_idx on public.boat_amenities (amenity_id);
+create index if not exists boat_amenities_amenity_idx on public.vessel_amenities (amenity_id);
 
 -- What they fish for. A catalog and a join, so "who targets red snapper" is an
 -- index lookup rather than a LIKE over a comma-separated string.

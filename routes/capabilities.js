@@ -2,15 +2,15 @@
 // CAPABILITIES — a map over the real tables in sql/capability_tables.sql
 // ============================================================
 //
-// A capability is a THING a business can have: units, boats, trips, gear,
+// A capability is a THING a business can have: units, vessels, trips, gear,
 // packages, spaces, plus one row of operating details. Not an industry.
 //
 //   ANY slug can have ANY capability.
 //
 // `entity.entity_type` / `entity_subtype` already say what a business is;
 // nothing here re-states it and nothing here gates on it. A marina that runs
-// charters, rents pontoons and has a restaurant uses `boats`, `trips`, `gear`
-// and `spaces` — the same four tables a hotel would use for its own boat, its
+// charters, rents pontoons and has a restaurant uses `vessels`, `trips`, `gear`
+// and `spaces` — the same four tables a hotel would use for its own vessel, its
 // own sunset cruise, its own bikes and its own ballroom.
 //
 // This file stores nothing. It describes the columns so a form can be built
@@ -23,7 +23,7 @@
 //   search  'min' | 'max' | 'eq' | 'has' | null
 //             min  at least this   (bedrooms >= 2)
 //             max  at most this    (nightly_rate <= 400)
-//             eq   exact match     (unit_number, boat_type)
+//             eq   exact match     (unit_number, vessel_type)
 //             has  must be true    (has_ac)
 //             null stored and shown, never filtered on
 //   group   which fieldset it belongs in
@@ -179,30 +179,30 @@ const CAPABILITIES = {
     },
 
     /* Anything that floats and carries people. */
-    boats: {
-        table: 'boats',
+    vessels: {
+        table: 'vessels',
         key: 'entity_slug',
-        label: 'Boats',
-        hint: 'A charter boat, a cruise catamaran, a rental pontoon, a jet ski.',
-        amenities: { join: 'boat_amenities', fk: 'boat_id' },
+        label: 'Vessels',
+        hint: 'A 65ft Viking on a charter, a 22ft double-deck tritoon at a rental company, a 56ft catamaran on a dolphin cruise. Same table — the business already knows which it is.',
+        amenities: { join: 'vessel_amenities', fk: 'vessel_id' },
         columns: {
-            name: txt('Boat name', { group: 'Identity' }),
-            boat_type: pick('Type', ['sportfish', 'center_console', 'pontoon', 'deck_boat', 'catamaran',
+            name: txt('Vessel name', { group: 'Identity' }),
+            vessel_type: pick('Type', ['sportfish', 'center_console', 'pontoon', 'deck_boat', 'catamaran',
                 'sailboat', 'yacht', 'jet_ski', 'kayak', 'paddleboard'], { group: 'Identity' }),
             make: txt('Make', { group: 'Identity' }),
             model: txt('Model', { group: 'Identity' }),
             year: int('Year', { search: 'min', group: 'Identity' }),
             quantity: int('How many of this', { search: 'min', group: 'Identity' }),
 
-            length_ft: dec('Length', { search: 'min', group: 'The boat', unit: 'ft' }),
-            beam_ft: dec('Beam', { group: 'The boat', unit: 'ft' }),
-            max_passengers: int('Maximum passengers', { search: 'min', group: 'The boat', unit: 'people' }),
-            max_anglers: int('Maximum anglers', { search: 'min', group: 'The boat', unit: 'people' }),
-            engines: int('Engines', { group: 'The boat' }),
-            engine_hp: int('Horsepower', { search: 'min', group: 'The boat', unit: 'hp' }),
-            cruising_speed_kn: dec('Cruising speed', { search: 'min', group: 'The boat', unit: 'kn' }),
-            fuel_capacity_gal: int('Fuel capacity', { group: 'The boat', unit: 'gal' }),
-            max_range_mi: int('Range', { search: 'min', group: 'The boat', unit: 'mi' }),
+            length_ft: dec('Length', { search: 'min', group: 'The vessel', unit: 'ft' }),
+            beam_ft: dec('Beam', { group: 'The vessel', unit: 'ft' }),
+            max_passengers: int('Maximum passengers', { search: 'min', group: 'The vessel', unit: 'people' }),
+            max_anglers: int('Maximum anglers', { search: 'min', group: 'The vessel', unit: 'people' }),
+            engines: int('Engines', { group: 'The vessel' }),
+            engine_hp: int('Horsepower', { search: 'min', group: 'The vessel', unit: 'hp' }),
+            cruising_speed_kn: dec('Cruising speed', { search: 'min', group: 'The vessel', unit: 'kn' }),
+            fuel_capacity_gal: int('Fuel capacity', { group: 'The vessel', unit: 'gal' }),
+            max_range_mi: int('Range', { search: 'min', group: 'The vessel', unit: 'mi' }),
 
             has_head: bool('Head (toilet)', { group: 'On board' }),
             has_ac: bool('Air conditioning', { group: 'On board' }),
@@ -254,7 +254,7 @@ const CAPABILITIES = {
         },
     },
 
-    /* Anything you rent that is not a boat or a unit. */
+    /* Anything you rent that is not a vessel or a unit. */
     gear: {
         table: 'gear',
         key: 'entity_slug',
@@ -296,6 +296,38 @@ const CAPABILITIES = {
             price: dec('Price', { search: 'max', group: 'Money', unit: '$' }),
             deposit: dec('Deposit', { group: 'Money', unit: '$' }),
             notes: txt('Notes', { group: 'Money', long: true }),
+        },
+    },
+
+    /*
+     * When each meal is served. Recorded once per business, not on every item.
+     *
+     * A section tagged breakfast already knows it runs 7–11, and every item in
+     * that section inherits it. Nobody types 7–11 onto forty items, and
+     * changing the time is one edit instead of forty.
+     */
+    service_periods: {
+        table: 'service_periods',
+        key: 'entity_slug',
+        label: 'Service periods',
+        hint: 'Breakfast 7–11, lunch 11–4, dinner 5–10. Menu sections point at these instead of repeating the times.',
+        children: [{
+            table: 'service_period_days',
+            fk: 'period_id',
+            label: 'Day overrides',
+            noId: true,
+            columns: {
+                day_of_week: int('Day (0 = Sunday)', { required: true }),
+                starts_at: time('Starts'),
+                ends_at: time('Ends'),
+            },
+        }],
+        columns: {
+            key: pick('Period', ['breakfast', 'brunch', 'lunch', 'happy_hour', 'dinner', 'late_night'],
+                { group: 'When', required: true }),
+            label: txt('What they call it', { group: 'When' }),
+            starts_at: time('Starts', { group: 'When' }),
+            ends_at: time('Ends', { group: 'When' }),
         },
     },
 
@@ -355,13 +387,13 @@ const ENTITY_LISTS = {
  *
  * A SUGGESTION, never a restriction — every capability is offered to every
  * business. This only decides what is open when the page loads, so a fishing
- * charter is not scrolling past Packages to find Boats.
+ * charter is not scrolling past Packages to find Vessels.
  */
 const SUGGESTIONS = [
-    { match: /charter|fishing|deep.?sea|offshore/i, capabilities: ['boats', 'trips', 'operations'] },
-    { match: /cruise|dolphin|sunset|sightsee|tour/i, capabilities: ['boats', 'trips', 'operations'] },
+    { match: /charter|fishing|deep.?sea|offshore/i, capabilities: ['vessels', 'trips', 'operations'] },
+    { match: /cruise|dolphin|sunset|sightsee|tour/i, capabilities: ['vessels', 'trips', 'operations'] },
     { match: /parasail|jet.?ski|wave.?runner|snorkel|scuba|dive|kayak|paddle|surf/i, capabilities: ['trips', 'gear', 'operations'] },
-    { match: /rental|rent-|marina|pontoon|bike|golf.?cart/i, capabilities: ['boats', 'gear', 'operations'] },
+    { match: /rental|rent-|marina|pontoon|bike|golf.?cart/i, capabilities: ['vessels', 'gear', 'operations'] },
     { match: /condo|hotel|resort|vacation|villa|cabin|lodge/i, capabilities: ['units', 'operations'] },
     { match: /photograph|photo|spa|salon|massage|lesson|instructor|guide/i, capabilities: ['packages', 'operations'] },
     { match: /venue|event|wedding|banquet|restaurant|bar|brewery/i, capabilities: ['spaces', 'operations'] },
@@ -449,7 +481,7 @@ function coerce(column, raw) {
         }
         default:
             // `suggestions` are a hint for the form, deliberately not enforced:
-            // a business that calls its boat something nobody listed should be
+            // a business that calls its vessel something nobody listed should be
             // able to say so.
             return { value: String(raw).slice(0, 5000) };
     }

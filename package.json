@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "check:sql": "node scripts/check-sql-safety.mjs",
+    "check:columns": "node scripts/check-capability-columns.mjs",
+    "verify": "npm run check:sql && npm run check:columns"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
