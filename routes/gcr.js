@@ -28,6 +28,7 @@ const db = createClient(
 );
 
 const { getContractForIndustry, getIndustryFacts } = require('../lib/industry-contract');
+const { conceptsFromOffers } = require('../lib/concepts');
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 3958.8;
@@ -568,11 +569,16 @@ router.get('/entities', async (req, res) => {
 
     // Batch fetch tags, photos, hours, today's availability for all entities
     const today = new Date().toISOString().split('T')[0];
-    const [tagRows, photoRows, hourRows, availRows] = await Promise.all([
+    const [tagRows, photoRows, hourRows, availRows, offerRows] = await Promise.all([
       slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
       slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
       slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
       slugs.length ? db.from('business_availability').select('entity_slug, total_capacity, remaining_spots, status, source_platform, last_updated, last_minute_deal, last_minute_price, original_price').in('entity_slug', slugs).eq('availability_date', today).eq('visible_on_profile', true) : { data: [] },
+      // What each place actually SELLS, not just what it's labelled as. Only
+      // the three columns the classifier reads — the raw offers are far too
+      // heavy to ship to a listing page (18k rows platform-wide), so they get
+      // reduced to a handful of concept tokens per entity below.
+      slugs.length ? db.from('entity_offer').select('entity_slug, name, description, offer_type').in('entity_slug', slugs).limit(30000) : { data: [] },
     ]);
 
     const tagMap = {}, photoMap = {}, hourMap = {}, availMap = {};
@@ -580,6 +586,7 @@ router.get('/entities', async (req, res) => {
     (photoRows.data || []).forEach(r => { if (!photoMap[r.entity_slug]) photoMap[r.entity_slug] = []; photoMap[r.entity_slug].push(r); });
     (hourRows.data || []).forEach(r => { if (!hourMap[r.entity_slug]) hourMap[r.entity_slug] = []; hourMap[r.entity_slug].push(r); });
     (availRows.data || []).forEach(r => { availMap[r.entity_slug] = r; });
+    const conceptMap = conceptsFromOffers(offerRows.data || []);
 
     const userLat = req.query.lat ? parseFloat(req.query.lat) : null;
     const userLng = req.query.lng ? parseFloat(req.query.lng) : null;
@@ -602,6 +609,10 @@ router.get('/entities', async (req, res) => {
       const avail = availMap[e.slug] || null;
       const row = {
         ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url),
+        // Canonical tokens derived from this entity's offerings — see
+        // lib/concepts.js. Consumed by gcr-unified's facet matcher alongside
+        // subtype and tags, so a listing row can find a place by what it sells.
+        concepts: conceptMap[e.slug] || [],
         // Flat field so GCRCard's existing (previously dead — the column
         // never existed) "🔴 Last spot!" badge logic just works.
         spots_remaining: avail ? avail.remaining_spots : null,
