@@ -77,6 +77,11 @@ mount('/api/admin', () => require('./routes/admin-settings'));
 // with no deploy.
 mount('/api/admin/gcr', () => require('./routes/business-profile'));
 
+// Read-only analytics over behaviour the front end already records: per
+// business and across the platform. Writes nothing, invents nothing, and
+// reports what is NOT tracked alongside what is.
+mount('/api/admin/analytics', () => require('./routes/admin-analytics'));
+
 // The embeddable availability calendar a business drops into its own website,
 // plus the JSON it reads. Public and unauthenticated by design — it runs on
 // anonymous visitors' browsers on other people's domains — and returns only
