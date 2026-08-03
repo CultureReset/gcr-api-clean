@@ -255,30 +255,57 @@ function summarise(entry, requestedDates, coverage = 'any', defaultCapacity = nu
  */
 const STAY_TYPES = ['hotel', 'condo', 'vacation-rental', 'resort'];
 
+/**
+ * Order matters — the first match wins, so the specific patterns sit above the
+ * general ones. `rental` in particular would swallow "vacation rental" and
+ * "condo rental" if it ran before the stay types, which is why those are
+ * matched on entity_type first.
+ *
+ * Condos and hotels are separate industries rather than one "stays" bucket:
+ * they are run by different people, they are searched separately, and each
+ * gets its own page.
+ */
 const VERTICAL_PATTERNS = [
-    { id: 'stay', label: 'Stays — condos, hotels, rentals', types: STAY_TYPES, coverage: 'all' },
-    { id: 'charter', label: 'Fishing charters', pattern: /charter|fishing|deep.?sea/i, coverage: 'any' },
-    { id: 'cruise', label: 'Cruises & tours', pattern: /cruise|dolphin|sunset|sightsee|tour(?!ism)/i, coverage: 'any' },
-    { id: 'watersport', label: 'Watersports & parasailing', pattern: /parasail|jet.?ski|wave.?runner|snorkel|dive|kayak|paddle|surf/i, coverage: 'any' },
-    { id: 'rental', label: 'Rentals — boats, gear, equipment', pattern: /rental|rent-|marina|pontoon|boat.?rent/i, coverage: 'any' },
-    { id: 'session', label: 'Sessions — photographers, guides', pattern: /photograph|photo|guide|instructor|lesson|spa|salon|massage/i, coverage: 'any' },
-    { id: 'venue', label: 'Venues & events', pattern: /venue|event|wedding|banquet|golf/i, coverage: 'any' },
+    { id: 'condo', label: 'Condos & vacation rentals', types: ['condo', 'vacation-rental'], coverage: 'all', unit_word: 'units' },
+    { id: 'hotel', label: 'Hotels & resorts', types: ['hotel', 'resort'], coverage: 'all', unit_word: 'rooms' },
+    { id: 'charter', label: 'Fishing charters', pattern: /charter|fishing|deep.?sea|offshore/i, coverage: 'any', unit_word: 'spots' },
+    { id: 'cruise', label: 'Dolphin & sunset cruises', pattern: /cruise|dolphin|sunset|sightsee|tour(?!ism)/i, coverage: 'any', unit_word: 'spots' },
+    { id: 'watersport', label: 'Parasailing & watersports', pattern: /parasail|jet.?ski|wave.?runner|snorkel|scuba|dive|kayak|paddle|surf|banana.?boat/i, coverage: 'any', unit_word: 'spots' },
+    { id: 'rental', label: 'Boat & gear rentals', pattern: /rental|rent-|marina|pontoon|boat.?rent|bike|golf.?cart/i, coverage: 'any', unit_word: 'units' },
+    { id: 'session', label: 'Photographers & sessions', pattern: /photograph|photo|guide|instructor|lesson|spa|salon|massage|charter.?fish/i, coverage: 'any', unit_word: 'sessions' },
+    { id: 'venue', label: 'Venues & events', pattern: /venue|event|wedding|banquet|golf.?course/i, coverage: 'any', unit_word: 'slots' },
 ];
+
+/** Shown alongside the real industries so nothing falls off the list silently. */
+const OTHER_VERTICAL = { id: 'other', label: 'Everything else', coverage: 'any', unit_word: 'spots' };
 
 function verticalOf(entity) {
     const type = String(entity.entity_type || '').toLowerCase();
     const subtype = String(entity.entity_subtype || '').toLowerCase();
-    if (STAY_TYPES.includes(type)) return 'stay';
+    for (const v of VERTICAL_PATTERNS) {
+        if (v.types && v.types.includes(type)) return v.id;
+    }
     for (const v of VERTICAL_PATTERNS) {
         if (v.pattern && (v.pattern.test(subtype) || v.pattern.test(type))) return v.id;
     }
     return 'other';
 }
 
-/** Default coverage rule for a vertical — stays need every night, the rest any day. */
+/** The type/subtype filter for one industry, for narrowing a query up front. */
+function verticalSpec(id) {
+    return VERTICAL_PATTERNS.find((v) => v.id === id) || (id === 'other' ? OTHER_VERTICAL : null);
+}
+
+/** "spots" / "units" / "rooms" — what a remaining count means in this industry. */
+function unitWordFor(vertical) {
+    const spec = verticalSpec(vertical);
+    return (spec && spec.unit_word) || 'spots';
+}
+
+/** Default coverage rule — stays need every night, the rest any open day. */
 function coverageFor(vertical) {
-    const found = VERTICAL_PATTERNS.find((v) => v.id === vertical);
-    return found ? found.coverage : 'any';
+    const spec = verticalSpec(vertical);
+    return spec ? spec.coverage : 'any';
 }
 
 module.exports = {
@@ -288,7 +315,10 @@ module.exports = {
     datesBetween,
     statusFor,
     verticalOf,
+    verticalSpec,
+    unitWordFor,
     coverageFor,
     VERTICAL_PATTERNS,
+    OTHER_VERTICAL,
     STAY_TYPES,
 };

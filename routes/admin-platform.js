@@ -1131,12 +1131,16 @@ router.delete('/deals/:id', adminRequired, async (req, res) => {
 const AVAIL = require('./availability-engine');
 
 router.get('/verticals', adminRequired, (_req, res) => {
+    // The industries the dashboard builds a page each from, so the nav and
+    // the classifier can never disagree about what exists.
+    const shape = (v) => ({
+        id: v.id,
+        label: v.label,
+        default_coverage: v.coverage,
+        unit_word: v.unit_word || 'spots',
+    });
     res.json({
-        verticals: AVAIL.VERTICAL_PATTERNS.map((v) => ({
-            id: v.id,
-            label: v.label,
-            default_coverage: v.coverage,
-        })).concat([{ id: 'other', label: 'Everything else', default_coverage: 'any' }]),
+        verticals: AVAIL.VERTICAL_PATTERNS.map(shape).concat([shape(AVAIL.OTHER_VERTICAL)]),
         stay_types: AVAIL.STAY_TYPES,
     });
 });
@@ -1295,6 +1299,308 @@ router.get('/search', adminRequired, async (req, res) => {
             // actually confirmed them.
             assumed_only: deduped.filter((r) => r.meets_coverage && !r.has_data).length,
             by_vertical: Object.values(counts).sort((a, b) => b.available - a.available),
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── one business, one month ─────────────────────────────────────────── */
+//
+// The calendar behind a single business's own page. Same merge as everything
+// else, but this is the operator's view rather than the public one, so it
+// carries the parts the embed widget deliberately strips:
+//
+//   sources      what claimed each date — 'fareharbor', 'ical:c3', 'capacity'
+//   assumed      nothing claimed it; it is open because capacity says so
+//   blocked_by   which feed or manual block vetoed the date
+//   hidden rows  visible_on_profile = false is included here
+//
+// Units come with it, so a condo building's page shows the building's rolled
+// up month AND each unit's own row.
+
+router.get('/business-calendar/:slug', adminRequired, async (req, res) => {
+    try {
+        const slug = String(req.params.slug || '');
+        const month = /^\d{4}-\d{2}$/.test(req.query.month || '')
+            ? req.query.month
+            : new Date().toISOString().slice(0, 10).slice(0, 7);
+        const from = `${month}-01`;
+        const lastDay = new Date(Date.UTC(
+            parseInt(month.slice(0, 4), 10), parseInt(month.slice(5, 7), 10), 0,
+        )).getUTCDate();
+        const to = `${month}-${String(lastDay).padStart(2, '0')}`;
+        const dates = AVAIL.datesBetween(from, to);
+
+        const { data: entity, error } = await supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, city, phone, email, booking_url, hero_image_url, daily_capacity, capacity_per_slot, parent_slug:parent_entity_slug, is_active')
+            .eq('slug', slug)
+            .maybeSingle();
+        if (error) return fail(res, 500, error.message);
+        if (!entity) return fail(res, 404, 'Business not found');
+
+        const [unitsRes, feedsRes] = await Promise.all([
+            supabase
+                .from('entity')
+                .select('slug, name, entity_subtype, daily_capacity, is_active')
+                .eq('parent_entity_slug', slug)
+                .order('name')
+                .limit(500),
+            // Shown beside the calendar because "why is the 14th blocked" is
+            // almost always "this feed claimed it", and that answer should not
+            // require a trip to another screen.
+            supabase
+                .from('entity_external_calendars')
+                .select('id, source_label, provider, resource_id, last_synced_at, last_sync_status')
+                .eq('entity_slug', slug)
+                .limit(50),
+        ]);
+
+        const units = (unitsRes.data || []).filter((u) => u.is_active !== false);
+        const slugs = [slug, ...units.map((u) => u.slug)];
+        const availability = await AVAIL.readAvailability({ from, to, slugs, publicOnly: false });
+
+        const vertical = AVAIL.verticalOf(entity);
+        const coverage = AVAIL.coverageFor(vertical);
+        const isUnit = !!entity.parent_slug && AVAIL.STAY_TYPES.includes(String(entity.entity_type || '').toLowerCase());
+
+        const unitRows = units.map((u) => {
+            const summary = AVAIL.summarise(
+                availability.get(u.slug), dates, coverage, u.daily_capacity ?? 1,
+            );
+            return {
+                entity_slug: u.slug,
+                entity_name: u.name,
+                entity_subtype: u.entity_subtype,
+                daily_capacity: u.daily_capacity ?? null,
+                available_dates: summary.available_dates,
+                open_days: summary.open_days,
+                claimed_days: summary.claimed_days,
+                has_data: summary.has_data,
+                days: summary.days,
+            };
+        });
+
+        const own = AVAIL.expand(
+            availability.get(slug),
+            dates,
+            entity.daily_capacity ?? (isUnit ? 1 : null),
+        );
+
+        // With units the parent's number IS the count of free units. Its own
+        // capacity row, if it has one, describes the building and would double
+        // count. Without units the parent's own numbers stand.
+        const days = unitRows.length
+            ? dates.map((date) => {
+                const ownDay = own.find((d) => d.date === date);
+                const free = unitRows.filter((u) => u.available_dates.includes(date));
+                const blocked = ownDay && ownDay.status === 'blocked' && !ownDay.assumed;
+                return {
+                    date,
+                    status: blocked ? 'blocked' : AVAIL.statusFor(free.length, unitRows.length),
+                    remaining: blocked ? 0 : free.length,
+                    total: unitRows.length,
+                    // Assumed only if NOTHING real touched the day. Checking
+                    // just the free units would call a day assumed when a
+                    // unit was genuinely blocked on it — the block is exactly
+                    // the real information that drove the count down.
+                    assumed: !blocked && unitRows.every((u) => {
+                        const d = (u.days || []).find((x) => x.date === date);
+                        return !d || d.assumed;
+                    }),
+                    units: free.map((u) => ({ entity_slug: u.entity_slug, entity_name: u.entity_name })),
+                    blocked_by: blocked ? ownDay.blocked_by : undefined,
+                    sources: ownDay ? ownDay.sources : [],
+                };
+            })
+            : own;
+
+        const summary = AVAIL.summarise(
+            availability.get(slug), dates, coverage, entity.daily_capacity ?? (isUnit ? 1 : null),
+        );
+
+        res.json({
+            entity: {
+                entity_slug: entity.slug,
+                entity_name: entity.name,
+                entity_type: entity.entity_type,
+                entity_subtype: entity.entity_subtype,
+                city: entity.city,
+                phone: entity.phone,
+                email: entity.email,
+                booking_url: entity.booking_url,
+                image_url: entity.hero_image_url,
+                daily_capacity: entity.daily_capacity ?? null,
+                capacity_per_slot: entity.capacity_per_slot ?? null,
+                parent_slug: entity.parent_slug || null,
+            },
+            month,
+            from,
+            to,
+            vertical,
+            vertical_label: (AVAIL.verticalSpec(vertical) || {}).label || vertical,
+            coverage,
+            unit_word: unitRows.length ? AVAIL.unitWordFor(vertical) : AVAIL.unitWordFor(vertical),
+            days,
+            units: unitRows,
+            unit_count: unitRows.length,
+            feeds: feedsRes.data || [],
+            capacity_known: unitRows.length > 0 || entity.daily_capacity != null,
+            // How much of this month is real rather than inferred. The single
+            // most useful number for judging whether to trust the calendar.
+            claimed_days: unitRows.length
+                ? unitRows.reduce((n, u) => Math.max(n, u.claimed_days), 0)
+                : summary.claimed_days,
+            open_days: days.filter((d) => d.status === 'available' || d.status === 'limited').length,
+            bcc_email: `gcr-${slug}@parse.gulfcoastradar.com`,
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── one industry, one month ─────────────────────────────────────────── */
+//
+// A page per industry: fishing charters, dolphin cruises, condos, hotels.
+// Returns the month twice over — once as a per-day roll-up across the whole
+// industry ("how many charters have something open on the 14th"), and once as
+// a row per business so the same page can drill in without a second call.
+
+router.get('/industry-calendar', adminRequired, async (req, res) => {
+    try {
+        const vertical = String(req.query.vertical || '');
+        const spec = AVAIL.verticalSpec(vertical);
+        if (!spec) return fail(res, 400, `Unknown industry "${vertical}"`);
+
+        const month = /^\d{4}-\d{2}$/.test(req.query.month || '')
+            ? req.query.month
+            : new Date().toISOString().slice(0, 7);
+        const from = `${month}-01`;
+        const lastDay = new Date(Date.UTC(
+            parseInt(month.slice(0, 4), 10), parseInt(month.slice(5, 7), 10), 0,
+        )).getUTCDate();
+        const to = `${month}-${String(lastDay).padStart(2, '0')}`;
+        const dates = AVAIL.datesBetween(from, to);
+        const coverage = req.query.coverage === 'all' || req.query.coverage === 'any'
+            ? req.query.coverage
+            : spec.coverage;
+
+        // Classified in JS rather than in the query: `verticalOf` is pattern
+        // based and the patterns are the single definition of an industry.
+        // Filtering in SQL would need that list duplicated and kept in step.
+        let entityQuery = supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, city, phone, email, hero_image_url, booking_url, rating, price_from, price_unit, daily_capacity, parent_slug:parent_entity_slug')
+            .eq('is_active', true)
+            .limit(limitOf(req, 2000, 5000));
+        if (req.query.city) entityQuery = entityQuery.eq('city', req.query.city);
+
+        const { data: entities, error } = await entityQuery;
+        if (error) return fail(res, 500, error.message);
+
+        const all = entities || [];
+        const inIndustry = all.filter((e) => AVAIL.verticalOf(e) === vertical);
+
+        // Children come along even if they classify elsewhere, so a complex
+        // can report what its units have free.
+        const parents = new Set(inIndustry.map((e) => e.slug));
+        const children = all.filter((e) => e.parent_slug && parents.has(e.parent_slug));
+        const childrenOf = new Map();
+        for (const c of children) {
+            if (!childrenOf.has(c.parent_slug)) childrenOf.set(c.parent_slug, []);
+            childrenOf.get(c.parent_slug).push(c);
+        }
+
+        const slugs = [...new Set([...inIndustry.map((e) => e.slug), ...children.map((c) => c.slug)])];
+        const availability = slugs.length
+            ? await AVAIL.readAvailability({ from, to, slugs, publicOnly: false })
+            : new Map();
+
+        const isStay = spec.types && spec.types.some((t) => AVAIL.STAY_TYPES.includes(t));
+        const fallbackFor = (e, child) => e.daily_capacity ?? (child && isStay ? 1 : null);
+
+        const businesses = inIndustry.map((e) => {
+            const kids = childrenOf.get(e.slug) || [];
+            const summary = AVAIL.summarise(availability.get(e.slug), dates, coverage, fallbackFor(e, false));
+            const units = kids.map((k) => ({
+                entity_slug: k.slug,
+                entity_name: k.name,
+                ...AVAIL.summarise(availability.get(k.slug), dates, coverage, fallbackFor(k, true)),
+            }));
+
+            let openDates = new Set(summary.available_dates);
+            if (units.length) {
+                openDates = new Set();
+                for (const u of units) for (const d of u.available_dates) openDates.add(d);
+            }
+
+            return {
+                entity_slug: e.slug,
+                entity_name: e.name,
+                entity_subtype: e.entity_subtype,
+                city: e.city,
+                phone: e.phone,
+                email: e.email,
+                image_url: e.hero_image_url,
+                booking_url: e.booking_url,
+                rating: e.rating,
+                price_from: e.price_from,
+                price_unit: e.price_unit,
+                daily_capacity: e.daily_capacity ?? null,
+                unit_count: units.length || undefined,
+                units_with_data: units.length ? units.filter((u) => u.has_data).length : undefined,
+                available_dates: [...openDates].sort(),
+                open_days: openDates.size,
+                claimed_days: units.length
+                    ? units.reduce((n, u) => Math.max(n, u.claimed_days), 0)
+                    : summary.claimed_days,
+                has_data: units.length ? units.some((u) => u.has_data) : summary.has_data,
+                capacity_known: units.length > 0 || e.daily_capacity != null,
+                min_remaining: summary.min_remaining,
+            };
+        });
+
+        // A unit already counts through its complex, so listing it separately
+        // double-counts every building on every day. Opt in for the flat view.
+        const parentsListed = new Set(businesses.filter((b) => b.unit_count).map((b) => b.entity_slug));
+        const parentBySlug = Object.fromEntries(all.map((e) => [e.slug, e.parent_slug || null]));
+        const listed = req.query.include_units === 'true'
+            ? businesses
+            : businesses.filter((b) => {
+                const parent = parentBySlug[b.entity_slug];
+                return !parent || !parentsListed.has(parent);
+            });
+
+        // The industry's own month: for each day, how many businesses have
+        // something open, and how much.
+        const byDate = dates.map((date) => {
+            const open = listed.filter((b) => b.available_dates.includes(date));
+            return {
+                date,
+                open_businesses: open.length,
+                total_businesses: listed.length,
+                // Only counts we actually know get summed — adding a null
+                // capacity as zero would understate the day.
+                spots: open.reduce((n, b) => n + (b.min_remaining || 0), 0),
+                slugs: open.map((b) => b.entity_slug),
+            };
+        });
+
+        res.json({
+            vertical,
+            label: spec.label,
+            unit_word: AVAIL.unitWordFor(vertical),
+            month,
+            from,
+            to,
+            coverage,
+            days: byDate,
+            businesses: listed.sort((a, b) => b.open_days - a.open_days || (b.rating || 0) - (a.rating || 0)),
+            total: listed.length,
+            with_data: listed.filter((b) => b.has_data).length,
+            without_capacity: listed.filter((b) => !b.capacity_known).length,
+            open_today: (byDate.find((d) => d.date === new Date().toISOString().slice(0, 10)) || {}).open_businesses ?? null,
         });
     } catch (err) {
         fail(res, 500, err.message);
