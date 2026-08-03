@@ -596,6 +596,517 @@ router.get('/parser/log', adminRequired, async (req, res) => {
     res.json({ logs: await withBusinessNames(data), total: (data || []).length });
 });
 
+/* ── inventory & capacity ────────────────────────────────────────────── */
+//
+// "What does this business actually have?" — five pontoons, two charters,
+// forty covers. Two independent answers live in the schema and the dashboard
+// needs both:
+//
+//   entity.daily_capacity / capacity_per_slot   the coarse number the email
+//                                               parser subtracts from when a
+//                                               confirmation lands
+//   offerings (+ capacity)                      the itemised catalog
+//
+// Without a capacity on file the parser can log a booking but cannot say how
+// many spots are left, so `remaining` stays null and nothing can be marketed
+// as last-minute. That is exactly the gap this route makes visible.
+
+router.get('/capacity', adminRequired, async (req, res) => {
+    try {
+        let entityQuery = supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, phone, email, daily_capacity, capacity_per_slot, is_active')
+            .order('name')
+            .limit(limitOf(req, 1000, 5000));
+
+        if (req.query.slug) entityQuery = entityQuery.eq('slug', req.query.slug);
+        if (req.query.type) entityQuery = entityQuery.eq('entity_type', req.query.type);
+        if (req.query.active !== 'false') entityQuery = entityQuery.eq('is_active', true);
+
+        const [entities, offerings] = await Promise.all([
+            entityQuery,
+            supabase.from('offerings').select('entity_slug, kind, capacity, active').limit(5000),
+        ]);
+        if (entities.error) return fail(res, 500, entities.error.message);
+
+        // offerings is optional — a deployment without the booking tables
+        // still gets the capacity column, just with zeroed inventory.
+        const byslug = {};
+        for (const o of offerings.data || []) {
+            if (!o.entity_slug) continue;
+            const e = (byslug[o.entity_slug] ||= { offerings: 0, active_offerings: 0, seats: 0, kinds: {} });
+            e.offerings += 1;
+            if (o.active !== false) e.active_offerings += 1;
+            if (o.capacity) e.seats += Number(o.capacity) || 0;
+            if (o.kind) e.kinds[o.kind] = (e.kinds[o.kind] || 0) + 1;
+        }
+
+        const businesses = (entities.data || []).map((e) => {
+            const inv = byslug[e.slug] || { offerings: 0, active_offerings: 0, seats: 0, kinds: {} };
+            return {
+                entity_slug: e.slug,
+                entity_name: e.name,
+                entity_type: e.entity_type,
+                entity_subtype: e.entity_subtype,
+                phone: e.phone,
+                email: e.email,
+                daily_capacity: e.daily_capacity ?? null,
+                capacity_per_slot: e.capacity_per_slot ?? null,
+                // The parser can only compute "spots left" once this is set.
+                capacity_configured: !!e.daily_capacity,
+                bcc_email: `gcr-${e.slug}@parse.gulfcoastradar.com`,
+                offerings: inv.offerings,
+                active_offerings: inv.active_offerings,
+                offering_seats: inv.seats,
+                offering_kinds: Object.entries(inv.kinds).map(([kind, count]) => ({ kind, count })),
+            };
+        });
+
+        res.json({
+            businesses,
+            total: businesses.length,
+            configured: businesses.filter((b) => b.capacity_configured).length,
+            with_offerings: businesses.filter((b) => b.offerings > 0).length,
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+// Set the capacity the parser counts down from. POST /api/email-parser/setup/
+// :slug does the same write but has no auth on it at all, so the dashboard
+// uses this instead.
+router.put('/capacity/:slug', adminRequired, async (req, res) => {
+    try {
+        const { daily_capacity, capacity_per_slot } = req.body || {};
+        const row = { updated_at: new Date().toISOString() };
+
+        if (daily_capacity !== undefined) {
+            const n = parseInt(daily_capacity, 10);
+            // null clears it back to "unknown capacity", which is a real state.
+            if (daily_capacity !== null && daily_capacity !== '' && !Number.isFinite(n)) {
+                return fail(res, 400, 'daily_capacity must be a number or null');
+            }
+            row.daily_capacity = daily_capacity === null || daily_capacity === '' ? null : n;
+        }
+        if (capacity_per_slot !== undefined) {
+            const n = parseInt(capacity_per_slot, 10);
+            if (capacity_per_slot !== null && capacity_per_slot !== '' && !Number.isFinite(n)) {
+                return fail(res, 400, 'capacity_per_slot must be a number or null');
+            }
+            row.capacity_per_slot = capacity_per_slot === null || capacity_per_slot === '' ? null : n;
+        }
+        if (Object.keys(row).length === 1) return fail(res, 400, 'Nothing to update');
+
+        const { data, error } = await supabase
+            .from('entity')
+            .update(row)
+            .eq('slug', req.params.slug)
+            .select('slug, name, daily_capacity, capacity_per_slot');
+        if (error) return fail(res, 400, error.message);
+        if (!data || !data.length) return fail(res, 404, 'Business not found');
+
+        res.json({
+            business: {
+                ...data[0],
+                bcc_email: `gcr-${req.params.slug}@parse.gulfcoastradar.com`,
+                capacity_configured: !!data[0].daily_capacity,
+            },
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── availability ────────────────────────────────────────────────────── */
+//
+// business_availability is where capacity meets bookings: one row per
+// (business, date, time slot) carrying total_capacity, booked_count and
+// remaining_spots. The email parser writes it on every confirmation, the iCal
+// importer blocks dates in it, and an admin can hand-edit a row.
+//
+// /api/admin/gcr/entities/:slug/availability already reads and writes ONE
+// business. This is the same data across all of them, which is what an
+// operator watching the whole coast needs.
+
+const AVAILABILITY_FIELDS = [
+    'entity_slug', 'availability_date', 'time_slot', 'resource_id',
+    'total_capacity', 'booked_count', 'remaining_spots', 'status',
+    'visible_on_profile', 'source_platform', 'booking_type',
+    'last_minute_deal', 'last_minute_price', 'original_price',
+];
+
+router.get('/availability', adminRequired, async (req, res) => {
+    try {
+        let query = supabase
+            .from('business_availability')
+            .select('*')
+            .order('availability_date')
+            .order('time_slot')
+            .limit(limitOf(req, 500, 2000));
+
+        query = applyCommon(query, req, { dateColumn: 'availability_date' });
+        if (req.query.platform) query = query.eq('source_platform', req.query.platform);
+
+        const { data, error } = await query;
+        if (error) return fail(res, 500, error.message);
+        res.json({ availability: await withBusinessNames(data), total: (data || []).length });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+// Upsert one (slug, date, time_slot) row. Keyed rather than id-addressed
+// because that triple is how every writer — parser, iCal, admin — finds it.
+router.put('/availability', adminRequired, async (req, res) => {
+    try {
+        const row = pick(req.body || {}, AVAILABILITY_FIELDS);
+        if (!row.entity_slug) return fail(res, 400, 'entity_slug is required');
+        if (!row.availability_date) return fail(res, 400, 'availability_date is required');
+        row.time_slot = row.time_slot || '00:00';
+        row.last_updated = new Date().toISOString();
+
+        // Keep remaining_spots consistent when the admin edits capacity or
+        // bookings but not the derived number, so the deal engine and the
+        // public profile never disagree with the row they read from.
+        if (row.remaining_spots === undefined && row.total_capacity != null) {
+            row.remaining_spots = Math.max(0, Number(row.total_capacity) - Number(row.booked_count || 0));
+        }
+        if (!row.status && row.remaining_spots != null) {
+            row.status = row.remaining_spots === 0 ? 'full' : row.remaining_spots <= 3 ? 'limited' : 'available';
+        }
+
+        let find = supabase
+            .from('business_availability')
+            .select('id')
+            .eq('entity_slug', row.entity_slug)
+            .eq('availability_date', row.availability_date)
+            .eq('time_slot', row.time_slot);
+        find = row.resource_id ? find.eq('resource_id', row.resource_id) : find.is('resource_id', null);
+        const { data: existing } = await find.maybeSingle();
+
+        const write = existing
+            ? await supabase.from('business_availability').update(row).eq('id', existing.id).select().single()
+            : await supabase.from('business_availability').insert(row).select().single();
+        if (write.error) return fail(res, 400, write.error.message);
+
+        res.json({ availability: write.data, created: !existing });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+router.delete('/availability/:id', adminRequired, async (req, res) => {
+    const { error, count } = await supabase
+        .from('business_availability')
+        .delete({ count: 'exact' })
+        .eq('id', req.params.id);
+    if (error) return fail(res, 400, error.message);
+    if (!count) return fail(res, 404, 'Availability row not found');
+    res.json({ success: true });
+});
+
+/* ── openings ────────────────────────────────────────────────────────── */
+//
+// The point of the whole parser pipeline: a boat that still has three seats
+// on Saturday is a thing you can sell today. This route is the outreach
+// worklist — near-term dates with spots left, each carrying the contact
+// details needed to send an email or an SMS about it, and whether a deal has
+// already been posted so nobody markets the same gap twice.
+
+router.get('/openings', adminRequired, async (req, res) => {
+    try {
+        const days = Math.min(Math.max(parseInt(req.query.days, 10) || 3, 1), 30);
+        const today = new Date().toISOString().slice(0, 10);
+        const from = req.query.from || today;
+        const to = req.query.to
+            || new Date(Date.parse(`${from}T00:00:00Z`) + (days - 1) * 86400000).toISOString().slice(0, 10);
+        // Only dates with SOME spots left are sellable; "full" and "blocked"
+        // are the opposite of an opening.
+        const threshold = Math.min(Math.max(parseInt(req.query.threshold, 10) || 5, 1), 100);
+
+        let query = supabase
+            .from('business_availability')
+            .select('*')
+            .gte('availability_date', from)
+            .lte('availability_date', to)
+            .gt('remaining_spots', 0)
+            .lte('remaining_spots', threshold)
+            .order('availability_date')
+            .order('remaining_spots')
+            .limit(limitOf(req, 300, 1000));
+        if (req.query.slug) query = query.eq('entity_slug', req.query.slug);
+
+        const { data, error } = await query;
+        if (error) return fail(res, 500, error.message);
+
+        const rows = data || [];
+        const slugs = [...new Set(rows.map((r) => r.entity_slug).filter(Boolean))];
+
+        // Contact details and any deal already live for the same (slug, date),
+        // both in one query each rather than per row.
+        const [entities, deals] = await Promise.all([
+            slugs.length
+                ? supabase.from('entity')
+                    .select('slug, name, entity_type, entity_subtype, phone, email, booking_url, hero_image_url, price_from, price_unit')
+                    .in('slug', slugs)
+                : { data: [] },
+            slugs.length
+                ? supabase.from('gcr_deals')
+                    .select('id, entity_slug, valid_date, headline, is_active, source, spots_remaining')
+                    .in('entity_slug', slugs)
+                    .gte('valid_date', from)
+                    .lte('valid_date', to)
+                : { data: [] },
+        ]);
+
+        const entityBySlug = Object.fromEntries((entities.data || []).map((e) => [e.slug, e]));
+        const dealKey = (slug, date) => `${slug}|${date}`;
+        const dealByKey = {};
+        for (const d of deals.data || []) {
+            // An inactive deal must not mask a gap that is open again.
+            if (d.is_active === false) continue;
+            dealByKey[dealKey(d.entity_slug, d.valid_date)] = d;
+        }
+
+        const openings = rows.map((r) => {
+            const e = entityBySlug[r.entity_slug] || {};
+            const deal = dealByKey[dealKey(r.entity_slug, r.availability_date)] || null;
+            return {
+                id: r.id,
+                entity_slug: r.entity_slug,
+                entity_name: e.name || null,
+                entity_type: e.entity_type || null,
+                entity_subtype: e.entity_subtype || null,
+                date: r.availability_date,
+                time_slot: r.time_slot,
+                remaining_spots: r.remaining_spots,
+                total_capacity: r.total_capacity,
+                booked_count: r.booked_count,
+                status: r.status,
+                source_platform: r.source_platform,
+                last_updated: r.last_updated,
+                // everything outreach needs, so the UI never has to fan out
+                phone: e.phone || null,
+                email: e.email || null,
+                booking_url: e.booking_url || null,
+                image_url: e.hero_image_url || null,
+                price_from: e.price_from ?? null,
+                price_unit: e.price_unit || null,
+                deal_posted: !!deal,
+                deal: deal ? { id: deal.id, headline: deal.headline, source: deal.source } : null,
+            };
+        });
+
+        res.json({
+            openings,
+            total: openings.length,
+            from,
+            to,
+            threshold,
+            unmarketed: openings.filter((o) => !o.deal_posted).length,
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── external calendars (iCal) ───────────────────────────────────────── */
+//
+// The second ingestion path alongside the email parser. A business pastes the
+// .ics export URL from Airbnb / VRBO / Google, a cron polls it hourly
+// (GET /api/email-parser/ical-import/run) and every date the feed claims gets
+// blocked here too. Owners manage their own feeds under /api/dashboard/ical/
+// external; this is the operator's view of every feed at once.
+
+const ICAL_FEED_FIELDS = ['entity_slug', 'source_label', 'provider', 'ical_url', 'resource_id'];
+
+router.get('/calendars', adminRequired, async (req, res) => {
+    try {
+        let query = supabase
+            .from('entity_external_calendars')
+            .select('id, entity_slug, source_label, provider, resource_id, ical_url, last_synced_at, last_sync_status, created_at')
+            .order('entity_slug')
+            .limit(limitOf(req, 500));
+        if (req.query.slug) query = query.eq('entity_slug', req.query.slug);
+        if (req.query.provider) query = query.eq('provider', req.query.provider);
+
+        const { data, error } = await query;
+        if (error) return fail(res, 500, error.message);
+
+        const rows = await withBusinessNames(data);
+        res.json({
+            calendars: rows,
+            total: rows.length,
+            // last_sync_status is free text written by the sync job; anything
+            // starting "error:" is a feed that needs attention.
+            failing: rows.filter((r) => (r.last_sync_status || '').startsWith('error')).length,
+            never_synced: rows.filter((r) => !r.last_synced_at).length,
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+router.post('/calendars', adminRequired, async (req, res) => {
+    const row = pick(req.body || {}, ICAL_FEED_FIELDS);
+    if (!row.entity_slug) return fail(res, 400, 'entity_slug is required');
+    if (!row.ical_url) return fail(res, 400, 'ical_url is required');
+    if (!/^https?:\/\//i.test(row.ical_url)) return fail(res, 400, 'ical_url must be an http(s) URL');
+    if (!row.source_label) row.source_label = 'External Calendar';
+
+    const { data, error } = await supabase.from('entity_external_calendars').insert(row).select().single();
+    if (error) return fail(res, 400, error.message);
+    res.status(201).json({ calendar: data });
+});
+
+router.patch('/calendars/:id', adminRequired, async (req, res) => {
+    const row = pick(req.body || {}, ICAL_FEED_FIELDS.filter((f) => f !== 'entity_slug'));
+    if (Object.keys(row).length === 0) return fail(res, 400, 'Nothing to update');
+    if (row.ical_url && !/^https?:\/\//i.test(row.ical_url)) {
+        return fail(res, 400, 'ical_url must be an http(s) URL');
+    }
+
+    const { data, error } = await supabase
+        .from('entity_external_calendars')
+        .update(row)
+        .eq('id', req.params.id)
+        .select();
+    if (error) return fail(res, 400, error.message);
+    if (!data || !data.length) return fail(res, 404, 'Calendar not found');
+    res.json({ calendar: data[0] });
+});
+
+router.delete('/calendars/:id', adminRequired, async (req, res) => {
+    const { data: row } = await supabase
+        .from('entity_external_calendars')
+        .select('id, entity_slug')
+        .eq('id', req.params.id)
+        .maybeSingle();
+    if (!row) return fail(res, 404, 'Calendar not found');
+
+    const { error } = await supabase.from('entity_external_calendars').delete().eq('id', row.id);
+    if (error) return fail(res, 400, error.message);
+
+    // Free the dates this feed had claimed, exactly as the owner-side delete
+    // does — a removed feed must not leave dates blocked forever.
+    await supabase.from('booking_calendar')
+        .delete()
+        .eq('entity_slug', row.entity_slug)
+        .eq('source', 'ical:' + row.id);
+
+    res.json({ success: true });
+});
+
+// Sync one feed now. routes/email-parser.js owns the sync; it is required
+// lazily and in-process, so a fault in that module can't take this router
+// down at boot and there is no HTTP hop back to ourselves.
+router.post('/calendars/:id/sync', adminRequired, async (req, res) => {
+    try {
+        const { data: row } = await supabase
+            .from('entity_external_calendars')
+            .select('*')
+            .eq('id', req.params.id)
+            .maybeSingle();
+        if (!row) return fail(res, 404, 'Calendar not found');
+
+        let sync;
+        try {
+            ({ syncExternalCalendar: sync } = require('./email-parser'));
+        } catch (err) {
+            return fail(res, 503, 'Calendar sync unavailable: ' + err.message);
+        }
+        if (typeof sync !== 'function') return fail(res, 503, 'Calendar sync unavailable');
+
+        await sync(row);
+
+        const { data: after } = await supabase
+            .from('entity_external_calendars')
+            .select('id, last_synced_at, last_sync_status')
+            .eq('id', row.id)
+            .maybeSingle();
+        res.json({ success: true, calendar: after || null });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── deals ───────────────────────────────────────────────────────────── */
+//
+// gcr_deals is the outbound side: the parser auto-posts one when a date drops
+// to a handful of spots (source 'email_parser'), the manual availability
+// editor posts one too ('availability_sync'), and an operator can write one by
+// hand. The dashboard needs to see and retire them, which nothing exposed.
+
+const DEAL_FIELDS = [
+    'entity_slug', 'entity_name', 'deal_type', 'headline', 'description',
+    'deal_price', 'original_price', 'price_unit', 'valid_date',
+    'valid_start_time', 'expires_at', 'is_today_only', 'spots_total',
+    'spots_remaining', 'claim_type', 'claim_url', 'claim_phone', 'is_active',
+    'is_featured', 'promoted_feed', 'promoted_sms', 'swipe_card', 'image_url',
+];
+
+router.get('/deals', adminRequired, async (req, res) => {
+    try {
+        let query = supabase
+            .from('gcr_deals')
+            .select('*')
+            .order('valid_date', { ascending: false })
+            .limit(limitOf(req, 300));
+
+        if (req.query.slug) query = query.eq('entity_slug', req.query.slug);
+        if (req.query.source) query = query.eq('source', req.query.source);
+        if (req.query.active === 'true') query = query.eq('is_active', true);
+        if (req.query.active === 'false') query = query.eq('is_active', false);
+        if (req.query.from) query = query.gte('valid_date', req.query.from);
+        if (req.query.to) query = query.lte('valid_date', req.query.to);
+
+        const { data, error } = await query;
+        if (error) return fail(res, 500, error.message);
+        res.json({ deals: data || [], total: (data || []).length });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+router.post('/deals', adminRequired, async (req, res) => {
+    const row = pick(req.body || {}, DEAL_FIELDS);
+    if (!row.entity_slug) return fail(res, 400, 'entity_slug is required');
+    if (!row.headline) return fail(res, 400, 'headline is required');
+    if (row.is_active === undefined) row.is_active = true;
+    if (!row.deal_type) row.deal_type = 'last_minute';
+    // 'admin' marks it as hand-written, so the auto-deal upserts (which key on
+    // source) never overwrite or deactivate it.
+    row.source = 'admin';
+    row.posted_by = 'admin';
+    row.created_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from('gcr_deals').insert(row).select().single();
+    if (error) return fail(res, 400, error.message);
+    res.status(201).json({ deal: data });
+});
+
+router.patch('/deals/:id', adminRequired, async (req, res) => {
+    const row = pick(req.body || {}, DEAL_FIELDS.filter((f) => f !== 'entity_slug'));
+    if (Object.keys(row).length === 0) return fail(res, 400, 'Nothing to update');
+    row.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from('gcr_deals').update(row).eq('id', req.params.id).select();
+    if (error) return fail(res, 400, error.message);
+    if (!data || !data.length) return fail(res, 404, 'Deal not found');
+    res.json({ deal: data[0] });
+});
+
+router.delete('/deals/:id', adminRequired, async (req, res) => {
+    const { error, count } = await supabase
+        .from('gcr_deals')
+        .delete({ count: 'exact' })
+        .eq('id', req.params.id);
+    if (error) return fail(res, 400, error.message);
+    if (!count) return fail(res, 404, 'Deal not found');
+    res.json({ success: true });
+});
+
 /* ── summary ─────────────────────────────────────────────────────────── */
 //
 // One call for the dashboard's headline numbers, so it doesn't need six.

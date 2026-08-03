@@ -1462,3 +1462,6 @@ router.post('/ical-import/sync-now/:id', async (req, res) => {
 
 module.exports = router;
 module.exports.EXTRACTORS = EXTRACTORS;
+// Exported so the admin router can trigger a sync in-process instead of
+// making an HTTP call back to this same server. Behaviour is unchanged.
+module.exports.syncExternalCalendar = syncExternalCalendar;
