@@ -1107,6 +1107,200 @@ router.delete('/deals/:id', adminRequired, async (req, res) => {
     res.json({ success: true });
 });
 
+/* ── cross-board availability search ─────────────────────────────────── */
+//
+// "Pick a date. Show me everything open on it, in every industry."
+//
+// This is the operator's version of the tourist-facing
+// POST /api/gcr/availability-search. Three differences, and each of them is
+// the reason this route exists rather than reusing that one:
+//
+//   1. It returns businesses with NO availability data too, labelled as such.
+//      A tourist doesn't want those; an operator very much does — a business
+//      sending nothing is the thing to go chase.
+//   2. It rolls units up to their complex. A condo building is one `entity`
+//      with child entities hanging off `parent_entity_slug`, and "what does
+//      this complex have free on the 15th" is a question about the children.
+//   3. It reads rows a business has hidden from its public profile
+//      (`visible_on_profile = false`), because the operator is not the public.
+//
+// The three-source merge itself lives in routes/availability-engine.js and is
+// shared with the embed widget, so the calendar on a business's own website
+// and this screen can never disagree.
+
+const AVAIL = require('./availability-engine');
+
+router.get('/verticals', adminRequired, (_req, res) => {
+    res.json({
+        verticals: AVAIL.VERTICAL_PATTERNS.map((v) => ({
+            id: v.id,
+            label: v.label,
+            default_coverage: v.coverage,
+        })).concat([{ id: 'other', label: 'Everything else', default_coverage: 'any' }]),
+        stay_types: AVAIL.STAY_TYPES,
+    });
+});
+
+router.get('/search', adminRequired, async (req, res) => {
+    try {
+        const from = String(req.query.from || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) return fail(res, 400, 'from is required (YYYY-MM-DD)');
+        const to = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.to || '')) ? String(req.query.to) : from;
+        if (to < from) return fail(res, 400, 'to must not be before from');
+
+        const requestedDates = AVAIL.datesBetween(from, to, 120);
+        const vertical = req.query.vertical && req.query.vertical !== 'all' ? String(req.query.vertical) : null;
+        // Explicit coverage wins; otherwise the vertical decides, and a
+        // mixed search falls back to "any open day", which is the only
+        // sane default when stays and charters are in the same result set.
+        const coverage = req.query.coverage === 'all' || req.query.coverage === 'any'
+            ? req.query.coverage
+            : (vertical ? AVAIL.coverageFor(vertical) : 'any');
+
+        let entityQuery = supabase
+            .from('entity')
+            .select('slug, name, entity_type, entity_subtype, city, phone, email, hero_image_url, booking_url, rating, price_from, price_unit, daily_capacity, capacity_per_slot, parent_slug:parent_entity_slug, is_active')
+            .eq('is_active', true)
+            .limit(limitOf(req, 1000, 4000));
+
+        if (req.query.slug) entityQuery = entityQuery.eq('slug', req.query.slug);
+        if (req.query.city) entityQuery = entityQuery.eq('city', req.query.city);
+        if (req.query.type) entityQuery = entityQuery.eq('entity_type', req.query.type);
+        if (req.query.q) {
+            const q = String(req.query.q).replace(/[%,()]/g, '');
+            entityQuery = entityQuery.or(`name.ilike.%${q}%,entity_subtype.ilike.%${q}%,city.ilike.%${q}%`);
+        }
+
+        const { data: entities, error } = await entityQuery;
+        if (error) return fail(res, 500, error.message);
+
+        const all = entities || [];
+        const byVertical = new Map(all.map((e) => [e.slug, AVAIL.verticalOf(e)]));
+        const scoped = vertical ? all.filter((e) => byVertical.get(e.slug) === vertical) : all;
+
+        // Children are read even when the vertical filter excluded them, so a
+        // complex can still report what its units have free.
+        const scopedSlugs = new Set(scoped.map((e) => e.slug));
+        const childrenOf = new Map();
+        for (const e of all) {
+            if (!e.parent_slug || !scopedSlugs.has(e.parent_slug)) continue;
+            if (!childrenOf.has(e.parent_slug)) childrenOf.set(e.parent_slug, []);
+            childrenOf.get(e.parent_slug).push(e);
+        }
+
+        const needed = new Set(scoped.map((e) => e.slug));
+        for (const kids of childrenOf.values()) for (const k of kids) needed.add(k.slug);
+
+        const availability = await AVAIL.readAvailability({
+            from,
+            to,
+            slugs: [...needed],
+            publicOnly: false,
+        });
+
+        const shape = (e) => {
+            // Unclaimed dates count as open when we know a capacity, unknown
+            // when we don't — a row only exists once something takes a date.
+            // A condo unit is one unit whether or not anyone set the number.
+            const isUnit = !!e.parent_slug && AVAIL.STAY_TYPES.includes(String(e.entity_type || '').toLowerCase());
+            const fallback = e.daily_capacity ?? (isUnit ? 1 : null);
+            const summary = AVAIL.summarise(availability.get(e.slug), requestedDates, coverage, fallback);
+            return {
+                entity_slug: e.slug,
+                entity_name: e.name,
+                entity_type: e.entity_type,
+                entity_subtype: e.entity_subtype,
+                vertical: byVertical.get(e.slug) || AVAIL.verticalOf(e),
+                city: e.city,
+                phone: e.phone,
+                email: e.email,
+                image_url: e.hero_image_url,
+                booking_url: e.booking_url,
+                rating: e.rating,
+                price_from: e.price_from,
+                price_unit: e.price_unit,
+                daily_capacity: e.daily_capacity ?? null,
+                parent_slug: e.parent_slug || null,
+                ...summary,
+            };
+        };
+
+        const results = scoped.map((e) => {
+            const row = shape(e);
+            const kids = childrenOf.get(e.slug) || [];
+            if (kids.length) {
+                row.units = kids.map(shape).sort((a, b) => (a.entity_name || '').localeCompare(b.entity_name || ''));
+                row.unit_count = row.units.length;
+                row.units_available = row.units.filter((u) => u.meets_coverage).length;
+                // A complex is bookable if the building itself is, OR if any
+                // of its units is. Rolling up matters because the parent
+                // usually carries no availability of its own — the inventory
+                // lives entirely on the children.
+                if (row.units_available > 0) {
+                    row.meets_coverage = true;
+                    row.has_data = true;
+                    const unitDates = new Set();
+                    for (const u of row.units) for (const d of u.available_dates) unitDates.add(d);
+                    row.available_dates = [...unitDates].sort();
+                    row.open_days = row.available_dates.length;
+                    row.covers_all_days = requestedDates.every((d) => unitDates.has(d));
+                }
+            }
+            return row;
+        });
+
+        // A unit already appears nested under its complex, so listing it at the
+        // top level too doubles every building in the results. Flat listing is
+        // still available for "show me every individual condo on the 15th".
+        const parentsShown = new Set(results.filter((r) => (r.unit_count || 0) > 0).map((r) => r.entity_slug));
+        const includeUnits = req.query.include_units === 'true';
+        const deduped = includeUnits
+            ? results
+            : results.filter((r) => !r.parent_slug || !parentsShown.has(r.parent_slug));
+
+        const onlyAvailable = req.query.only_available === 'true';
+        const visible = onlyAvailable ? deduped.filter((r) => r.meets_coverage) : deduped;
+
+        // Rank: actually open first, then the ones we can at least reach, then
+        // rating. A business with no data is not "unavailable" — it is
+        // unknown, and it sorts last so it never masks a real opening.
+        visible.sort((a, b) => {
+            const rank = (r) => (r.meets_coverage ? 2 : r.has_data ? 1 : 0);
+            if (rank(b) !== rank(a)) return rank(b) - rank(a);
+            return (b.rating || 0) - (a.rating || 0);
+        });
+
+        const counts = {};
+        for (const r of deduped) {
+            const v = r.vertical;
+            if (!counts[v]) counts[v] = { vertical: v, total: 0, available: 0, no_data: 0 };
+            counts[v].total += 1;
+            if (r.meets_coverage) counts[v].available += 1;
+            if (!r.has_data) counts[v].no_data += 1;
+        }
+
+        res.json({
+            from,
+            to,
+            dates: requestedDates,
+            coverage,
+            vertical: vertical || 'all',
+            results: visible,
+            total: visible.length,
+            searched: deduped.length,
+            available: deduped.filter((r) => r.meets_coverage).length,
+            no_data: deduped.filter((r) => !r.has_data).length,
+            // Businesses that came back "available" only because a capacity
+            // number let us assume the unclaimed dates were free — nothing has
+            // actually confirmed them.
+            assumed_only: deduped.filter((r) => r.meets_coverage && !r.has_data).length,
+            by_vertical: Object.values(counts).sort((a, b) => b.available - a.available),
+        });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
 /* ── summary ─────────────────────────────────────────────────────────── */
 //
 // One call for the dashboard's headline numbers, so it doesn't need six.

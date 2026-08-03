@@ -71,6 +71,12 @@ mount('/api/admin/connections', () => require('./routes/composio'));
 // so these paths are additive and nothing in admin.js is shadowed.
 mount('/api/admin', () => require('./routes/admin-settings'));
 
+// The embeddable availability calendar a business drops into its own website,
+// plus the JSON it reads. Public and unauthenticated by design — it runs on
+// anonymous visitors' browsers on other people's domains — and returns only
+// counts and statuses, never a guest, an email or a booking row.
+mount('/api/embed', () => require('./routes/embed'));
+
 // Apps & Modules
 mount('/api/apps', () => require('./routes/apps'));
 //mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
