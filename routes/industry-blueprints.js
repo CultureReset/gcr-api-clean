@@ -1,393 +1,596 @@
 // ============================================================
-// INDUSTRY BLUEPRINTS — what each kind of business would store
+// INDUSTRY BLUEPRINTS — a map over the real tables
 // ============================================================
 //
-// The question this answers: if you rebuilt Airbnb, or FareHarbor, or Peek
-// Pro from scratch, what would a listing actually hold? Not the booking
-// engine — that already exists here — but the DESCRIPTION. The fields a guest
-// searches on:
+// The tables are in sql/industry_tables.sql: `stay_units` with a `bedrooms`
+// integer, `charter_boats` with a `length_ft` numeric, `venue_spaces` with a
+// `seated_capacity` integer. Real columns, real types, real indexes, real
+// foreign keys. Nothing is stored as a key/value pair and nothing is stored
+// as JSON.
 //
-//   "a two bedroom two bath at Phoenix East on these dates"
-//   "a charter for eight people, at least eight hours, a 45ft boat with AC
-//    and a head"
+// This file does NOT store anything. It describes those tables so that:
 //
-// Neither question can be answered from `entity` as it stands, because those
-// are attributes of a specific unit or a specific boat and nothing stores
-// them. This file is that missing half.
+//   * the dashboard can build a form from them without a second, hand-kept
+//     field list that drifts out of step with the schema,
+//   * the match search knows which column to compare and whether the guest
+//     means "at least" or "at most",
+//   * a write can be checked against the columns that actually exist before
+//     it reaches the database.
 //
-// ── Why a blueprint and one table, rather than eight tables ─────────────
+// So: schema in SQL, description here, and the two are checked against each
+// other by scripts/check-blueprint-columns.mjs.
 //
-// A `condo_units` table, a `charter_boats` table, a `cruise_vessels` table
-// and five more would each need a migration every time a field is added, and
-// a bespoke search per vertical. What actually varies between industries is
-// the FIELD LIST, not the shape of storage — every one of them is
-// (this listing, this attribute, this value).
+// ── Shape ───────────────────────────────────────────────────────────────
 //
-// So: the field list lives here as data, the values live in one
-// `entity_attributes` table, and one search route serves every industry. A
-// new field is an entry in this file. A new industry is an entry in this
-// file. Neither is a migration.
+//   listing      the table keyed to the business itself. For a condo complex
+//                that is the building — pool, lazy river, floors, front desk.
+//   unit         the table keyed to each bookable child. For a condo that is
+//                the unit — bedrooms, bathrooms, view. This is what guests
+//                actually search, and it is why units are separate entities.
+//   collections  one-to-many rows hanging off either: beds in a unit, trips a
+//                charter runs, packages a photographer sells.
+//   amenities    which join table connects this thing to the shared catalog.
+//   tags         a controlled vocabulary join — species, activities — kept as
+//                a catalog and a join rather than free text, so "who targets
+//                red snapper" is an index lookup.
 //
-// Nothing here is invented from nothing — the field lists follow what the
-// real platforms collect, so a business that already fills in an Airbnb or
-// FareHarbor listing can transcribe it without inventing answers.
+// ── Column descriptor ───────────────────────────────────────────────────
 //
-// ── Field descriptor ────────────────────────────────────────────────────
-//
-//   key         stable identifier, snake_case; never renamed once shipped
-//   label       what a human sees
-//   type        'number' | 'text' | 'bool' | 'select' | 'multi' | 'time'
-//   unit        'ft' | 'hours' | 'people' | … shown after the value
-//   options     for select/multi
-//   group       which section of the form it belongs in
-//   search      how a guest filters on it:
-//                 'min'    guest asks for at least this  (bedrooms >= 2)
-//                 'max'    guest asks for at most this   (price <= 400)
-//                 'eq'     exact match                   (unit_number)
-//                 'has'    must be present/true          (has_ac)
-//                 'any'    value must be one of a list   (species)
-//                 null     stored and shown, not filtered on
-//   applies     'listing' (the business) | 'unit' (each bookable thing)
-//
-// `applies: 'unit'` is the important one: bedrooms belong to condo 1204, not
-// to the Phoenix West building, and boat length belongs to the boat, not to
-// the charter company. Those are child entities, and that is why they get
-// their own attribute rows.
+//   label     what a human sees
+//   type      'int' | 'decimal' | 'text' | 'bool' | 'time' | 'enum'
+//   search    'min' | 'max' | 'eq' | 'has' | 'any' | null
+//               min  guest asks for at least this   (bedrooms >= 2)
+//               max  guest asks for at most this    (nightly_rate <= 400)
+//               eq   exact match
+//               has  must be true                   (has_ac)
+//               any  one of a list                  (view in (...))
+//               null stored and shown, never filtered on
+//   options   for enum
+//   group     which fieldset it belongs in
+//   unit      shown after the value: ft, hours, people, $
 
-const N = (key, label, extra = {}) => ({ key, label, type: 'number', ...extra });
-const T = (key, label, extra = {}) => ({ key, label, type: 'text', ...extra });
-const B = (key, label, extra = {}) => ({ key, label, type: 'bool', search: 'has', ...extra });
-const S = (key, label, options, extra = {}) => ({ key, label, type: 'select', options, ...extra });
-const M = (key, label, options, extra = {}) => ({ key, label, type: 'multi', options, search: 'any', ...extra });
-
-/* ── shared vocabularies ─────────────────────────────────────────────── */
+const int = (label, extra = {}) => ({ label, type: 'int', ...extra });
+const dec = (label, extra = {}) => ({ label, type: 'decimal', ...extra });
+const txt = (label, extra = {}) => ({ label, type: 'text', ...extra });
+const bool = (label, extra = {}) => ({ label, type: 'bool', search: 'has', ...extra });
+const time = (label, extra = {}) => ({ label, type: 'time', ...extra });
+const en = (label, options, extra = {}) => ({ label, type: 'enum', options, search: 'any', ...extra });
 
 const CANCELLATION = ['flexible', 'moderate', 'strict', 'non_refundable'];
-const BED_TYPES = ['king', 'queen', 'full', 'twin', 'bunk', 'sofa_bed', 'murphy'];
 
-/* ── stays: condos, vacation rentals, hotels ─────────────────────────── */
-//
-// What Airbnb, VRBO and Booking.com collect. The unit-level fields are the
-// ones a guest actually searches — "2 bed 2 bath, sleeps 8, gulf front".
+/* ══ stays ═══════════════════════════════════════════════════════════════ */
 
-const STAY_UNIT_FIELDS = [
-    N('bedrooms', 'Bedrooms', { search: 'min', group: 'Layout', required: true }),
-    N('bathrooms', 'Bathrooms', { search: 'min', group: 'Layout', step: 0.5, required: true }),
-    N('sleeps', 'Sleeps', { search: 'min', group: 'Layout', unit: 'people', required: true }),
-    N('square_feet', 'Square feet', { search: 'min', group: 'Layout', unit: 'sq ft' }),
-    T('unit_number', 'Unit number', { search: 'eq', group: 'Layout' }),
-    N('floor', 'Floor', { search: 'min', group: 'Layout' }),
-    M('bed_types', 'Beds', BED_TYPES, { group: 'Layout' }),
+const STAY_PROPERTY = {
+    table: 'stay_properties',
+    key: 'entity_slug',
+    label: 'The property',
+    amenities: { join: 'stay_property_amenities', fk: 'property_id' },
+    columns: {
+        property_type: en('Property type', ['condo_complex', 'hotel', 'resort', 'house', 'duplex'], { group: 'The property' }),
+        total_units: int('Units in the building', { group: 'The property' }),
+        floors: int('Floors', { group: 'The property' }),
+        year_built: int('Year built', { group: 'The property' }),
+        renovated_year: int('Last renovated', { group: 'The property' }),
 
-    S('view', 'View', ['gulf_front', 'gulf_view', 'side_gulf', 'bay', 'lagoon', 'pool', 'parking', 'none'],
-        { search: 'any', group: 'The place' }),
-    B('balcony', 'Balcony', { group: 'The place' }),
-    B('elevator', 'Elevator', { group: 'The place' }),
-    B('ground_floor', 'Ground floor', { group: 'The place' }),
+        beachfront: bool('Beachfront', { group: 'Location' }),
+        distance_to_beach_ft: int('Distance to the beach', { search: 'max', group: 'Location', unit: 'ft' }),
+        distance_to_airport_mi: dec('Distance to the airport', { search: 'max', group: 'Location', unit: 'mi' }),
 
-    B('pet_friendly', 'Pets allowed', { group: 'Rules' }),
-    B('smoking_allowed', 'Smoking allowed', { group: 'Rules' }),
-    N('min_nights', 'Minimum nights', { search: 'max', group: 'Rules', unit: 'nights' }),
-    N('max_guests', 'Maximum guests', { search: 'min', group: 'Rules', unit: 'people' }),
-    T('check_in_time', 'Check-in', { type: 'time', group: 'Rules' }),
-    T('check_out_time', 'Check-out', { type: 'time', group: 'Rules' }),
-    S('cancellation', 'Cancellation', CANCELLATION, { group: 'Rules' }),
+        front_desk_24h: bool('Front desk 24/7', { group: 'Service' }),
+        housekeeping_daily: bool('Daily housekeeping', { group: 'Service' }),
+        security_onsite: bool('Security on site', { group: 'Service' }),
+        gated: bool('Gated', { group: 'Service' }),
 
-    N('nightly_rate', 'Nightly rate', { search: 'max', group: 'Money', unit: '$' }),
-    N('cleaning_fee', 'Cleaning fee', { group: 'Money', unit: '$' }),
-    N('deposit', 'Deposit', { group: 'Money', unit: '$' }),
+        check_in_time: time('Check-in', { group: 'Arrival' }),
+        check_out_time: time('Check-out', { group: 'Arrival' }),
+        parking_type: en('Parking', ['covered', 'surface', 'garage', 'street', 'none'], { group: 'Arrival' }),
+        parking_spaces_per_unit: dec('Spaces per unit', { search: 'min', group: 'Arrival' }),
+        parking_notes: txt('Parking notes', { group: 'Arrival' }),
 
-    M('amenities', 'Amenities', [
-        'wifi', 'air_conditioning', 'washer', 'dryer', 'dishwasher', 'full_kitchen',
-        'kitchenette', 'coffee_maker', 'grill', 'private_pool', 'hot_tub', 'crib',
-        'high_chair', 'beach_chairs', 'beach_service', 'linens', 'tv', 'workspace',
-    ], { group: 'Amenities' }),
-];
-
-const STAY_LISTING_FIELDS = [
-    N('total_units', 'Units in the building', { group: 'The property' }),
-    N('floors', 'Floors', { group: 'The property' }),
-    N('year_built', 'Year built', { group: 'The property' }),
-    N('distance_to_beach', 'Distance to the beach', { search: 'max', group: 'The property', unit: 'ft' }),
-    B('beachfront', 'Beachfront', { group: 'The property' }),
-
-    M('property_amenities', 'Property amenities', [
-        'outdoor_pool', 'indoor_pool', 'heated_pool', 'lazy_river', 'hot_tub',
-        'fitness_center', 'sauna', 'tennis', 'pickleball', 'boat_slips', 'gated',
-        'covered_parking', 'ev_charging', 'elevator', 'onsite_restaurant', 'bar',
-        'beach_service', 'game_room', 'grills', 'conference_room',
-    ], { group: 'Property amenities' }),
-
-    B('front_desk_24h', 'Front desk 24/7', { group: 'Service' }),
-    B('housekeeping_daily', 'Daily housekeeping', { group: 'Service' }),
-    T('parking_notes', 'Parking', { group: 'Service' }),
-];
-
-/* ── fishing charters ────────────────────────────────────────────────── */
-//
-// FareHarbor and Peek Pro shape. Boat-level fields sit on the boat, because
-// "a 45ft boat with AC and a head" is a question about a specific vessel and
-// a marina may run six of them.
-
-const CHARTER_UNIT_FIELDS = [
-    N('boat_length', 'Boat length', { search: 'min', group: 'The boat', unit: 'ft', required: true }),
-    T('boat_name', 'Boat name', { group: 'The boat' }),
-    T('boat_make', 'Make & model', { group: 'The boat' }),
-    N('boat_year', 'Year', { group: 'The boat' }),
-    N('max_anglers', 'Maximum anglers', { search: 'min', group: 'The boat', unit: 'people', required: true }),
-    N('cruising_speed', 'Cruising speed', { group: 'The boat', unit: 'kn' }),
-    N('engines', 'Engines', { group: 'The boat' }),
-
-    // The three questions every caller asks, in the order they ask them.
-    B('has_head', 'Has a head (toilet)', { group: 'Comfort' }),
-    B('has_ac', 'Air conditioning', { group: 'Comfort' }),
-    B('has_cabin', 'Enclosed cabin', { group: 'Comfort' }),
-    B('has_shade', 'Shade / T-top', { group: 'Comfort' }),
-    B('has_livewell', 'Livewell', { group: 'Fishing' }),
-    B('has_fishfinder', 'Fish finder / sonar', { group: 'Fishing' }),
-    B('has_outriggers', 'Outriggers', { group: 'Fishing' }),
-];
-
-const CHARTER_LISTING_FIELDS = [
-    M('trip_lengths', 'Trip lengths offered', [
-        '2_hour', '4_hour', '6_hour', '8_hour', '10_hour', '12_hour', 'overnight', 'multi_day',
-    ], { group: 'Trips', required: true }),
-    M('trip_types', 'Trip types', [
-        'inshore', 'nearshore', 'offshore', 'deep_sea', 'bottom_fishing', 'trolling',
-        'fly_fishing', 'shark', 'night_fishing', 'family', 'tournament',
-    ], { group: 'Trips' }),
-    M('species', 'Target species', [
-        'red_snapper', 'grouper', 'amberjack', 'king_mackerel', 'spanish_mackerel',
-        'cobia', 'tuna', 'mahi', 'wahoo', 'marlin', 'sailfish', 'redfish',
-        'speckled_trout', 'flounder', 'shark', 'triggerfish', 'tarpon',
-    ], { group: 'Trips' }),
-    M('seasons', 'Seasons', ['spring', 'summer', 'fall', 'winter', 'year_round'], { group: 'Trips' }),
-
-    B('license_included', 'Fishing license included', { group: 'Included' }),
-    B('gear_included', 'Rods & tackle included', { group: 'Included' }),
-    B('bait_included', 'Bait included', { group: 'Included' }),
-    B('cleaning_included', 'Fish cleaning included', { group: 'Included' }),
-    B('ice_included', 'Ice included', { group: 'Included' }),
-    B('byob_allowed', 'BYOB allowed', { group: 'Included' }),
-
-    N('captains', 'Captains', { group: 'Crew' }),
-    N('deckhands', 'Deckhands', { group: 'Crew' }),
-    B('uscg_licensed', 'USCG licensed', { group: 'Crew' }),
-    B('insured', 'Insured', { group: 'Crew' }),
-
-    N('price_per_person', 'Price per person', { search: 'max', group: 'Money', unit: '$' }),
-    N('private_charter_price', 'Private charter', { search: 'max', group: 'Money', unit: '$' }),
-    N('deposit_percent', 'Deposit', { group: 'Money', unit: '%' }),
-    S('cancellation', 'Cancellation', CANCELLATION, { group: 'Money' }),
-
-    T('marina', 'Departs from', { group: 'Logistics' }),
-    T('dock_number', 'Dock / slip', { group: 'Logistics' }),
-    M('departure_times', 'Departure times', ['dawn', 'morning', 'midday', 'afternoon', 'sunset', 'night'],
-        { group: 'Logistics' }),
-];
-
-/* ── cruises & tours ─────────────────────────────────────────────────── */
-
-const CRUISE_UNIT_FIELDS = [
-    N('vessel_length', 'Vessel length', { search: 'min', group: 'The vessel', unit: 'ft' }),
-    T('vessel_name', 'Vessel name', { group: 'The vessel' }),
-    N('passenger_capacity', 'Passenger capacity', { search: 'min', group: 'The vessel', unit: 'people', required: true }),
-    B('has_restroom', 'Restroom on board', { group: 'The vessel' }),
-    B('has_bar', 'Bar on board', { group: 'The vessel' }),
-    B('covered_seating', 'Covered seating', { group: 'The vessel' }),
-    B('wheelchair_accessible', 'Wheelchair accessible', { group: 'The vessel' }),
-];
-
-const CRUISE_LISTING_FIELDS = [
-    M('cruise_types', 'Cruise types', [
-        'dolphin', 'sunset', 'sightseeing', 'dinner', 'party', 'private', 'fireworks',
-        'eco_tour', 'island_hop', 'snorkel_stop',
-    ], { group: 'Cruises', required: true }),
-    N('duration_hours', 'Duration', { search: 'min', group: 'Cruises', unit: 'hours', step: 0.5 }),
-    M('departure_times', 'Departure times', ['morning', 'midday', 'afternoon', 'sunset', 'evening'],
-        { group: 'Cruises' }),
-    B('narrated', 'Narrated', { group: 'Cruises' }),
-    B('dolphin_guarantee', 'Dolphin sighting guarantee', { group: 'Cruises' }),
-
-    N('adult_price', 'Adult price', { search: 'max', group: 'Money', unit: '$' }),
-    N('child_price', 'Child price', { search: 'max', group: 'Money', unit: '$' }),
-    N('min_age', 'Minimum age', { search: 'max', group: 'Rules' }),
-    B('alcohol_allowed', 'Alcohol allowed', { group: 'Rules' }),
-    B('pets_allowed', 'Pets allowed', { group: 'Rules' }),
-    T('departure_point', 'Departs from', { group: 'Logistics' }),
-];
-
-/* ── watersports & parasailing ───────────────────────────────────────── */
-
-const WATERSPORT_LISTING_FIELDS = [
-    M('activities', 'Activities', [
-        'parasailing', 'jet_ski', 'wave_runner', 'banana_boat', 'tubing', 'kayak',
-        'paddleboard', 'snorkel', 'scuba', 'wakeboard', 'water_ski', 'flyboard',
-    ], { group: 'Activities', required: true }),
-    N('max_flight_height', 'Maximum flight height', { search: 'min', group: 'Activities', unit: 'ft' }),
-    N('riders_per_flight', 'Riders per flight', { search: 'min', group: 'Activities', unit: 'people' }),
-    N('min_weight', 'Minimum weight', { group: 'Rules', unit: 'lb' }),
-    N('max_weight', 'Maximum weight', { search: 'min', group: 'Rules', unit: 'lb' }),
-    N('min_age', 'Minimum age', { search: 'max', group: 'Rules' }),
-    B('instruction_included', 'Instruction included', { group: 'Included' }),
-    B('gear_included', 'Gear included', { group: 'Included' }),
-    B('photos_included', 'Photos included', { group: 'Included' }),
-    B('observers_allowed', 'Observers can ride along', { group: 'Rules' }),
-    N('price_per_person', 'Price per person', { search: 'max', group: 'Money', unit: '$' }),
-];
-
-/* ── boat & gear rentals ─────────────────────────────────────────────── */
-
-const RENTAL_UNIT_FIELDS = [
-    S('rental_type', 'Type', ['pontoon', 'deck_boat', 'center_console', 'jet_ski', 'kayak',
-        'paddleboard', 'golf_cart', 'bike', 'beach_gear'], { search: 'any', group: 'The item', required: true }),
-    T('model', 'Make & model', { group: 'The item' }),
-    N('year', 'Year', { group: 'The item' }),
-    N('length', 'Length', { search: 'min', group: 'The item', unit: 'ft' }),
-    N('capacity', 'Capacity', { search: 'min', group: 'The item', unit: 'people', required: true }),
-    N('horsepower', 'Horsepower', { search: 'min', group: 'The item', unit: 'hp' }),
-    B('has_bimini', 'Bimini / shade', { group: 'The item' }),
-    B('has_stereo', 'Stereo', { group: 'The item' }),
-    B('has_cooler', 'Cooler included', { group: 'The item' }),
-    B('has_restroom', 'Restroom', { group: 'The item' }),
-];
-
-const RENTAL_LISTING_FIELDS = [
-    M('rental_periods', 'Rental periods', ['hourly', 'half_day', 'full_day', 'multi_day', 'weekly'],
-        { group: 'Terms', required: true }),
-    B('license_required', 'Boating licence required', { group: 'Terms' }),
-    N('min_age', 'Minimum age to rent', { search: 'max', group: 'Terms' }),
-    B('captain_available', 'Captain available', { group: 'Terms' }),
-    B('delivery_available', 'Delivered to you', { group: 'Terms' }),
-    B('fuel_included', 'Fuel included', { group: 'Terms' }),
-    N('security_deposit', 'Security deposit', { group: 'Money', unit: '$' }),
-    N('half_day_price', 'Half day', { search: 'max', group: 'Money', unit: '$' }),
-    N('full_day_price', 'Full day', { search: 'max', group: 'Money', unit: '$' }),
-    T('pickup_location', 'Pick-up location', { group: 'Logistics' }),
-];
-
-/* ── photographers & sessions ────────────────────────────────────────── */
-
-const SESSION_LISTING_FIELDS = [
-    M('session_types', 'Session types', [
-        'family', 'engagement', 'wedding', 'elopement', 'maternity', 'newborn',
-        'senior', 'headshot', 'event', 'real_estate', 'drone', 'product',
-    ], { group: 'Sessions', required: true }),
-    N('session_length', 'Session length', { search: 'min', group: 'Sessions', unit: 'minutes' }),
-    N('edited_images', 'Edited images included', { search: 'min', group: 'Sessions' }),
-    N('turnaround_days', 'Turnaround', { search: 'max', group: 'Sessions', unit: 'days' }),
-    N('max_people', 'Maximum people', { search: 'min', group: 'Sessions', unit: 'people' }),
-
-    M('locations', 'Locations', ['beach', 'studio', 'venue', 'home', 'travel'], { search: 'any', group: 'Where' }),
-    B('travels_to_you', 'Travels to you', { group: 'Where' }),
-    N('travel_radius', 'Travel radius', { search: 'min', group: 'Where', unit: 'miles' }),
-
-    B('prints_available', 'Prints available', { group: 'Included' }),
-    B('digital_included', 'Digital files included', { group: 'Included' }),
-    B('raw_available', 'RAW files available', { group: 'Included' }),
-    B('second_shooter', 'Second shooter available', { group: 'Included' }),
-
-    N('session_price', 'Session price', { search: 'max', group: 'Money', unit: '$' }),
-    N('deposit', 'Deposit', { group: 'Money', unit: '$' }),
-];
-
-/* ── venues & events ─────────────────────────────────────────────────── */
-
-const VENUE_LISTING_FIELDS = [
-    N('standing_capacity', 'Standing capacity', { search: 'min', group: 'Space', unit: 'people' }),
-    N('seated_capacity', 'Seated capacity', { search: 'min', group: 'Space', unit: 'people', required: true }),
-    N('square_feet', 'Square feet', { search: 'min', group: 'Space', unit: 'sq ft' }),
-    B('outdoor_space', 'Outdoor space', { group: 'Space' }),
-    B('beachfront', 'Beachfront', { group: 'Space' }),
-    M('event_types', 'Event types', ['wedding', 'reception', 'corporate', 'birthday', 'reunion',
-        'conference', 'concert', 'fundraiser'], { search: 'any', group: 'Events' }),
-    B('catering_inhouse', 'In-house catering', { group: 'Services' }),
-    B('outside_catering', 'Outside catering allowed', { group: 'Services' }),
-    B('bar_service', 'Bar service', { group: 'Services' }),
-    B('av_equipment', 'A/V equipment', { group: 'Services' }),
-    B('tables_chairs', 'Tables & chairs included', { group: 'Services' }),
-    N('parking_spaces', 'Parking spaces', { search: 'min', group: 'Logistics' }),
-    N('hourly_rate', 'Hourly rate', { search: 'max', group: 'Money', unit: '$' }),
-    N('day_rate', 'Day rate', { search: 'max', group: 'Money', unit: '$' }),
-];
-
-/* ── the registry ────────────────────────────────────────────────────── */
-
-const BLUEPRINTS = {
-    condo: { listing: STAY_LISTING_FIELDS, unit: STAY_UNIT_FIELDS, unit_label: 'Unit' },
-    hotel: { listing: STAY_LISTING_FIELDS, unit: STAY_UNIT_FIELDS, unit_label: 'Room type' },
-    charter: { listing: CHARTER_LISTING_FIELDS, unit: CHARTER_UNIT_FIELDS, unit_label: 'Boat' },
-    cruise: { listing: CRUISE_LISTING_FIELDS, unit: CRUISE_UNIT_FIELDS, unit_label: 'Vessel' },
-    watersport: { listing: WATERSPORT_LISTING_FIELDS, unit: [], unit_label: 'Equipment' },
-    rental: { listing: RENTAL_LISTING_FIELDS, unit: RENTAL_UNIT_FIELDS, unit_label: 'Rental item' },
-    session: { listing: SESSION_LISTING_FIELDS, unit: [], unit_label: 'Package' },
-    venue: { listing: VENUE_LISTING_FIELDS, unit: [], unit_label: 'Space' },
-    other: { listing: [], unit: [], unit_label: 'Item' },
+        hoa_name: txt('HOA', { group: 'Management' }),
+        management_company: txt('Management company', { group: 'Management' }),
+    },
 };
 
-/** Every field for one industry, listing and unit together, each tagged. */
-function fieldsFor(vertical) {
-    const bp = BLUEPRINTS[vertical] || BLUEPRINTS.other;
-    return [
-        ...bp.listing.map((f) => ({ ...f, applies: 'listing' })),
-        ...bp.unit.map((f) => ({ ...f, applies: 'unit' })),
-    ];
+const STAY_UNIT = {
+    table: 'stay_units',
+    key: 'entity_slug',
+    label: 'Unit',
+    parentFk: 'property_id',
+    parentTable: 'stay_properties',
+    amenities: { join: 'stay_unit_amenities', fk: 'unit_id' },
+    collections: [{
+        table: 'stay_unit_beds',
+        fk: 'unit_id',
+        label: 'Beds',
+        // "Bedroom 1: one king" — a real row, because someone working out
+        // where to put four kids is asking about exactly this.
+        columns: {
+            room_name: txt('Room'),
+            room_type: en('Room type', ['bedroom', 'living', 'loft', 'den', 'bunk_room']),
+            bed_type: en('Bed', ['king', 'queen', 'full', 'twin', 'bunk', 'sofa_bed', 'murphy'], { required: true }),
+            quantity: int('How many'),
+        },
+    }],
+    columns: {
+        unit_number: txt('Unit number', { search: 'eq', group: 'Identity' }),
+        floor: int('Floor', { search: 'min', group: 'Identity' }),
+        unit_type: en('Unit type', ['condo', 'suite', 'studio', 'villa', 'room'], { group: 'Identity' }),
+
+        bedrooms: int('Bedrooms', { search: 'min', group: 'Layout', required: true }),
+        bathrooms: dec('Bathrooms', { search: 'min', group: 'Layout', step: 0.5, required: true }),
+        half_baths: int('Half baths', { group: 'Layout' }),
+        sleeps: int('Sleeps', { search: 'min', group: 'Layout', unit: 'people', required: true }),
+        square_feet: int('Square feet', { search: 'min', group: 'Layout', unit: 'sq ft' }),
+
+        view: en('View', ['gulf_front', 'gulf_view', 'side_gulf', 'bay', 'lagoon', 'pool', 'parking', 'none'], { group: 'The place' }),
+        balcony: bool('Balcony', { group: 'The place' }),
+        balcony_count: int('Balconies', { group: 'The place' }),
+        ground_floor: bool('Ground floor', { group: 'The place' }),
+        elevator_access: bool('Elevator access', { group: 'The place' }),
+        wheelchair_accessible: bool('Wheelchair accessible', { group: 'The place' }),
+
+        pet_friendly: bool('Pets allowed', { group: 'Rules' }),
+        pet_fee: dec('Pet fee', { group: 'Rules', unit: '$' }),
+        max_pets: int('Maximum pets', { search: 'min', group: 'Rules' }),
+        smoking_allowed: bool('Smoking allowed', { group: 'Rules' }),
+        events_allowed: bool('Events allowed', { group: 'Rules' }),
+        min_nights: int('Minimum nights', { search: 'max', group: 'Rules', unit: 'nights' }),
+        max_nights: int('Maximum nights', { group: 'Rules', unit: 'nights' }),
+        max_guests: int('Maximum guests', { search: 'min', group: 'Rules', unit: 'people' }),
+        min_age_to_book: int('Minimum age to book', { search: 'max', group: 'Rules' }),
+        check_in_time: time('Check-in', { group: 'Rules' }),
+        check_out_time: time('Check-out', { group: 'Rules' }),
+        cancellation_policy: en('Cancellation', CANCELLATION, { group: 'Rules' }),
+
+        nightly_rate: dec('Nightly rate', { search: 'max', group: 'Money', unit: '$' }),
+        weekly_rate: dec('Weekly rate', { search: 'max', group: 'Money', unit: '$' }),
+        monthly_rate: dec('Monthly rate', { group: 'Money', unit: '$' }),
+        cleaning_fee: dec('Cleaning fee', { group: 'Money', unit: '$' }),
+        pet_deposit: dec('Pet deposit', { group: 'Money', unit: '$' }),
+        security_deposit: dec('Security deposit', { group: 'Money', unit: '$' }),
+        tax_rate: dec('Tax rate', { group: 'Money', unit: '%' }),
+
+        description: txt('Description', { group: 'Words', long: true }),
+        house_rules: txt('House rules', { group: 'Words', long: true }),
+    },
+};
+
+/* ══ fishing charters ════════════════════════════════════════════════════ */
+
+const CHARTER_OPERATOR = {
+    table: 'charter_operators',
+    key: 'entity_slug',
+    label: 'The operation',
+    tags: [{
+        join: 'charter_species', fk: 'operator_id', catalogFk: 'species_id',
+        catalog: 'fish_species', label: 'Target species',
+    }],
+    collections: [{
+        table: 'charter_trips',
+        fk: 'operator_id',
+        label: 'Trips',
+        // What a guest actually books. "8 hour offshore, up to 6, $1,800."
+        columns: {
+            name: txt('Trip name'),
+            trip_type: en('Type', ['inshore', 'nearshore', 'offshore', 'deep_sea', 'bottom', 'trolling', 'shark', 'night']),
+            duration_hours: dec('Hours', { search: 'min', unit: 'hours' }),
+            min_anglers: int('Minimum anglers'),
+            max_anglers: int('Maximum anglers', { search: 'min', unit: 'people' }),
+            departure_time: time('Departs'),
+            return_time: time('Returns'),
+            price: dec('Price', { search: 'max', unit: '$' }),
+            price_unit: en('Priced per', ['trip', 'person']),
+            extra_person_fee: dec('Extra person', { unit: '$' }),
+            is_private: bool('Private charter'),
+        },
+    }],
+    columns: {
+        marina: txt('Departs from', { group: 'Where' }),
+        dock_number: txt('Dock / slip', { group: 'Where' }),
+
+        captains: int('Captains', { group: 'Crew' }),
+        deckhands: int('Deckhands', { group: 'Crew' }),
+        years_operating: int('Years operating', { search: 'min', group: 'Crew' }),
+        uscg_licensed: bool('USCG licensed', { group: 'Crew' }),
+        insured: bool('Insured', { group: 'Crew' }),
+
+        license_included: bool('Fishing licence included', { group: 'Included' }),
+        gear_included: bool('Rods & tackle included', { group: 'Included' }),
+        bait_included: bool('Bait included', { group: 'Included' }),
+        ice_included: bool('Ice included', { group: 'Included' }),
+        cleaning_included: bool('Fish cleaning included', { group: 'Included' }),
+        cooler_provided: bool('Cooler provided', { group: 'Included' }),
+        byob_allowed: bool('BYOB allowed', { group: 'Included' }),
+
+        deposit_percent: dec('Deposit', { group: 'Money', unit: '%' }),
+        cancellation_policy: en('Cancellation', CANCELLATION, { group: 'Money' }),
+        weather_policy: txt('Weather policy', { group: 'Money', long: true }),
+    },
+};
+
+const CHARTER_BOAT = {
+    table: 'charter_boats',
+    key: 'entity_slug',
+    label: 'Boat',
+    parentFk: 'operator_id',
+    parentTable: 'charter_operators',
+    amenities: { join: 'charter_boat_amenities', fk: 'boat_id' },
+    columns: {
+        boat_name: txt('Boat name', { group: 'Identity' }),
+        make: txt('Make', { group: 'Identity' }),
+        model: txt('Model', { group: 'Identity' }),
+        year: int('Year', { search: 'min', group: 'Identity' }),
+
+        length_ft: dec('Length', { search: 'min', group: 'The boat', unit: 'ft', required: true }),
+        beam_ft: dec('Beam', { group: 'The boat', unit: 'ft' }),
+        max_anglers: int('Maximum anglers', { search: 'min', group: 'The boat', unit: 'people', required: true }),
+        crew_size: int('Crew', { group: 'The boat' }),
+        engines: int('Engines', { group: 'The boat' }),
+        engine_hp: int('Horsepower', { search: 'min', group: 'The boat', unit: 'hp' }),
+        cruising_speed_kn: dec('Cruising speed', { search: 'min', group: 'The boat', unit: 'kn' }),
+        fuel_capacity_gal: int('Fuel capacity', { group: 'The boat', unit: 'gal' }),
+        max_range_mi: int('Range', { search: 'min', group: 'The boat', unit: 'mi' }),
+
+        // The three questions every caller asks, in the order they ask them.
+        has_head: bool('Head (toilet)', { group: 'Comfort' }),
+        has_ac: bool('Air conditioning', { group: 'Comfort' }),
+        has_cabin: bool('Enclosed cabin', { group: 'Comfort' }),
+        has_shade: bool('Shade / T-top', { group: 'Comfort' }),
+        has_galley: bool('Galley', { group: 'Comfort' }),
+        wheelchair_accessible: bool('Wheelchair accessible', { group: 'Comfort' }),
+
+        has_livewell: bool('Livewell', { group: 'Fishing' }),
+        has_fishfinder: bool('Fish finder / sonar', { group: 'Fishing' }),
+        has_radar: bool('Radar', { group: 'Fishing' }),
+        has_outriggers: bool('Outriggers', { group: 'Fishing' }),
+        has_fighting_chair: bool('Fighting chair', { group: 'Fishing' }),
+    },
+};
+
+/* ══ cruises ═════════════════════════════════════════════════════════════ */
+
+const CRUISE_OPERATOR = {
+    table: 'cruise_operators',
+    key: 'entity_slug',
+    label: 'The operation',
+    collections: [{
+        table: 'cruise_trips',
+        fk: 'operator_id',
+        label: 'Cruises',
+        columns: {
+            name: txt('Name'),
+            cruise_type: en('Type', ['dolphin', 'sunset', 'sightseeing', 'dinner', 'party', 'private', 'fireworks', 'eco_tour']),
+            duration_hours: dec('Hours', { search: 'min', unit: 'hours' }),
+            departure_time: time('Departs'),
+            max_passengers: int('Maximum passengers', { search: 'min', unit: 'people' }),
+            adult_price: dec('Adult', { search: 'max', unit: '$' }),
+            child_price: dec('Child', { search: 'max', unit: '$' }),
+            narrated: bool('Narrated'),
+            dolphin_guarantee: bool('Dolphin guarantee'),
+        },
+    }],
+    columns: {
+        departure_point: txt('Departs from', { group: 'Where' }),
+        dock_number: txt('Dock', { group: 'Where' }),
+        min_age: int('Minimum age', { search: 'max', group: 'Rules' }),
+        alcohol_allowed: bool('Alcohol allowed', { group: 'Rules' }),
+        byob_allowed: bool('BYOB allowed', { group: 'Rules' }),
+        pets_allowed: bool('Pets allowed', { group: 'Rules' }),
+        food_available: bool('Food available', { group: 'Rules' }),
+        adult_price: dec('Adult price', { search: 'max', group: 'Money', unit: '$' }),
+        child_price: dec('Child price', { search: 'max', group: 'Money', unit: '$' }),
+        senior_price: dec('Senior price', { group: 'Money', unit: '$' }),
+        infant_free_under: int('Infants free under', { group: 'Money' }),
+        cancellation_policy: en('Cancellation', CANCELLATION, { group: 'Money' }),
+    },
+};
+
+const CRUISE_VESSEL = {
+    table: 'cruise_vessels',
+    key: 'entity_slug',
+    label: 'Vessel',
+    parentFk: 'operator_id',
+    parentTable: 'cruise_operators',
+    columns: {
+        vessel_name: txt('Vessel name', { group: 'Identity' }),
+        vessel_type: en('Type', ['catamaran', 'pontoon', 'sailboat', 'yacht', 'speedboat'], { group: 'Identity' }),
+        length_ft: dec('Length', { search: 'min', group: 'The vessel', unit: 'ft' }),
+        passenger_capacity: int('Passenger capacity', { search: 'min', group: 'The vessel', unit: 'people', required: true }),
+        decks: int('Decks', { group: 'The vessel' }),
+        has_restroom: bool('Restroom on board', { group: 'Comfort' }),
+        has_bar: bool('Bar on board', { group: 'Comfort' }),
+        covered_seating: bool('Covered seating', { group: 'Comfort' }),
+        has_sound_system: bool('Sound system', { group: 'Comfort' }),
+        wheelchair_accessible: bool('Wheelchair accessible', { group: 'Comfort' }),
+    },
+};
+
+/* ══ rentals ═════════════════════════════════════════════════════════════ */
+
+const RENTAL_OPERATOR = {
+    table: 'rental_operators',
+    key: 'entity_slug',
+    label: 'The operation',
+    columns: {
+        pickup_location: txt('Pick-up location', { group: 'Where' }),
+        license_required: bool('Boating licence required', { group: 'Terms' }),
+        min_age_to_rent: int('Minimum age to rent', { search: 'max', group: 'Terms' }),
+        captain_available: bool('Captain available', { group: 'Terms' }),
+        captain_rate: dec('Captain rate', { group: 'Terms', unit: '$' }),
+        delivery_available: bool('Delivered to you', { group: 'Terms' }),
+        delivery_fee: dec('Delivery fee', { group: 'Terms', unit: '$' }),
+        fuel_included: bool('Fuel included', { group: 'Terms' }),
+        security_deposit: dec('Security deposit', { group: 'Money', unit: '$' }),
+        cancellation_policy: en('Cancellation', CANCELLATION, { group: 'Money' }),
+    },
+};
+
+const RENTAL_ITEM = {
+    table: 'rental_items',
+    key: 'entity_slug',
+    label: 'Rental item',
+    parentFk: 'operator_id',
+    parentTable: 'rental_operators',
+    columns: {
+        rental_type: en('Type', ['pontoon', 'deck_boat', 'center_console', 'jet_ski', 'kayak', 'paddleboard', 'golf_cart', 'bike'],
+            { group: 'Identity', required: true }),
+        name: txt('Name', { group: 'Identity' }),
+        make: txt('Make', { group: 'Identity' }),
+        model: txt('Model', { group: 'Identity' }),
+        year: int('Year', { search: 'min', group: 'Identity' }),
+        // Five identical pontoons is one row with quantity 5, not five rows.
+        quantity: int('How many of these', { search: 'min', group: 'Identity' }),
+
+        length_ft: dec('Length', { search: 'min', group: 'The item', unit: 'ft' }),
+        capacity: int('Capacity', { search: 'min', group: 'The item', unit: 'people', required: true }),
+        horsepower: int('Horsepower', { search: 'min', group: 'The item', unit: 'hp' }),
+        has_bimini: bool('Bimini / shade', { group: 'The item' }),
+        has_stereo: bool('Stereo', { group: 'The item' }),
+        has_cooler: bool('Cooler', { group: 'The item' }),
+        has_restroom: bool('Restroom', { group: 'The item' }),
+        has_ladder: bool('Swim ladder', { group: 'The item' }),
+
+        hourly_rate: dec('Hourly', { search: 'max', group: 'Money', unit: '$' }),
+        half_day_rate: dec('Half day', { search: 'max', group: 'Money', unit: '$' }),
+        full_day_rate: dec('Full day', { search: 'max', group: 'Money', unit: '$' }),
+        weekly_rate: dec('Weekly', { group: 'Money', unit: '$' }),
+    },
+};
+
+/* ══ watersports ═════════════════════════════════════════════════════════ */
+
+const WATERSPORT_OPERATOR = {
+    table: 'watersport_operators',
+    key: 'entity_slug',
+    label: 'The operation',
+    tags: [{
+        join: 'watersport_operator_activities', fk: 'operator_id', catalogFk: 'activity_id',
+        catalog: 'watersport_activities', label: 'Activities',
+    }],
+    columns: {
+        launch_location: txt('Launches from', { group: 'Where' }),
+        max_flight_height_ft: int('Maximum flight height', { search: 'min', group: 'The flight', unit: 'ft' }),
+        riders_per_flight: int('Riders per flight', { search: 'min', group: 'The flight', unit: 'people' }),
+        min_weight_lb: int('Minimum weight', { group: 'Rules', unit: 'lb' }),
+        max_weight_lb: int('Maximum weight', { search: 'min', group: 'Rules', unit: 'lb' }),
+        min_age: int('Minimum age', { search: 'max', group: 'Rules' }),
+        observers_allowed: bool('Observers can ride along', { group: 'Rules' }),
+        observer_price: dec('Observer price', { group: 'Money', unit: '$' }),
+        instruction_included: bool('Instruction included', { group: 'Included' }),
+        gear_included: bool('Gear included', { group: 'Included' }),
+        photos_included: bool('Photos included', { group: 'Included' }),
+        photos_price: dec('Photos price', { group: 'Money', unit: '$' }),
+        price_per_person: dec('Price per person', { search: 'max', group: 'Money', unit: '$' }),
+        cancellation_policy: en('Cancellation', CANCELLATION, { group: 'Money' }),
+    },
+};
+
+/* ══ sessions ════════════════════════════════════════════════════════════ */
+
+const SESSION_PROVIDER = {
+    table: 'session_providers',
+    key: 'entity_slug',
+    label: 'The provider',
+    collections: [{
+        table: 'session_packages',
+        fk: 'provider_id',
+        label: 'Packages',
+        columns: {
+            name: txt('Package'),
+            session_type: en('Type', ['family', 'engagement', 'wedding', 'elopement', 'maternity', 'newborn', 'senior', 'headshot', 'event', 'real_estate']),
+            length_minutes: int('Length', { search: 'min', unit: 'minutes' }),
+            edited_images: int('Edited images', { search: 'min' }),
+            turnaround_days: int('Turnaround', { search: 'max', unit: 'days' }),
+            max_people: int('Maximum people', { search: 'min', unit: 'people' }),
+            outfit_changes: int('Outfit changes'),
+            locations_count: int('Locations'),
+            price: dec('Price', { search: 'max', unit: '$' }),
+        },
+    }],
+    columns: {
+        travels_to_you: bool('Travels to you', { group: 'Where' }),
+        travel_radius_mi: int('Travel radius', { search: 'min', group: 'Where', unit: 'mi' }),
+        travel_fee: dec('Travel fee', { group: 'Where', unit: '$' }),
+        studio_available: bool('Studio available', { group: 'Where' }),
+        prints_available: bool('Prints available', { group: 'Included' }),
+        digital_included: bool('Digital files included', { group: 'Included' }),
+        raw_available: bool('RAW files available', { group: 'Included' }),
+        second_shooter: bool('Second shooter available', { group: 'Included' }),
+        drone_licensed: bool('Drone licensed', { group: 'Included' }),
+        deposit: dec('Deposit', { group: 'Money', unit: '$' }),
+        cancellation_policy: en('Cancellation', CANCELLATION, { group: 'Money' }),
+    },
+};
+
+/* ══ venues ══════════════════════════════════════════════════════════════ */
+
+const VENUE_SPACE = {
+    table: 'venue_spaces',
+    key: 'venue_entity_slug',
+    // A venue's spaces are a list on the venue itself rather than separate
+    // entities, because a ballroom is not a listing anyone links to.
+    multiple: true,
+    label: 'Spaces',
+    amenities: { join: 'venue_space_amenities', fk: 'space_id' },
+    columns: {
+        name: txt('Space name', { group: 'Identity' }),
+        space_type: en('Type', ['ballroom', 'deck', 'lawn', 'beach', 'private_room', 'whole_venue'], { group: 'Identity' }),
+        standing_capacity: int('Standing capacity', { search: 'min', group: 'Size', unit: 'people' }),
+        seated_capacity: int('Seated capacity', { search: 'min', group: 'Size', unit: 'people', required: true }),
+        square_feet: int('Square feet', { search: 'min', group: 'Size', unit: 'sq ft' }),
+        outdoor: bool('Outdoor', { group: 'Size' }),
+        beachfront: bool('Beachfront', { group: 'Size' }),
+        catering_inhouse: bool('In-house catering', { group: 'Services' }),
+        outside_catering: bool('Outside catering allowed', { group: 'Services' }),
+        bar_service: bool('Bar service', { group: 'Services' }),
+        av_equipment: bool('A/V equipment', { group: 'Services' }),
+        tables_chairs: bool('Tables & chairs', { group: 'Services' }),
+        dance_floor: bool('Dance floor', { group: 'Services' }),
+        parking_spaces: int('Parking spaces', { search: 'min', group: 'Services' }),
+        hourly_rate: dec('Hourly rate', { search: 'max', group: 'Money', unit: '$' }),
+        day_rate: dec('Day rate', { search: 'max', group: 'Money', unit: '$' }),
+        minimum_spend: dec('Minimum spend', { search: 'max', group: 'Money', unit: '$' }),
+    },
+};
+
+/* ══ the registry ════════════════════════════════════════════════════════ */
+
+const SCHEMAS = {
+    condo: { listing: STAY_PROPERTY, unit: STAY_UNIT, unit_label: 'Unit' },
+    hotel: { listing: STAY_PROPERTY, unit: STAY_UNIT, unit_label: 'Room type' },
+    charter: { listing: CHARTER_OPERATOR, unit: CHARTER_BOAT, unit_label: 'Boat' },
+    cruise: { listing: CRUISE_OPERATOR, unit: CRUISE_VESSEL, unit_label: 'Vessel' },
+    rental: { listing: RENTAL_OPERATOR, unit: RENTAL_ITEM, unit_label: 'Rental item' },
+    watersport: { listing: WATERSPORT_OPERATOR, unit: null, unit_label: null },
+    session: { listing: SESSION_PROVIDER, unit: null, unit_label: null },
+    venue: { listing: VENUE_SPACE, unit: null, unit_label: 'Space' },
+    other: { listing: null, unit: null, unit_label: null },
+};
+
+function schemaFor(vertical) {
+    return SCHEMAS[vertical] || SCHEMAS.other;
 }
 
-/** One field by key, so a write can be validated against its type. */
-function fieldFor(vertical, key) {
-    return fieldsFor(vertical).find((f) => f.key === key) || null;
+/** Columns as a list, each carrying its own name — what a form iterates. */
+function columnList(spec) {
+    if (!spec) return [];
+    return Object.entries(spec.columns).map(([name, def]) => ({ name, ...def }));
 }
 
 /**
- * Coerce a submitted value to the field's type, or return `{ error }`.
+ * Every searchable column across a vertical, tagged with where it lives.
  *
- * Returning the coerced value rather than trusting the client matters for
- * search: `bedrooms` has to land in the numeric column or a `>= 2` filter
- * silently matches nothing.
+ * A name can legitimately exist on two tables — `max_anglers` is on both
+ * `charter_boats` (how many the boat holds) and `charter_trips` (how many this
+ * trip takes). Left alone, which one a filter hits would depend on the order
+ * of this loop, which is exactly the kind of thing that works until someone
+ * reorders the file. So duplicates are collapsed to the FIRST occurrence and
+ * the others are recorded on `also_on`, making the choice explicit and stable
+ * and letting the UI say where the number comes from.
+ *
+ * First means listing-level, then its collections, then unit-level — the order
+ * below. For `max_anglers` that resolves to the trip, which is the right one:
+ * "a charter for eight" is a question about the trip you can book, and the
+ * boat's capacity is only the ceiling above it.
  */
-function coerce(field, raw) {
-    if (raw === null || raw === undefined || raw === '') return { value: null, cleared: true };
+function searchableFor(vertical) {
+    const schema = schemaFor(vertical);
+    const out = [];
+    for (const level of ['listing', 'unit']) {
+        const spec = schema[level];
+        if (!spec) continue;
+        for (const col of columnList(spec)) {
+            if (col.search) out.push({ ...col, level, table: spec.table });
+        }
+        for (const coll of spec.collections || []) {
+            for (const [name, def] of Object.entries(coll.columns)) {
+                if (def.search) out.push({ name, ...def, level: 'collection', table: coll.table, fk: coll.fk });
+            }
+        }
+        for (const tag of spec.tags || []) {
+            out.push({
+                name: tag.catalog, label: tag.label, type: 'tags', search: 'any',
+                level, table: tag.join, catalog: tag.catalog, fk: tag.fk, catalogFk: tag.catalogFk,
+            });
+        }
+        if (spec.amenities) {
+            out.push({
+                name: `${level}_amenities`, label: level === 'unit' ? 'Unit amenities' : 'Amenities',
+                type: 'amenities', search: 'any', level, table: spec.amenities.join, fk: spec.amenities.fk,
+            });
+        }
+    }
 
-    switch (field.type) {
-        case 'number': {
+    const byName = new Map();
+    for (const field of out) {
+        const existing = byName.get(field.name);
+        if (!existing) byName.set(field.name, { ...field });
+        else (existing.also_on ||= []).push({ table: field.table, level: field.level });
+    }
+    return [...byName.values()];
+}
+
+/**
+ * Coerce one submitted value to its column's type, or return `{ error }`.
+ *
+ * Done server-side and not trusted from the client, because a `bedrooms`
+ * arriving as the string "2" would be stored fine by Postgres but a `view`
+ * arriving as an unlisted string would sit in the table forever matching
+ * nothing anyone can search for.
+ */
+function coerce(column, raw) {
+    if (raw === null || raw === undefined || raw === '') return { value: null };
+
+    switch (column.type) {
+        case 'int': {
+            const n = parseInt(raw, 10);
+            if (!Number.isFinite(n)) return { error: `${column.label} must be a whole number` };
+            return { value: n };
+        }
+        case 'decimal': {
             const n = Number(raw);
-            if (!Number.isFinite(n)) return { error: `${field.label} must be a number` };
-            return { value: n, column: 'value_num' };
+            if (!Number.isFinite(n)) return { error: `${column.label} must be a number` };
+            return { value: n };
         }
-        case 'bool': {
-            const v = raw === true || raw === 'true' || raw === 1 || raw === '1';
-            return { value: v, column: 'value_bool' };
+        case 'bool':
+            return { value: raw === true || raw === 'true' || raw === 1 || raw === '1' };
+        case 'time': {
+            const s = String(raw);
+            if (!/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return { error: `${column.label} must be a time like 16:00` };
+            return { value: s.length === 5 ? `${s}:00` : s };
         }
-        case 'select': {
-            const v = String(raw);
-            if (field.options && !field.options.includes(v)) {
-                return { error: `${field.label}: "${v}" is not one of ${field.options.join(', ')}` };
+        case 'enum': {
+            const s = String(raw);
+            if (column.options && !column.options.includes(s)) {
+                return { error: `${column.label}: "${s}" is not one of ${column.options.join(', ')}` };
             }
-            return { value: v, column: 'value_text' };
-        }
-        case 'multi': {
-            const list = Array.isArray(raw) ? raw.map(String) : String(raw).split(',').map((s) => s.trim()).filter(Boolean);
-            if (field.options) {
-                const bad = list.filter((v) => !field.options.includes(v));
-                if (bad.length) return { error: `${field.label}: unknown ${bad.join(', ')}` };
-            }
-            return { value: list, column: 'value_list' };
+            return { value: s };
         }
         default:
-            return { value: String(raw).slice(0, 2000), column: 'value_text' };
+            return { value: String(raw).slice(0, 5000) };
     }
 }
 
-/** The subset a guest can filter on, which is what the match route exposes. */
-function searchableFor(vertical) {
-    return fieldsFor(vertical).filter((f) => f.search);
+/** Validate and coerce a whole patch against a table spec. */
+function coerceRow(spec, patch) {
+    const row = {};
+    const errors = [];
+    for (const [name, raw] of Object.entries(patch || {})) {
+        const column = spec.columns[name];
+        if (!column) { errors.push(`Unknown field "${name}" on ${spec.table}`); continue; }
+        const result = coerce({ ...column, name }, raw);
+        if (result.error) { errors.push(result.error); continue; }
+        row[name] = result.value;
+    }
+    return { row, errors };
 }
 
 module.exports = {
-    BLUEPRINTS,
-    fieldsFor,
-    fieldFor,
+    SCHEMAS,
+    schemaFor,
+    columnList,
     searchableFor,
     coerce,
+    coerceRow,
 };

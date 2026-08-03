@@ -1607,338 +1607,547 @@ router.get('/industry-calendar', adminRequired, async (req, res) => {
     }
 });
 
-/* ── industry blueprints & structured listing data ───────────────────── */
+/* ── industry tables: the structured listing data ────────────────────── */
 //
-// "A two bedroom two bath at Phoenix East on these dates."
-// "A charter for eight people, at least eight hours, a 45ft boat with AC."
+// "A two bedroom two bath at Phoenix West on these dates."
+// "A charter for eight, at least eight hours, a 45ft boat with AC and a head."
 //
-// Neither question can be answered from `entity` — those are facts about a
-// specific unit or a specific boat, and nothing stored them. routes/
-// industry-blueprints.js defines what each industry would store if you built
-// its platform from scratch; `entity_attributes` holds the values; and
-// /match below joins them to the availability engine so the answer is
-// "matches the description AND is actually free".
+// `entity` holds what every business has — name, slug, phone, hours, hero
+// image. What it cannot hold is bedrooms, boat length, or whether there is a
+// head on board, because those belong to an industry. sql/industry_tables.sql
+// creates a real table per real thing, with real typed columns:
+//
+//   stay_properties / stay_units / stay_unit_beds     the building, the unit, the beds
+//   charter_operators / charter_boats / charter_trips the operation, the boat, the trip
+//   cruise_operators / cruise_vessels / cruise_trips
+//   rental_operators / rental_items
+//   watersport_operators, session_providers / session_packages, venue_spaces
+//   amenities + amenity_sections, joined per thing
+//   fish_species, watersport_activities — catalogs, joined, never free text
+//
+// routes/industry-blueprints.js maps those tables so a form and a search can
+// be generated from them, and scripts/check-blueprint-columns.mjs fails the
+// build if the map ever names a column the SQL does not create.
+//
+// A condo complex is one entity and each unit is its own entity with
+// parent_entity_slug set — the separation that already exists. The building
+// row lives in stay_properties keyed to the building's slug; each unit's row
+// lives in stay_units keyed to its own.
 
 const BP = require('./industry-blueprints');
 
-/** Every field an industry defines. The dashboard renders its form from this. */
-router.get('/blueprints', adminRequired, (_req, res) => {
-    const out = {};
-    for (const id of Object.keys(BP.BLUEPRINTS)) {
-        const spec = AVAIL.verticalSpec(id);
-        out[id] = {
-            id,
-            label: spec ? spec.label : id,
-            unit_label: BP.BLUEPRINTS[id].unit_label,
-            listing_fields: BP.BLUEPRINTS[id].listing.length,
-            unit_fields: BP.BLUEPRINTS[id].unit.length,
-        };
-    }
-    res.json({ blueprints: out });
-});
+/** Which table applies to this entity: the listing level, or the unit level. */
+async function resolveLevel(slug) {
+    const { data: entity } = await supabase
+        .from('entity')
+        .select('slug, name, entity_type, entity_subtype, is_active, parent_slug:parent_entity_slug')
+        .eq('slug', slug)
+        .maybeSingle();
+    if (!entity) return { error: 'Business not found' };
 
-router.get('/blueprint/:vertical', adminRequired, (req, res) => {
-    const vertical = String(req.params.vertical);
-    if (!BP.BLUEPRINTS[vertical]) return fail(res, 404, `No blueprint for "${vertical}"`);
-    const spec = AVAIL.verticalSpec(vertical);
-    res.json({
-        vertical,
-        label: spec ? spec.label : vertical,
-        unit_label: BP.BLUEPRINTS[vertical].unit_label,
-        fields: BP.fieldsFor(vertical),
-        searchable: BP.searchableFor(vertical).map((f) => ({
-            key: f.key, label: f.label, type: f.type, search: f.search,
-            unit: f.unit, options: f.options, applies: f.applies,
-        })),
-    });
-});
-
-/**
- * One listing's stored attributes, with the blueprint for its industry so the
- * caller does not have to make a second request to know what the keys mean.
- * Unit children come along, because a condo building's answer is mostly its
- * units' answers.
- */
-router.get('/attributes/:slug', adminRequired, async (req, res) => {
-    try {
-        const slug = String(req.params.slug);
-        const { data: entity, error } = await supabase
+    let parent = null;
+    if (entity.parent_slug) {
+        const { data } = await supabase
             .from('entity')
-            .select('slug, name, entity_type, entity_subtype, parent_slug:parent_entity_slug')
-            .eq('slug', slug)
+            .select('slug, name, entity_type, entity_subtype')
+            .eq('slug', entity.parent_slug)
             .maybeSingle();
-        if (error) return fail(res, 500, error.message);
-        if (!entity) return fail(res, 404, 'Business not found');
+        parent = data || null;
+    }
 
-        const { data: units } = await supabase
-            .from('entity')
-            .select('slug, name, entity_subtype')
-            .eq('parent_entity_slug', slug)
-            .eq('is_active', true)
-            .order('name')
-            .limit(500);
+    // A unit inherits its industry from its parent. A condo unit's own subtype
+    // is 'condo_unit', which would classify it as a stay by luck rather than
+    // by design, and a charter boat listed separately would classify as
+    // nothing at all.
+    const vertical = AVAIL.verticalOf(parent || entity);
+    const schema = BP.schemaFor(vertical);
+    const level = parent && schema.unit ? 'unit' : 'listing';
 
-        const slugs = [slug, ...(units || []).map((u) => u.slug)];
-        const { data: rows } = await supabase
-            .from('entity_attributes')
-            .select('entity_slug, attr_key, value_text, value_num, value_bool, value_list')
-            .in('entity_slug', slugs)
-            .limit(5000);
+    return { entity, parent, vertical, schema, level, spec: schema[level] };
+}
 
-        // A unit inherits its industry from its parent: a condo unit's
-        // entity_subtype is 'condo_unit', which classifies as a stay, but the
-        // parent is the authority on which blueprint applies.
-        const vertical = AVAIL.verticalOf(entity);
-        const flatten = (forSlug) => {
-            const out = {};
-            for (const r of rows || []) {
-                if (r.entity_slug !== forSlug) continue;
-                out[r.attr_key] = r.value_num ?? r.value_bool ?? r.value_list ?? r.value_text ?? null;
-            }
-            return out;
-        };
+/** The amenity catalog, grouped the way a guest sees it. */
+router.get('/amenities', adminRequired, async (_req, res) => {
+    try {
+        const [sections, amenities] = await Promise.all([
+            supabase.from('amenity_sections').select('key, label, sort_order').order('sort_order'),
+            supabase.from('amenities').select('id, key, label, section_key, sort_order').eq('is_active', true).order('sort_order').limit(2000),
+        ]);
+        if (sections.error) return fail(res, 500, sections.error.message);
 
+        const bySection = {};
+        for (const a of amenities.data || []) {
+            (bySection[a.section_key || 'other'] ||= []).push(a);
+        }
         res.json({
-            entity_slug: slug,
-            entity_name: entity.name,
-            vertical,
-            unit_label: (BP.BLUEPRINTS[vertical] || BP.BLUEPRINTS.other).unit_label,
-            fields: BP.fieldsFor(vertical),
-            attributes: flatten(slug),
-            units: (units || []).map((u) => ({
-                entity_slug: u.slug,
-                entity_name: u.name,
-                entity_subtype: u.entity_subtype,
-                attributes: flatten(u.slug),
-            })),
-            // Which required fields are still blank. A listing missing these
-            // cannot be matched on the thing guests actually ask for.
-            missing_required: BP.fieldsFor(vertical)
-                .filter((f) => f.required && f.applies === 'listing')
-                .filter((f) => flatten(slug)[f.key] == null)
-                .map((f) => ({ key: f.key, label: f.label })),
+            sections: (sections.data || []).map((s) => ({ ...s, amenities: bySection[s.key] || [] })),
+            total: (amenities.data || []).length,
         });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
 
+/** One industry's tables and columns — what the dashboard builds a form from. */
+router.get('/blueprint/:vertical', adminRequired, (req, res) => {
+    const vertical = String(req.params.vertical);
+    const schema = BP.SCHEMAS[vertical];
+    if (!schema) return fail(res, 404, `No blueprint for "${vertical}"`);
+    const spec = AVAIL.verticalSpec(vertical);
+
+    const describe = (s) => (s ? {
+        table: s.table,
+        key: s.key,
+        label: s.label,
+        multiple: !!s.multiple,
+        columns: BP.columnList(s),
+        collections: (s.collections || []).map((c) => ({
+            table: c.table, fk: c.fk, label: c.label,
+            columns: Object.entries(c.columns).map(([name, def]) => ({ name, ...def })),
+        })),
+        tags: s.tags || [],
+        amenities: s.amenities || null,
+    } : null);
+
+    res.json({
+        vertical,
+        label: spec ? spec.label : vertical,
+        unit_label: schema.unit_label,
+        listing: describe(schema.listing),
+        unit: describe(schema.unit),
+        searchable: BP.searchableFor(vertical),
+    });
+});
+
+router.get('/blueprints', adminRequired, (_req, res) => {
+    const out = [];
+    for (const [id, schema] of Object.entries(BP.SCHEMAS)) {
+        const spec = AVAIL.verticalSpec(id);
+        out.push({
+            id,
+            label: spec ? spec.label : id,
+            unit_label: schema.unit_label,
+            listing_table: schema.listing ? schema.listing.table : null,
+            unit_table: schema.unit ? schema.unit.table : null,
+            listing_columns: schema.listing ? Object.keys(schema.listing.columns).length : 0,
+            unit_columns: schema.unit ? Object.keys(schema.unit.columns).length : 0,
+            collections: [
+                ...(schema.listing?.collections || []).map((c) => c.table),
+                ...(schema.unit?.collections || []).map((c) => c.table),
+            ],
+        });
+    }
+    res.json({ blueprints: out });
+});
+
 /**
- * Write attributes for one listing. The body is `{ key: value }`; every key is
- * validated against the blueprint and coerced to its declared type before it
- * is stored, because `bedrooms` landing in the text column would make every
- * `>= 2` filter silently match nothing.
- *
- * A null clears the attribute rather than storing a null row.
+ * Everything stored about one listing: its own row, its amenities, its tags,
+ * its collections, and — for a building — a summary row per unit so the
+ * dashboard can show which units are still blank without N requests.
  */
-router.put('/attributes/:slug', adminRequired, async (req, res) => {
+router.get('/listing/:slug', adminRequired, async (req, res) => {
     try {
-        const slug = String(req.params.slug);
-        const body = req.body && typeof req.body === 'object' ? req.body : {};
-        const patch = body.attributes && typeof body.attributes === 'object' ? body.attributes : body;
+        const ctx = await resolveLevel(String(req.params.slug));
+        if (ctx.error) return fail(res, 404, ctx.error);
+        const { entity, parent, vertical, schema, level, spec } = ctx;
 
-        const { data: entity } = await supabase
-            .from('entity')
-            .select('slug, entity_type, entity_subtype, parent_slug:parent_entity_slug')
-            .eq('slug', slug)
-            .maybeSingle();
-        if (!entity) return fail(res, 404, 'Business not found');
-
-        // A unit is described by its parent's blueprint — a condo unit holds
-        // bedrooms and bathrooms, which only the stay blueprint defines.
-        let vertical = AVAIL.verticalOf(entity);
-        if (entity.parent_slug) {
-            const { data: parent } = await supabase
-                .from('entity')
-                .select('entity_type, entity_subtype')
-                .eq('slug', entity.parent_slug)
-                .maybeSingle();
-            if (parent) vertical = AVAIL.verticalOf(parent);
-        }
-
-        const writes = [];
-        const clears = [];
-        const errors = [];
-
-        for (const [key, raw] of Object.entries(patch)) {
-            const field = BP.fieldFor(vertical, key);
-            if (!field) { errors.push(`Unknown field "${key}" for ${vertical}`); continue; }
-            const result = BP.coerce(field, raw);
-            if (result.error) { errors.push(result.error); continue; }
-            if (result.cleared) { clears.push(key); continue; }
-
-            writes.push({
-                entity_slug: slug,
-                attr_key: key,
-                value_text: result.column === 'value_text' ? result.value : null,
-                value_num: result.column === 'value_num' ? result.value : null,
-                value_bool: result.column === 'value_bool' ? result.value : null,
-                value_list: result.column === 'value_list' ? result.value : null,
-                updated_at: new Date().toISOString(),
+        if (!spec) {
+            return res.json({
+                entity_slug: entity.slug, entity_name: entity.name, vertical, level,
+                supported: false,
+                reason: `No industry tables for "${vertical}" yet.`,
             });
         }
 
-        if (errors.length) return fail(res, 400, errors.join('; '));
+        const { data: rows } = await supabase
+            .from(spec.table)
+            .select('*')
+            .eq(spec.key, entity.slug)
+            .limit(spec.multiple ? 200 : 1);
+        const record = spec.multiple ? null : (rows || [])[0] || null;
 
-        if (clears.length) {
-            await supabase.from('entity_attributes').delete().eq('entity_slug', slug).in('attr_key', clears);
-        }
-        if (writes.length) {
-            const { error } = await supabase
-                .from('entity_attributes')
-                .upsert(writes, { onConflict: 'entity_slug,attr_key' });
-            if (error) return fail(res, 400, error.message);
-        }
+        const [amenities, tags, collections, units] = await Promise.all([
+            readAmenities(spec, record),
+            readTags(spec, record),
+            readCollections(spec, record),
+            level === 'listing' && schema.unit ? readUnitSummaries(entity.slug, schema.unit) : Promise.resolve(null),
+        ]);
 
-        res.json({ entity_slug: slug, vertical, written: writes.length, cleared: clears.length });
+        res.json({
+            entity_slug: entity.slug,
+            entity_name: entity.name,
+            parent_slug: parent ? parent.slug : null,
+            parent_name: parent ? parent.name : null,
+            vertical,
+            unit_label: schema.unit_label,
+            level,
+            supported: true,
+            table: spec.table,
+            record,
+            records: spec.multiple ? rows || [] : undefined,
+            amenities,
+            tags,
+            collections,
+            units,
+            missing_required: BP.columnList(spec)
+                .filter((c) => c.required && (!record || record[c.name] === null || record[c.name] === undefined))
+                .map((c) => ({ name: c.name, label: c.label })),
+        });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
 
+async function readAmenities(spec, record) {
+    if (!spec.amenities || !record) return [];
+    const { data } = await supabase
+        .from(spec.amenities.join)
+        .select('amenity_id')
+        .eq(spec.amenities.fk, record.id)
+        .limit(500);
+    return (data || []).map((r) => r.amenity_id);
+}
+
+async function readTags(spec, record) {
+    if (!spec.tags || !record) return {};
+    const out = {};
+    for (const tag of spec.tags) {
+        const { data } = await supabase
+            .from(tag.join)
+            .select(tag.catalogFk)
+            .eq(tag.fk, record.id)
+            .limit(500);
+        out[tag.catalog] = (data || []).map((r) => r[tag.catalogFk]);
+    }
+    return out;
+}
+
+async function readCollections(spec, record) {
+    if (!spec.collections || !record) return {};
+    const out = {};
+    for (const coll of spec.collections) {
+        const { data } = await supabase
+            .from(coll.table)
+            .select('*')
+            .eq(coll.fk, record.id)
+            .limit(500);
+        out[coll.table] = data || [];
+    }
+    return out;
+}
+
+/** One line per unit: is its row there, and are the required fields filled? */
+async function readUnitSummaries(parentSlug, unitSpec) {
+    const { data: children } = await supabase
+        .from('entity')
+        .select('slug, name, entity_subtype')
+        .eq('parent_entity_slug', parentSlug)
+        .eq('is_active', true)
+        .order('name')
+        .limit(500);
+    if (!children || children.length === 0) return [];
+
+    const { data: rows } = await supabase
+        .from(unitSpec.table)
+        .select('*')
+        .in(unitSpec.key, children.map((c) => c.slug))
+        .limit(500);
+    const bySlug = Object.fromEntries((rows || []).map((r) => [r[unitSpec.key], r]));
+    const required = BP.columnList(unitSpec).filter((c) => c.required);
+
+    return children.map((c) => {
+        const row = bySlug[c.slug] || null;
+        return {
+            entity_slug: c.slug,
+            entity_name: c.name,
+            entity_subtype: c.entity_subtype,
+            has_row: !!row,
+            record: row,
+            missing_required: required
+                .filter((col) => !row || row[col.name] === null || row[col.name] === undefined)
+                .map((col) => col.label),
+        };
+    });
+}
+
+/**
+ * Write one listing's row. Upsert on the entity slug, because there is exactly
+ * one row per listing and the caller should not have to know whether it exists.
+ * Every value is checked against the blueprint's column list first, so a
+ * misspelled field is a 400 here rather than a Postgres error later.
+ */
+router.put('/listing/:slug', adminRequired, async (req, res) => {
+    try {
+        const ctx = await resolveLevel(String(req.params.slug));
+        if (ctx.error) return fail(res, 404, ctx.error);
+        const { entity, parent, schema, level, spec } = ctx;
+        if (!spec) return fail(res, 400, `No industry tables for this business's industry`);
+        if (spec.multiple) return fail(res, 400, `${spec.table} holds many rows per business — use the collection routes`);
+
+        const { row, errors } = BP.coerceRow(spec, req.body?.record || req.body || {});
+        if (errors.length) return fail(res, 400, errors.join('; '));
+        if (Object.keys(row).length === 0) return fail(res, 400, 'Nothing to update');
+
+        row[spec.key] = entity.slug;
+        row.updated_at = new Date().toISOString();
+
+        // A unit's row points at its building's row. Resolve that here rather
+        // than making the caller send an id it has no way to know.
+        if (level === 'unit' && spec.parentFk && parent) {
+            const { data: parentRow } = await supabase
+                .from(spec.parentTable)
+                .select('id')
+                .eq(schema.listing.key, parent.slug)
+                .maybeSingle();
+            if (parentRow) row[spec.parentFk] = parentRow.id;
+        }
+
+        const { data, error } = await supabase
+            .from(spec.table)
+            .upsert(row, { onConflict: spec.key })
+            .select()
+            .single();
+        if (error) return fail(res, 400, error.message);
+
+        res.json({ entity_slug: entity.slug, table: spec.table, record: data });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/**
+ * Replace this listing's amenities. A full replace rather than add/remove:
+ * the form sends the state of every checkbox, and reconciling that into deltas
+ * client-side is how a checkbox ends up out of step with the database.
+ */
+router.put('/listing/:slug/amenities', adminRequired, async (req, res) => {
+    try {
+        const ctx = await resolveLevel(String(req.params.slug));
+        if (ctx.error) return fail(res, 404, ctx.error);
+        const { entity, spec } = ctx;
+        if (!spec || !spec.amenities) return fail(res, 400, 'This industry does not record amenities at this level');
+
+        const ids = Array.isArray(req.body?.amenity_ids) ? req.body.amenity_ids.map(String) : null;
+        if (!ids) return fail(res, 400, 'amenity_ids must be an array');
+
+        const { data: record } = await supabase
+            .from(spec.table).select('id').eq(spec.key, entity.slug).maybeSingle();
+        if (!record) return fail(res, 400, `Save the ${spec.label.toLowerCase()} details first — amenities attach to that row`);
+
+        await supabase.from(spec.amenities.join).delete().eq(spec.amenities.fk, record.id);
+        if (ids.length) {
+            const { error } = await supabase.from(spec.amenities.join).insert(
+                ids.map((amenity_id) => ({ [spec.amenities.fk]: record.id, amenity_id })),
+            );
+            if (error) return fail(res, 400, error.message);
+        }
+        res.json({ entity_slug: entity.slug, amenities: ids.length });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/** Replace a controlled-vocabulary join — species, activities. */
+router.put('/listing/:slug/tags/:catalog', adminRequired, async (req, res) => {
+    try {
+        const ctx = await resolveLevel(String(req.params.slug));
+        if (ctx.error) return fail(res, 404, ctx.error);
+        const { entity, spec } = ctx;
+        const tag = (spec?.tags || []).find((t) => t.catalog === req.params.catalog);
+        if (!tag) return fail(res, 404, `No "${req.params.catalog}" list for this industry`);
+
+        const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : null;
+        if (!ids) return fail(res, 400, 'ids must be an array');
+
+        const { data: record } = await supabase
+            .from(spec.table).select('id').eq(spec.key, entity.slug).maybeSingle();
+        if (!record) return fail(res, 400, 'Save the details first — this list attaches to that row');
+
+        await supabase.from(tag.join).delete().eq(tag.fk, record.id);
+        if (ids.length) {
+            const { error } = await supabase.from(tag.join).insert(
+                ids.map((id) => ({ [tag.fk]: record.id, [tag.catalogFk]: id })),
+            );
+            if (error) return fail(res, 400, error.message);
+        }
+        res.json({ entity_slug: entity.slug, catalog: tag.catalog, count: ids.length });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/* ── collections: beds, trips, packages ──────────────────────────────── */
+
+function findCollection(spec, table) {
+    return (spec?.collections || []).find((c) => c.table === table) || null;
+}
+
+router.post('/listing/:slug/collection/:table', adminRequired, async (req, res) => {
+    try {
+        const ctx = await resolveLevel(String(req.params.slug));
+        if (ctx.error) return fail(res, 404, ctx.error);
+        const coll = findCollection(ctx.spec, req.params.table);
+        if (!coll) return fail(res, 404, `No "${req.params.table}" list for this industry`);
+
+        const { data: record } = await supabase
+            .from(ctx.spec.table).select('id').eq(ctx.spec.key, ctx.entity.slug).maybeSingle();
+        if (!record) return fail(res, 400, 'Save the details first — this list attaches to that row');
+
+        const { row, errors } = BP.coerceRow(coll, req.body || {});
+        if (errors.length) return fail(res, 400, errors.join('; '));
+        row[coll.fk] = record.id;
+
+        const { data, error } = await supabase.from(coll.table).insert(row).select().single();
+        if (error) return fail(res, 400, error.message);
+        res.status(201).json({ record: data });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+router.patch('/collection/:table/:id', adminRequired, async (req, res) => {
+    try {
+        const coll = allCollections().find((c) => c.table === req.params.table);
+        if (!coll) return fail(res, 404, `"${req.params.table}" is not a collection table`);
+        const { row, errors } = BP.coerceRow(coll, req.body || {});
+        if (errors.length) return fail(res, 400, errors.join('; '));
+        if (Object.keys(row).length === 0) return fail(res, 400, 'Nothing to update');
+
+        const { data, error } = await supabase.from(coll.table).update(row).eq('id', req.params.id).select();
+        if (error) return fail(res, 400, error.message);
+        if (!data || !data.length) return fail(res, 404, 'Row not found');
+        res.json({ record: data[0] });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+router.delete('/collection/:table/:id', adminRequired, async (req, res) => {
+    const coll = allCollections().find((c) => c.table === req.params.table);
+    if (!coll) return fail(res, 404, `"${req.params.table}" is not a collection table`);
+    const { error, count } = await supabase
+        .from(coll.table).delete({ count: 'exact' }).eq('id', req.params.id);
+    if (error) return fail(res, 400, error.message);
+    if (!count) return fail(res, 404, 'Row not found');
+    res.json({ success: true });
+});
+
+/** Every collection any industry declares — the allow-list for the two routes above. */
+function allCollections() {
+    const out = [];
+    for (const schema of Object.values(BP.SCHEMAS)) {
+        for (const level of ['listing', 'unit']) {
+            for (const coll of schema[level]?.collections || []) out.push(coll);
+        }
+    }
+    return out;
+}
+
 /* ── match: description + dates ──────────────────────────────────────── */
 //
-// The whole point. A guest describes what they want and when; this returns
-// what matches BOTH — the attributes and the calendar. Either half alone is
-// useless: a 2-bed 2-bath that is booked all week is not an answer, and a
-// free week in a studio is not an answer either.
+// The point of all of it. A guest describes what they want and when, and this
+// returns what satisfies both — a 2-bed 2-bath booked all week is not an
+// answer, and a free week in a studio is not either.
 //
-// POST body:
-//   { vertical, from, to, coverage?, filters: { bedrooms: 2, has_ac: true,
-//     boat_length: 45, species: ['red_snapper'] }, q?, limit? }
-//
-// Numeric filters read as "at least" or "at most" from the field's own
-// `search` rule, so the caller sends `{ bedrooms: 2 }` and gets `>= 2` for
-// bedrooms and `<= 400` for nightly_rate without having to know which is
+// Filters are real WHERE clauses on real columns: `bedrooms >= 2`,
+// `length_ft >= 45`, `has_ac = true`. The blueprint says which comparison a
+// column wants, so the caller sends `{ bedrooms: 2, nightly_rate: 400 }` and
+// gets `>= 2` for one and `<= 400` for the other without knowing which is
 // which.
 
 router.post('/match', adminRequired, async (req, res) => {
     try {
         const body = req.body || {};
         const vertical = String(body.vertical || '');
-        if (!BP.BLUEPRINTS[vertical]) return fail(res, 400, `Unknown industry "${vertical}"`);
+        const schema = BP.SCHEMAS[vertical];
+        if (!schema) return fail(res, 400, `Unknown industry "${vertical}"`);
 
         const from = /^\d{4}-\d{2}-\d{2}$/.test(body.from || '') ? body.from : null;
         const to = /^\d{4}-\d{2}-\d{2}$/.test(body.to || '') ? body.to : from;
         const filters = body.filters && typeof body.filters === 'object' ? body.filters : {};
         const limit = Math.min(parseInt(body.limit, 10) || 200, 1000);
+        const searchable = BP.searchableFor(vertical);
 
-        /* 1. Which listings match the description? */
-        const active = Object.entries(filters).filter(([, v]) => v !== null && v !== undefined && v !== '');
-        let matchedSlugs = null;   // null means "no attribute filter applied"
+        // The level that carries the searchable columns is the level that
+        // produces candidate slugs — units for a condo, boats for a charter.
         const applied = [];
+        let candidateSlugs = null;
 
-        for (const [key, value] of active) {
-            const field = BP.fieldFor(vertical, key);
-            if (!field || !field.search) return fail(res, 400, `"${key}" is not searchable for ${vertical}`);
+        for (const [name, raw] of Object.entries(filters)) {
+            if (raw === null || raw === undefined || raw === '' || raw === false) continue;
+            if (Array.isArray(raw) && raw.length === 0) continue;
+            const field = searchable.find((s) => s.name === name);
+            if (!field) return fail(res, 400, `"${name}" is not searchable for ${vertical}`);
 
-            let query = supabase.from('entity_attributes').select('entity_slug').eq('attr_key', key).limit(5000);
-            if (field.search === 'min') query = query.gte('value_num', Number(value));
-            else if (field.search === 'max') query = query.lte('value_num', Number(value));
-            else if (field.search === 'has') query = query.eq('value_bool', true);
-            else if (field.search === 'eq') query = query.eq('value_text', String(value));
-            else if (field.search === 'any') {
-                const wanted = Array.isArray(value) ? value : [value];
-                // `contains` is array containment: the listing must offer ALL
-                // of what was asked for, which is the honest reading of
-                // "8 hour trips targeting red snapper".
-                query = field.type === 'multi'
-                    ? query.contains('value_list', wanted)
-                    : query.in('value_text', wanted.map(String));
-            }
-
-            const { data, error } = await query;
-            if (error) return fail(res, 500, error.message);
-
-            const found = new Set((data || []).map((r) => r.entity_slug));
-            // Intersect, never union: every filter narrows. A guest asking for
-            // 2 bedrooms AND air conditioning does not want either/or.
-            matchedSlugs = matchedSlugs === null ? found : new Set([...matchedSlugs].filter((s) => found.has(s)));
-            applied.push({ key, label: field.label, rule: field.search, value });
-            if (matchedSlugs.size === 0) break;
+            const found = await slugsMatching(schema, field, raw);
+            if (found === null) return fail(res, 400, `Cannot filter on "${name}"`);
+            candidateSlugs = candidateSlugs === null
+                ? found
+                // Intersect, never union: two bedrooms AND air conditioning.
+                : new Set([...candidateSlugs].filter((s) => found.has(s)));
+            applied.push({ name, label: field.label, rule: field.search, value: raw, table: field.table });
+            if (candidateSlugs.size === 0) break;
         }
 
-        /* 2. Which of those are in this industry, and what are they? */
+        if (candidateSlugs && candidateSlugs.size === 0) {
+            return res.json({
+                vertical, from, to, filters: applied, results: [], total: 0,
+                described: 0, reason: 'nothing matches the description',
+            });
+        }
+
+        /* Which entities are those, and are they in this industry? */
         let entityQuery = supabase
             .from('entity')
-            .select('slug, name, entity_type, entity_subtype, city, phone, email, hero_image_url, booking_url, rating, price_from, price_unit, daily_capacity, parent_slug:parent_entity_slug')
+            .select('slug, name, entity_type, entity_subtype, city, phone, email, hero_image_url, booking_url, rating, daily_capacity, parent_slug:parent_entity_slug')
             .eq('is_active', true)
             .limit(limit * 4);
-        if (matchedSlugs) {
-            if (matchedSlugs.size === 0) {
-                return res.json({ vertical, from, to, filters: applied, results: [], total: 0, reason: 'no listing matches the description' });
-            }
-            entityQuery = entityQuery.in('slug', [...matchedSlugs]);
-        }
+        if (candidateSlugs) entityQuery = entityQuery.in('slug', [...candidateSlugs]);
         if (body.q) {
             const q = String(body.q).replace(/[%,()]/g, '');
             entityQuery = entityQuery.or(`name.ilike.%${q}%,city.ilike.%${q}%`);
         }
         if (body.city) entityQuery = entityQuery.eq('city', body.city);
 
-        const { data: entities, error: entError } = await entityQuery;
-        if (entError) return fail(res, 500, entError.message);
+        const { data: entities, error } = await entityQuery;
+        if (error) return fail(res, 500, error.message);
 
-        // A matched UNIT belongs to its parent's industry, so classify by the
-        // parent when there is one — otherwise "2 bed 2 bath" matches unit
-        // 1204 and then throws it away because a condo_unit isn't a condo.
         const rows = entities || [];
         const parentSlugs = [...new Set(rows.map((e) => e.parent_slug).filter(Boolean))];
         const { data: parents } = parentSlugs.length
             ? await supabase.from('entity').select('slug, name, entity_type, entity_subtype').in('slug', parentSlugs)
             : { data: [] };
         const parentBySlug = Object.fromEntries((parents || []).map((p) => [p.slug, p]));
+        const inIndustry = rows.filter((e) =>
+            AVAIL.verticalOf(e.parent_slug ? parentBySlug[e.parent_slug] || e : e) === vertical);
 
-        const inIndustry = rows.filter((e) => {
-            const owner = e.parent_slug ? parentBySlug[e.parent_slug] : null;
-            return AVAIL.verticalOf(owner || e) === vertical;
-        });
-
-        /* 3. Of those, which are actually free? */
-        let withAvailability = inIndustry;
+        /* Of those, which are free? */
+        let ranked = inIndustry.map((e) => ({ entity: e }));
         let dates = [];
         let coverage = null;
 
         if (from) {
             dates = AVAIL.datesBetween(from, to, 120);
-            coverage = body.coverage === 'all' || body.coverage === 'any'
-                ? body.coverage
-                : AVAIL.coverageFor(vertical);
-
+            coverage = body.coverage === 'all' || body.coverage === 'any' ? body.coverage : AVAIL.coverageFor(vertical);
             const availability = await AVAIL.readAvailability({
                 from, to, slugs: inIndustry.map((e) => e.slug), publicOnly: false,
             });
-
-            const isStay = ['condo', 'hotel'].includes(vertical);
-            withAvailability = inIndustry.map((e) => {
-                const fallback = e.daily_capacity ?? (e.parent_slug && isStay ? 1 : null);
-                const summary = AVAIL.summarise(availability.get(e.slug), dates, coverage, fallback);
-                return { entity: e, ...summary };
-            });
-            if (body.only_available !== false) {
-                withAvailability = withAvailability.filter((r) => r.meets_coverage);
-            }
-        } else {
-            withAvailability = inIndustry.map((e) => ({ entity: e }));
+            const isStay = vertical === 'condo' || vertical === 'hotel';
+            ranked = inIndustry.map((e) => ({
+                entity: e,
+                ...AVAIL.summarise(
+                    availability.get(e.slug), dates, coverage,
+                    e.daily_capacity ?? (e.parent_slug && isStay ? 1 : null),
+                ),
+            }));
+            if (body.only_available !== false) ranked = ranked.filter((r) => r.meets_coverage);
         }
 
-        /* 4. Attach the attributes that were asked about, so the answer shows
-              its work rather than asserting a match. */
-        const finalSlugs = withAvailability.map((r) => r.entity.slug).slice(0, limit);
-        const { data: attrRows } = finalSlugs.length
-            ? await supabase.from('entity_attributes')
-                .select('entity_slug, attr_key, value_text, value_num, value_bool, value_list')
-                .in('entity_slug', finalSlugs)
-                .limit(5000)
-            : { data: [] };
+        /* Attach the actual rows, so the answer shows its work. */
+        const finalSlugs = ranked.slice(0, limit).map((r) => r.entity.slug);
+        const detail = await detailFor(schema, finalSlugs);
 
-        const attrsBySlug = {};
-        for (const r of attrRows || []) {
-            (attrsBySlug[r.entity_slug] ||= {})[r.attr_key] =
-                r.value_num ?? r.value_bool ?? r.value_list ?? r.value_text ?? null;
-        }
-
-        const results = withAvailability.slice(0, limit).map((r) => {
+        const results = ranked.slice(0, limit).map((r) => {
             const e = r.entity;
             const parent = e.parent_slug ? parentBySlug[e.parent_slug] : null;
             return {
@@ -1951,13 +2160,9 @@ router.post('/match', adminRequired, async (req, res) => {
                 image_url: e.hero_image_url,
                 booking_url: e.booking_url,
                 rating: e.rating,
-                price_from: e.price_from,
-                price_unit: e.price_unit,
-                // For a unit, the building it belongs to — "unit 1204" alone
-                // does not tell anyone it is at Phoenix West.
                 parent_slug: e.parent_slug || null,
                 parent_name: parent ? parent.name : null,
-                attributes: attrsBySlug[e.slug] || {},
+                record: detail[e.slug] || null,
                 available_dates: r.available_dates || [],
                 open_days: r.open_days ?? null,
                 covers_all_days: r.covers_all_days ?? null,
@@ -1967,21 +2172,116 @@ router.post('/match', adminRequired, async (req, res) => {
         });
 
         res.json({
-            vertical,
-            from,
-            to,
-            dates,
-            coverage,
+            vertical, from, to, dates, coverage,
             filters: applied,
             results,
             total: results.length,
-            described: matchedSlugs ? matchedSlugs.size : null,
+            described: candidateSlugs ? candidateSlugs.size : null,
             in_industry: inIndustry.length,
         });
     } catch (err) {
         fail(res, 500, err.message);
     }
 });
+
+/**
+ * The entity slugs whose row satisfies one filter.
+ *
+ * Every branch resolves to a set of slugs, so the caller can intersect filters
+ * that live on different tables — bedrooms on stay_units, an amenity on
+ * stay_unit_amenities — without a join it would have to write per industry.
+ */
+async function slugsMatching(schema, field, raw) {
+    const spec = field.level === 'unit' ? schema.unit : schema.listing;
+    if (!spec) return null;
+
+    // Amenities and tags are joins: find the row ids, then map back to slugs.
+    if (field.type === 'amenities' || field.type === 'tags') {
+        const wanted = (Array.isArray(raw) ? raw : [raw]).map(String);
+        const fkColumn = field.type === 'amenities' ? 'amenity_id' : field.catalogFk;
+        const { data } = await supabase
+            .from(field.table)
+            .select(`${field.fk}, ${fkColumn}`)
+            .in(fkColumn, wanted)
+            .limit(20000);
+
+        // Every requested amenity, not any — someone asking for a washer AND a
+        // dishwasher does not want a place with only one of them.
+        const counts = {};
+        for (const r of data || []) {
+            (counts[r[field.fk]] ||= new Set()).add(r[fkColumn]);
+        }
+        const ids = Object.keys(counts).filter((id) => counts[id].size >= wanted.length);
+        if (ids.length === 0) return new Set();
+        return rowIdsToSlugs(spec, ids);
+    }
+
+    // A collection filter — trip duration, package price — matches the parent
+    // row, then the parent row maps to a slug.
+    if (field.level === 'collection') {
+        let query = supabase.from(field.table).select(field.fk).limit(20000);
+        query = applyComparison(query, field, raw);
+        const { data } = await query;
+        const ids = [...new Set((data || []).map((r) => r[field.fk]))];
+        if (ids.length === 0) return new Set();
+        // Collections hang off whichever level declared them.
+        const owner = (schema.listing?.collections || []).some((c) => c.table === field.table)
+            ? schema.listing : schema.unit;
+        return rowIdsToSlugs(owner, ids);
+    }
+
+    let query = supabase.from(spec.table).select(spec.key).limit(20000);
+    query = applyComparison(query, field, raw);
+    const { data } = await query;
+    return new Set((data || []).map((r) => r[spec.key]).filter(Boolean));
+}
+
+function applyComparison(query, field, raw) {
+    switch (field.search) {
+        case 'min': return query.gte(field.name, Number(raw));
+        case 'max': return query.lte(field.name, Number(raw));
+        case 'has': return query.eq(field.name, true);
+        case 'eq': return query.eq(field.name, String(raw));
+        case 'any': {
+            const list = (Array.isArray(raw) ? raw : [raw]).map(String);
+            return query.in(field.name, list);
+        }
+        default: return query;
+    }
+}
+
+/** Row ids on an industry table → the entity slugs they belong to. */
+async function rowIdsToSlugs(spec, ids) {
+    if (!spec) return new Set();
+    const { data } = await supabase
+        .from(spec.table)
+        .select(`id, ${spec.key}`)
+        .in('id', ids)
+        .limit(20000);
+    return new Set((data || []).map((r) => r[spec.key]).filter(Boolean));
+}
+
+/** The industry row for each result, so the UI can show what matched. */
+async function detailFor(schema, slugs) {
+    if (slugs.length === 0) return {};
+    const out = {};
+    for (const level of ['unit', 'listing']) {
+        const spec = schema[level];
+        if (!spec || spec.multiple) continue;
+        const { data } = await supabase
+            .from(spec.table)
+            .select('*')
+            .in(spec.key, slugs)
+            .limit(1000);
+        for (const row of data || []) {
+            // The unit's own row wins over the building's — a search result IS
+            // the unit, and its bedrooms are the interesting number.
+            if (!out[row[spec.key]]) out[row[spec.key]] = row;
+        }
+    }
+    return out;
+}
+
 
 /* ── summary ─────────────────────────────────────────────────────────── */
 //
