@@ -86,6 +86,12 @@ mount('/api/admin/analytics', () => require('./routes/admin-analytics'));
 // slug-keyed table. Proposes only — nothing is written without review.
 mount('/api/admin/gcr', () => require('./routes/ingest'));
 
+// Intake: a business submits its links, every listening webhook is told, and
+// the operator works the queue. The public POST /api/intake only creates a
+// request; reading and updating the queue is admin-only.
+mount('/api/intake', () => require('./routes/intake'));
+mount('/api/admin/intake', () => require('./routes/intake'));
+
 // The embeddable availability calendar a business drops into its own website,
 // plus the JSON it reads. Public and unauthenticated by design — it runs on
 // anonymous visitors' browsers on other people's domains — and returns only
