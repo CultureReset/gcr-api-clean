@@ -1,3 +1,11 @@
+-- ############################################################
+-- ##  DO NOT RUN. See HANDOFF.md in the repository root.    ##
+-- ##                                                        ##
+-- ##  This file was written against the WRONG database and  ##
+-- ##  has never been validated against the real one         ##
+-- ##  (Supabase project "cyber check" / mkepugvdlktfsossumox).##
+-- ############################################################
+
 -- Catalog rows for the capability tables.
 --
 -- `category` on each catalog is a plain grouping column so a form can show

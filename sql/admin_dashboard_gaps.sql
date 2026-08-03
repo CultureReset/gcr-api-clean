@@ -1,3 +1,11 @@
+-- ############################################################
+-- ##  DO NOT RUN. See HANDOFF.md in the repository root.    ##
+-- ##                                                        ##
+-- ##  This file was written against the WRONG database and  ##
+-- ##  has never been validated against the real one         ##
+-- ##  (Supabase project "cyber check" / mkepugvdlktfsossumox).##
+-- ############################################################
+
 -- Tables the admin dashboard needs that don't exist yet.
 --
 -- Small on purpose. Most of the gap was covered by tables that already exist:

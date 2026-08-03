@@ -1,3 +1,11 @@
+-- ############################################################
+-- ##  DO NOT RUN. See HANDOFF.md in the repository root.    ##
+-- ##                                                        ##
+-- ##  This file was written against the WRONG database and  ##
+-- ##  has never been validated against the real one         ##
+-- ##  (Supabase project "cyber check" / mkepugvdlktfsossumox).##
+-- ############################################################
+
 -- Composio connections.
 --
 -- Two catalog tables an admin curates, and one table recording which business

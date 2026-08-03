@@ -1,3 +1,11 @@
+-- ############################################################
+-- ##  DO NOT RUN. See HANDOFF.md in the repository root.    ##
+-- ##                                                        ##
+-- ##  This file was written against the WRONG database and  ##
+-- ##  has never been validated against the real one         ##
+-- ##  (Supabase project "cyber check" / mkepugvdlktfsossumox).##
+-- ############################################################
+
 -- Schema the admin ingestion views depend on.
 --
 -- Deliberately tiny. The routes added for Booking Sources, Inventory &
