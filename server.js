@@ -21,9 +21,24 @@ const PORT = process.env.PORT || 3000;
  * refusing them would break every integration without protecting anything, as
  * anything that can omit an Origin header can also forge one.
  */
+// The origins that exist today, baked in so this file is correct with no
+// configuration at all. CORS_ORIGINS adds to this list; it does not replace
+// it, so forgetting to set it cannot take the dashboards down.
+//
+// Per-deploy preview hostnames are deliberately absent and cannot be added:
+// Vercel mints a new one on every push. Test against the stable domains.
 const DEFAULT_ORIGINS = [
     'https://gulfcoastradar.com',
     'https://www.gulfcoastradar.com',
+    'https://dashboard.gulfcoastradar.com',
+    // The business dashboard (Vercel project: dashboards-users)
+    'https://dashboards-users.vercel.app',
+    'https://dashboards-users-cyber-check.vercel.app',
+    // The admin dashboard (Vercel project: admin-dashboard-main)
+    'https://admin-dashboard-main.vercel.app',
+    'https://admin-dashboard-main-cyber-check.vercel.app',
+    // The public tourist site
+    'https://gcr-unified.vercel.app',
 ];
 
 const allowedOrigins = new Set(
