@@ -49,6 +49,24 @@ const router = express.Router();
  */
 const newSessionSecret = () => `${crypto.randomBytes(24).toString('base64url')}Aa1!`;
 
+/**
+ * The Supabase account identity for a phone number.
+ *
+ * Supabase Auth is asked for an EMAIL account, never a phone one. Phone
+ * accounts require the phone provider to be switched on in the project, and it
+ * is not — auth.users holds 17 accounts and every one of them is email. Twilio
+ * Verify is what proves the number; Supabase only has to store the account, so
+ * the number is folded into a derived address and nothing else changes.
+ *
+ * The real number lives on the entity and in user_metadata, so it is still
+ * queryable and still shown in the dashboard.
+ *
+ * Its own domain, deliberately not the one tourist sign-up derives. These are
+ * separate systems and their address spaces must not collide.
+ */
+const PHONE_LOGIN_DOMAIN = process.env.BUSINESS_PHONE_LOGIN_DOMAIN || 'phone.biz.gulfcoastradar.com';
+const loginEmailFor = (phone) => `${String(phone).replace(/\D/g, '')}@${PHONE_LOGIN_DOMAIN}`;
+
 /* ── Twilio, this file's own ─────────────────────────────────────────────
  *
  * Verify — not Programmable Messaging. Verify sends through Twilio's own
@@ -332,11 +350,16 @@ router.post('/register', async (req, res) => {
         const slug = await uniqueSlug(name);
 
         const { data: authData, error: authError } = await db.auth.admin.createUser({
-            phone,
-            phone_confirm: true,
+            email: loginEmailFor(phone),
+            email_confirm: true,
             password: sessionSecret,
-            ...(email ? { email, email_confirm: true } : {}),
-            user_metadata: { business_name: name, gcr_slug: slug, signup_source: 'business-phone' },
+            user_metadata: {
+                business_name: name,
+                gcr_slug: slug,
+                signup_source: 'business-phone',
+                phone,                       // the real number, for the dashboard
+                contact_email: email || null, // theirs, if they gave one
+            },
         });
         if (authError) {
             const taken = /already|registered|exists/i.test(authError.message || '');
@@ -390,8 +413,10 @@ router.post('/register', async (req, res) => {
         res.status(201).json({
             slug: entity.slug,
             entity: { id: entity.id, slug: entity.slug, name: entity.name },
-            // One-time secret the browser signs in with right now. Not a
-            // password the business has, knows, or ever needs again.
+            // The address Supabase knows this account by, and a one-time
+            // secret to sign in with right now. Neither is a credential the
+            // business has, sees, or ever needs again — the phone is the login.
+            login_email: loginEmailFor(phone),
             session_secret: sessionSecret,
             phone,
             pending_review: true,
@@ -444,17 +469,26 @@ router.post('/signin-verify', async (req, res) => {
         return res.status(400).json({ error: 'That code is not right, or it expired.' });
     }
 
-    // Find the account behind the number. listUsers is paged, so filter by
-    // phone rather than pulling everyone.
-    const { data: list, error: listError } = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
-    if (listError) return res.status(500).json({ error: listError.message });
-    const user = (list?.users || []).find((u) => normalizePhone(u.phone) === phone);
-    if (!user) {
+    // The account behind the number, found in our own table. business_signups
+    // already records user_id against the phone at registration, so this is a
+    // direct indexed lookup rather than paging through every account on the
+    // platform to find one email.
+    const { data: signup, error: lookupError } = await db
+        .from('business_signups')
+        .select('user_id, entity_slug')
+        .eq('phone', phone)
+        .not('user_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+    if (lookupError) return res.status(500).json({ error: lookupError.message });
+    if (!signup) {
         return res.status(404).json({
             error: 'No business is set up on that number yet.',
             hint: 'Add your business first — it only takes the number you just verified.',
         });
     }
+    const user = { id: signup.user_id };
 
     // Rotate. The previous secret dies here, so a leaked one is worthless
     // after the next sign-in.
@@ -471,8 +505,11 @@ router.post('/signin-verify', async (req, res) => {
     res.json({
         success: true,
         phone,
+        // The address Supabase knows this account by. The browser signs in
+        // with it plus the secret above; neither is ever shown to the owner.
+        login_email: loginEmailFor(phone),
         session_secret: sessionSecret,
-        entity_slug: owned?.[0]?.entity_slug || null,
+        entity_slug: owned?.[0]?.entity_slug || signup.entity_slug || null,
     });
 });
 
