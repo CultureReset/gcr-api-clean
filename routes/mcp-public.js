@@ -27,8 +27,9 @@
 // both.
 
 const db = require('../db');
-const { createMcpRouter, content } = require('../lib/mcpServer');
+const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { CONCIERGE_TOOLS, runConciergeTool } = require('../lib/conciergeTools');
+const { publicTables, allowPublicTable, scrubRow, getSchema, textColumns } = require('../lib/businessTables');
 
 const SERVER_INFO = { name: 'gulf-coast-radar', title: 'Gulf Coast Radar', version: '1.0.0' };
 
@@ -136,8 +137,119 @@ const PINNED_TOOLS = CONCIERGE_TOOLS.map((tool) => {
     };
 });
 
+/* ── discovery: any table this business actually uses ─────────────────────
+ *
+ * The curated tools above answer the questions the website asks — menu, hours,
+ * prices, what's on. They cannot answer the rest, because there is no fixed set
+ * of tables to curate: every table in this database is keyed by entity_slug and
+ * a business may use any of them. A dive shop fills tables a bakery never
+ * touches, and both are real.
+ *
+ * So these two ask the schema instead of a list. list_sections returns the
+ * tables that actually hold rows for this business, read_section returns them.
+ * Nothing is enumerated in code, so a table added to the database is answerable
+ * the same day with no deploy — and a business that has not filled a table
+ * simply has no section for it, which is why the agent declines instead of
+ * inventing: there is nothing there to read.
+ *
+ * The line these do not cross is in lib/businessTables.js. Tables holding other
+ * people — bookings, customers, waivers, message logs, credentials — are out,
+ * because this URL takes no credential and that data is not the business's to
+ * publish. Sensitive columns are stripped again on the way out.
+ */
+
+const DISCOVERY_TOOLS = [
+    {
+        name: 'list_sections',
+        title: 'What else is on file for this business',
+        description:
+            'Every section of published information this business actually has, with a row count for each — beyond the menu and hours the other tools cover. Businesses differ: a charter has trips and fish species, a spa has treatments, a rental has units. Call this when a question is not answered by get_business_details, then read_section to answer it.',
+        inputSchema: { type: 'object', properties: {} },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    {
+        name: 'read_section',
+        title: 'Read one section',
+        description:
+            'The rows of one section for this business, optionally filtered by a search across its text. Returns exactly what is stored — quote it, do not paraphrase figures. If a section is not in list_sections this business has not filled it in, and the honest answer is that you do not have it.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                section: { type: 'string', description: 'A section name from list_sections.' },
+                search: { type: 'string', description: 'Match this text anywhere in the section.' },
+                limit: { type: 'integer', description: 'Rows to return, 1-200. Default 50.' },
+            },
+            required: ['section'],
+        },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+];
+
+const PUBLIC_ROW_LIMIT = 200;
+const COUNT_CONCURRENCY = 24;
+
+async function mapLimit(items, limit, worker) {
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (cursor < items.length) await worker(items[cursor++]);
+    }));
+}
+
+async function runDiscoveryTool(name, a, caller) {
+    if (name === 'list_sections') {
+        const tables = await publicTables();
+        const found = [];
+        await mapLimit(tables, COUNT_CONCURRENCY, async (table) => {
+            const { count, error } = await db
+                .from(table)
+                .select('id', { count: 'exact', head: true })
+                .eq('entity_slug', caller.slug);
+            // A section that cannot be counted must not take the list with it.
+            if (!error && count) found.push({ section: table, rows: count });
+        });
+        found.sort((x, y) => y.rows - x.rows || x.section.localeCompare(y.section));
+        return content({
+            business: caller.name,
+            sections: found,
+            note: found.length
+                ? 'These are the sections this business has filled in. Anything not listed here, they have not published — say so rather than guessing.'
+                : 'This business has not published any extra sections yet.',
+        });
+    }
+
+    // read_section
+    const table = await allowPublicTable(String(a.section || '').trim());
+    if (!table) {
+        return toolError(`There is no published section called "${a.section}". Call list_sections to see what this business has.`);
+    }
+
+    const limit = Math.min(Math.max(Number(a.limit) || 50, 1), PUBLIC_ROW_LIMIT);
+    const query = db.from(table).select('*', { count: 'exact' }).eq('entity_slug', caller.slug).limit(limit);
+
+    const term = typeof a.search === 'string' ? a.search.trim() : '';
+    if (term) {
+        // PostgREST's or() is a comma-separated list wrapped in its own
+        // punctuation, so characters that would end a clause early are stripped.
+        const safe = term.replace(/[,()*%\\]/g, ' ').trim();
+        const cols = await textColumns(table);
+        if (safe && cols.length) query.or(cols.map((c) => `${c}.ilike.%${safe}%`).join(','));
+    }
+
+    const { data, error, count } = await query;
+    if (error) return toolError(`Could not read ${table}: ${error.message}`);
+    if (!data?.length) {
+        return content({ section: table, rows: [], note: 'Nothing on file here for this business. Say you do not have it.' });
+    }
+
+    return content({ section: table, rows: data.map(scrubRow), returned: data.length, total: count ?? null });
+}
+
+const DISCOVERY_NAMES = new Set(DISCOVERY_TOOLS.map((t) => t.name));
+
 async function runPinnedTool(name, args, caller) {
     const a = { ...(args && typeof args === 'object' ? args : {}) };
+    if (DISCOVERY_NAMES.has(name)) return runDiscoveryTool(name, a, caller);
+
     // "How late are you open" arrives with no slug, because from the caller's
     // side there is only one business in the conversation.
     if (['get_business_details', 'check_availability'].includes(name) && !a.slug) a.slug = caller.slug;
@@ -152,6 +264,9 @@ const pinnedInstructions = (caller) => [
     '',
     `  • get_business_details and check_availability already know who you are — call them with no`,
     `    arguments for hours, the menu, prices, policies and today's availability.`,
+    '  • If that does not answer it, call list_sections. Businesses keep different things on file —',
+    '    trips, treatments, units, fish species, whatever this one actually does — and read_section',
+    '    reads any of them. This is how you answer a question the standard tools do not cover.',
     '  • whats_on tells you what is happening across the whole coast tonight, including here.',
     '  • search_businesses, find_item_prices and compare_businesses reach every other business.',
     '    Use them when someone wants something this business does not do — sending them somewhere',
@@ -166,7 +281,7 @@ const pinnedInstructions = (caller) => [
 module.exports.pinned = createMcpRouter({
     serverInfo: { name: 'gulf-coast-radar-business', title: 'Gulf Coast Radar — one business', version: '1.0.0' },
     instructions: pinnedInstructions,
-    tools: PINNED_TOOLS,
+    tools: [...PINNED_TOOLS, ...DISCOVERY_TOOLS],
     runTool: runPinnedTool,
     authenticate: pinToSlug,
 });

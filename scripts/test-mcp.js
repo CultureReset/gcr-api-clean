@@ -108,6 +108,17 @@ const schemaStub = {
         return out;
     },
     textColumns: async () => ['name'],
+    // The public boundary, stubbed to the same shape the real one has.
+    publicTables: async () => ['menu_items', 'faqs'],
+    allowPublicTable: async (n) => (['menu_items', 'faqs'].includes(n) ? n : null),
+    scrubRow: (row) => {
+        const out = {};
+        for (const [k, v] of Object.entries(row || {})) {
+            if (/email|phone_number|token/i.test(k)) continue;
+            out[k] = v;
+        }
+        return out;
+    },
 };
 
 function inject(file, exports) {
@@ -344,6 +355,35 @@ async function run() {
     });
     check('an explicit slug still looks up another business — this is public data',
         conciergeCalls[0]?.input?.slug === 'somewhere-else');
+
+    console.log('\n── the slug-attached agent can read any table the business uses ──');
+    const discTools = pinTools.body.result.tools.map((t) => t.name);
+    check('list_sections is offered', discTools.includes('list_sections'));
+    check('read_section is offered', discTools.includes('read_section'));
+    check('no write tool is', !discTools.some((n) => /create|update|delete/.test(n)));
+
+    const sections = await pinRpc('flora-bama', {
+        jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_sections', arguments: {} },
+    });
+    check('only sections with rows are listed',
+        sections.body.result.structuredContent.sections.every((s) => s.rows > 0));
+
+    calls.length = 0;
+    const readOne = await pinRpc('flora-bama', {
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'read_section', arguments: { section: 'menu_items' } },
+    });
+    const readQuery = calls.find((c) => c.table === 'menu_items');
+    check('the read is scoped to the slug in the URL', readQuery.eq.entity_slug === 'flora-bama',
+        JSON.stringify(readQuery.eq));
+    check('rows come back', readOne.body.result.structuredContent.rows.length === 1);
+
+    const refused = await pinRpc('flora-bama', {
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'read_section', arguments: { section: 'bookings' } },
+    });
+    check('a table holding other people is refused', refused.body.result?.isError === true,
+        JSON.stringify(refused.body).slice(0, 140));
 
     entityExists = false;
     const missing = await pinRpc('not-a-business', { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });

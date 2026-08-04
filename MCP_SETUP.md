@@ -105,8 +105,7 @@ No credentials in either command. If the second returns priced rows, the voice a
 https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama
 ```
 
-Same seven tools, same no-token setup — the slug in the URL is the whole
-configuration. The agent knows which business it is without being told:
+Nine tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
 `get_business_details` and `check_availability` take no arguments and mean
 *here*, and the instruction block it receives on connect names the business, its
 city and its own phone number.
@@ -115,6 +114,45 @@ It keeps the coast-wide tools on purpose. The question after "are you open" is
 usually "well who is", and a local who only knows one address is not a local —
 sending someone to a real place down the road is better service than turning
 them away.
+
+## It reads any table the business actually uses
+
+There is no fixed set of tables in this database. Every table is keyed by
+`entity_slug`, and any business may use any of them — a charter fills tables a
+bakery never touches, and both are real. So on top of the seven curated tools it
+gets two that ask the schema instead of a list:
+
+| Tool | |
+| --- | --- |
+| `list_sections` | every section this business actually has rows in, with counts |
+| `read_section` | the rows of one, searchable |
+
+Nothing is enumerated in code, so a table added to the database is answerable
+the same day with no deploy. And the "won't answer without data" property falls
+out for free: a business that has not filled a table simply has no section for
+it, so there is nothing to read and the agent says so.
+
+## Where the line is, and why there has to be one
+
+The owner's agent (section 3) sees **every** table with rows for its slug. This
+one cannot, and the reason is not the schema — it is whose data is in it.
+
+`bookings`, `customers`, `signed_waivers`, `business_leads`, `sms_log`,
+`entity_owners`, `oauth_tokens` and about forty more are all keyed by the
+business's slug, and none of them are the business's own information. They are
+other people's: names, numbers, what they paid, what they signed. This URL takes
+no credential, so anyone who can type it would reach them.
+
+`lib/businessTables.js` draws that line by what a table holds — people who are
+not the business, money and commitments, credentials, anything sent to someone,
+platform telemetry, unpublished drafts. A table added tomorrow is private until
+somebody decides otherwise, which is the safe direction to fail in. Sensitive
+columns are stripped again on the way out, for the reviewer's email address on
+an otherwise public table.
+
+`npm run test:concierge` asserts the classification on 52 real table names.
+
+## Errors
 
 An unknown or delisted slug answers `404`, not `401`, so nobody goes hunting for
 a token they never needed.
@@ -210,8 +248,8 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 46 checks — the protocol, the token scoping, the slug scoping
-npm run test:concierge # 32 checks — whats_on's day and time filtering, against a fixed clock
+npm run test:mcp       # 53 checks — the protocol, the token scoping, the slug scoping
+npm run test:concierge # 36 checks — whats_on's day/time filtering, and the public/private table line
 ```
 
 The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.

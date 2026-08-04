@@ -150,6 +150,31 @@ async function run() {
     check('sorts the biggest category first', cats.categories[0].category === 'Eat & drink');
     check('drops rows with no category', !cats.categories.some((c) => c.category === null));
 
+    console.log('\n── the public boundary ──');
+    const { PRIVATE_TABLE } = require(path.join(ROOT, 'lib/businessTables.js'));
+    const mustBePrivate = [
+        'bookings', 'entity_bookings', 'charter_bookings', 'booking_holds', 'booking_funnel',
+        'customers', 'customer_live_photos', 'signed_waivers', 'business_leads', 'leads',
+        'entity_owners', 'oauth_tokens', 'business_mcp_tokens', 'business_signups', 'business_claims',
+        'sms_log', 'dashboard_sms_log', 'sms_blast_log', 'email_webhook_log', 'messages', 'ai_messages',
+        'orders', 'order_links', 'coupon_claims', 'loyalty_programs', 'intake_requests',
+        'session_events', 'sms_qr_scans', 'tourist_memories',
+    ];
+    const mustBePublic = [
+        'menu_items', 'menu_sections', 'drink_items', 'happy_hour_sections', 'happy_hour_items',
+        'entity_events', 'entity_specials', 'entity_hours', 'entity_photos', 'entity_tags',
+        'entity_amenities', 'entity_faqs', 'entity_offer', 'entity_offer_price', 'entity_offer_fee',
+        'entity_team', 'entity_reviews', 'entity_policies', 'entity_refund_policy',
+        'inventory_items', 'bookable_resources', 'weather_rules', 'business_availability',
+    ];
+    const leaks = mustBePrivate.filter((t) => !PRIVATE_TABLE.test(t));
+    const blocked = mustBePublic.filter((t) => PRIVATE_TABLE.test(t));
+    check(`${mustBePrivate.length} tables holding other people are private`, !leaks.length, leaks.join(', '));
+    check(`${mustBePublic.length} tables the website already shows stay public`, !blocked.length, blocked.join(', '));
+    check('"entity_reviews" is not caught by the view/tracking rule', !PRIVATE_TABLE.test('entity_reviews'));
+    check('a table nobody has classified yet defaults to private if it names people',
+        PRIVATE_TABLE.test('guest_feedback') && PRIVATE_TABLE.test('customer_notes'));
+
     console.log('\n── unknown ──');
     check('an unknown tool returns null', (await runConciergeTool('nope', {})) === null);
 
