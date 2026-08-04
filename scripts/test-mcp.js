@@ -298,6 +298,10 @@ async function run() {
 
     const pubInit = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
+    check('and forbid sending people to the website or a phone number',
+        /never tell anyone to\s+ring the business, check its website/i.test(pubInit.body.result.instructions));
+    check('a missing figure is answered, not deflected',
+        /have not published it/i.test(pubInit.body.result.instructions));
 
     conciergeCalls.length = 0;
     const found = await pubRpc({
@@ -370,7 +374,8 @@ async function run() {
     const pinInit = await pinRpc('flora-bama', { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('a slug in the URL is the whole setup', pinInit.status === 200);
     check('it knows which business it is', /You answer for Flora-Bama/.test(pinInit.body.result.instructions));
-    check('and its own phone number', /555-0100/.test(pinInit.body.result.instructions));
+    check('the pinned agent is told it is the last stop, not a switchboard',
+        /last stop, not a switchboard/i.test(pinInit.body.result.instructions));
 
     const pinTools = await pinRpc('flora-bama', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
     const detailTool = pinTools.body.result.tools.find((t) => t.name === 'get_business_details');
