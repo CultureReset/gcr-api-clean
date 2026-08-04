@@ -47,9 +47,9 @@ Everything it returns is already on the public website. A token would protect no
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
 | `check_availability` | today's remaining spots, for businesses that publish it |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
-| `read_business` | **give it a slug, get everything that business has** — every section it uses and the rows in each, in one call. The agent never needs to know which table anything lives in |
-| `list_sections` | given a slug, the sections and their row counts — for large businesses |
-| `read_section` | given a slug and a section, the rows |
+| `read_business` | **give it a slug, get everything that business has** — every section, every row, in one call. The agent never needs to know which table an answer lives in |
+| `list_sections` | the sections and their row counts — an index, when you only need to know whether something exists |
+| `read_section` | one section narrowed by a search term |
 
 Five of these are not new. `search_businesses`, `get_business_details`, `check_availability`, `find_item_prices` and `compare_businesses` are what the tourist chat already runs on, lifted out of `routes/tourist.js` into `lib/conciergeTools.js` so both use one copy. `whats_on` and `list_categories` were added because the site displays them and nothing else could answer by time or by category. `search_businesses` reaches the same deep index as the website's search bar. Improving the search improves the phone agent, the web chat and the website at the same time.
 
@@ -287,7 +287,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 63 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 65 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 37 checks — whats_on's day/time filtering, and the public/private table line
 ```
 

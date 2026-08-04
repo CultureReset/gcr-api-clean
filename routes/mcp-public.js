@@ -71,12 +71,13 @@ const INSTRUCTIONS = [
  * The curated tools answer the questions the website asks. These two answer the
  * rest, and they are what makes one agent enough for the whole platform.
  *
- * A business is a slug. Every table in this database hangs off a slug. So given
- * a slug, the schema itself says what that business has on file — a charter's
- * fish species, a spa's treatments, a rental's units — and read_section reads
- * any of it. Nothing is enumerated in code, so a hundred thousand businesses
- * and every table they use are reachable through the same two tools, and a
- * table added to the database is answerable the same day with no deploy.
+ * A business is a slug. Every table in this database hangs off a slug, and any
+ * business may fill any of them — hours, FAQs, photos and policies are the same
+ * tables for a bakery and a dive charter. So given a slug, the database itself
+ * says what that business has on file. Nothing is enumerated in code, so a
+ * hundred thousand businesses and every table they use are reachable through
+ * the same tools, and a table added to the database is answerable the same day
+ * with no deploy.
  *
  * A business that has not filled a table has no section for it, which is why an
  * agent declines instead of inventing: there is nothing there to read.
@@ -87,12 +88,12 @@ const DISCOVERY_TOOLS = [
         name: 'read_business',
         title: 'Everything on file for one business',
         description:
-            'Give it a slug and it returns everything that business has — every section it uses and the rows in each, in one call. This is the tool to reach for when a question is about a specific business and you do not already know which section holds the answer. Prefer it over list_sections + read_section unless the business is large and you only need one section.',
+            'Give it a slug and it returns everything that business has — every section it uses and every row in each, in one call. Reach for this whenever a question is about a specific business: you never need to know which table an answer lives in, only the slug. Anything absent from the result, that business has not published.',
         inputSchema: {
             type: 'object',
             properties: {
                 slug: { type: 'string', description: 'The business\'s slug, from search_businesses.' },
-                rows_per_section: { type: 'integer', description: 'Rows to include from each section, 1-100. Default 25.' },
+                rows_per_section: { type: 'integer', description: 'Optional ceiling per section. Leave it out to get every row.' },
             },
             required: ['slug'],
         },
@@ -102,7 +103,7 @@ const DISCOVERY_TOOLS = [
         name: 'list_sections',
         title: 'What a business has on file',
         description:
-            'Every section of information one business actually has, with a row count for each. Businesses differ — a charter has trips and fish species, a spa has treatments, a rental has units — so call this whenever a question is not answered by get_business_details, then read_section to answer it. Anything not listed, that business has not filled in.',
+            'The sections one business has on file and how many rows are in each — an index rather than the data. read_business returns the data itself and is usually what you want; use this when you only need to know whether something exists, or which section to read on a very large business.',
         inputSchema: {
             type: 'object',
             properties: { slug: { type: 'string', description: 'The business\'s slug, from search_businesses.' } },
@@ -114,7 +115,7 @@ const DISCOVERY_TOOLS = [
         name: 'read_section',
         title: 'Read one section of one business',
         description:
-            'The rows of one section for one business, optionally filtered by a search across its text. Returns exactly what is stored — quote it, do not paraphrase figures. If the section is not in list_sections for that business, the honest answer is that you do not have it.',
+            'One section of one business, optionally filtered by a search across its text. Returns exactly what is stored — quote it, do not paraphrase figures. read_business already returns every section, so reach for this only when you want one of them narrowed by a search term.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -164,35 +165,55 @@ async function listSections(slug) {
 }
 
 /**
+ * Every row a table holds for one slug.
+ *
+ * PostgREST silently caps a select with no range at 1,000 rows, which is how a
+ * synced catalogue of 1,070 showed up as 1,000 and looked fine. A short page is
+ * the only reliable end-of-data signal, so this walks ranges until it gets one.
+ */
+const PAGE = 1000;
+async function allRowsFor(table, slug, cap = Infinity) {
+    const out = [];
+    for (let from = 0; out.length < cap; from += PAGE) {
+        const size = Math.min(PAGE, cap - out.length);
+        const { data, error } = await db
+            .from(table)
+            .select('*')
+            .eq('entity_slug', slug)
+            .range(from, from + size - 1);
+        // A section that cannot be read must not take the whole business with it.
+        if (error) break;
+        out.push(...(data || []));
+        if (!data || data.length < size) break; // short page = last page
+    }
+    return out;
+}
+
+/**
  * Everything on file for one slug, in one call.
  *
  * The slug is the entry point, not the table. An agent asked "do they allow
- * dogs" should not have to know which section that lives in — it hands over the
- * slug and gets what the business has, whatever tables that turns out to be.
+ * dogs" should not have to work out which section that lives in — it hands over
+ * the slug and gets what the business has.
  *
- * Every table with an entity_slug column is swept in parallel and the ones with
- * no rows for this business simply do not come back. That is also why an agent
- * declines instead of inventing: an unfilled table is an absent section, not an
- * empty one it might talk around.
+ * Every table with an entity_slug column is swept in parallel, in full. The
+ * tables are shared: hours, FAQs, photos and policies are the same tables for a
+ * bakery and a dive charter, and either may fill any of the rest. Nothing here
+ * decides which ones belong to which kind of business — a table with rows for
+ * this slug is a section, and a table without is absent.
+ *
+ * That absence is what keeps an agent honest. An unfilled table does not come
+ * back empty for the model to talk around; it does not come back at all.
  */
 async function readBusiness(slug, a) {
-    const perSection = Math.min(Math.max(Number(a.rows_per_section) || 25, 1), 100);
+    // A ceiling only if the caller asks for one. Left alone it returns the lot.
+    const cap = Number(a.rows_per_section) > 0 ? Number(a.rows_per_section) : Infinity;
     const tables = await publicTables();
 
     const sections = {};
-    let truncated = 0;
     await mapLimit(tables, COUNT_CONCURRENCY, async (table) => {
-        const { data, error, count } = await db
-            .from(table)
-            .select('*', { count: 'exact' })
-            .eq('entity_slug', slug)
-            .limit(perSection);
-        if (error || !data?.length) return;
-        sections[table] = data.map(scrubRow);
-        if (count && count > data.length) {
-            truncated += 1;
-            sections[table].push({ _more: `${count - data.length} further rows — call read_section for the rest.` });
-        }
+        const rows = await allRowsFor(table, slug, cap);
+        if (rows.length) sections[table] = rows.map(scrubRow);
     });
 
     const names = Object.keys(sections);
@@ -200,8 +221,9 @@ async function readBusiness(slug, a) {
         slug,
         sections,
         section_count: names.length,
+        row_count: names.reduce((n, t) => n + sections[t].length, 0),
         note: names.length
-            ? `Everything ${slug} has on file${truncated ? `, with ${truncated} section(s) cut short` : ''}. Anything not here, they have not published — say so rather than guessing.`
+            ? `Everything ${slug} has on file. Anything not here, they have not published — say so rather than guessing.`
             : `${slug} has nothing on file beyond its listing. Say you do not have it.`,
     };
 }

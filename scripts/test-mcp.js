@@ -336,6 +336,10 @@ async function run() {
     const swept = whole.body.result.structuredContent;
     check('one slug returns every section that has rows', swept.section_count > 0 && !!swept.sections.menu_items);
     check('a section with no rows is absent, not empty', !('faqs' in swept.sections));
+    check('nothing is truncated or told to call another tool',
+        !JSON.stringify(swept).includes('for the rest'));
+    check('the sweep pages with range() rather than a capped select',
+        calls.filter((c) => c.table === 'menu_items').some((c) => Array.isArray(c.range)));
     check('every sweep query filtered on that slug',
         calls.filter((c) => c.eq.entity_slug).every((c) => c.eq.entity_slug === 'flora-bama'));
 
