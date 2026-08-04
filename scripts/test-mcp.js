@@ -111,6 +111,7 @@ const schemaStub = {
     // The public boundary, stubbed to the same shape the real one has.
     publicTables: async () => ['menu_items', 'faqs'],
     allowPublicTable: async (n) => (['menu_items', 'faqs'].includes(n) ? n : null),
+    whyPrivate: (t) => (['menu_items', 'faqs'].includes(t) ? null : 'holds a "customer_email" column — these rows are about a person'),
     scrubRow: (row) => {
         const out = {};
         for (const [k, v] of Object.entries(row || {})) {

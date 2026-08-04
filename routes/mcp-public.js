@@ -29,7 +29,7 @@
 const db = require('../db');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { CONCIERGE_TOOLS, runConciergeTool } = require('../lib/conciergeTools');
-const { publicTables, allowPublicTable, scrubRow, getSchema, textColumns } = require('../lib/businessTables');
+const { publicTables, allowPublicTable, scrubRow, getSchema, textColumns, whyPrivate } = require('../lib/businessTables');
 
 const SERVER_INFO = { name: 'gulf-coast-radar', title: 'Gulf Coast Radar', version: '1.0.0' };
 
@@ -310,7 +310,6 @@ pinned.get('/sections', async (req, res) => {
         return res.status(502).json({ error: err.message });
     }
 
-    const open = new Set(await publicTables());
     const visible = [];
     const withheld = [];
 
@@ -320,7 +319,11 @@ pinned.get('/sections', async (req, res) => {
             .select('id', { count: 'exact', head: true })
             .eq('entity_slug', caller.slug);
         if (error || !count) return;
-        (open.has(table) ? visible : withheld).push({ section: table, rows: count });
+        // whyPrivate names the column that decided it, so a wrong call is
+        // something you can see the reason for rather than argue with.
+        const why = whyPrivate(table, schema.columns[table]);
+        if (why) withheld.push({ section: table, rows: count, reason: why });
+        else visible.push({ section: table, rows: count });
     });
 
     const bySize = (a, b) => b.rows - a.rows || a.section.localeCompare(b.section);
@@ -332,7 +335,7 @@ pinned.get('/sections', async (req, res) => {
         // messages and credentials — keyed by its slug, but not its to publish
         // through a URL that takes no password.
         held_back: withheld.sort(bySize),
-        note: 'Counts only, no rows. If something in held_back should be public, or something readable should not be, say which and the rule moves.',
+        note: 'Counts and reasons only, never rows. The reason names the column that decided it — if a section is on the wrong side, that column is the thing to argue with.',
     });
 });
 

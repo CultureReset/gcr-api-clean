@@ -151,30 +151,47 @@ async function run() {
     check('drops rows with no category', !cats.categories.some((c) => c.category === null));
 
     console.log('\n── the public boundary ──');
-    const { PRIVATE_TABLE } = require(path.join(ROOT, 'lib/businessTables.js'));
-    const mustBePrivate = [
-        'bookings', 'entity_bookings', 'charter_bookings', 'booking_holds', 'booking_funnel',
-        'customers', 'customer_live_photos', 'signed_waivers', 'business_leads', 'leads',
-        'entity_owners', 'oauth_tokens', 'business_mcp_tokens', 'business_signups', 'business_claims',
-        'sms_log', 'dashboard_sms_log', 'sms_blast_log', 'email_webhook_log', 'messages', 'ai_messages',
-        'orders', 'order_links', 'coupon_claims', 'loyalty_programs', 'intake_requests',
-        'session_events', 'sms_qr_scans', 'tourist_memories',
-    ];
-    const mustBePublic = [
-        'menu_items', 'menu_sections', 'drink_items', 'happy_hour_sections', 'happy_hour_items',
-        'entity_events', 'entity_specials', 'entity_hours', 'entity_photos', 'entity_tags',
-        'entity_amenities', 'entity_faqs', 'entity_offer', 'entity_offer_price', 'entity_offer_fee',
-        'entity_team', 'entity_reviews', 'entity_policies', 'entity_refund_policy',
-        'inventory_items', 'bookable_resources', 'weather_rules', 'business_availability',
-    ];
-    const leaks = mustBePrivate.filter((t) => !PRIVATE_TABLE.test(t));
-    const blocked = mustBePublic.filter((t) => PRIVATE_TABLE.test(t));
-    check(`${mustBePrivate.length} tables holding other people are private`, !leaks.length, leaks.join(', '));
-    check(`${mustBePublic.length} tables the website already shows stay public`, !blocked.length, blocked.join(', '));
-    check('"entity_reviews" is not caught by the view/tracking rule', !PRIVATE_TABLE.test('entity_reviews'));
-    check('a table nobody has classified yet defaults to private if it names people',
-        PRIVATE_TABLE.test('guest_feedback') && PRIVATE_TABLE.test('customer_notes'));
+    const { whyPrivate } = require(path.join(ROOT, 'lib/businessTables.js'));
+    const cols = (...n) => n.map((name) => ({ name }));
 
+    // The rule reads columns, not names. These are the real shapes.
+    const shaped = [
+        ['menu_items', cols('id', 'entity_slug', 'item_name', 'price', 'description'), false],
+        ['entity_events', cols('id', 'entity_slug', 'event_name', 'event_date', 'artist_name'), false],
+        ['fish_species', cols('id', 'entity_slug', 'species', 'season'), false],
+        ['bookable_resources', cols('id', 'entity_slug', 'name', 'nightly_price', 'bedrooms'), false],
+        ['entity_team', cols('id', 'entity_slug', 'name', 'title', 'bio'), false],
+        ['entity_reviews', cols('id', 'entity_slug', 'body', 'rating', 'reviewer_name'), false],
+        ['business_availability', cols('id', 'entity_slug', 'remaining_spots', 'status'), false],
+        // A table nobody has ever seen, holding plain business columns, is public.
+        // That is the point: the schema decides, not a list somebody maintains.
+        ['some_new_table_2027', cols('id', 'entity_slug', 'label', 'value'), false],
+        ['bookings', cols('id', 'entity_slug', 'customer_name', 'customer_email', 'amount_paid'), true],
+        ['customers', cols('id', 'entity_slug', 'name', 'email', 'phone'), true],
+        ['signed_waivers', cols('id', 'entity_slug', 'guest_name', 'signature'), true],
+        ['entity_owners', cols('id', 'entity_slug', 'user_id', 'role'), true],
+        ['oauth_tokens', cols('id', 'entity_slug', 'access_token'), true],
+        ['sms_log', cols('id', 'entity_slug', 'to_number', 'body'), true],
+        // Named innocuously, but it carries an email address.
+        ['entity_notes', cols('id', 'entity_slug', 'note', 'contact_email'), true],
+    ];
+    const wrong = shaped.filter(([t, c, priv]) => !!whyPrivate(t, c) !== priv).map(([t]) => t);
+    check(`${shaped.length} real table shapes classified by their columns`, !wrong.length, wrong.join(', '));
+    check('a business phone number does not make a table private',
+        !whyPrivate('entity', cols('slug', 'name', 'phone', 'city')));
+    check('the reason names the deciding column',
+        /customer_name/.test(whyPrivate('bookings', cols('customer_name'))));
+
+    // The name rule is only a backstop now, for the transaction tables that can
+    // exist without a personal column on them at all.
+    const { PRIVATE_TABLE } = require(path.join(ROOT, 'lib/businessTables.js'));
+    const backstop = ['bookings', 'entity_bookings', 'signed_waivers', 'oauth_tokens', 'sms_log', 'business_leads'];
+    const throughTheNet = backstop.filter((t) => !PRIVATE_TABLE.test(t));
+    check('the backstop still catches a transaction table with no personal column',
+        !throughTheNet.length, throughTheNet.join(', '));
+    const overreach = ['menu_items', 'entity_events', 'entity_reviews', 'fish_species', 'bookable_resources']
+        .filter((t) => PRIVATE_TABLE.test(t));
+    check('and does not reach past them', !overreach.length, overreach.join(', '));
     console.log('\n── unknown ──');
     check('an unknown tool returns null', (await runConciergeTool('nope', {})) === null);
 

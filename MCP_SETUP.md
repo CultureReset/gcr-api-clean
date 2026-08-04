@@ -135,24 +135,22 @@ it, so there is nothing to read and the agent says so.
 ## Where the line is, and why there has to be one
 
 The owner's agent (section 3) sees **every** table with rows for its slug. This
-one cannot, and the reason is not the schema — it is whose data is in it.
+one sees nearly all of them. The exception is not about the schema — it is about
+whose data is in a row.
 
-`bookings`, `customers`, `signed_waivers`, `business_leads`, `sms_log`,
-`entity_owners`, `oauth_tokens` and about forty more are all keyed by the
-business's slug, and none of them are the business's own information. They are
-other people's: names, numbers, what they paid, what they signed. This URL takes
-no credential, so anyone who can type it would reach them.
+A `bookings` row is keyed by the business's slug and is a record of a *customer*:
+their name, their number, what they paid, what they signed. This URL takes no
+password, so anyone who could type it would read them.
 
-`lib/businessTables.js` draws that line by what a table holds — people who are
-not the business, money and commitments, credentials, anything sent to someone,
-platform telemetry, unpublished drafts. A table added tomorrow is private until
-somebody decides otherwise, which is the safe direction to fail in. Sensitive
-columns are stripped again on the way out, for the reviewer's email address on
-an otherwise public table.
+**The line is drawn from the schema, not from a list of table names.** A table
+carrying an `email`, a `user_id`, a `customer_*` field, a card charge or a
+signature holds people; a table carrying `item_name`, `price`, `description` and
+`day_of_week` holds business information. A list of names would be a guess that
+has to be maintained and goes stale the moment a table is added — the columns are
+already in the database and cannot drift from it. A table invented next year with
+ordinary business columns is readable the day it has rows in it.
 
-`npm run test:concierge` asserts the classification on 52 real table names — but
-a rule about names can be wrong in both directions without anybody noticing, so
-it reports itself per business:
+And it explains itself, per business:
 
 ```bash
 curl https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama/sections
@@ -161,13 +159,16 @@ curl https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama/sections
 ```json
 {
   "readable_by_the_agent": [ { "section": "menu_items", "rows": 214 }, … ],
-  "held_back":             [ { "section": "bookings",   "rows": 89  }, … ]
+  "held_back": [
+    { "section": "bookings", "rows": 89,
+      "reason": "holds a \"customer_name\" column — these rows are about a person" }
+  ]
 }
 ```
 
-Names and counts, never rows. Read it for any business and the boundary is
-something you can check rather than trust. If a section is on the wrong side,
-the rule moves.
+Names, counts and reasons — never rows. The reason names the column that decided
+it, so a section on the wrong side is a specific thing to fix rather than an
+argument with a list.
 
 ## Errors
 
@@ -266,7 +267,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 ```
 npm run verify         # everything below
 npm run test:mcp       # 55 checks — the protocol, the token scoping, the slug scoping
-npm run test:concierge # 36 checks — whats_on's day/time filtering, and the public/private table line
+npm run test:concierge # 37 checks — whats_on's day/time filtering, and the public/private table line
 ```
 
 The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.
