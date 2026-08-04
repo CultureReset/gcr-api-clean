@@ -140,8 +140,9 @@ const conciergeStub = {
         { name: 'compare_businesses', description: 'c', inputSchema: { type: 'object', properties: {}, required: ['slugs'] } },
         { name: 'whats_on', description: 'w', inputSchema: { type: 'object', properties: {} } },
         { name: 'list_categories', description: 'l', inputSchema: { type: 'object', properties: {} } },
+        { name: 'find_available', description: 'v', inputSchema: { type: 'object', properties: {} } },
     ],
-    CONCIERGE_TOOL_NAMES: new Set(['search_businesses', 'get_business_details', 'check_availability', 'find_item_prices', 'compare_businesses', 'whats_on', 'list_categories']),
+    CONCIERGE_TOOL_NAMES: new Set(['search_businesses', 'get_business_details', 'check_availability', 'find_item_prices', 'compare_businesses', 'whats_on', 'list_categories', 'find_available']),
     asInputSchemaTools: () => [],
     runConciergeTool: async (name, input) => {
         conciergeCalls.push({ name, input });
@@ -294,7 +295,7 @@ async function run() {
     // The whole point of this one: an agent can connect with nothing.
     const anon = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     check('no token needed', anon.status === 200);
-    check('ten directory tools', anon.body.result.tools.length === 10, String(anon.body.result?.tools?.length));
+    check('eleven directory tools', anon.body.result.tools.length === 11, String(anon.body.result?.tools?.length));
 
     const pubInit = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
@@ -359,7 +360,7 @@ async function run() {
     // A token sent to the public server must not grant anything extra, and
     // must not be rejected either — an agent configured once may send one.
     const withToken = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { Authorization: `Bearer ${AUTH}` });
-    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 10);
+    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 11);
 
     console.log('\n── attached to a slug (no token at all) ──');
     const PIN = (slug) => `http://127.0.0.1:${server.address().port}/api/mcp/business/${slug}`;

@@ -36,16 +36,17 @@ That is the whole setup. Paste the URL into the xAI Voice Agent Builder's remote
 
 Everything it returns is already on the public website. A token would protect nothing and would stop the thing scaling — every new surface would need one issued, stored and rotated. It is read-only, scoped to `is_active` businesses, and cannot write. A rate limit (120 requests/minute per IP, `PUBLIC_MCP_RATE_LIMIT`) stops a scraper walking the directory; it is not a password.
 
-## The ten tools
+## The eleven tools
 
 | Tool | What it answers |
 | --- | --- |
-| `search_businesses` | "who has crab legs", "red snapper charter" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags |
+| `search_businesses` | "who has all-you-can-eat snow crab legs", "gluten free menu", "vegan", "red snapper charter" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags. Filters stack: `must_have`, `has_happy_hour`, `live_music`, `open_now` in one call |
 | `whats_on` | "what's going on tonight", "who has happy hour right now", "live music this weekend" — events, specials and happy hours across **every** business, filtered by time, on the coast's own Central clock |
 | `list_categories` | "what is there to do here?" — the platform's category list with counts, and the exact `entity_subtype` values to search with |
 | `find_item_prices` | "cheapest dolphin cruise", "margarita under $10" — real rows across menus, drinks, happy hour, offer tiers and retail, sorted low to high |
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
-| `check_availability` | today's remaining spots, for businesses that publish it |
+| `find_available` | **"who has availability for a dolphin cruise today"** — open capacity across every business on a date, merging the email-parser feed, the booking engine and calendar blocks |
+| `check_availability` | today's remaining spots for one named business |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
 | `read_business` | **give it a slug, get everything that business has** — every section, every row, in one call. The agent never needs to know which table an answer lives in |
 | `list_sections` | the sections and their row counts — an index, when you only need to know whether something exists |
@@ -108,7 +109,7 @@ No credentials in either command. If the second returns priced rows, the voice a
 https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama
 ```
 
-Ten tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
+Eleven tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
 `get_business_details` and `check_availability` take no arguments and mean
 *here*, and the instruction block it receives on connect names the business, its
 city and its own phone number.
@@ -287,8 +288,8 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 65 checks — the protocol, the token scoping, the slug scoping
-npm run test:concierge # 37 checks — whats_on's day/time filtering, and the public/private table line
+npm run test:mcp       # 67 checks — the protocol, the token scoping, the slug scoping
+npm run test:concierge # 47 checks — availability merging, stacking filters, whats_on's day/time logic
 ```
 
 The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.

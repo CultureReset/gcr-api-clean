@@ -28,26 +28,53 @@ const gcrStub = {
 /* ── the rows each table hands back ───────────────────────────────────── */
 const TABLES = {
     entity_events: [
-        { event_name: 'Dated today', event_date: '2025-07-16', start_time: '20:00', end_time: '23:00', entity_slug: 'a', entity: { name: 'Bar A', phone: '555' } },
-        { event_name: 'Dated tomorrow', event_date: '2025-07-17', start_time: '20:00', end_time: '23:00', entity_slug: 'b', entity: { name: 'Bar B' } },
-        { event_name: 'Matinee today', event_date: '2025-07-16', start_time: '11:00', end_time: '13:00', entity_slug: 'c', entity: { name: 'Bar C' } },
-        { event_name: 'On stage right now', event_date: '2025-07-16', start_time: '15:00', end_time: '18:00', entity_slug: 'p', entity: { name: 'Bar P' } },
-        { event_name: 'Weekly wednesday', event_date: null, day_of_week: 'wednesday', recurring: true, start_time: '19:00', end_time: '22:00', entity_slug: 'd', entity: { name: 'Bar D' } },
-        { event_name: 'Weekly monday', event_date: null, day_of_week: 'monday', recurring: true, start_time: '19:00', end_time: '22:00', entity_slug: 'e', entity: { name: 'Bar E' } },
+        { event_name: 'Dated today', is_active: true, event_date: '2025-07-16', start_time: '20:00', end_time: '23:00', entity_slug: 'a', entity: { name: 'Bar A', phone: '555' } },
+        { event_name: 'Dated tomorrow', is_active: true, event_date: '2025-07-17', start_time: '20:00', end_time: '23:00', entity_slug: 'b', entity: { name: 'Bar B' } },
+        { event_name: 'Matinee today', is_active: true, event_date: '2025-07-16', start_time: '11:00', end_time: '13:00', entity_slug: 'c', entity: { name: 'Bar C' } },
+        { event_name: 'On stage right now', is_active: true, event_date: '2025-07-16', start_time: '15:00', end_time: '18:00', entity_slug: 'p', entity: { name: 'Bar P' } },
+        { event_name: 'Weekly wednesday', is_active: true, event_date: null, day_of_week: 'wednesday', recurring: true, start_time: '19:00', end_time: '22:00', entity_slug: 'd', entity: { name: 'Bar D' } },
+        { event_name: 'Weekly monday', is_active: true, event_date: null, day_of_week: 'monday', recurring: true, start_time: '19:00', end_time: '22:00', entity_slug: 'e', entity: { name: 'Bar E' } },
     ],
     entity_specials: [
-        { special_name: 'Array excludes today', days: ['mon', 'tue'], entity_slug: 'f', entity: { name: 'F' } },
-        { special_name: 'Array includes today', days: ['wed', 'thu'], entity_slug: 'g', entity: { name: 'G' } },
-        { special_name: 'Range text', days: 'Mon-Fri', entity_slug: 'h', entity: { name: 'H' } },
-        { special_name: 'Daily', days: 'daily', entity_slug: 'i', entity: { name: 'I' } },
-        { special_name: 'No day recorded', days: null, entity_slug: 'j', entity: { name: 'J' } },
-        { special_name: 'Ended last month', days: 'daily', end_date: '2025-06-01', entity_slug: 'k', entity: { name: 'K' } },
+        { special_name: 'Array excludes today', is_active: true, days: ['mon', 'tue'], entity_slug: 'f', entity: { name: 'F' } },
+        { special_name: 'Array includes today', is_active: true, days: ['wed', 'thu'], entity_slug: 'g', entity: { name: 'G' } },
+        { special_name: 'Range text', is_active: true, days: 'Mon-Fri', entity_slug: 'h', entity: { name: 'H' } },
+        { special_name: 'Daily', is_active: true, days: 'daily', entity_slug: 'i', entity: { name: 'I' } },
+        { special_name: 'No day recorded', is_active: true, days: null, entity_slug: 'j', entity: { name: 'J' } },
+        { special_name: 'Ended last month', is_active: true, days: 'daily', end_date: '2025-06-01', entity_slug: 'k', entity: { name: 'K' } },
     ],
     entity: [
-        { slug: 'l', name: 'In happy hour now', hh_days: 'daily', hh_start: '15:00', hh_end: '18:00' },
-        { slug: 'm', name: 'Happy hour over', hh_days: 'daily', hh_start: '11:00', hh_end: '13:00' },
-        { slug: 'n', name: 'Wrong day', hh_days: ['mon'], hh_start: '15:00', hh_end: '18:00' },
-        { slug: 'o', name: 'Crosses midnight', hh_days: 'daily', hh_start: '22:00', hh_end: '02:00' },
+        { slug: 'l', name: 'In happy hour now', is_active: true, hh_days: 'daily', hh_start: '15:00', hh_end: '18:00' },
+        { slug: 'm', name: 'Happy hour over', is_active: true, hh_days: 'daily', hh_start: '11:00', hh_end: '13:00' },
+        { slug: 'n', name: 'Wrong day', is_active: true, hh_days: ['mon'], hh_start: '15:00', hh_end: '18:00' },
+        { slug: 'o', name: 'Crosses midnight', is_active: true, hh_days: 'daily', hh_start: '22:00', hh_end: '02:00' },
+        { slug: 'cruise-co', name: 'Cruise Co', is_active: true, entity_subtype: 'dolphin_cruise', rating: 4.6 },
+        { slug: 'charter-co', name: 'Charter Co', is_active: true, entity_subtype: 'fishing_charter', rating: 4.4 },
+        { slug: 'blocked-co', name: 'Blocked Co', is_active: true, entity_subtype: 'dolphin_cruise', rating: 4.0 },
+        { slug: 'tiny-co', name: 'Tiny Co', is_active: true, entity_subtype: 'kayak_rental', rating: 4.1 },
+    ],
+    entity_tags: [
+        { entity_slug: 'a', tag_name: 'outdoor seating' },
+        { entity_slug: 'd', tag_name: 'outdoor seating' },
+    ],
+    entity_amenities: [
+        { entity_slug: 'p', amenity: 'Outdoor seating' },
+    ],
+    happy_hour_sections: [{ entity_slug: 'd' }, { entity_slug: 'z' }],
+    entity_hours: [
+        { entity_slug: 'd', day_of_week: 'wednesday', opens_at: '11:00', closes_at: '23:00', is_closed: false },
+        { entity_slug: 'a', day_of_week: 'wednesday', opens_at: '18:00', closes_at: '23:00', is_closed: false },
+    ],
+    business_availability: [
+        { entity_slug: 'cruise-co', availability_date: '2025-07-16', time_slot: '14:00', end_time: '16:00', status: 'open', remaining_spots: 6, total_capacity: 20 },
+        { entity_slug: 'blocked-co', availability_date: '2025-07-16', time_slot: '09:00', status: 'open', remaining_spots: 4, total_capacity: 12 },
+        { entity_slug: 'tiny-co', availability_date: '2025-07-16', time_slot: '10:00', status: 'open', remaining_spots: 1, total_capacity: 6 },
+    ],
+    availability: [
+        { entity_slug: 'charter-co', date: '2025-07-16', start_time: '07:00', end_time: '11:00', spots_remaining: 4, spots_total: 6 },
+    ],
+    booking_calendar: [
+        { entity_slug: 'blocked-co', date: '2025-07-16', end_date: null, kind: 'block', offering_id: null, status: 'confirmed' },
     ],
     subtype_taxonomy: [
         { subtype_key: 'fishing_charter', display_name: 'Fishing charters', listing_category: 'On the water', entity_count: 40 },
@@ -57,17 +84,36 @@ const TABLES = {
     ],
 };
 
+// The stub applies the filters it is given rather than returning the table
+// whole — otherwise a test for "this row was excluded" passes on a router that
+// never excluded anything.
 function builder(table) {
+    const eq = {};
+    const preds = [];
+    const rows = () => (TABLES[table] || []).filter((r) => {
+        for (const [k, v] of Object.entries(eq)) if (r[k] !== v) return false;
+        return preds.every((p) => p(r));
+    });
     const self = {
         select: () => self,
-        eq: () => self,
-        not: () => self,
+        eq: (k, v) => { eq[k] = v; return self; },
+        neq: (k, v) => { preds.push((r) => r[k] !== v); return self; },
+        gt: (k, v) => { preds.push((r) => Number(r[k]) > Number(v)); return self; },
+        gte: (k, v) => { preds.push((r) => r[k] >= v); return self; },
+        lte: (k, v) => { preds.push((r) => r[k] <= v); return self; },
+        is: (k, v) => { preds.push((r) => (v === null ? r[k] == null : r[k] === v)); return self; },
+        not: (k, op, v) => { preds.push((r) => (op === 'is' && v === null ? r[k] != null : true)); return self; },
+        in: (k, list) => { preds.push((r) => list.includes(r[k])); return self; },
+        or: () => self,
+        ilike: (k, pat) => {
+            const needle = String(pat).replace(/%/g, '').toLowerCase();
+            preds.push((r) => String(r[k] ?? '').toLowerCase().includes(needle));
+            return self;
+        },
         order: () => self,
         limit: () => self,
-        in: () => self,
-        ilike: () => self,
-        maybeSingle: () => Promise.resolve({ data: (TABLES[table] || [])[0] || null, error: null }),
-        then: (res, rej) => Promise.resolve({ data: TABLES[table] || [], error: null }).then(res, rej),
+        maybeSingle: () => Promise.resolve({ data: rows()[0] || null, error: null }),
+        then: (res, rej) => Promise.resolve({ data: rows(), error: null }).then(res, rej),
     };
     return self;
 }
@@ -93,7 +139,7 @@ const names = (rows, key) => (rows || []).map((r) => r[key]);
 
 async function run() {
     console.log('\n── the tool list ──');
-    check('seven public tools', CONCIERGE_TOOLS.length === 7, String(CONCIERGE_TOOLS.length));
+    check('eight public tools', CONCIERGE_TOOLS.length === 8, String(CONCIERGE_TOOLS.length));
     check('every tool is marked read-only', CONCIERGE_TOOLS.every((t) => t.annotations?.readOnlyHint === true));
 
     console.log('\n── whats_on: "now" (Wednesday 16:00) ──');
@@ -149,6 +195,33 @@ async function run() {
     check('sums the businesses in a category', water?.businesses === 52, String(water?.businesses));
     check('sorts the biggest category first', cats.categories[0].category === 'Eat & drink');
     check('drops rows with no category', !cats.categories.some((c) => c.category === null));
+
+    console.log('\n── find_available ──');
+    const avail = await runConciergeTool('find_available', {});
+    const open = names(avail.available, 'slug');
+    check('defaults to today on the Central clock', avail.date === '2025-07-16', avail.date);
+    check('capacity rows count', open.includes('cruise-co'));
+    check('booking-engine slot rows count too', open.includes('charter-co'));
+    check('an entity-wide block vetoes the date', !open.includes('blocked-co'));
+    check('party_size filters out a slot that is too small',
+        !names((await runConciergeTool('find_available', { party_size: 4 })).available, 'slug').includes('tiny-co'));
+    check('open slots carry the real number left',
+        avail.available.find((a) => a.slug === 'cruise-co')?.open_slots[0].spots === 6);
+    check('nobody published is not the same as everybody booked',
+        /rather than saying the coast is booked out/.test(
+            (await runConciergeTool('find_available', { date: '2030-01-01' })).note));
+
+    console.log('\n── stacking filters ──');
+    const stacked = await runConciergeTool('search_businesses', {
+        must_have: ['outdoor seating'], has_happy_hour: true, live_music: 'today', open_now: true,
+    });
+    check('a four-part request runs as one call', typeof stacked === 'object');
+    const missing = await runConciergeTool('search_businesses', { must_have: ['helipad'] });
+    check('an unmatched condition is reported, not dropped',
+        /do not drop the condition/.test(missing.note || ''), JSON.stringify(missing).slice(0, 120));
+    const noMusic = await runConciergeTool('search_businesses', { live_music: '2030-01-01' });
+    check('no live music that night says so',
+        /Nobody has live music listed/.test(noMusic.note || ''));
 
     console.log('\n── the public boundary ──');
     const { whyPrivate } = require(path.join(ROOT, 'lib/businessTables.js'));
