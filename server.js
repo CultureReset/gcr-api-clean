@@ -183,6 +183,16 @@ mount('/api/business', () => require('./routes/business-data'));
 // Mounted before /api/mcp so the more specific path wins.
 mount('/api/mcp/public', () => require('./routes/mcp-public'));
 
+// The same tools, attached to one business by the slug in the URL:
+//
+//     /api/mcp/business/flora-bama
+//
+// A business's own agent with nothing to provision — standing one up for every
+// business on the platform is a string concatenation, not a token minted and
+// rotated a thousand times. Reads only, same public data. Writing is what
+// /api/mcp and its tokens are for.
+mount('/api/mcp/business/:slug', () => require('./routes/mcp-public').pinned);
+
 // The same data, spoken to instead of clicked on. An MCP server so an outside
 // AI assistant — Grok, or any other MCP client — can read and edit one
 // business's sections in words.

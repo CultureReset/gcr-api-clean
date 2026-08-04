@@ -9,15 +9,18 @@ are two of them and they are two routes in the same Express app, the same way
 `lib/mcpServer.js` and the database client in `db.js`. They exist separately
 because they answer to different callers, not because they run apart.
 
-| | `/api/mcp/public` | `/api/mcp` |
-| --- | --- | --- |
-| **Who it is for** | one agent that answers for **every** business | one business's own assistant |
-| **Auth** | none | `gcr_mcp_…` token |
-| **Scope** | every active business, public data | one business, decided by the token |
-| **Writes** | no | yes, with a write-scoped token |
-| **Use it for** | the phone number, the web chat | a business editing its own menu by text |
+| | `/api/mcp/public` | `/api/mcp/business/:slug` | `/api/mcp` |
+| --- | --- | --- | --- |
+| **Who it is for** | Ask a Local — one agent, every business | one business's own agent | a business editing its own data |
+| **Auth** | none | none — the slug is in the URL | `gcr_mcp_…` token |
+| **Scope** | every active business | attached to one, can still reach the rest | one business, decided by the token |
+| **Writes** | no | no | yes, with a write-scoped token |
+| **Setup** | none | none | one SQL file, then mint a token |
 
-If you are building the coast-wide voice agent — one number, any business — you want the public one and you can stop reading after the next section.
+The first two need nothing provisioned, because everything they return is
+already on the public site. Standing an agent up for every business is a string
+concatenation, not a thousand tokens minted and rotated. Only writing needs a
+credential.
 
 ---
 
@@ -96,7 +99,33 @@ No credentials in either command. If the second returns priced rows, the voice a
 
 ---
 
-# 2. The single-business server
+# 2. Attached to one business
+
+```
+https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama
+```
+
+Same seven tools, same no-token setup — the slug in the URL is the whole
+configuration. The agent knows which business it is without being told:
+`get_business_details` and `check_availability` take no arguments and mean
+*here*, and the instruction block it receives on connect names the business, its
+city and its own phone number.
+
+It keeps the coast-wide tools on purpose. The question after "are you open" is
+usually "well who is", and a local who only knows one address is not a local —
+sending someone to a real place down the road is better service than turning
+them away.
+
+An unknown or delisted slug answers `404`, not `401`, so nobody goes hunting for
+a token they never needed.
+
+Reads only. A business agent that can *change* the menu is a different thing
+with a different threat model — anyone who can type a URL reaches this one —
+and that is what section 3 is for.
+
+---
+
+# 3. The token server — for writing
 
 `https://gcr-api-clean.vercel.app/api/mcp`
 
@@ -181,7 +210,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 36 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 46 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 32 checks — whats_on's day and time filtering, against a fixed clock
 ```
 
@@ -189,6 +218,6 @@ The MCP stub records the queries the router *builds* rather than running them, s
 
 # Adding a tool
 
-**Public:** add to `CONCIERGE_TOOLS` and `runConciergeTool()` in `lib/conciergeTools.js`. It appears on the MCP server and in the tourist chat at once. Read-only, and return an explicit note when there is no data rather than an empty result.
+**Public and slug-attached:** add to `CONCIERGE_TOOLS` and `runConciergeTool()` in `lib/conciergeTools.js`. It appears on the MCP server and in the tourist chat at once. Read-only, and return an explicit note when there is no data rather than an empty result.
 
 **Business:** add to `TOOLS` and `runTool()` in `routes/mcp.js`. Anything touching business data must go through `section()` (the allow-list) and filter on `caller.slug` — never on anything from `params`.

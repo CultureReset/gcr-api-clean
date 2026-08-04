@@ -26,6 +26,7 @@
 // is the search the website does in its search bar, and improving one improves
 // both.
 
+const db = require('../db');
 const { createMcpRouter, content } = require('../lib/mcpServer');
 const { CONCIERGE_TOOLS, runConciergeTool } = require('../lib/conciergeTools');
 
@@ -72,4 +73,100 @@ module.exports = createMcpRouter({
     tools: CONCIERGE_TOOLS,
     runTool,
     // No authenticate: public by design. See the note at the top.
+});
+
+/* ── the same thing, attached to one slug ─────────────────────────────────
+ *
+ *     /api/mcp/business/flora-bama
+ *
+ * A business's own agent, and it needs nothing provisioned. The slug is in the
+ * URL, so standing one up for every business on the platform is a string
+ * concatenation — not a token minted, stored and rotated a thousand times.
+ *
+ * It answers about that business without being told which one it is, and it
+ * keeps the coast-wide tools, because the question after "are you open" is
+ * usually "well who is". A local who only knows one address is not a local.
+ *
+ * Reads only, exactly like the open server above. A business's agent that can
+ * CHANGE the menu is a different thing with a different threat model, and that
+ * is what /api/mcp and its tokens are for — anyone who can type a URL can
+ * reach this one.
+ */
+
+/** Resolve the slug in the URL to a real, listed business. */
+async function pinToSlug(req) {
+    const slug = String(req.params?.slug || '').trim().toLowerCase();
+    if (!slug) return { reason: 'No business in the URL.', status: 404 };
+
+    const { data, error } = await db
+        .from('entity')
+        .select('slug, name, city, phone, is_active')
+        .eq('slug', slug)
+        .maybeSingle();
+    if (error) return { reason: error.message, status: 502 };
+    // Not listed reads the same as not there. A delisted business should not be
+    // answerable through a URL somebody kept.
+    if (!data || data.is_active === false) return { reason: `No business called "${slug}".`, status: 404 };
+
+    return { slug: data.slug, name: data.name, city: data.city, phone: data.phone };
+}
+
+/**
+ * The same seven tools, with the two that take a slug no longer requiring one.
+ * Built once at load — the shape does not vary per business, only the value
+ * filled in for it does.
+ */
+const PINNED_TOOLS = CONCIERGE_TOOLS.map((tool) => {
+    if (!['get_business_details', 'check_availability'].includes(tool.name)) return tool;
+    // `slug` stops being required: the URL already said which business.
+    const schema = { ...tool.inputSchema };
+    delete schema.required;
+    return {
+        ...tool,
+        inputSchema: {
+            ...schema,
+            properties: {
+                ...schema.properties,
+                slug: {
+                    type: 'string',
+                    description: 'Leave this out to mean the business you are attached to. Only pass it to look up a different one.',
+                },
+            },
+        },
+    };
+});
+
+async function runPinnedTool(name, args, caller) {
+    const a = { ...(args && typeof args === 'object' ? args : {}) };
+    // "How late are you open" arrives with no slug, because from the caller's
+    // side there is only one business in the conversation.
+    if (['get_business_details', 'check_availability'].includes(name) && !a.slug) a.slug = caller.slug;
+    const payload = await runConciergeTool(name, a);
+    if (payload === null) return null;
+    return content(payload);
+}
+
+const pinnedInstructions = (caller) => [
+    `You answer for ${caller.name}${caller.city ? ` in ${caller.city}` : ''} — a business on the Gulf Coast`,
+    'Radar platform. When someone says "you", "your" or "here", they mean this business.',
+    '',
+    `  • get_business_details and check_availability already know who you are — call them with no`,
+    `    arguments for hours, the menu, prices, policies and today's availability.`,
+    '  • whats_on tells you what is happening across the whole coast tonight, including here.',
+    '  • search_businesses, find_item_prices and compare_businesses reach every other business.',
+    '    Use them when someone wants something this business does not do — sending them somewhere',
+    '    real is better service than turning them away.',
+    '',
+    'The one rule: never state a price, a time, a phone number or a count you did not read from a',
+    'tool. If a tool has no data, say you do not have it and offer to pass the caller on — do not',
+    'estimate and do not reason from what is typical for a place like this.',
+    `${caller.phone ? `This business's own number is ${caller.phone}.` : ''}`,
+].filter(Boolean).join('\n');
+
+module.exports.pinned = createMcpRouter({
+    serverInfo: { name: 'gulf-coast-radar-business', title: 'Gulf Coast Radar — one business', version: '1.0.0' },
+    instructions: pinnedInstructions,
+    tools: PINNED_TOOLS,
+    runTool: runPinnedTool,
+    authenticate: pinToSlug,
 });

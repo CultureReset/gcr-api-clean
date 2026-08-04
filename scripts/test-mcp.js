@@ -48,13 +48,21 @@ const TOKEN_ROW = {
     id: 'tok-1', entity_slug: 'flora-bama', label: 'Grok', scope: 'write', revoked_at: null,
 };
 let tokenScope = 'write';
+let entityExists = true;
 
 function result(rec) {
     if (rec.table === 'business_mcp_tokens') {
         if (rec.update) return { data: [{ id: 'tok-1' }], error: null };
         return { data: { ...TOKEN_ROW, scope: tokenScope }, error: null };
     }
-    if (rec.table === 'entity') return { data: { name: 'Flora-Bama', entity_type: 'restaurant' }, error: null };
+    if (rec.table === 'entity') {
+        // entityExists false stands in for a slug nobody has, or a delisted one.
+        if (!entityExists) return { data: null, error: null };
+        return {
+            data: { slug: 'flora-bama', name: 'Flora-Bama', entity_type: 'restaurant', city: 'Perdido Key', phone: '555-0100', is_active: true },
+            error: null,
+        };
+    }
     if (rec.table === 'menu_items') {
         if (rec.insert) return { data: { id: 1, ...rec.insert }, error: null };
         if (rec.update) return { data: [{ id: 8821, ...rec.update }], error: null };
@@ -139,6 +147,7 @@ const mcpPublic = require(path.join(ROOT, 'routes/mcp-public.js'));
 const app = express();
 app.use(express.json());
 app.use('/api/mcp/public', mcpPublic);
+app.use('/api/mcp/business/:slug', mcpPublic.pinned);
 app.use('/api/mcp', mcp);
 
 const server = app.listen(0, run);
@@ -298,6 +307,49 @@ async function run() {
     // must not be rejected either — an agent configured once may send one.
     const withToken = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { Authorization: `Bearer ${AUTH}` });
     check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 7);
+
+    console.log('\n── attached to a slug (no token at all) ──');
+    const PIN = (slug) => `http://127.0.0.1:${server.address().port}/api/mcp/business/${slug}`;
+    const pinRpc = async (slug, body) => {
+        const res = await fetch(PIN(slug), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        return { status: res.status, body: await res.json() };
+    };
+
+    entityExists = true;
+    const pinInit = await pinRpc('flora-bama', { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+    check('a slug in the URL is the whole setup', pinInit.status === 200);
+    check('it knows which business it is', /You answer for Flora-Bama/.test(pinInit.body.result.instructions));
+    check('and its own phone number', /555-0100/.test(pinInit.body.result.instructions));
+
+    const pinTools = await pinRpc('flora-bama', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const detailTool = pinTools.body.result.tools.find((t) => t.name === 'get_business_details');
+    check('slug is no longer required', !detailTool.inputSchema.required);
+    check('but can still be passed', !!detailTool.inputSchema.properties.slug);
+    check('the coast-wide tools stay', pinTools.body.result.tools.some((t) => t.name === 'search_businesses'));
+
+    conciergeCalls.length = 0;
+    await pinRpc('flora-bama', {
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'get_business_details', arguments: {} },
+    });
+    check('a slugless call is filled in from the URL', conciergeCalls[0]?.input?.slug === 'flora-bama',
+        JSON.stringify(conciergeCalls[0]));
+
+    conciergeCalls.length = 0;
+    await pinRpc('flora-bama', {
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'get_business_details', arguments: { slug: 'somewhere-else' } },
+    });
+    check('an explicit slug still looks up another business — this is public data',
+        conciergeCalls[0]?.input?.slug === 'somewhere-else');
+
+    entityExists = false;
+    const missing = await pinRpc('not-a-business', { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+    check('an unknown slug is 404, not 401', missing.status === 404, String(missing.status));
+    check('and says so plainly', /No business called/.test(missing.body.error.message));
+    entityExists = true;
 
     console.log(`\n${pass} passed, ${fail} failed\n`);
     server.close();
