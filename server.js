@@ -75,6 +75,12 @@ mount('/api/admin/platform', () => require('./routes/admin-platform'));
 // Composio connections — the tool catalog and which business connected what.
 mount('/api/admin/connections', () => require('./routes/composio'));
 
+// The same App Store, scoped to one business. Resolves the slug from
+// entity_owners rather than the path, so a business connects its own tools and
+// cannot reach anyone else's. Every route above is adminRequired; without this
+// a business could not connect anything at all.
+mount('/api/connections', () => require('./routes/composio').ownerRouter);
+
 // Admin settings, business leads, guest photos, category cards. Mounted at
 // /api/admin alongside routes/admin.js — Express runs both routers in order,
 // so these paths are additive and nothing in admin.js is shadowed.
