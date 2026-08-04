@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authRequired } = require('../middleware/auth');
+const { getArtist, listArtists, EDITABLE } = require('../lib/artist');
 
 const router = express.Router();
 
@@ -23,46 +24,29 @@ async function genReqCodeRetry(maxRetries = 3) {
   throw new Error('Failed to generate unique REQ code after retries');
 }
 
-// GET / — public, list all active artists
+// GET / — public, every active artist with their next show.
+//
+// Reads artist_profiles and artists together, and gets the shows from
+// entity_events. It used to read artist_profiles alone and hand back its
+// `events` jsonb column, which is empty on all 390 rows — so no artist has
+// ever shown a date, while 317 of them have real ones in entity_events.
 router.get('/', async (req, res) => {
   try {
-    const { data: profiles, error } = await db
-      .from('artist_profiles')
-      .select(
-        'id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount, songs, events, instagram_url, spotify_url, youtube_url, booking_url'
-      )
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-
-    return res.json(profiles || []);
+    return res.json({ artists: await listArtists() });
   } catch (err) {
     console.error('List artists error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /:slug — public, get artist profile
+// GET /:slug — public, the complete artist: profile, links, shows, setlist.
 router.get('/:slug', async (req, res) => {
   try {
-    const { slug } = req.params;
-    const { data: profile, error } = await db
-      .from('artist_profiles')
-      .select(
-        'id, artist_name, slug, bio, photo_url, cashtag, venmo, request_enabled, shoutout_enabled, default_min_request_amount, songs, events, instagram_url, spotify_url, youtube_url, booking_url'
-      )
-      .eq('slug', slug)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (error || !profile) {
+    const artist = await getArtist(req.params.slug);
+    if (!artist || !artist.is_active) {
       return res.status(404).json({ error: 'Artist not found' });
     }
-
-    return res.json(profile);
+    return res.json(artist);
   } catch (err) {
     console.error('Get artist error:', err);
     res.status(500).json({ error: err.message });
@@ -285,28 +269,62 @@ router.post('/', authRequired, async (req, res) => {
   }
 });
 
-// PATCH /:slug — authRequired, update artist profile
+/**
+ * May this signed-in user edit this artist?
+ *
+ * Admins always. Otherwise the account has to be tied to the slug, by either
+ * `users.artist_slug` or `artist_profiles.owner_user_id`. Neither is populated
+ * on any row yet, so today only an admin passes — which matches reality: no
+ * artist has a login. Linking an account to a slug is what turns that on.
+ */
+async function canEditArtist(req, slug) {
+  if (req.role === 'admin') return true;
+  if (!req.userId) return false;
+
+  const { data: acct } = await db
+    .from('users').select('artist_slug').eq('id', req.userId).maybeSingle();
+  if (acct && acct.artist_slug === slug) return true;
+
+  const { data: profile } = await db
+    .from('artist_profiles').select('owner_user_id').eq('slug', slug).maybeSingle();
+  return !!(profile && profile.owner_user_id && profile.owner_user_id === req.userId);
+}
+
+// PATCH /:slug — the artist's own dashboard writes here.
+//
+// One write target: artist_profiles, keyed by slug. Whatever the artist saves
+// is what GET /:slug hands back, so the dashboard, the GCR Unified page and
+// any embed of the link all move together. Fields not in EDITABLE are dropped
+// rather than rejected, so a dashboard can post its whole form back.
 router.patch('/:slug', authRequired, async (req, res) => {
   try {
     const { slug } = req.params;
-    const updates = req.body;
 
-    // Remove sensitive fields
-    delete updates.id;
-    delete updates.created_at;
+    if (!(await canEditArtist(req, slug))) {
+      return res.status(403).json({ error: 'Not allowed to edit this artist' });
+    }
 
-    const { data: profile, error } = await db
+    const updates = {};
+    for (const key of EDITABLE) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) updates[key] = req.body[key];
+    }
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: 'No editable fields supplied' });
+    }
+    updates.updated_at = new Date().toISOString();
+
+    const { error } = await db
       .from('artist_profiles')
       .update(updates)
-      .eq('slug', slug)
-      .select()
-      .single();
+      .eq('slug', slug);
 
     if (error) {
       return res.status(400).json({ error: error.message });
     }
 
-    return res.json(profile);
+    // Hand back the same shape the public page reads, so the dashboard renders
+    // what a fan will see rather than its own idea of it.
+    return res.json(await getArtist(slug));
   } catch (err) {
     console.error('Update artist error:', err);
     res.status(500).json({ error: err.message });
