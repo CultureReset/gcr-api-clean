@@ -327,6 +327,10 @@ async function run() {
     check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
     check('and forbid sending people to the website or a phone number',
         /never tell anyone to\s+ring the business, check its website/i.test(pubInit.body.result.instructions));
+    check('unknown is a third answer, not a no',
+        /never read it as a no/i.test(pubInit.body.result.instructions));
+    check('a unit overriding its complex is called out',
+        /the more specific one wins/i.test(pubInit.body.result.instructions));
     check('a missing figure is answered, not deflected',
         /have not published it/i.test(pubInit.body.result.instructions));
 

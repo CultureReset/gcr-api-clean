@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,20 +99,40 @@ app.use('/api/tourist-auth', authLimiter);
  * public website. That makes it the only unauthenticated endpoint here that
  * runs real queries, so it gets a ceiling instead of a password.
  *
- * Generous on purpose: a voice agent works a call in bursts of several tool
- * calls a minute, and a web chat behind one office IP is many visitors sharing
- * one address. The limit is here to stop a scraper walking the whole directory,
- * not to ration a conversation.
+ * ── Why this cannot be keyed on the IP alone ─────────────────────────────
+ *
+ * The caller is usually not the visitor. A hosted voice agent relays every
+ * conversation from its own servers, so a thousand people talking at once
+ * arrive from a handful of addresses — and a per-IP ceiling would throttle the
+ * whole platform at a dozen simultaneous conversations while the visitors sat
+ * there hearing nothing.
+ *
+ * So the bucket is the caller's own credential where there is one: each
+ * signed-in visitor and each guest id gets its own budget no matter whose
+ * servers relayed the request. Only traffic with no identity at all falls back
+ * to the IP, and that bucket is large, because it is shared by everyone behind
+ * one hotel's wifi as well as by a scraper.
+ *
+ * The limit exists to stop somebody walking the entire directory. It is not
+ * here to ration a conversation.
  */
 const publicMcpLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: Number(process.env.PUBLIC_MCP_RATE_LIMIT || 120),
+    max: Number(process.env.PUBLIC_MCP_RATE_LIMIT || 600),
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => {
+        const credential = (req.headers.authorization || '').trim()
+            || String(req.headers['x-guest-id'] || '').trim();
+        // Hashed, so a token never reaches the limiter's key store in the clear.
+        if (credential) return `id:${crypto.createHash('sha256').update(credential).digest('hex').slice(0, 32)}`;
+        return `ip:${req.ip}`;
+    },
     message: { error: 'Too many requests — slow down and try again shortly.' },
 });
 
 app.use('/api/mcp/public', publicMcpLimiter);
+app.use('/api/mcp/business', publicMcpLimiter);
 
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
