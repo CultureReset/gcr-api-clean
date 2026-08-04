@@ -30,6 +30,7 @@ const express = require('express');
 const twilio = require('twilio');
 const crypto = require('crypto');
 const db = require('../db');
+const { isInServiceArea, SERVICE_AREA_MILES } = require('../lib/serviceArea');
 
 const router = express.Router();
 
@@ -376,6 +377,22 @@ router.post('/register', async (req, res) => {
         }
         authId = authData.user.id;
 
+        // Does this business belong on GCR at all? Gulf Coast Radar covers a
+        // 25-mile strip along the coast between New Orleans and Mexico Beach.
+        // A business outside it is a CyberCheck customer with a dashboard, not
+        // a directory listing — and never needs to be approved for one.
+        //
+        // With no usable location the answer is "unknown", and unknown is
+        // treated as listed. The entity is inactive pending review either way,
+        // so nothing is published on a guess.
+        const city = (req.body?.city || '').trim() || null;
+        const area = isInServiceArea({
+            latitude: req.body?.latitude,
+            longitude: req.body?.longitude,
+            city,
+        });
+        const listedOnGcr = area.inArea !== false;
+
         // Inactive and hidden. Approval is what makes it public.
         const { data: entity, error: entityError } = await db
             .from('entity')
@@ -385,8 +402,11 @@ router.post('/register', async (req, res) => {
                 phone,
                 email,
                 website_url: (req.body?.website || '').trim() || null,
-                city: (req.body?.city || '').trim() || null,
+                city,
                 entity_type: req.body?.entity_type || null,
+                latitude: Number(req.body?.latitude) || null,
+                longitude: Number(req.body?.longitude) || null,
+                listed_on_gcr: listedOnGcr,
                 is_active: false,
                 show_in_listings: false,
             })
@@ -413,7 +433,13 @@ router.post('/register', async (req, res) => {
             website: (req.body?.website || '').trim() || null,
             status: 'pending',
             possible_duplicates: duplicates,
-            verification: { phone_verified: true },
+            verification: {
+                phone_verified: true,
+                service_area: area.basis,          // coordinates | city | unknown
+                miles_to_coast: area.miles,
+                nearest_coast_town: area.nearest,
+                in_service_area: area.inArea,      // true | false | null
+            },
         });
         if (signupError) throw new Error(`Could not record the sign-up: ${signupError.message}`);
 
@@ -428,7 +454,18 @@ router.post('/register', async (req, res) => {
             phone,
             pending_review: true,
             possible_duplicates: duplicates.length,
-            message: 'Account created. Your listing stays hidden from the public site until it is reviewed.',
+            // Told plainly, because it changes what happens next: outside the
+            // strip there is a dashboard but never a GCR listing.
+            listed_on_gcr: listedOnGcr,
+            service_area: {
+                in_area: area.inArea,
+                miles_to_coast: area.miles,
+                nearest: area.nearest,
+                limit_miles: SERVICE_AREA_MILES,
+            },
+            message: listedOnGcr
+                ? 'Account created. Your listing stays hidden from the public site until it is reviewed.'
+                : `Account created. Your dashboard is ready — Gulf Coast Radar only lists businesses within ${SERVICE_AREA_MILES} miles of the coast, so this one will not appear there.`,
         });
     } catch (err) {
         // Nothing half-created — an orphan auth account would lock that number
