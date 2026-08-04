@@ -311,7 +311,7 @@ router.get('/invite/:token', async (req, res) => {
 // ============================================
 router.post('/accept-invite', async (req, res) => {
     try {
-        const { token, password } = req.body || {};
+        const { token, password, entity_type } = req.body || {};
         if (!token || !password) return res.status(400).json({ error: 'token and password required' });
         if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
@@ -396,6 +396,17 @@ router.post('/accept-invite', async (req, res) => {
         }
 
         await supabase.from('business_invites').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invite.id);
+
+        // Industry, if the owner picked one on the way in. It drives which
+        // sections and which apps get recommended, so asking once during
+        // setup beats asking later. Only ever set, never cleared — an owner
+        // skipping the question leaves whatever the listing already had.
+        if (entity_type) {
+            await supabase
+                .from('entity')
+                .update({ entity_type: String(entity_type).trim() })
+                .eq('slug', entity.slug);
+        }
 
         const jwtToken = jwt.sign({ userId: user.id, siteId: business.id, role: 'owner' }, process.env.JWT_SECRET, { expiresIn: '7d' });
 

@@ -2876,14 +2876,27 @@ router.post('/invite-business', authRequired, async (req, res) => {
     });
     if (inviteErr) return res.status(500).json({ error: inviteErr.message });
 
-    const baseUrl = process.env.PUBLIC_DASHBOARD_URL || 'https://app.cybercheckinc.com';
-    const claimUrl = `${baseUrl}/claim-business.html?token=${token}`;
+    // Where the invite lands. DASHBOARD_ACCEPT_URL points at the business
+    // dashboard's own accept page; without it this keeps the existing
+    // cybercheck-login page, so setting the variable is what moves the flow
+    // over rather than a deploy silently changing where invites go.
+    const acceptBase = process.env.DASHBOARD_ACCEPT_URL
+      || `${process.env.PUBLIC_DASHBOARD_URL || 'https://app.cybercheckinc.com'}/claim-business.html`;
+    const claimUrl = `${acceptBase}${acceptBase.includes('?') ? '&' : '?'}token=${token}`;
 
-    const { sendEmail } = require('../utils/email');
-    const result = await sendEmail({
-      to: email,
-      subject: `You've been invited to manage ${entity.name} on Gulf Coast Radar`,
-      html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6f8;padding:32px;">
+    // Sending is optional. The link is the deliverable — an admin can copy it
+    // and send it however they like (text it from their own phone, put it in
+    // a DM), which is the only option until an SMS sender is approved. Pass
+    // send:false to skip the email entirely.
+    let sent = false;
+    let sendError = null;
+    if (req.body?.send !== false) {
+      try {
+        const { sendEmail } = require('../utils/email');
+        const result = await sendEmail({
+          to: email,
+          subject: `You've been invited to manage ${entity.name} on Gulf Coast Radar`,
+          html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f4f6f8;padding:32px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">
           <tr><td style="background:#0b7a75;padding:28px 32px;text-align:center;">
             <h1 style="margin:0;color:#fff;font-size:22px;">You're invited</h1>
@@ -2895,9 +2908,25 @@ router.post('/invite-business', authRequired, async (req, res) => {
           </td></tr>
         </table>
       </body></html>`,
-    });
+        });
+        sent = !!(result && result.success !== false);
+      } catch (mailErr) {
+        // A mail failure must not lose the invite — the row and the link are
+        // already good, and copying the link is a complete way to deliver it.
+        sendError = mailErr.message;
+      }
+    }
 
-    res.json({ success: true, sent: !!(result && result.success !== false), claim_url: claimUrl });
+    res.json({
+      success: true,
+      sent,
+      send_error: sendError,
+      claim_url: claimUrl,
+      email: email.toLowerCase(),
+      entity_slug,
+      business_name: entity.name,
+      expires_in_days: 14,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
