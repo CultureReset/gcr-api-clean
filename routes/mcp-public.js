@@ -30,6 +30,7 @@ const db = require('../db');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { CONCIERGE_TOOLS, runConciergeTool } = require('../lib/conciergeTools');
 const { publicTables, allowPublicTable, scrubRow, getSchema, textColumns, publicReason, HIDE_PERSONAL } = require('../lib/businessTables');
+const { MEMORY_TOOLS, MEMORY_TOOL_NAMES, briefing, runMemoryTool } = require('../lib/touristMemory');
 
 const SERVER_INFO = { name: 'gulf-coast-radar', title: 'Gulf Coast Radar', version: '1.0.0' };
 
@@ -296,8 +297,39 @@ async function readSection(slug, a) {
     return content({ slug, section: table, rows: data.map(scrubRow), returned: data.length, total: count ?? null });
 }
 
-async function runTool(name, args) {
+/* ── who is asking ────────────────────────────────────────────────────────
+ *
+ * Optional, and never a reason to refuse. Anyone can use this server; a signed
+ * -in traveller additionally gets remembered.
+ *
+ * MCP clients hand over one credential field, so both forms arrive through it:
+ * a Supabase access token resolves to the real account exactly as touristAuth
+ * does, and a bare UUID is the guest id a signed-out visitor keeps in
+ * localStorage — the same one tourist-auth.js reassigns to the real account
+ * when they sign up, so a conversation held before signing up is not lost.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function identify(req) {
+    const header = (req.headers.authorization || '').trim();
+    const raw = (/^Bearer\s+/i.test(header) ? header.replace(/^Bearer\s+/i, '') : header).trim()
+        || String(req.headers['x-guest-id'] || '').trim();
+    if (!raw) return {};
+
+    if (UUID_RE.test(raw)) return { touristId: raw, isGuest: true };
+
+    try {
+        const { data, error } = await db.auth.getUser(raw);
+        if (!error && data?.user) return { touristId: data.user.id, email: data.user.email, isGuest: false };
+    } catch { /* an unusable token is simply an anonymous caller */ }
+    return {};
+}
+
+async function runTool(name, args, caller = {}) {
     const a = args && typeof args === 'object' ? args : {};
+
+    const remembered = await runMemoryTool(name, a, caller.touristId);
+    if (remembered !== null) return content(remembered);
 
     if (name === 'read_business') {
         if (!a.slug) return toolError('A slug is required. Use search_businesses to find one.');
@@ -317,12 +349,33 @@ async function runTool(name, args) {
     return content(payload);
 }
 
+/**
+ * The instruction block, plus what is already known about this person.
+ *
+ * The memories go in here rather than being left for the agent to fetch,
+ * because a voice agent that opens by asking how many are in your party —
+ * again — has lost the conversation before it starts.
+ */
+async function instructionsFor(caller) {
+    if (!caller.touristId) return INSTRUCTIONS;
+    const known = await briefing(caller.touristId);
+    return known ? `${INSTRUCTIONS}\n\n${known}` : INSTRUCTIONS;
+}
+
 module.exports = createMcpRouter({
     serverInfo: SERVER_INFO,
-    instructions: INSTRUCTIONS,
-    tools: [...CONCIERGE_TOOLS, ...DISCOVERY_TOOLS],
+    instructions: instructionsFor,
+    // The memory tools only exist for someone there is a memory to keep
+    // against. An anonymous caller is not shown them, so no request can reach
+    // another person's memories — the user id is never an argument.
+    tools: (caller) => (caller.touristId
+        ? [...CONCIERGE_TOOLS, ...DISCOVERY_TOOLS, ...MEMORY_TOOLS]
+        : [...CONCIERGE_TOOLS, ...DISCOVERY_TOOLS]),
     runTool,
-    // No authenticate: public by design. See the note at the top.
+    // Resolves an identity when one is offered and never refuses without one:
+    // the directory is public, being remembered is what signing in buys.
+    authenticate: identify,
+    authNote: 'none — public. Send a tourist access token (or their guest UUID) to be remembered between conversations.',
 });
 
 /* ── the same thing, attached to one slug ─────────────────────────────────

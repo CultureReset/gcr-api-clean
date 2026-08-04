@@ -26,6 +26,9 @@ const { adminRequired } = require('../middleware/auth');
 // The public directory tools — search, details, prices, availability, compare.
 // Shared with the MCP server at /api/mcp/public rather than duplicated there.
 const { CONCIERGE_TOOL_NAMES, asInputSchemaTools, runConciergeTool } = require('../lib/conciergeTools');
+// The same three memories the MCP server offers, over the same table — so what
+// this chat learns, the voice agent already knows, and the other way round.
+const { runMemoryTool } = require('../lib/touristMemory');
 
 const router = express.Router();
 
@@ -1396,22 +1399,13 @@ HARD RULES:
         // The memory tools stay here: they are the only ones scoped to a
         // signed-in traveller rather than to public data, so they have no place
         // on a public MCP server.
-        if (name === 'save_memory') {
-            const row = { user_id: touristId, category: input.category, key: input.key, value: input.value, tags: input.tags || [], confidence: input.confidence || 'medium', source_message: (message || '').slice(0, 500), updated_at: new Date().toISOString() };
-            const { error } = await mainDb.from('tourist_memories').upsert(row, { onConflict: 'user_id,category,key' });
-            if (error) return { error: error.message };
-            return { success: true, saved_key: input.key, category: input.category };
-        }
-        if (name === 'update_memory') {
-            const { error } = await mainDb.from('tourist_memories').update({ value: input.new_value, updated_at: new Date().toISOString() }).eq('user_id', touristId).eq('category', input.category).eq('key', input.key);
-            if (error) return { error: error.message };
-            return { success: true, updated_key: input.key };
-        }
-        if (name === 'delete_memory') {
-            const { error } = await mainDb.from('tourist_memories').delete().eq('user_id', touristId).eq('category', input.category).eq('key', input.key);
-            if (error) return { error: error.message };
-            return { success: true, deleted_key: input.key };
-        }
+        // save_memory / update_memory / delete_memory keep their names here for
+        // the chat's own tool schema, and run through lib/touristMemory.js so
+        // there is one writer of tourist_memories rather than two.
+        if (name === 'save_memory') return runMemoryTool('remember', input, touristId);
+        if (name === 'update_memory') return runMemoryTool('remember', { ...input, value: input.new_value }, touristId);
+        if (name === 'delete_memory') return runMemoryTool('forget', input, touristId);
+
         return { error: 'Unknown tool' };
     }
 

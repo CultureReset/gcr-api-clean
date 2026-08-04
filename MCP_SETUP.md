@@ -12,7 +12,7 @@ because they answer to different callers, not because they run apart.
 | | `/api/mcp/public` | `/api/mcp/business/:slug` | `/api/mcp` |
 | --- | --- | --- | --- |
 | **Who it is for** | Ask a Local — one agent, every business | one business's own agent | a business editing its own data |
-| **Auth** | none | none — the slug is in the URL | `gcr_mcp_…` token |
+| **Auth** | none; a tourist token adds memory | none — the slug is in the URL | `gcr_mcp_…` token |
 | **Scope** | every active business | attached to one, can still reach the rest | one business, decided by the token |
 | **Writes** | no | no | yes, with a write-scoped token |
 | **Setup** | none | none | one SQL file, then mint a token |
@@ -54,6 +54,30 @@ Everything it returns is already on the public website. A token would protect no
 | `read_section` | one section narrowed by a search term |
 
 Five of these are not new. `search_businesses`, `get_business_details`, `check_availability`, `find_item_prices` and `compare_businesses` are what the tourist chat already runs on, lifted out of `routes/tourist.js` into `lib/conciergeTools.js` so both use one copy. `whats_on` and `list_categories` were added because the site displays them and nothing else could answer by time or by category. `search_businesses` reaches the same deep index as the website's search bar. Improving the search improves the phone agent, the web chat and the website at the same time.
+
+## It remembers the person asking
+
+Send the traveller's access token — or, before they sign up, the guest UUID the
+client already keeps — in the same `authorization` field, and three more tools
+appear: `recall`, `remember`, `forget`. They write `tourist_memories`, the same
+table the tourist chat already uses, so what one learns the other knows.
+
+What is already known arrives **in the instruction block on connect**, not on
+request:
+
+```
+What you already know about the person you are talking to:
+  • dietary: no seafood
+  • party: two kids
+  • where staying: Phoenix East until the 18th
+```
+
+That placement is the point. An agent that opens a call by asking how many are
+in your party — again — has lost the conversation before it starts.
+
+Anonymous callers are not shown these tools at all, so no request can reach
+another person's memories: the user id comes from the credential, never from an
+argument. Signing in is what buys memory; the directory itself stays open.
 
 ## The rule that matters on a phone call
 
@@ -301,7 +325,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 69 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 78 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 74 checks — availability merging, stacking filters, whats_on's day/time logic
 ```
 

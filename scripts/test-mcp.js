@@ -28,6 +28,7 @@ function builder(table, verb) {
     const self = {
         select: (...a) => { rec.args.push(['select', ...a]); return self; },
         insert: (v) => { rec.insert = v; return self; },
+        upsert: (v) => { rec.upsert = v; return self; },
         update: (v) => { rec.update = v; return self; },
         delete: () => self,
         eq: (k, v) => { rec.eq[k] = v; return self; },
@@ -63,6 +64,11 @@ function result(rec) {
             error: null,
         };
     }
+    if (rec.table === 'tourist_memories') {
+        if (rec.upsert) return { data: null, error: null };
+        return { data: [{ category: 'preference', key: 'dietary', value: 'no seafood', confidence: 'high' },
+                         { category: 'fact', key: 'party', value: 'two kids' }], error: null };
+    }
     if (rec.table === 'menu_items') {
         if (rec.insert) return { data: { id: 1, ...rec.insert }, error: null };
         if (rec.update) return { data: [{ id: 8821, ...rec.update }], error: null };
@@ -75,10 +81,15 @@ const dbStub = {
     from: (t) => ({
         select: (...a) => builder(t, 'select').select(...a),
         insert: (v) => builder(t, 'insert').insert(v),
+        upsert: (v, o) => builder(t, 'upsert').upsert(v, o),
         update: (v) => builder(t, 'update').update(v),
         delete: () => builder(t, 'delete').delete(),
     }),
-    auth: { getUser: async () => ({ data: null, error: new Error('no') }) },
+    auth: {
+        getUser: async (token) => (token === 'tourist-token'
+            ? { data: { user: { id: 'user-77', email: 't@example.com' } }, error: null }
+            : { data: null, error: new Error('no') }),
+    },
 };
 
 const schemaStub = {
@@ -372,8 +383,49 @@ async function run() {
     });
     check('a read with no slug is refused', noSlug.body.result?.isError === true);
 
+    console.log('\n── it remembers the person asking ──');
+    const anonTools = anon.body.result.tools.map((t) => t.name);
+    check('an anonymous caller is not shown the memory tools',
+        !anonTools.includes('remember') && !anonTools.includes('recall'));
+
+    const asTourist = (body) => pubRpc(body, { Authorization: 'Bearer tourist-token' });
+    const mine = await asTourist({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    const myTools = mine.body.result.tools.map((t) => t.name);
+    check('a signed-in traveller gets recall, remember and forget',
+        ['recall', 'remember', 'forget'].every((n) => myTools.includes(n)));
+
+    const hello = await asTourist({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+    check('what is already known arrives on connect, not on request',
+        /no seafood/.test(hello.body.result.instructions) && /two kids/.test(hello.body.result.instructions));
+    check('and it is told not to ask again',
+        /Do not ask them again/i.test(hello.body.result.instructions));
+
+    calls.length = 0;
+    const saved = await asTourist({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'remember', arguments: { category: 'fact', key: 'where_staying', value: 'Phoenix East' } },
+    });
+    const write = calls.find((c) => c.table === 'tourist_memories' && c.upsert);
+    check('remember writes against the token holder, not an argument',
+        write.upsert.user_id === 'user-77', JSON.stringify(write.upsert));
+    check('and reports what it saved', saved.body.result.structuredContent.saved === 'where_staying');
+
+    calls.length = 0;
+    await asTourist({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'recall', arguments: {} },
+    });
+    check('recall reads only that person\'s memories',
+        calls.find((c) => c.table === 'tourist_memories')?.eq.user_id === 'user-77');
+
+    // A guest UUID is the id a signed-out visitor keeps until they sign up.
+    const guest = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' },
+        { Authorization: 'Bearer 3f2504e0-4f89-11d3-9a0c-0305e82c3301' });
+    check('a guest id also earns memory', guest.body.result.tools.map((t) => t.name).includes('remember'));
+
     const pubInfo = await fetch(`${PUB()}/info`).then((r) => r.json());
-    check('info says it is public', pubInfo.authentication === 'none — public');
+    check('info says it is public', /^none — public/.test(pubInfo.authentication), pubInfo.authentication);
+    check('and that a token buys memory', /remembered between conversations/.test(pubInfo.authentication));
 
     // A token sent to the public server must not grant anything extra, and
     // must not be rejected either — an agent configured once may send one.
