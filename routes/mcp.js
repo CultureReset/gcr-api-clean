@@ -1,20 +1,24 @@
 // ============================================================
-// MCP — the door an AI assistant knocks on
+// MCP (BUSINESS) — the door one business's own AI knocks on
 // ============================================================
 //
-// Model Context Protocol server for one business's own data. Point Grok (or
-// any MCP client) at this URL with a token and it can read and edit that
-// business's sections by name, in words, without anybody wiring up an
-// integration per tool.
+// Model Context Protocol server for one business's own data. Point an MCP
+// client at this URL with a token and it can read and edit that business's
+// sections by name, in words, without anybody wiring up an integration per
+// tool.
+//
+// The public directory lives at /api/mcp/public and has nothing to do with
+// this: it is open, read-only, and covers every business. This one is scoped
+// to exactly one business and can write.
 //
 // ── Why it lives here and not next to the database ──────────────────────
 //
-// The rule for this platform is that only gcr-api-clean talks to Postgres.
-// An MCP server that held the Supabase service key and ran SQL would be a
-// second thing touching the database, with its own idea of what a business is
-// allowed to see. So this is not a database MCP server. It is an MCP wrapper
-// over the same handlers the dashboard uses — same schema discovery, same
-// table allow-list, same column filter, same slug scoping, all from
+// The rule for this platform is that only gcr-api-clean talks to Postgres. An
+// MCP server that held the Supabase service key and ran SQL would be a second
+// thing touching the database, with its own idea of what a business is allowed
+// to see. So this is not a database MCP server. It is an MCP wrapper over the
+// same handlers the dashboard uses — same schema discovery, same table
+// allow-list, same column filter, same slug scoping, all from
 // lib/businessTables.js.
 //
 // The practical consequence: a bug fixed for the dashboard is fixed for the
@@ -25,31 +29,15 @@
 // It acts as exactly one business, decided by the token, never by anything in
 // the request. There is no `slug` argument on any tool below and no way to add
 // one — the same property that makes the dashboard safe. A read-scoped token
-// gets the three read tools and is refused the three writes.
-//
-// ── Transport ───────────────────────────────────────────────────────────
-//
-// Streamable HTTP: one POST endpoint carrying JSON-RPC 2.0, answered with a
-// plain JSON body. No SSE stream and no session ids, because this runs on
-// Vercel serverless where a long-lived connection is killed mid-flight — the
-// same thing that killed the Composio sync. Stateless request/response is the
-// part of the transport that survives there, and it is enough: every method
-// this server implements answers immediately.
+// gets the four read tools and is refused the three writes.
 
-const express = require('express');
 const crypto = require('crypto');
 const supabase = require('../db');
 const { ownerRequired } = require('../middleware/ownerAuth');
 const { getSchema, allowTable, cleanBody, textColumns } = require('../lib/businessTables');
+const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 
-const router = express.Router();
-
-/* ── protocol ─────────────────────────────────────────────────────────── */
-
-// Newest first. A client asking for one of these gets it back; anything else
-// is answered with the newest and the client decides whether it can proceed.
-const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26'];
-const SERVER_INFO = { name: 'gcr-api-clean', title: 'Gulf Coast Radar', version: '1.0.0' };
+const SERVER_INFO = { name: 'gcr-api-clean', title: 'Gulf Coast Radar — business', version: '1.0.0' };
 
 const INSTRUCTIONS = [
     'You are connected to one business on the Gulf Coast Radar platform. Every tool acts on',
@@ -62,33 +50,6 @@ const INSTRUCTIONS = [
     'Never invent a figure. If a number is asked for, read it with read_section and report what',
     'came back. If a section holds no rows, say so rather than estimating.',
 ].join('\n');
-
-const RPC = {
-    PARSE: -32700,
-    INVALID_REQUEST: -32600,
-    METHOD_NOT_FOUND: -32601,
-    INVALID_PARAMS: -32602,
-    INTERNAL: -32603,
-};
-
-const ok = (id, result) => ({ jsonrpc: '2.0', id, result });
-const err = (id, code, message, data) => ({
-    jsonrpc: '2.0',
-    id: id ?? null,
-    error: { code, message, ...(data ? { data } : {}) },
-});
-
-/** What a tool hands back. Text for every client, structured for the ones that read it. */
-const content = (payload) => ({
-    content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-    structuredContent: payload,
-});
-
-/** A tool that failed. isError, not a JSON-RPC error — the model should see it and recover. */
-const toolError = (message) => ({
-    content: [{ type: 'text', text: message }],
-    isError: true,
-});
 
 /* ── who is calling ───────────────────────────────────────────────────────
  *
@@ -109,9 +70,10 @@ const toolError = (message) => ({
 
 const TOKEN_PREFIX = 'gcr_mcp_';
 const hashToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex');
-const missingTable = (error) => /business_mcp_tokens/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
+const missingTable = (error) =>
+    /business_mcp_tokens/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
 
-async function resolveCaller(req) {
+async function authenticate(req) {
     const header = (req.headers.authorization || '').trim();
     if (!header) return { reason: 'No bearer token.' };
     // Hosts differ on whether they add the scheme themselves: some take a raw
@@ -455,127 +417,16 @@ async function runTool(name, args, caller) {
         }
 
         default:
-            return null; // unknown tool — the caller turns this into a JSON-RPC error
+            return null; // unknown tool — the transport turns this into an error
     }
 }
 
-/* ── JSON-RPC ─────────────────────────────────────────────────────────── */
-
-async function handleMessage(msg, caller) {
-    if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.method !== 'string') {
-        return err(msg?.id, RPC.INVALID_REQUEST, 'Not a JSON-RPC request.');
-    }
-
-    const { id, method, params } = msg;
-    // No id means a notification: act on it, answer nothing.
-    const isNotification = id === undefined || id === null;
-
-    switch (method) {
-        case 'initialize': {
-            const asked = params?.protocolVersion;
-            return ok(id, {
-                protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
-                capabilities: { tools: { listChanged: false } },
-                serverInfo: SERVER_INFO,
-                instructions: INSTRUCTIONS,
-            });
-        }
-
-        case 'notifications/initialized':
-        case 'notifications/cancelled':
-            return null;
-
-        case 'ping':
-            return isNotification ? null : ok(id, {});
-
-        case 'tools/list':
-            return ok(id, { tools: toolsFor(caller) });
-
-        case 'tools/call': {
-            const name = params?.name;
-            if (typeof name !== 'string') return err(id, RPC.INVALID_PARAMS, 'A tool name is required.');
-            if (!toolsFor(caller).some((t) => t.name === name)) {
-                return err(id, RPC.METHOD_NOT_FOUND, `No tool called "${name}".`);
-            }
-            try {
-                const result = await runTool(name, params.arguments, caller);
-                if (!result) return err(id, RPC.METHOD_NOT_FOUND, `No tool called "${name}".`);
-                return ok(id, result);
-            } catch (e) {
-                // A thrown tool is still a tool result: the model reads it and
-                // can correct itself, where a JSON-RPC error just ends the turn.
-                return ok(id, toolError(e.message || 'That did not work.'));
-            }
-        }
-
-        // Advertised as unsupported in capabilities, but clients still ask.
-        case 'resources/list':
-            return ok(id, { resources: [] });
-        case 'prompts/list':
-            return ok(id, { prompts: [] });
-
-        default:
-            return isNotification ? null : err(id, RPC.METHOD_NOT_FOUND, `Unknown method "${method}".`);
-    }
-}
-
-/* ── the endpoint ─────────────────────────────────────────────────────── */
-
-router.post('/', async (req, res) => {
-    const caller = await resolveCaller(req);
-    if (caller.reason) {
-        return res
-            .status(401)
-            .set('WWW-Authenticate', 'Bearer realm="gcr-api-clean"')
-            .json(err(req.body?.id, RPC.INVALID_REQUEST, caller.reason));
-    }
-
-    const body = req.body;
-    const batched = Array.isArray(body);
-    const messages = batched ? body : [body];
-    if (batched && !messages.length) {
-        return res.status(400).json(err(null, RPC.INVALID_REQUEST, 'Empty batch.'));
-    }
-
-    const replies = [];
-    for (const msg of messages) {
-        try {
-            const reply = await handleMessage(msg, caller);
-            if (reply) replies.push(reply);
-        } catch (e) {
-            replies.push(err(msg?.id, RPC.INTERNAL, e.message || 'Server error.'));
-        }
-    }
-
-    // Everything was a notification. 202 with no body is the correct answer.
-    if (!replies.length) return res.status(202).end();
-    return res.json(batched ? replies : replies[0]);
-});
-
-// The spec's optional SSE channel, which this server does not offer. Saying so
-// plainly beats a hang: clients that see 405 here fall back to plain POST.
-router.get('/', (_req, res) => {
-    res.status(405).set('Allow', 'POST').json({
-        error: 'This MCP server is POST-only (streamable HTTP without the SSE channel).',
-        endpoint: 'POST /api/mcp',
-        info: 'GET /api/mcp/info',
-    });
-});
-
-// Session teardown. Nothing is held between requests, so there is nothing to
-// tear down — but answering 204 is friendlier than 404.
-router.delete('/', (_req, res) => res.status(204).end());
-
-/** Unauthenticated: enough to check the server is up and reachable, nothing more. */
-router.get('/info', (_req, res) => {
-    res.json({
-        server: SERVER_INFO,
-        transport: 'streamable-http (POST, JSON responses)',
-        protocol_versions: PROTOCOL_VERSIONS,
-        endpoint: '/api/mcp',
-        auth: 'Authorization: Bearer <gcr_mcp_… token, or a dashboard session token>',
-        tools: TOOLS.map((t) => ({ name: t.name, scope: WRITE_TOOLS.has(t.name) ? 'write' : 'read' })),
-    });
+const router = createMcpRouter({
+    serverInfo: SERVER_INFO,
+    instructions: INSTRUCTIONS,
+    tools: toolsFor,
+    runTool,
+    authenticate,
 });
 
 /* ── tokens ───────────────────────────────────────────────────────────────

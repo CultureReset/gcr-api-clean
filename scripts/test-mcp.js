@@ -108,12 +108,35 @@ function inject(file, exports) {
     m.filename = full; m.loaded = true; m.exports = exports;
     require.cache[full] = m;
 }
+/* ── the public directory tools, stubbed to record their input ────────── */
+const conciergeCalls = [];
+const conciergeStub = {
+    CONCIERGE_TOOLS: [
+        { name: 'search_businesses', description: 's', inputSchema: { type: 'object', properties: {} } },
+        { name: 'get_business_details', description: 'd', inputSchema: { type: 'object', properties: {}, required: ['slug'] } },
+        { name: 'check_availability', description: 'a', inputSchema: { type: 'object', properties: {}, required: ['slug'] } },
+        { name: 'find_item_prices', description: 'p', inputSchema: { type: 'object', properties: {}, required: ['query'] } },
+        { name: 'compare_businesses', description: 'c', inputSchema: { type: 'object', properties: {}, required: ['slugs'] } },
+    ],
+    CONCIERGE_TOOL_NAMES: new Set(['search_businesses', 'get_business_details', 'check_availability', 'find_item_prices', 'compare_businesses']),
+    asInputSchemaTools: () => [],
+    runConciergeTool: async (name, input) => {
+        conciergeCalls.push({ name, input });
+        if (name === 'search_businesses') return { count: 1, results: [{ name: 'Flora-Bama', slug: 'flora-bama' }] };
+        if (name === 'find_item_prices') return { results: [{ item: 'crab legs', price: 29, business: 'Flora-Bama' }] };
+        return null;
+    },
+};
+
 inject(path.join(ROOT, 'db.js'), dbStub);
 inject(path.join(ROOT, 'lib/businessTables.js'), schemaStub);
+inject(path.join(ROOT, 'lib/conciergeTools.js'), conciergeStub);
 
 const mcp = require(path.join(ROOT, 'routes/mcp.js'));
+const mcpPublic = require(path.join(ROOT, 'routes/mcp-public.js'));
 const app = express();
 app.use(express.json());
+app.use('/api/mcp/public', mcpPublic);
 app.use('/api/mcp', mcp);
 
 const server = app.listen(0, run);
@@ -232,6 +255,47 @@ async function run() {
     check('describe_section lists columns', desc.body.result.structuredContent.columns.length === 5);
     const secs = await call('list_sections');
     check('list_sections returns sections', Array.isArray(secs.body.result.structuredContent.sections));
+
+    console.log('\n── the public directory server ──');
+    const PUB = () => `http://127.0.0.1:${server.address().port}/api/mcp/public`;
+    const pubRpc = async (body, headers = {}) => {
+        const res = await fetch(PUB(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: JSON.stringify(body),
+        });
+        return { status: res.status, body: await res.json() };
+    };
+
+    // The whole point of this one: an agent can connect with nothing.
+    const anon = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    check('no token needed', anon.status === 200);
+    check('five directory tools', anon.body.result.tools.length === 5, String(anon.body.result?.tools?.length));
+
+    const pubInit = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
+    check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
+
+    conciergeCalls.length = 0;
+    const found = await pubRpc({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'search_businesses', arguments: { query: 'crab legs', limit: 5 } },
+    });
+    check('arguments reach the tool', conciergeCalls[0]?.input?.query === 'crab legs');
+    check('the result comes back as text', /Flora-Bama/.test(found.body.result.content[0].text));
+    check('and as structured content', found.body.result.structuredContent.count === 1);
+
+    const noSuch = await pubRpc({
+        jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'delete_row', arguments: {} },
+    });
+    check('business write tools are not reachable here', noSuch.body.error?.code === -32601);
+
+    const pubInfo = await fetch(`${PUB()}/info`).then((r) => r.json());
+    check('info says it is public', pubInfo.authentication === 'none — public');
+
+    // A token sent to the public server must not grant anything extra, and
+    // must not be rejected either — an agent configured once may send one.
+    const withToken = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { Authorization: `Bearer ${AUTH}` });
+    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 5);
 
     console.log(`\n${pass} passed, ${fail} failed\n`);
     server.close();

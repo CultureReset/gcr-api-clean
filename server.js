@@ -92,6 +92,27 @@ const authLimiter = rateLimit({
 app.use('/api/business-auth', authLimiter);
 app.use('/api/tourist-auth', authLimiter);
 
+/* ── and on the one door that is open to everybody ────────────────────────
+ *
+ * /api/mcp/public takes no token by design — it serves data already on the
+ * public website. That makes it the only unauthenticated endpoint here that
+ * runs real queries, so it gets a ceiling instead of a password.
+ *
+ * Generous on purpose: a voice agent works a call in bursts of several tool
+ * calls a minute, and a web chat behind one office IP is many visitors sharing
+ * one address. The limit is here to stop a scraper walking the whole directory,
+ * not to ration a conversation.
+ */
+const publicMcpLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: Number(process.env.PUBLIC_MCP_RATE_LIMIT || 120),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests — slow down and try again shortly.' },
+});
+
+app.use('/api/mcp/public', publicMcpLimiter);
+
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
 // literal require('./...') string so Vercel's bundler statically traces and
@@ -148,6 +169,19 @@ mount('/api/simple', () => require('./routes/simple-menu-edit'));
 // request can name a business. This is what replaced the dashboard's direct
 // PostgREST access — and with it, the anon key in a public browser bundle.
 mount('/api/business', () => require('./routes/business-data'));
+
+// One agent that knows every business. The public directory as MCP tools —
+// search, full details, cheapest-first prices, today's availability, side-by-
+// side comparison — so a single voice agent on one phone number, or one web
+// chat, can answer for any business on the platform.
+//
+// Open and read-only by design: everything it returns is already on the public
+// site, so a token would protect nothing and would stop it scaling. The tools
+// come from lib/conciergeTools.js, the same five routes/tourist.js already
+// runs its chat on.
+//
+// Mounted before /api/mcp so the more specific path wins.
+mount('/api/mcp/public', () => require('./routes/mcp-public'));
 
 // The same data, spoken to instead of clicked on. An MCP server so an outside
 // AI assistant — Grok, or any other MCP client — can read and edit one
