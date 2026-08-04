@@ -40,7 +40,7 @@ Everything it returns is already on the public website. A token would protect no
 
 | Tool | What it answers |
 | --- | --- |
-| `search_businesses` | "who has all-you-can-eat snow crab legs", "gluten free menu", "vegan", "red snapper charter" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags. Filters stack: `must_have`, `has_happy_hour`, `live_music`, `open_now` in one call |
+| `search_businesses` | "who has all-you-can-eat snow crab legs", "gluten free menu", "vegan", "red snapper charter" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags. Filters stack: `must_have`, `has_happy_hour`, `live_music`, `open_now`, `at` in one call |
 | `whats_on` | "what's going on tonight", "who has happy hour right now", "live music this weekend" — events, specials and happy hours across **every** business, filtered by time, on the coast's own Central clock |
 | `list_categories` | "what is there to do here?" — the platform's category list with counts, and the exact `entity_subtype` values to search with |
 | `industry_sections` | **the subtype is the router** — given `fishing_charter` or `condo`, which sections that industry actually fills, so the agent knows where to look before it looks |
@@ -302,7 +302,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 ```
 npm run verify         # everything below
 npm run test:mcp       # 69 checks — the protocol, the token scoping, the slug scoping
-npm run test:concierge # 56 checks — availability merging, stacking filters, whats_on's day/time logic
+npm run test:concierge # 65 checks — availability merging, stacking filters, whats_on's day/time logic
 ```
 
 The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.

@@ -34,6 +34,7 @@ const TABLES = {
         { event_name: 'On stage right now', is_active: true, event_date: '2025-07-16', start_time: '15:00', end_time: '18:00', entity_slug: 'p', entity: { name: 'Bar P' } },
         { event_name: 'Weekly wednesday', is_active: true, event_date: null, day_of_week: 'wednesday', recurring: true, start_time: '19:00', end_time: '22:00', entity_slug: 'd', entity: { name: 'Bar D' } },
         { event_name: 'Weekly monday', is_active: true, event_date: null, day_of_week: 'monday', recurring: true, start_time: '19:00', end_time: '22:00', entity_slug: 'e', entity: { name: 'Bar E' } },
+        { event_name: 'Wharf live music', is_active: true, event_date: '2025-07-16', start_time: '19:00', end_time: '22:00', entity_slug: 'zodiac', entity: { name: 'Zodiac' } },
     ],
     entity_specials: [
         { special_name: 'Array excludes today', is_active: true, days: ['mon', 'tue'], entity_slug: 'f', entity: { name: 'F' } },
@@ -54,6 +55,10 @@ const TABLES = {
         { slug: 'tiny-co', name: 'Tiny Co', is_active: true, entity_subtype: 'kayak_rental', rating: 4.1 },
         { slug: 'reel-1', name: 'Reel One', is_active: true, entity_subtype: 'fishing_charter' },
         { slug: 'reel-2', name: 'Reel Two', is_active: true, entity_subtype: 'fishing_charter' },
+        { slug: 'the-wharf', name: 'The Wharf', is_active: true, entity_subtype: 'complex' },
+        { slug: 'zodiac', name: 'Zodiac', is_active: true, parent_entity_slug: 'the-wharf', hh_days: 'daily', hh_start: '15:00', hh_end: '18:00' },
+        { slug: 'crab-shack', name: 'Crab Shack', is_active: true, parent_entity_slug: 'the-wharf' },
+        { slug: 'far-away', name: 'Far Away Bar', is_active: true, hh_days: 'daily', hh_start: '15:00', hh_end: '18:00' },
     ],
     fish_species: [
         { entity_slug: 'reel-1', species: 'red snapper' },
@@ -116,7 +121,22 @@ function builder(table) {
         is: (k, v) => { preds.push((r) => (v === null ? r[k] == null : r[k] === v)); return self; },
         not: (k, op, v) => { preds.push((r) => (op === 'is' && v === null ? r[k] != null : true)); return self; },
         in: (k, list) => { preds.push((r) => list.includes(r[k])); return self; },
-        or: () => self,
+        // PostgREST's or() is "col.op.value,col.op.value" — parsed here for the
+        // two operators these tools build, so a test for "the hub resolved"
+        // means the filter worked and not that the stub ignored it.
+        or: (expr) => {
+            const clauses = String(expr).split(',').map((c) => {
+                const [col, op, ...rest] = c.split('.');
+                return { col, op, value: rest.join('.') };
+            });
+            preds.push((r) => clauses.some(({ col, op, value }) => {
+                const cell = String(r[col] ?? '').toLowerCase();
+                if (op === 'eq') return cell === value.toLowerCase();
+                if (op === 'ilike') return cell.includes(value.replace(/%/g, '').toLowerCase());
+                return false;
+            }));
+            return self;
+        },
         ilike: (k, pat) => {
             const needle = String(pat).replace(/%/g, '').toLowerCase();
             preds.push((r) => String(r[k] ?? '').toLowerCase().includes(needle));
@@ -246,6 +266,28 @@ async function run() {
     const noMusic = await runConciergeTool('search_businesses', { live_music: '2030-01-01' });
     check('no live music that night says so',
         /Nobody has live music listed/.test(noMusic.note || ''));
+
+    console.log('\n── "at the Wharf" ──');
+    const atWharf = await runConciergeTool('search_businesses', { at: 'The Wharf' });
+    const wharfSlugs = names(atWharf.results, 'slug');
+    check('a spoken name resolves to the hub', atWharf.count > 0, JSON.stringify(atWharf).slice(0, 140));
+    check('its tenants are in', wharfSlugs.includes('zodiac') && wharfSlugs.includes('crab-shack'));
+    check('the hub itself counts as being there', wharfSlugs.includes('the-wharf'));
+    check('somewhere else is out', !wharfSlugs.includes('far-away'));
+
+    const hhAtWharf = await runConciergeTool('search_businesses', { at: 'the wharf', has_happy_hour: true });
+    check('"who has happy hour at the Wharf" stacks with the hub',
+        names(hhAtWharf.results, 'slug').includes('zodiac') && !names(hhAtWharf.results, 'slug').includes('far-away'));
+
+    const onAtWharf = await runConciergeTool('whats_on', { when: 'today', at: 'The Wharf' });
+    check('whats_on scopes to the hub', names(onAtWharf.events, 'event').includes('Wharf live music'));
+    check('and drops what is happening elsewhere', !names(onAtWharf.events, 'event').includes('Dated today'));
+    check('happy hour is scoped too', names(onAtWharf.happy_hour, 'business').includes('Zodiac')
+        && !names(onAtWharf.happy_hour, 'business').includes('Far Away Bar'));
+
+    const nowhere = await runConciergeTool('search_businesses', { at: 'The Nonexistent Pier' });
+    check('an unknown place is said so, not silently widened',
+        /rather than answering about the whole coast/.test(nowhere.note || ''), JSON.stringify(nowhere).slice(0, 140));
 
     console.log('\n── the subtype routes to the section ──');
     const charter = await runConciergeTool('industry_sections', { subtype: 'fishing_charter' });
