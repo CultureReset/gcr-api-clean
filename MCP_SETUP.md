@@ -49,7 +49,7 @@ Everything it returns is already on the public website. A token would protect no
 | `find_available` | **"who has availability for a dolphin cruise today"** — open capacity across every business on a date, merging the email-parser feed, the booking engine and calendar blocks |
 | `check_availability` | today's remaining spots for one named business |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
-| `read_business` | **give it a slug, get everything that business has** — every section, every row, in one call. The agent never needs to know which table an answer lives in |
+| `read_business` | **give it a slug, get the business in full** — `profile` is what its page on the site renders (menus with every dish and price, sections with their price tiers), `sections` is every slug-keyed table underneath, flat |
 | `list_sections` | the sections and their row counts — an index, when you only need to know whether something exists |
 | `read_section` | one section narrowed by a search term |
 
@@ -301,7 +301,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 67 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 69 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 56 checks — availability merging, stacking filters, whats_on's day/time logic
 ```
 

@@ -153,6 +153,20 @@ const conciergeStub = {
     },
 };
 
+// routes/gcr.js owns the profile assembly (the joins a flat slug sweep cannot
+// reach) and the Central clock. Stubbed so this needs no database.
+inject(path.join(ROOT, 'routes/gcr.js'), {
+    buildFullEntity: async (slug) => ({
+        slug,
+        name: 'Flora-Bama',
+        menu_sections: [
+            { section_name: 'Starters', items: [{ item_name: 'Snow Crab Legs', price: 34 }] },
+        ],
+    }),
+    searchEntitySlugs: async () => ({ slugs: [] }),
+    getCentralNow: () => ({ nowTime: '16:00', today: '2025-07-16', todayName: 'wednesday' }),
+});
+
 inject(path.join(ROOT, 'db.js'), dbStub);
 inject(path.join(ROOT, 'lib/businessTables.js'), schemaStub);
 inject(path.join(ROOT, 'lib/conciergeTools.js'), conciergeStub);
@@ -341,6 +355,9 @@ async function run() {
     });
     const swept = whole.body.result.structuredContent;
     check('one slug returns every section that has rows', swept.section_count > 0 && !!swept.sections.menu_items);
+    check('the assembled profile comes back too', swept.profile?.name === 'Flora-Bama');
+    check('and carries the menu items a flat sweep cannot reach',
+        swept.profile.menu_sections[0].items[0].item_name === 'Snow Crab Legs');
     check('a section with no rows is absent, not empty', !('faqs' in swept.sections));
     check('nothing is truncated or told to call another tool',
         !JSON.stringify(swept).includes('for the rest'));

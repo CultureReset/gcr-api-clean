@@ -98,7 +98,7 @@ const DISCOVERY_TOOLS = [
         name: 'read_business',
         title: 'Everything on file for one business',
         description:
-            'Give it a slug and it returns everything that business has — every section it uses and every row in each, in one call. Reach for this whenever a question is about a specific business: you never need to know which table an answer lives in, only the slug. Anything absent from the result, that business has not published.',
+            'Give it a slug and it returns that business in full: `profile` is exactly what its page on the site renders — menus with every dish and price, sections with their items and price tiers, hours, photos, policies, fees — and `sections` is every slug-keyed table underneath it, flat. Reach for this whenever a question is about a specific business; you never need to know which table an answer lives in, only the slug. Anything absent from the result, that business has not published.',
         inputSchema: {
             type: 'object',
             properties: {
@@ -218,8 +218,29 @@ async function allRowsFor(table, slug, cap = Infinity) {
 async function readBusiness(slug, a) {
     // A ceiling only if the caller asks for one. Left alone it returns the lot.
     const cap = Number(a.rows_per_section) > 0 ? Number(a.rows_per_section) : Infinity;
-    const tables = await publicTables();
 
+    // ── the profile, assembled ───────────────────────────────────────────
+    //
+    // Not every table hangs off entity_slug. The ones holding the actual
+    // content mostly do not: menu_items, drink_items, happy_hour_items and
+    // entity_section_items are keyed by their parent section's id, and
+    // price_tiers by the item's. A sweep of slug tables alone returns
+    // menu_sections — "Appetizers", "Entrées" — and not one dish or price.
+    //
+    // buildFullEntity() is what resolves those joins, and it is the same
+    // function GCR Unified's profile page renders from. Calling it means the
+    // agent sees exactly what the website shows, assembled the same way, with
+    // one copy of the assembly rather than a second that drifts.
+    const { buildFullEntity } = require('./gcr');
+    const profile = await buildFullEntity(slug).catch(() => null);
+
+    // ── and the flat sweep, for anything the profile does not reach ──────
+    //
+    // Kept alongside rather than instead: buildFullEntity names the tables it
+    // knows, so a table added to the database tomorrow is not in it. The sweep
+    // is what keeps "every table keyed by the slug" true. Some data appears in
+    // both; that costs bytes, where dropping it would cost an answer.
+    const tables = await publicTables();
     const sections = {};
     await mapLimit(tables, COUNT_CONCURRENCY, async (table) => {
         const rows = await allRowsFor(table, slug, cap);
@@ -227,14 +248,20 @@ async function readBusiness(slug, a) {
     });
 
     const names = Object.keys(sections);
+    if (!profile && !names.length) {
+        return { slug, sections: {}, note: `${slug} has nothing on file beyond its listing. Say you do not have it.` };
+    }
+
     return {
         slug,
+        // What the profile page shows: menus with their items and prices,
+        // sections with their items and price tiers, hours, photos, policies.
+        profile: profile ? scrubRow(profile) : null,
+        // Every table keyed by this slug, flat. Catches anything the profile
+        // does not assemble.
         sections,
         section_count: names.length,
-        row_count: names.reduce((n, t) => n + sections[t].length, 0),
-        note: names.length
-            ? `Everything ${slug} has on file. Anything not here, they have not published — say so rather than guessing.`
-            : `${slug} has nothing on file beyond its listing. Say you do not have it.`,
+        note: 'profile is the business exactly as its page on the site renders it — menu items, prices and tiers are in there, nested under their sections. sections is every slug-keyed table underneath, flat. Anything in neither, this business has not published: say so rather than guessing.',
     };
 }
 
