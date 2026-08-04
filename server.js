@@ -47,6 +47,15 @@ mount('/api/menu-editor', () => require('./routes/menu-editor'));
 mount('/api/menu-edit', () => require('./routes/menu-edit'));
 mount('/api/simple', () => require('./routes/simple-menu-edit'));
 
+// Business sign-up — phone, six-digit code, account. A SEPARATE system from
+// routes/tourist-auth.js below: different product, different account model,
+// no shared code. Changing one must never move the other.
+mount('/api/business-auth', () => require('./routes/business-auth'));
+
+// The approval gate for those sign-ups. Nothing self-created goes public
+// until an admin says so.
+mount('/api/admin/signups', () => require('./routes/admin-signups'));
+
 // Tourist
 mount('/api/tourist-auth', () => require('./routes/tourist-auth'));
 mount('/api/tourist', () => require('./routes/tourist'));
