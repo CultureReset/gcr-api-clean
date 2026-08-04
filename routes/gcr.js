@@ -565,12 +565,40 @@ router.get('/entities', async (req, res) => {
 
     const slugs = (entities || []).map(e => e.slug);
 
-    // Batch fetch tags, photos, hours, today's availability for all entities
+    // Batch fetch tags, photos, hours, today's availability for all entities.
+    //
+    // These used to be one query per table with .limit(10000) across every
+    // requested slug at once. That silently truncated: entity_photos alone
+    // holds ~52k rows over ~2.8k businesses (~19 each), so a page of 1000
+    // slugs needs ~19k photo rows and got 10k. Worse, the cap applied to a
+    // set ordered by sort_order rather than by slug, so the businesses that
+    // lost their photos were arbitrary — they came back with an empty photo
+    // array and the card had nothing to fall back on but hero_image_url,
+    // which for a lot of the older catalogue is an expired Google URL.
+    //
+    // Chunking on slugs instead keeps every chunk far under any row cap and
+    // makes the result complete by construction rather than by hoping the
+    // limit is big enough. 200 slugs x ~19 photos is ~3.8k rows per query.
+    const SLUG_CHUNK = 200;
+    async function fetchAllBySlug(table, columns, orderBy) {
+      if (!slugs.length) return { data: [] };
+      const out = [];
+      for (let i = 0; i < slugs.length; i += SLUG_CHUNK) {
+        const chunk = slugs.slice(i, i + SLUG_CHUNK);
+        let q = db.from(table).select(columns).in('entity_slug', chunk);
+        if (orderBy) q = q.order(orderBy);
+        const { data, error } = await q;
+        if (error) return { data: out, error };
+        out.push(...(data || []));
+      }
+      return { data: out };
+    }
+
     const today = new Date().toISOString().split('T')[0];
     const [tagRows, photoRows, hourRows, availRows] = await Promise.all([
-      slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
+      fetchAllBySlug('entity_tags', 'entity_slug, tag_name, tag_category'),
+      fetchAllBySlug('entity_photos', 'entity_slug, url, is_cover, sort_order, caption, usage_note', 'sort_order'),
+      fetchAllBySlug('entity_hours', 'entity_slug, day_of_week, opens_at, closes_at, is_closed', 'day_of_week'),
       slugs.length ? db.from('business_availability').select('entity_slug, total_capacity, remaining_spots, status, source_platform, last_updated, last_minute_deal, last_minute_price, original_price').in('entity_slug', slugs).eq('availability_date', today).eq('visible_on_profile', true) : { data: [] },
     ]);
 
