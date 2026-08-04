@@ -28,9 +28,26 @@
 
 const express = require('express');
 const twilio = require('twilio');
+const crypto = require('crypto');
 const db = require('../db');
 
 const router = express.Router();
+
+/**
+ * How a phone-only account gets a browser session.
+ *
+ * The business proves it owns the number by entering the code. There is no
+ * password to sign in with, and Supabase has no admin call that mints a phone
+ * session the way generateLink() does for email. So the server sets a fresh
+ * random secret on the account and hands it back once, over HTTPS, to the
+ * client that just passed the code check; the browser signs in with it
+ * immediately and Supabase issues the real session.
+ *
+ * The secret is rotated on every sign-in and never stored anywhere by us, so
+ * an old one is worthless the moment the next code is used. The business never
+ * sees it or types it — as far as they are concerned the phone IS the login.
+ */
+const newSessionSecret = () => `${crypto.randomBytes(24).toString('base64url')}Aa1!`;
 
 /* ── Twilio, this file's own ─────────────────────────────────────────────
  *
@@ -272,12 +289,17 @@ router.post('/register', async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     const code = String(req.body?.code || '').trim();
     const name = String(req.body?.business_name || '').trim();
-    const password = req.body?.password || '';
+
+    // Email is optional and expected to be blank. It arrives later, when they
+    // connect Gmail or Google Business — asking for it here is one more field
+    // between a business and an account, for something we get for free.
     const email = (req.body?.email || '').trim().toLowerCase() || null;
+
+    // No password. The phone number is the login; the code proves they own it.
+    const sessionSecret = newSessionSecret();
 
     if (!looksLikePhone(phone) || !code) return res.status(400).json({ error: 'Phone and code required.' });
     if (!name) return res.status(400).json({ error: 'What is the business called?' });
-    if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
 
     let authId = null;
     let entityId = null;
@@ -312,7 +334,7 @@ router.post('/register', async (req, res) => {
         const { data: authData, error: authError } = await db.auth.admin.createUser({
             phone,
             phone_confirm: true,
-            password,
+            password: sessionSecret,
             ...(email ? { email, email_confirm: true } : {}),
             user_metadata: { business_name: name, gcr_slug: slug, signup_source: 'business-phone' },
         });
@@ -368,6 +390,10 @@ router.post('/register', async (req, res) => {
         res.status(201).json({
             slug: entity.slug,
             entity: { id: entity.id, slug: entity.slug, name: entity.name },
+            // One-time secret the browser signs in with right now. Not a
+            // password the business has, knows, or ever needs again.
+            session_secret: sessionSecret,
+            phone,
             pending_review: true,
             possible_duplicates: duplicates.length,
             message: 'Account created. Your listing stays hidden from the public site until it is reviewed.',
@@ -379,6 +405,75 @@ router.post('/register', async (req, res) => {
         if (authId) await db.auth.admin.deleteUser(authId);
         res.status(500).json({ error: err.message });
     }
+});
+
+/* ── signing in again ────────────────────────────────────────────────────
+ *
+ * Same two steps as signing up, and no password at either end. The number is
+ * the login.
+ */
+
+// POST /signin — text a code to a number that already has an account.
+router.post('/signin', async (req, res) => {
+    const phone = normalizePhone(req.body?.phone);
+    if (!looksLikePhone(phone)) return res.status(400).json({ error: 'Enter a valid phone number.' });
+
+    // Deliberately does NOT reveal whether the number has an account. Telling
+    // a stranger which numbers are registered is a free directory of every
+    // business owner on the platform. The code simply never arrives.
+    try {
+        await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
+    } catch (err) {
+        console.error('[business-auth] signin send failed:', err.message);
+        return res.status(502).json({ error: 'Could not send the code — try again in a moment.' });
+    }
+    res.json({ success: true, phone });
+});
+
+// POST /signin-verify — check the code, hand back a one-time secret the
+// browser signs in with.
+router.post('/signin-verify', async (req, res) => {
+    const phone = normalizePhone(req.body?.phone);
+    const code = String(req.body?.code || '').trim();
+    if (!looksLikePhone(phone) || !code) return res.status(400).json({ error: 'Phone and code required.' });
+
+    try {
+        const check = await (await verifyService()).verificationChecks.create({ to: phone, code });
+        if (check?.status !== 'approved') return res.status(400).json({ error: 'That code is not right.' });
+    } catch {
+        return res.status(400).json({ error: 'That code is not right, or it expired.' });
+    }
+
+    // Find the account behind the number. listUsers is paged, so filter by
+    // phone rather than pulling everyone.
+    const { data: list, error: listError } = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
+    if (listError) return res.status(500).json({ error: listError.message });
+    const user = (list?.users || []).find((u) => normalizePhone(u.phone) === phone);
+    if (!user) {
+        return res.status(404).json({
+            error: 'No business is set up on that number yet.',
+            hint: 'Add your business first — it only takes the number you just verified.',
+        });
+    }
+
+    // Rotate. The previous secret dies here, so a leaked one is worthless
+    // after the next sign-in.
+    const sessionSecret = newSessionSecret();
+    const { error: updateError } = await db.auth.admin.updateUserById(user.id, { password: sessionSecret });
+    if (updateError) return res.status(500).json({ error: updateError.message });
+
+    const { data: owned } = await db
+        .from('entity_owners')
+        .select('entity_slug')
+        .eq('user_id', user.id)
+        .limit(1);
+
+    res.json({
+        success: true,
+        phone,
+        session_secret: sessionSecret,
+        entity_slug: owned?.[0]?.entity_slug || null,
+    });
 });
 
 /** A slug that is free, derived from the business name. */
