@@ -36,13 +36,14 @@ That is the whole setup. Paste the URL into the xAI Voice Agent Builder's remote
 
 Everything it returns is already on the public website. A token would protect nothing and would stop the thing scaling — every new surface would need one issued, stored and rotated. It is read-only, scoped to `is_active` businesses, and cannot write. A rate limit (120 requests/minute per IP, `PUBLIC_MCP_RATE_LIMIT`) stops a scraper walking the directory; it is not a password.
 
-## The eleven tools
+## The twelve tools
 
 | Tool | What it answers |
 | --- | --- |
 | `search_businesses` | "who has all-you-can-eat snow crab legs", "gluten free menu", "vegan", "red snapper charter" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags. Filters stack: `must_have`, `has_happy_hour`, `live_music`, `open_now` in one call |
 | `whats_on` | "what's going on tonight", "who has happy hour right now", "live music this weekend" — events, specials and happy hours across **every** business, filtered by time, on the coast's own Central clock |
 | `list_categories` | "what is there to do here?" — the platform's category list with counts, and the exact `entity_subtype` values to search with |
+| `industry_sections` | **the subtype is the router** — given `fishing_charter` or `condo`, which sections that industry actually fills, so the agent knows where to look before it looks |
 | `find_item_prices` | "cheapest dolphin cruise", "margarita under $10" — real rows across menus, drinks, happy hour, offer tiers and retail, sorted low to high |
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
 | `find_available` | **"who has availability for a dolphin cruise today"** — open capacity across every business on a date, merging the email-parser feed, the booking engine and calendar blocks |
@@ -109,7 +110,7 @@ No credentials in either command. If the second returns priced rows, the voice a
 https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama
 ```
 
-Eleven tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
+Twelve tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
 `get_business_details` and `check_availability` take no arguments and mean
 *here*, and the instruction block it receives on connect names the business, its
 city and its own phone number.
@@ -139,9 +140,21 @@ it, so there is nothing to read and the agent says so.
 ## The slug is the entry point, not the table
 
 ```
-search_businesses("crab legs")  →  slug
-read_business(slug)             →  everything that business has on file
+search_businesses("crab legs")   →  slug
+read_business(slug)              →  everything that business has on file
 ```
+
+Or route by kind rather than by name — the subtype says where an answer lives:
+
+```
+list_categories()                →  fishing_charter, condo, seafood, dolphin_cruise …
+industry_sections("condo")       →  room_types, entity_amenities, entity_photos …
+read_section(slug, "room_types") →  the beds, the views, the rates
+```
+
+`industry_sections` works that out by counting which sections businesses of that
+subtype actually fill. Nothing declares it, so an industry that starts using a
+new section starts being routed to it.
 
 Two calls and the agent has the answer, whatever table it happened to be in. It
 never picks a table: it hands over the slug and the schema decides what comes
@@ -289,7 +302,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 ```
 npm run verify         # everything below
 npm run test:mcp       # 67 checks — the protocol, the token scoping, the slug scoping
-npm run test:concierge # 47 checks — availability merging, stacking filters, whats_on's day/time logic
+npm run test:concierge # 56 checks — availability merging, stacking filters, whats_on's day/time logic
 ```
 
 The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.

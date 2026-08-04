@@ -52,6 +52,18 @@ const TABLES = {
         { slug: 'charter-co', name: 'Charter Co', is_active: true, entity_subtype: 'fishing_charter', rating: 4.4 },
         { slug: 'blocked-co', name: 'Blocked Co', is_active: true, entity_subtype: 'dolphin_cruise', rating: 4.0 },
         { slug: 'tiny-co', name: 'Tiny Co', is_active: true, entity_subtype: 'kayak_rental', rating: 4.1 },
+        { slug: 'reel-1', name: 'Reel One', is_active: true, entity_subtype: 'fishing_charter' },
+        { slug: 'reel-2', name: 'Reel Two', is_active: true, entity_subtype: 'fishing_charter' },
+    ],
+    fish_species: [
+        { entity_slug: 'reel-1', species: 'red snapper' },
+        { entity_slug: 'reel-2', species: 'king mackerel' },
+    ],
+    room_types: [
+        { entity_slug: 'condo-1', name: 'Gulf front 2BR' },
+    ],
+    faqs: [
+        { entity_slug: 'reel-1', question: 'Do you provide bait?' },
     ],
     entity_tags: [
         { entity_slug: 'a', tag_name: 'outdoor seating' },
@@ -128,6 +140,18 @@ function inject(file, exports) {
 inject(path.join(ROOT, 'db.js'), { from: (t) => builder(t) });
 inject(path.join(ROOT, 'routes/gcr.js'), gcrStub);
 
+// The real boundary rules, with only the live schema read replaced — getSchema
+// is the one function in there that would go to the network.
+const realTables = require(path.join(ROOT, 'lib/businessTables.js'));
+inject(path.join(ROOT, 'lib/businessTables.js'), {
+    ...realTables,
+    getSchema: async () => ({
+        tables: ['menu_items', 'room_types', 'fish_species', 'entity_hours', 'faqs'],
+        columns: {},
+        at: 0,
+    }),
+});
+
 const { runConciergeTool, CONCIERGE_TOOLS } = require(path.join(ROOT, 'lib/conciergeTools.js'));
 
 let pass = 0, fail = 0;
@@ -139,7 +163,7 @@ const names = (rows, key) => (rows || []).map((r) => r[key]);
 
 async function run() {
     console.log('\n── the tool list ──');
-    check('eight public tools', CONCIERGE_TOOLS.length === 8, String(CONCIERGE_TOOLS.length));
+    check('nine public tools', CONCIERGE_TOOLS.length === 9, String(CONCIERGE_TOOLS.length));
     check('every tool is marked read-only', CONCIERGE_TOOLS.every((t) => t.annotations?.readOnlyHint === true));
 
     console.log('\n── whats_on: "now" (Wednesday 16:00) ──');
@@ -223,8 +247,27 @@ async function run() {
     check('no live music that night says so',
         /Nobody has live music listed/.test(noMusic.note || ''));
 
+    console.log('\n── the subtype routes to the section ──');
+    const charter = await runConciergeTool('industry_sections', { subtype: 'fishing_charter' });
+    check('finds the businesses of that kind', charter.businesses === 3, String(charter.businesses));
+    const secs = names(charter.sections, 'section');
+    check('names the section that kind actually fills', secs.includes('fish_species'));
+    check('and one only some of them fill', secs.includes('faqs'));
+    check('not a section that kind never touches', !secs.includes('room_types'));
+    check('most-used first', charter.sections[0].section === 'fish_species', secs.join(','));
+    check('reports how many of them have it',
+        charter.sections.find((x) => x.section === 'fish_species').businesses_with_data === 2);
+    check('and as a share of that industry', charter.sections.find((x) => x.section === 'faqs').share === '33%',
+        charter.sections.find((x) => x.section === 'faqs').share);
+
+    const bySlug = await runConciergeTool('industry_sections', { slug: 'reel-1' });
+    check('a slug works instead of a subtype', bySlug.subtype === 'fishing_charter');
+
+    const unknown = await runConciergeTool('industry_sections', { subtype: 'nope' });
+    check('an unknown subtype says so', /No active business has the subtype/.test(unknown.note || ''));
+
     console.log('\n── the public boundary ──');
-    const { whyPrivate } = require(path.join(ROOT, 'lib/businessTables.js'));
+    const { whyPrivate } = realTables;
     const cols = (...n) => n.map((name) => ({ name }));
 
     // The rule reads columns, not names. These are the real shapes.
@@ -257,7 +300,7 @@ async function run() {
 
     // The name rule is only a backstop now, for the transaction tables that can
     // exist without a personal column on them at all.
-    const { PRIVATE_TABLE } = require(path.join(ROOT, 'lib/businessTables.js'));
+    const { PRIVATE_TABLE } = realTables;
     const backstop = ['bookings', 'entity_bookings', 'signed_waivers', 'oauth_tokens', 'sms_log', 'business_leads'];
     const throughTheNet = backstop.filter((t) => !PRIVATE_TABLE.test(t));
     check('the backstop still catches a transaction table with no personal column',
