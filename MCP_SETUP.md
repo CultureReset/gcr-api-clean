@@ -46,7 +46,7 @@ Everything it returns is already on the public website. A token would protect no
 | `industry_sections` | **the subtype is the router** — given `fishing_charter` or `condo`, which sections that industry actually fills, so the agent knows where to look before it looks |
 | `find_item_prices` | "cheapest dolphin cruise", "margarita under $10" — real rows across menus, drinks, happy hour, offer tiers and retail, sorted low to high |
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
-| `find_available` | **"who has availability for a dolphin cruise today"** — open capacity across every business on a date, merging the email-parser feed, the booking engine and calendar blocks |
+| `find_available` | **"who has availability at Phoenix East the 14th to the 18th"** — open capacity on a date or across a range, merging the email-parser feed, the booking engine and calendar blocks. A stay must be free every night; a charter needs one |
 | `check_availability` | today's remaining spots for one named business |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
 | `read_business` | **give it a slug, get the business in full** — `profile` is what its page on the site renders (menus with every dish and price, sections with their price tiers), `sections` is every slug-keyed table underneath, flat |
@@ -302,7 +302,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 ```
 npm run verify         # everything below
 npm run test:mcp       # 69 checks — the protocol, the token scoping, the slug scoping
-npm run test:concierge # 65 checks — availability merging, stacking filters, whats_on's day/time logic
+npm run test:concierge # 74 checks — availability merging, stacking filters, whats_on's day/time logic
 ```
 
 The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.

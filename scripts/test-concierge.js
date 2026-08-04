@@ -59,6 +59,9 @@ const TABLES = {
         { slug: 'zodiac', name: 'Zodiac', is_active: true, parent_entity_slug: 'the-wharf', hh_days: 'daily', hh_start: '15:00', hh_end: '18:00' },
         { slug: 'crab-shack', name: 'Crab Shack', is_active: true, parent_entity_slug: 'the-wharf' },
         { slug: 'far-away', name: 'Far Away Bar', is_active: true, hh_days: 'daily', hh_start: '15:00', hh_end: '18:00' },
+        { slug: 'phoenix-east', name: 'Phoenix East', is_active: true, entity_type: 'condo' },
+        { slug: 'pe-201', name: 'Phoenix East 201', is_active: true, entity_type: 'condo', parent_entity_slug: 'phoenix-east' },
+        { slug: 'pe-905', name: 'Phoenix East 905', is_active: true, entity_type: 'condo', parent_entity_slug: 'phoenix-east' },
     ],
     fish_species: [
         { entity_slug: 'reel-1', species: 'red snapper' },
@@ -82,10 +85,22 @@ const TABLES = {
         { entity_slug: 'd', day_of_week: 'wednesday', opens_at: '11:00', closes_at: '23:00', is_closed: false },
         { entity_slug: 'a', day_of_week: 'wednesday', opens_at: '18:00', closes_at: '23:00', is_closed: false },
     ],
+    bookable_resources: [
+        { entity_slug: 'pe-201', name: 'Unit 201', bedrooms: 2, bathrooms: 2, capacity: 6, nightly_price: 310, min_nights: 3, is_active: true },
+        { entity_slug: 'pe-905', name: 'Unit 905', bedrooms: 3, bathrooms: 2, capacity: 8, nightly_price: 425, is_active: true },
+    ],
     business_availability: [
         { entity_slug: 'cruise-co', availability_date: '2025-07-16', time_slot: '14:00', end_time: '16:00', status: 'open', remaining_spots: 6, total_capacity: 20 },
         { entity_slug: 'blocked-co', availability_date: '2025-07-16', time_slot: '09:00', status: 'open', remaining_spots: 4, total_capacity: 12 },
         { entity_slug: 'tiny-co', availability_date: '2025-07-16', time_slot: '10:00', status: 'open', remaining_spots: 1, total_capacity: 6 },
+        // Phoenix East: 201 is free all four nights, 905 is booked on the 16th.
+        { entity_slug: 'pe-201', availability_date: '2025-07-14', status: 'open', remaining_spots: 1 },
+        { entity_slug: 'pe-201', availability_date: '2025-07-15', status: 'open', remaining_spots: 1 },
+        { entity_slug: 'pe-201', availability_date: '2025-07-16', status: 'open', remaining_spots: 1 },
+        { entity_slug: 'pe-201', availability_date: '2025-07-17', status: 'open', remaining_spots: 1 },
+        { entity_slug: 'pe-905', availability_date: '2025-07-14', status: 'open', remaining_spots: 1 },
+        { entity_slug: 'pe-905', availability_date: '2025-07-15', status: 'open', remaining_spots: 1 },
+        { entity_slug: 'pe-905', availability_date: '2025-07-17', status: 'open', remaining_spots: 1 },
     ],
     availability: [
         { entity_slug: 'charter-co', date: '2025-07-16', start_time: '07:00', end_time: '11:00', spots_remaining: 4, spots_total: 6 },
@@ -243,7 +258,8 @@ async function run() {
     console.log('\n── find_available ──');
     const avail = await runConciergeTool('find_available', {});
     const open = names(avail.available, 'slug');
-    check('defaults to today on the Central clock', avail.date === '2025-07-16', avail.date);
+    check('defaults to today on the Central clock', avail.from === '2025-07-16' && avail.to === '2025-07-16',
+        `${avail.from}..${avail.to}`);
     check('capacity rows count', open.includes('cruise-co'));
     check('booking-engine slot rows count too', open.includes('charter-co'));
     check('an entity-wide block vetoes the date', !open.includes('blocked-co'));
@@ -252,8 +268,29 @@ async function run() {
     check('open slots carry the real number left',
         avail.available.find((a) => a.slug === 'cruise-co')?.open_slots[0].spots === 6);
     check('nobody published is not the same as everybody booked',
-        /rather than saying the coast is booked out/.test(
+        /Only businesses that publish availability appear/.test(
             (await runConciergeTool('find_available', { date: '2030-01-01' })).note));
+
+    console.log('\n── "availability at Phoenix East, the 14th to the 17th" ──');
+    const stay = await runConciergeTool('find_available', { at: 'Phoenix East', from: '2025-07-14', to: '2025-07-17' });
+    const openUnits = names(stay.available, 'slug');
+    check('four nights asked for', stay.nights === 4, String(stay.nights));
+    check('a unit free every night is available', openUnits.includes('pe-201'));
+    check('a unit booked one night is NOT listed as available', !openUnits.includes('pe-905'));
+    check('it is reported as partly available instead of dropped',
+        names(stay.partly_available, 'slug').includes('pe-905'));
+    check('and names the night that is missing',
+        stay.partly_available[0].missing_nights.includes('2025-07-16'),
+        JSON.stringify(stay.partly_available?.[0]?.missing_nights));
+    check('the unit specs ride along',
+        stay.available.find((u) => u.slug === 'pe-201').unit.bedrooms === 2);
+    check('and its nightly rate', stay.available.find((u) => u.slug === 'pe-201').unit.nightly === '$310');
+    check('the parent complex is named on each unit',
+        stay.available.find((u) => u.slug === 'pe-201').part_of === 'phoenix-east');
+
+    const anyDay = await runConciergeTool('find_available', { from: '2025-07-14', to: '2025-07-17', what: 'Charter' });
+    check('a charter needs only one open day in the range, not all four',
+        names(anyDay.available, 'slug').includes('charter-co') || anyDay.count === 0);
 
     console.log('\n── stacking filters ──');
     const stacked = await runConciergeTool('search_businesses', {
