@@ -385,6 +385,10 @@ async function run() {
     check('a table holding other people is refused', refused.body.result?.isError === true,
         JSON.stringify(refused.body).slice(0, 140));
 
+    const audit = await fetch(`${PIN('flora-bama')}/sections`).then((r) => r.json());
+    check('the boundary reports itself', Array.isArray(audit.readable_by_the_agent) && Array.isArray(audit.held_back));
+    check('the audit ships names and counts, never rows', !JSON.stringify(audit).includes('Bushwacker'));
+
     entityExists = false;
     const missing = await pinRpc('not-a-business', { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('an unknown slug is 404, not 401', missing.status === 404, String(missing.status));

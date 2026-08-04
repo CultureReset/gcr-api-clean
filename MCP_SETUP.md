@@ -150,7 +150,24 @@ somebody decides otherwise, which is the safe direction to fail in. Sensitive
 columns are stripped again on the way out, for the reviewer's email address on
 an otherwise public table.
 
-`npm run test:concierge` asserts the classification on 52 real table names.
+`npm run test:concierge` asserts the classification on 52 real table names — but
+a rule about names can be wrong in both directions without anybody noticing, so
+it reports itself per business:
+
+```bash
+curl https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama/sections
+```
+
+```json
+{
+  "readable_by_the_agent": [ { "section": "menu_items", "rows": 214 }, … ],
+  "held_back":             [ { "section": "bookings",   "rows": 89  }, … ]
+}
+```
+
+Names and counts, never rows. Read it for any business and the boundary is
+something you can check rather than trust. If a section is on the wrong side,
+the rule moves.
 
 ## Errors
 
@@ -248,7 +265,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 53 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 55 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 36 checks — whats_on's day/time filtering, and the public/private table line
 ```
 

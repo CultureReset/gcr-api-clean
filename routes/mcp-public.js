@@ -278,10 +278,62 @@ const pinnedInstructions = (caller) => [
     `${caller.phone ? `This business's own number is ${caller.phone}.` : ''}`,
 ].filter(Boolean).join('\n');
 
-module.exports.pinned = createMcpRouter({
+const pinned = createMcpRouter({
     serverInfo: { name: 'gulf-coast-radar-business', title: 'Gulf Coast Radar — one business', version: '1.0.0' },
     instructions: pinnedInstructions,
     tools: [...PINNED_TOOLS, ...DISCOVERY_TOOLS],
     runTool: runPinnedTool,
     authenticate: pinToSlug,
 });
+
+/* ── what the line actually did, per business ─────────────────────────────
+ *
+ *     GET /api/mcp/business/flora-bama/sections
+ *
+ * The public/private split is a rule about table names, and a rule about names
+ * can be wrong in both directions without anybody noticing: a table full of
+ * customers quietly readable, or a business's own trip list quietly missing
+ * from every answer it gives.
+ *
+ * So it reports itself. This lists what the agent can see and what was held
+ * back, by name, with counts — no rows either way. Read it for a business and
+ * the boundary is a thing you can check rather than trust.
+ */
+pinned.get('/sections', async (req, res) => {
+    const caller = await pinToSlug(req);
+    if (caller.reason) return res.status(caller.status || 404).json({ error: caller.reason });
+
+    let schema;
+    try {
+        schema = await getSchema();
+    } catch (err) {
+        return res.status(502).json({ error: err.message });
+    }
+
+    const open = new Set(await publicTables());
+    const visible = [];
+    const withheld = [];
+
+    await mapLimit(schema.tables, COUNT_CONCURRENCY, async (table) => {
+        const { count, error } = await db
+            .from(table)
+            .select('id', { count: 'exact', head: true })
+            .eq('entity_slug', caller.slug);
+        if (error || !count) return;
+        (open.has(table) ? visible : withheld).push({ section: table, rows: count });
+    });
+
+    const bySize = (a, b) => b.rows - a.rows || a.section.localeCompare(b.section);
+    res.json({
+        slug: caller.slug,
+        name: caller.name,
+        readable_by_the_agent: visible.sort(bySize),
+        // Named, never read. These hold this business's customers, bookings,
+        // messages and credentials — keyed by its slug, but not its to publish
+        // through a URL that takes no password.
+        held_back: withheld.sort(bySize),
+        note: 'Counts only, no rows. If something in held_back should be public, or something readable should not be, say which and the rule moves.',
+    });
+});
+
+module.exports.pinned = pinned;
