@@ -294,7 +294,7 @@ async function run() {
     // The whole point of this one: an agent can connect with nothing.
     const anon = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     check('no token needed', anon.status === 200);
-    check('nine directory tools', anon.body.result.tools.length === 9, String(anon.body.result?.tools?.length));
+    check('ten directory tools', anon.body.result.tools.length === 10, String(anon.body.result?.tools?.length));
 
     const pubInit = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
@@ -328,6 +328,17 @@ async function run() {
     check('and read any of their tables', anyRead.body.result.structuredContent.section === 'menu_items');
     check('scoped to the slug it was asked for',
         calls.filter((c) => c.table === 'menu_items').pop()?.eq.entity_slug === 'other-business');
+    calls.length = 0;
+    const whole = await pubRpc({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'read_business', arguments: { slug: 'flora-bama' } },
+    });
+    const swept = whole.body.result.structuredContent;
+    check('one slug returns every section that has rows', swept.section_count > 0 && !!swept.sections.menu_items);
+    check('a section with no rows is absent, not empty', !('faqs' in swept.sections));
+    check('every sweep query filtered on that slug',
+        calls.filter((c) => c.eq.entity_slug).every((c) => c.eq.entity_slug === 'flora-bama'));
+
     const noSlug = await pubRpc({
         jsonrpc: '2.0', id: 1, method: 'tools/call',
         params: { name: 'read_section', arguments: { section: 'menu_items' } },
@@ -340,7 +351,7 @@ async function run() {
     // A token sent to the public server must not grant anything extra, and
     // must not be rejected either — an agent configured once may send one.
     const withToken = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { Authorization: `Bearer ${AUTH}` });
-    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 9);
+    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 10);
 
     console.log('\n── attached to a slug (no token at all) ──');
     const PIN = (slug) => `http://127.0.0.1:${server.address().port}/api/mcp/business/${slug}`;

@@ -36,7 +36,7 @@ That is the whole setup. Paste the URL into the xAI Voice Agent Builder's remote
 
 Everything it returns is already on the public website. A token would protect nothing and would stop the thing scaling — every new surface would need one issued, stored and rotated. It is read-only, scoped to `is_active` businesses, and cannot write. A rate limit (120 requests/minute per IP, `PUBLIC_MCP_RATE_LIMIT`) stops a scraper walking the directory; it is not a password.
 
-## The nine tools
+## The ten tools
 
 | Tool | What it answers |
 | --- | --- |
@@ -47,8 +47,9 @@ Everything it returns is already on the public website. A token would protect no
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
 | `check_availability` | today's remaining spots, for businesses that publish it |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
-| `list_sections` | given a slug, every table that business actually has rows in |
-| `read_section` | given a slug and a section, the rows — this is what makes one agent enough for the whole platform |
+| `read_business` | **give it a slug, get everything that business has** — every section it uses and the rows in each, in one call. The agent never needs to know which table anything lives in |
+| `list_sections` | given a slug, the sections and their row counts — for large businesses |
+| `read_section` | given a slug and a section, the rows |
 
 Five of these are not new. `search_businesses`, `get_business_details`, `check_availability`, `find_item_prices` and `compare_businesses` are what the tourist chat already runs on, lifted out of `routes/tourist.js` into `lib/conciergeTools.js` so both use one copy. `whats_on` and `list_categories` were added because the site displays them and nothing else could answer by time or by category. `search_businesses` reaches the same deep index as the website's search bar. Improving the search improves the phone agent, the web chat and the website at the same time.
 
@@ -107,7 +108,7 @@ No credentials in either command. If the second returns priced rows, the voice a
 https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama
 ```
 
-Nine tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
+Ten tools, no token — the slug in the URL is the whole configuration. The agent knows which business it is without being told:
 `get_business_details` and `check_availability` take no arguments and mean
 *here*, and the instruction block it receives on connect names the business, its
 city and its own phone number.
@@ -134,7 +135,17 @@ the same day with no deploy. And the "won't answer without data" property falls
 out for free: a business that has not filled a table simply has no section for
 it, so there is nothing to read and the agent says so.
 
-## Every table, every business
+## The slug is the entry point, not the table
+
+```
+search_businesses("crab legs")  →  slug
+read_business(slug)             →  everything that business has on file
+```
+
+Two calls and the agent has the answer, whatever table it happened to be in. It
+never picks a table: it hands over the slug and the schema decides what comes
+back. A dive shop returns tables a bakery has never touched, and neither the
+agent nor this code has a list of either.
 
 Both public servers read **every table keyed by `entity_slug`** — the same set
 the owner's own agent sees. Nothing is enumerated in code, so a hundred thousand
@@ -276,7 +287,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 60 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 63 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 37 checks — whats_on's day/time filtering, and the public/private table line
 ```
 

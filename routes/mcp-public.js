@@ -52,6 +52,10 @@ const INSTRUCTIONS = [
     '    fees, what is included.',
     '  • check_availability only tells you about today, and only for businesses that publish it.',
     '  • compare_businesses when someone is choosing between two or three.',
+    '  • read_business is the catch-all: hand it a slug and you get everything that business has on',
+    '    file, whatever tables that turns out to be. Use it whenever a question is about one place',
+    '    and you do not already know which section holds the answer — you never need to know which',
+    '    table anything lives in, only the slug.',
     '',
     'The one rule: never state a price, a time, a phone number or a count you did not read from a',
     'tool. If a tool says there is no data, say you do not have it and offer to give them the',
@@ -79,6 +83,21 @@ const INSTRUCTIONS = [
  */
 
 const DISCOVERY_TOOLS = [
+    {
+        name: 'read_business',
+        title: 'Everything on file for one business',
+        description:
+            'Give it a slug and it returns everything that business has — every section it uses and the rows in each, in one call. This is the tool to reach for when a question is about a specific business and you do not already know which section holds the answer. Prefer it over list_sections + read_section unless the business is large and you only need one section.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                slug: { type: 'string', description: 'The business\'s slug, from search_businesses.' },
+                rows_per_section: { type: 'integer', description: 'Rows to include from each section, 1-100. Default 25.' },
+            },
+            required: ['slug'],
+        },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+    },
     {
         name: 'list_sections',
         title: 'What a business has on file',
@@ -144,6 +163,49 @@ async function listSections(slug) {
     };
 }
 
+/**
+ * Everything on file for one slug, in one call.
+ *
+ * The slug is the entry point, not the table. An agent asked "do they allow
+ * dogs" should not have to know which section that lives in — it hands over the
+ * slug and gets what the business has, whatever tables that turns out to be.
+ *
+ * Every table with an entity_slug column is swept in parallel and the ones with
+ * no rows for this business simply do not come back. That is also why an agent
+ * declines instead of inventing: an unfilled table is an absent section, not an
+ * empty one it might talk around.
+ */
+async function readBusiness(slug, a) {
+    const perSection = Math.min(Math.max(Number(a.rows_per_section) || 25, 1), 100);
+    const tables = await publicTables();
+
+    const sections = {};
+    let truncated = 0;
+    await mapLimit(tables, COUNT_CONCURRENCY, async (table) => {
+        const { data, error, count } = await db
+            .from(table)
+            .select('*', { count: 'exact' })
+            .eq('entity_slug', slug)
+            .limit(perSection);
+        if (error || !data?.length) return;
+        sections[table] = data.map(scrubRow);
+        if (count && count > data.length) {
+            truncated += 1;
+            sections[table].push({ _more: `${count - data.length} further rows — call read_section for the rest.` });
+        }
+    });
+
+    const names = Object.keys(sections);
+    return {
+        slug,
+        sections,
+        section_count: names.length,
+        note: names.length
+            ? `Everything ${slug} has on file${truncated ? `, with ${truncated} section(s) cut short` : ''}. Anything not here, they have not published — say so rather than guessing.`
+            : `${slug} has nothing on file beyond its listing. Say you do not have it.`,
+    };
+}
+
 /** The rows of one section for one slug. */
 async function readSection(slug, a) {
     const table = await allowPublicTable(String(a.section || '').trim());
@@ -174,6 +236,10 @@ async function readSection(slug, a) {
 async function runTool(name, args) {
     const a = args && typeof args === 'object' ? args : {};
 
+    if (name === 'read_business') {
+        if (!a.slug) return toolError('A slug is required. Use search_businesses to find one.');
+        return content(await readBusiness(String(a.slug).trim().toLowerCase(), a));
+    }
     if (name === 'list_sections') {
         if (!a.slug) return toolError('A slug is required. Use search_businesses to find one.');
         return content(await listSections(String(a.slug).trim().toLowerCase()));
@@ -294,9 +360,9 @@ const pinnedInstructions = (caller) => [
     '',
     `  • get_business_details and check_availability already know who you are — call them with no`,
     `    arguments for hours, the menu, prices, policies and today's availability.`,
-    '  • If that does not answer it, call list_sections. Businesses keep different things on file —',
-    '    trips, treatments, units, fish species, whatever this one actually does — and read_section',
-    '    reads any of them. This is how you answer a question the standard tools do not cover.',
+    '  • If that does not answer it, call read_business with no arguments — it returns everything',
+    '    on file here, whatever sections this business actually uses. You never need to know which',
+    '    table something lives in. list_sections and read_section are there for the large ones.',
     '  • whats_on tells you what is happening across the whole coast tonight, including here.',
     '  • search_businesses, find_item_prices and compare_businesses reach every other business.',
     '    Use them when someone wants something this business does not do — sending them somewhere',
