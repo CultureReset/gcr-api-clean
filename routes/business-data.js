@@ -42,132 +42,15 @@ const express = require('express');
 const supabase = require('../db');
 const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 
+// The schema discovery, the table allow-list and the column filter live in
+// lib/businessTables.js so routes/mcp.js applies exactly the same three guards
+// to an AI assistant that this file applies to the dashboard. One copy only —
+// a second copy of a security check drifts until one of them has a hole in it.
+const { getSchema, allowTable, cleanBody } = require('../lib/businessTables');
+
 const router = express.Router();
 
-const SUPABASE_URL = process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.GCR_SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
-
 const fail = (res, code, message, extra) => res.status(code).json({ error: message, ...(extra || {}) });
-
-/* ── the schema, discovered rather than listed ────────────────────────────
- *
- * Nothing here carries a list of tables. PostgREST publishes an OpenAPI
- * document describing every table it can see, and the service key sees all of
- * them. Any table with an entity_slug column is a business section by
- * definition — add a table to the database and it appears, drop one and it
- * disappears, with no deploy in between.
- *
- * Cached for five minutes because it is a whole-schema read and the answer
- * only changes when the database does.
- */
-
-const SCHEMA_TTL_MS = 5 * 60 * 1000;
-let schemaCache = null;      // { tables, columns, at }
-let schemaPromise = null;    // in-flight read, so a cold start fans in to one
-
-/** Columns a business must never set by hand: identity, ownership, bookkeeping. */
-const SYSTEM_COLUMNS = new Set([
-    'id',
-    'entity_slug',
-    'entity_id',
-    'site_id',
-    'created_at',
-    'updated_at',
-    'search_vector',
-    'embedding',
-]);
-
-async function readSchema() {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-        headers: {
-            apikey: SERVICE_KEY,
-            Authorization: `Bearer ${SERVICE_KEY}`,
-            Accept: 'application/openapi+json',
-        },
-        cache: 'no-store',
-    });
-    if (!res.ok) throw new Error(`Schema read failed (${res.status})`);
-    const spec = await res.json();
-
-    const defs = spec.definitions || spec.components?.schemas || {};
-    const columns = {};
-    const tables = [];
-
-    for (const [name, def] of Object.entries(defs)) {
-        const props = def?.properties;
-        if (!props || !Object.prototype.hasOwnProperty.call(props, 'entity_slug')) continue;
-        tables.push(name);
-        columns[name] = Object.entries(props).map(([col, spec]) => ({
-            name: col,
-            type: spec.type || 'string',
-            format: spec.format || '',
-            enum: spec.enum || null,
-            // PostgREST describes generated and identity columns in prose.
-            readOnly: /generated|identity/i.test(spec.description || ''),
-            editable: !SYSTEM_COLUMNS.has(col) && !/generated|identity/i.test(spec.description || ''),
-        }));
-    }
-
-    tables.sort();
-    return { tables, columns, at: Date.now() };
-}
-
-/** The live slug-table schema, at most five minutes old. */
-async function getSchema() {
-    if (schemaCache && Date.now() - schemaCache.at < SCHEMA_TTL_MS) return schemaCache;
-    if (!schemaPromise) {
-        schemaPromise = readSchema()
-            .then((fresh) => {
-                schemaCache = fresh;
-                return fresh;
-            })
-            .finally(() => {
-                schemaPromise = null;
-            });
-    }
-    try {
-        return await schemaPromise;
-    } catch (err) {
-        // A stale schema beats no dashboard at all — the table list barely
-        // moves, and the next request tries again.
-        if (schemaCache) return schemaCache;
-        throw err;
-    }
-}
-
-/**
- * Resolve :table against the live allow-list.
- *
- * Returns the table name only if the database actually has a slug-scoped table
- * by that name. Anything else — a typo, a table in another schema, a probe for
- * auth.users — comes back null and the caller answers 400.
- */
-async function allowTable(name) {
-    const { tables } = await getSchema();
-    return tables.includes(name) ? name : null;
-}
-
-/**
- * Everything a business is allowed to send for this table, and nothing else.
- *
- * Two passes: drop the system columns, then drop anything the table does not
- * actually have. The second pass turns what would be a confusing PostgREST
- * error into a field that is quietly ignored.
- */
-async function cleanBody(table, body) {
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return {};
-    const { columns } = await getSchema();
-    const known = new Set((columns[table] || []).map((c) => c.name));
-
-    const out = {};
-    for (const [key, value] of Object.entries(body)) {
-        if (SYSTEM_COLUMNS.has(key)) continue;
-        if (known.size && !known.has(key)) continue;
-        // An empty input means "no value", not an empty string.
-        out[key] = value === '' ? null : value;
-    }
-    return out;
-}
 
 /* ── who am I ─────────────────────────────────────────────────────────────
  *

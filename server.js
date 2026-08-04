@@ -149,6 +149,17 @@ mount('/api/simple', () => require('./routes/simple-menu-edit'));
 // PostgREST access — and with it, the anon key in a public browser bundle.
 mount('/api/business', () => require('./routes/business-data'));
 
+// The same data, spoken to instead of clicked on. An MCP server so an outside
+// AI assistant — Grok, or any other MCP client — can read and edit one
+// business's sections in words.
+//
+// It is deliberately NOT a database MCP server. It calls the same schema
+// discovery, table allow-list and column filter as the router above
+// (lib/businessTables.js), so the rule holds: only this API touches Postgres,
+// including when the caller is a model. Which business it acts as comes from
+// the token, never from the request.
+mount('/api/mcp', () => require('./routes/mcp'));
+
 // Business sign-up — phone, six-digit code, account. A SEPARATE system from
 // routes/tourist-auth.js below: different product, different account model,
 // no shared code. Changing one must never move the other.
