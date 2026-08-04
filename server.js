@@ -124,9 +124,15 @@ mount('/api/apps', () => require('./routes/apps'));
 //mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/platform', () => require('./routes/platform'));
 
-// Google Business
-//mount('/api/google-business', () => require('./routes/google-business')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
-// mount('/api/dashboard/google-business', () => require('./routes/google-business')); // dashboard disabled
+// Google Business Profile. Remounted: oauth_tokens now exists and is keyed by
+// entity_slug, the routes resolve the business from entity_owners instead of
+// the dead site_id convention, and the OAuth state is signed rather than
+// carrying a slug anyone could edit in a query string.
+//
+// This is the one integration Composio does not cover, and the only one that
+// carries proof: Google made the business verify its address before it could
+// control the profile, so connecting is evidence the business is real.
+mount('/api/google-business', () => require('./routes/google-business'));
 
 // SMS
 mount('/api/sms', () => require('./routes/sms'));
