@@ -14,7 +14,18 @@ const express = require('express');
 const db = require('../db');
 const router = express.Router();
 const { sendSms, normalizePhone } = require('../utils/sms');
-const { resolveEntity } = require('../lib/entity-resolver');
+const { ownerRequired } = require('../middleware/ownerAuth');
+
+// Two audiences in one file, and only one of them is signed in.
+//
+// The customer half — POST /request, the inbound SMS webhook, the expiry
+// sweep — is public by necessity: it runs on tourists' phones and on Twilio's
+// callbacks, neither of which has a session.
+//
+// The business half below it — a company's driver roster and its brokering
+// settings — is ownerRequired. It resolves the business from the session,
+// which is also what makes it work at all: it used to call resolveEntity(),
+// which reads req.userId, and nothing on this router ever set that.
 
 const DISPATCH_TIMEOUT_MINS = 5;
 const GCR_CUT = 0.10; // 10% platform fee
@@ -277,17 +288,15 @@ router.get('/expire', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // PROVIDER MANAGEMENT — a business registers its drivers/vehicles
 // ─────────────────────────────────────────────────────────────
-router.get('/providers', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.get('/providers', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
   const { data, error } = await db.from('transportation_providers').select('*').eq('entity_slug', entity.slug).eq('active', true).order('driver_name')
   if (error) return res.status(500).json({ error: error.message })
   res.json(data || [])
 })
 
-router.post('/providers', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.post('/providers', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
 
   const { driver_name, phone, vehicle_type, vehicle_make, vehicle_model, vehicle_color, vehicle_plate, capacity, handles_luggage, handles_passengers, notes } = req.body
   if (!driver_name || !phone) return res.status(400).json({ error: 'driver_name and phone required' })
@@ -311,9 +320,8 @@ router.post('/providers', async (req, res) => {
   res.json(data)
 })
 
-router.patch('/providers/:id', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.patch('/providers/:id', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
 
   const updates = {}
   const allowed = ['available', 'driver_name', 'phone', 'vehicle_type', 'vehicle_make', 'vehicle_model', 'vehicle_color', 'vehicle_plate', 'capacity', 'handles_luggage', 'handles_passengers', 'notes', 'active']
@@ -329,27 +337,24 @@ router.patch('/providers/:id', async (req, res) => {
   res.json(data)
 })
 
-router.delete('/providers/:id', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.delete('/providers/:id', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
   const { error } = await db.from('transportation_providers').update({ active: false }).eq('id', req.params.id).eq('entity_slug', entity.slug)
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
 
 // GET /api/transportation/company/settings — current on/off state for this business
-router.get('/company/settings', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.get('/company/settings', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
   const { data, error } = await db.from('entity').select('slug, name, offers_transportation').eq('slug', entity.slug).maybeSingle()
   if (error) return res.status(500).json({ error: error.message })
   res.json(data || { offers_transportation: false })
 })
 
 // PATCH /api/transportation/company/settings — turn transportation brokering on/off for this business
-router.patch('/company/settings', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.patch('/company/settings', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
   const { offers_transportation } = req.body
   const { data, error } = await db.from('entity').update({ offers_transportation: !!offers_transportation }).eq('slug', entity.slug).select('slug, name, offers_transportation').single()
   if (error) return res.status(500).json({ error: error.message })
@@ -357,9 +362,8 @@ router.patch('/company/settings', async (req, res) => {
 })
 
 // GET /api/transportation/requests — a provider's own requests (dispatched to or won by them)
-router.get('/requests', async (req, res) => {
-  const entity = await resolveEntity(req)
-  if (!entity) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' })
+router.get('/requests', ownerRequired, async (req, res) => {
+  const entity = { slug: req.entitySlug }
 
   const { data, error } = await db
     .from('transportation_requests')

@@ -29,10 +29,58 @@
 const express = require('express');
 const twilio = require('twilio');
 const crypto = require('crypto');
+const { createClient } = require('@supabase/supabase-js');
 const db = require('../db');
 const { isInServiceArea, SERVICE_AREA_MILES } = require('../lib/serviceArea');
 
 const router = express.Router();
+
+/* ── minting the browser's session here instead of there ──────────────────
+ *
+ * The dashboard used to carry the Supabase client itself: this file handed
+ * back a one-time secret and the browser redeemed it for a session. That is
+ * what required the anon key to be in the bundle, and the anon key in the
+ * bundle is what left 78 tables writable by anyone who opened developer tools.
+ *
+ * So the redemption happens here now. The secret is created, used, and
+ * discarded inside this process; the browser is handed the finished session
+ * and never sees the credential that produced it.
+ *
+ * A separate client from ../db on purpose. Signing in mutates a client's own
+ * session state, and ../db is the service-key client every other route shares
+ * — a sign-in must not be able to move what those routes are acting as.
+ */
+const authClient = createClient(
+    process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL,
+    process.env.GCR_SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY,
+    { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+);
+
+/** The session shape the dashboard stores. Deliberately not the whole object. */
+const sessionPayload = (session) => ({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_at: session.expires_at,
+    expires_in: session.expires_in,
+    token_type: session.token_type || 'bearer',
+    user: { id: session.user?.id, email: session.user?.email },
+});
+
+/**
+ * Exchange an account label and a password for a session.
+ *
+ * Used three ways: right after registration, right after a sign-in code, and
+ * for the invite accounts that really do have a password the owner chose.
+ */
+async function mintSession(email, password) {
+    const { data, error } = await authClient.auth.signInWithPassword({ email, password });
+    if (error || !data?.session) {
+        const err = new Error(error?.message || 'Could not start a session.');
+        err.status = 401;
+        throw err;
+    }
+    return sessionPayload(data.session);
+}
 
 /**
  * How a phone-only account gets a browser session.
@@ -443,12 +491,28 @@ router.post('/register', async (req, res) => {
         });
         if (signupError) throw new Error(`Could not record the sign-up: ${signupError.message}`);
 
+        // The finished session, so the browser needs no Supabase client of its
+        // own. Minted here from the secret above, which then goes no further.
+        // A failure to mint is not a failure to register — the account and the
+        // listing exist either way, and the owner can sign in with their phone.
+        let session = null;
+        try {
+            session = await mintSession(loginEmailFor(phone), sessionSecret);
+        } catch (err) {
+            console.error('[business-auth] session mint failed after register:', err.message);
+        }
+
         res.status(201).json({
             slug: entity.slug,
             entity: { id: entity.id, slug: entity.slug, name: entity.name },
+            session,
             // The address Supabase knows this account by, and a one-time
             // secret to sign in with right now. Neither is a credential the
             // business has, sees, or ever needs again — the phone is the login.
+            //
+            // Kept alongside `session` so a dashboard build that still redeems
+            // them itself keeps working through the cutover. Once every client
+            // reads `session`, these two fields come out.
             login_email: loginEmailFor(phone),
             session_secret: sessionSecret,
             phone,
@@ -546,15 +610,88 @@ router.post('/signin-verify', async (req, res) => {
         .eq('user_id', user.id)
         .limit(1);
 
+    let session = null;
+    try {
+        session = await mintSession(loginEmailFor(phone), sessionSecret);
+    } catch (err) {
+        console.error('[business-auth] session mint failed after signin:', err.message);
+        return res.status(502).json({ error: 'Could not start a session — try the code again.' });
+    }
+
     res.json({
         success: true,
         phone,
-        // The address Supabase knows this account by. The browser signs in
-        // with it plus the secret above; neither is ever shown to the owner.
+        session,
+        // The address Supabase knows this account by, and the secret that was
+        // just spent on the session above. Kept only so a dashboard build that
+        // still redeems them itself keeps working through the cutover.
         login_email: loginEmailFor(phone),
         session_secret: sessionSecret,
         entity_slug: owned?.[0]?.entity_slug || signup.entity_slug || null,
     });
+});
+
+/* ── sessions, for a browser with no Supabase client ─────────────────────
+ *
+ * Three small routes the dashboard needs once @supabase/supabase-js is gone
+ * from its bundle: start a session from a password, keep it alive, end it.
+ * None of them touches business data — they only turn a credential into a
+ * token that middleware/ownerAuth.js can resolve.
+ */
+
+// POST /password — { identifier, password } → session.
+//
+// For the accounts that really do have a password: the invite flow, where the
+// owner chose one. `identifier` is a slug or an email; a slug maps to the
+// derived login address the invite was issued against.
+router.post('/password', async (req, res) => {
+    const identifier = String(req.body?.identifier || '').trim();
+    const password = String(req.body?.password || '');
+    if (!identifier || !password) return res.status(400).json({ error: 'Enter your details.' });
+
+    const loginDomain = process.env.BUSINESS_LOGIN_DOMAIN || 'biz.gulfcoastradar.com';
+    const email = identifier.includes('@')
+        ? identifier.toLowerCase()
+        : `${identifier.toLowerCase()}@${loginDomain}`;
+
+    try {
+        res.json({ success: true, session: await mintSession(email, password) });
+    } catch (err) {
+        // Deliberately the same answer for a wrong password and an account
+        // that does not exist.
+        res.status(err.status || 401).json({ error: 'That sign-in did not work.' });
+    }
+});
+
+// POST /refresh — { refresh_token } → a fresh session.
+//
+// Supabase access tokens are short-lived. The browser used to renew them
+// through the Supabase client; without one, it asks here instead.
+router.post('/refresh', async (req, res) => {
+    const refreshToken = String(req.body?.refresh_token || '').trim();
+    if (!refreshToken) return res.status(400).json({ error: 'No refresh token.' });
+
+    const { data, error } = await authClient.auth.refreshSession({ refresh_token: refreshToken });
+    if (error || !data?.session) return res.status(401).json({ error: 'That session has expired.' });
+
+    res.json({ success: true, session: sessionPayload(data.session) });
+});
+
+// POST /signout — revoke the refresh token so it cannot be used again.
+//
+// Discarding the tokens in the browser is what ends the session for the user;
+// this is what ends it for anyone who copied them. Answers 200 either way —
+// a sign-out that reports failure gives a caller nothing it can act on.
+router.post('/signout', async (req, res) => {
+    const header = req.headers.authorization || '';
+    if (header.startsWith('Bearer ')) {
+        try {
+            await authClient.auth.admin.signOut(header.slice(7));
+        } catch (err) {
+            console.error('[business-auth] signout failed:', err.message);
+        }
+    }
+    res.json({ success: true });
 });
 
 /** A slug that is free, derived from the business name. */

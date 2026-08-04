@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { ownerRequired } = require('../middleware/ownerAuth');
 const { createClient } = require('@supabase/supabase-js');
 
 // ─── Central-time helper ────────────────────────────────────────────────────
@@ -987,10 +988,15 @@ router.get('/entity/:slug', async (req, res) => {
 });
 
 // ─── POST /api/gcr/entity/:slug/set-pin ──────────────────────────────────────
-router.post('/entity/:slug/set-pin', async (req, res) => {
+// ownerRequired, and not optional. This handler was open to the internet, and
+// the PIN it sets is the credential that /api/menu-editor/* and the
+// daily-update route below both accept — so anyone could set a stranger's PIN
+// and then edit their entire menu with it. Setting your own PIN now requires
+// proving the business is yours.
+router.post('/entity/:slug/set-pin', ownerRequired, async (req, res) => {
   const { pin } = req.body;
   if (!pin) return res.status(400).json({ error: 'PIN required' });
-  const { error } = await db.from('entity').update({ menu_pin: String(pin) }).eq('slug', req.params.slug);
+  const { error } = await db.from('entity').update({ menu_pin: String(pin) }).eq('slug', req.entitySlug);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
 });
@@ -2540,7 +2546,9 @@ router.get('/entity/:slug/social-posts', async (req, res) => {
   }
 })
 
-router.post('/entity/:slug/social-posts', async (req, res) => {
+// A business pinning its own Instagram/TikTok posts to its profile. Was open;
+// the slug in the path decided whose profile got the post.
+router.post('/entity/:slug/social-posts', ownerRequired, async (req, res) => {
   try {
     const { post_url, duration_seconds } = req.body
     if (!post_url) return res.status(400).json({ error: 'post_url required' })
@@ -2562,7 +2570,7 @@ router.post('/entity/:slug/social-posts', async (req, res) => {
     }
 
     const { data, error } = await db.from('entity_social_posts').insert({
-      entity_slug: req.params.slug,
+      entity_slug: req.entitySlug,
       platform: detected.platform,
       post_url: post_url.trim(),
       media_type: detected.media_type,
@@ -2580,9 +2588,13 @@ router.post('/entity/:slug/social-posts', async (req, res) => {
   }
 })
 
-router.delete('/social-posts/:id', async (req, res) => {
+// Scoped as well as guarded: the id alone used to be enough to delete any
+// business's post, so the session's slug goes in the WHERE clause too.
+router.delete('/social-posts/:id', ownerRequired, async (req, res) => {
   try {
-    const { error } = await db.from('entity_social_posts').delete().eq('id', req.params.id)
+    const { error } = await db.from('entity_social_posts').delete()
+      .eq('id', req.params.id)
+      .eq('entity_slug', req.entitySlug)
     if (error) return res.status(500).json({ error: error.message })
     res.json({ success: true })
   } catch (err) {

@@ -1,5 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const { ownerRequired } = require('../middleware/ownerAuth');
+
+// The read stays public; every write is ownerRequired. These handlers used to
+// take the business straight from the :slug in the path, which meant the path
+// was the authorization — anyone could POST a menu item onto any restaurant.
+// The writes resolve `slug` from the session now; the path segment is left in
+// place so existing links keep working, and is no longer trusted.
 const multer = require('multer');
 const getGcrDb = () => require('../db'); // db module exports the client itself
 
@@ -9,7 +16,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 // GET /simple/:slug/data - Load menu by business slug
 router.get('/:slug/data', async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.params.slug;
 
     // Find entity by slug
     const { data: entity, error: entErr } = await db()
@@ -69,9 +76,9 @@ router.get('/:slug/data', async (req, res) => {
 });
 
 // POST /simple/:slug/items - Add/update menu item to LIVE tables
-router.post('/:slug/items', async (req, res) => {
+router.post('/:slug/items', ownerRequired, async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.entitySlug;
     const { id, section_id, section_type, item_name, item_description, item_price } = req.body;
 
     const { data: entity } = await db()
@@ -129,9 +136,10 @@ router.post('/:slug/items', async (req, res) => {
 });
 
 // DELETE /simple/:slug/items/:id - Delete from LIVE tables
-router.delete('/:slug/items/:id', async (req, res) => {
+router.delete('/:slug/items/:id', ownerRequired, async (req, res) => {
   try {
-    const { slug, id } = req.params;
+    const { id } = req.params;
+    const slug = req.entitySlug;
     const { section_type } = req.body || {};
 
     const { data: entity } = await db()
@@ -162,9 +170,9 @@ router.delete('/:slug/items/:id', async (req, res) => {
 });
 
 // POST /simple/:slug/specials - Add/update special
-router.post('/:slug/specials', async (req, res) => {
+router.post('/:slug/specials', ownerRequired, async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = req.entitySlug;
     const { id, special_name, description, days, start_time, end_time } = req.body;
 
     const { data: entity } = await db()
@@ -201,9 +209,10 @@ router.post('/:slug/specials', async (req, res) => {
 });
 
 // DELETE /simple/:slug/specials/:id
-router.delete('/:slug/specials/:id', async (req, res) => {
+router.delete('/:slug/specials/:id', ownerRequired, async (req, res) => {
   try {
-    const { slug, id } = req.params;
+    const { id } = req.params;
+    const slug = req.entitySlug;
 
     const { data: entity } = await db()
       .from('entity')
@@ -227,11 +236,11 @@ router.delete('/:slug/specials/:id', async (req, res) => {
 });
 
 // POST /simple/:slug/upload - Upload photo
-router.post('/:slug/upload', upload.single('image'), async (req, res) => {
+router.post('/:slug/upload', ownerRequired, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No image file' });
 
-    const { slug } = req.params;
+    const slug = req.entitySlug;
     const { data: entity } = await db()
       .from('entity')
       .select('id')

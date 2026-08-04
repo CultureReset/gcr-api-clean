@@ -4,6 +4,7 @@
 
 const express = require('express');
 const router = express.Router();
+const { adminRequired } = require('../middleware/auth');
 const { createClient } = require('@supabase/supabase-js');
 const { logEdit } = require('../lib/edit-log');
 const { analyzePhoto } = require('../lib/analyze-photo');
@@ -77,7 +78,15 @@ function log(req, fields) {
 //   - slug: optional explicit slug (from pages/new.js); auto-generated from name if absent
 //   - pin: optional explicit PIN (from pages/new.js); random 4-digit if absent (AI flow)
 // Returns: { success, slug, pin, token, name }
-router.post('/create', async (req, res) => {
+// adminRequired. This created a real entity row — a listing in a directory of
+// 4,067 real businesses — for anybody who could POST to it, with no phone
+// verification, no service-area check and no approval step.
+//
+// The supported public path is POST /api/business-auth/register, which verifies
+// the number by text, records the sign-up as pending, captures near-duplicate
+// listings for a reviewer, and creates the entity INACTIVE until a human
+// approves it. That is the counterfeit gate; this handler went around it.
+router.post('/create', adminRequired, async (req, res) => {
   try {
     const { name, slug: requestedSlug, tagline, icon, pin: requestedPin, ai_data, ai_summary } = req.body;
     if (!name || !String(name).trim()) return res.status(400).json({ error: 'Restaurant name required' });

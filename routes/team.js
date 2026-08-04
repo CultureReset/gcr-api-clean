@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
+const { ownerRequired } = require('../middleware/ownerAuth');
+
+// Reads stay public — GCR Unified renders these on tourist-facing pages.
+//
+// Writes did not have a guard at all: the business was whatever slug appeared
+// in the path, so anyone on the internet could POST to a stranger's listing.
+// ownerRequired resolves the business from the session via entity_owners
+// instead, and every write below uses req.entitySlug rather than the slug in
+// the URL. The path keeps its :slug so existing links still work; it is simply
+// no longer what decides whose data is written.
+
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
   process.env.GCR_SUPABASE_SERVICE_KEY
@@ -32,7 +43,7 @@ router.get('/:slug', async (req, res) => {
 
 // ─── POST /api/team/:slug ─────────────────────────────────────────────────
 // Add a team member (admin only)
-router.post('/:slug', async (req, res) => {
+router.post('/:slug', ownerRequired, async (req, res) => {
   try {
     const { name, title, bio, photo_url, specialty, certifications, years_experience, sort_order } = req.body;
 
@@ -43,7 +54,7 @@ router.post('/:slug', async (req, res) => {
     const { data, error } = await db
       .from('entity_team_members')
       .insert({
-        entity_slug: req.params.slug,
+        entity_slug: req.entitySlug,
         name: name.trim(),
         title: title?.trim() || null,
         bio: bio?.trim() || null,
@@ -65,7 +76,7 @@ router.post('/:slug', async (req, res) => {
 
 // ─── PUT /api/team/:slug/:id ──────────────────────────────────────────────
 // Edit a team member
-router.put('/:slug/:id', async (req, res) => {
+router.put('/:slug/:id', ownerRequired, async (req, res) => {
   try {
     const { name, title, bio, photo_url, specialty, certifications, years_experience, sort_order } = req.body;
 
@@ -82,7 +93,7 @@ router.put('/:slug/:id', async (req, res) => {
         ...(sort_order !== undefined && { sort_order })
       })
       .eq('id', req.params.id)
-      .eq('entity_slug', req.params.slug)
+      .eq('entity_slug', req.entitySlug)
       .select()
       .single();
 
@@ -95,13 +106,13 @@ router.put('/:slug/:id', async (req, res) => {
 
 // ─── DELETE /api/team/:slug/:id ────────────────────────────────────────────
 // Delete a team member
-router.delete('/:slug/:id', async (req, res) => {
+router.delete('/:slug/:id', ownerRequired, async (req, res) => {
   try {
     const { error } = await db
       .from('entity_team_members')
       .delete()
       .eq('id', req.params.id)
-      .eq('entity_slug', req.params.slug);
+      .eq('entity_slug', req.entitySlug);
 
     if (error) throw error;
     res.json({ ok: true });

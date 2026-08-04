@@ -3,25 +3,106 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const rateLimit = require('express-rate-limit');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: '*' }));
+/* ── who is allowed to call this API from a browser ───────────────────────
+ *
+ * This was `origin: '*'`, which let any page on any domain make authenticated
+ * requests from a visitor's browser. The list below comes from an env var so a
+ * new white-label domain is a config change rather than a deploy.
+ *
+ *   CORS_ORIGINS=https://a.example.com,https://b.example.com
+ *
+ * Requests with no Origin header — server-to-server, curl, Twilio and Stripe
+ * webhooks, health checks — are allowed through. CORS is a browser mechanism;
+ * refusing them would break every integration without protecting anything, as
+ * anything that can omit an Origin header can also forge one.
+ */
+const DEFAULT_ORIGINS = [
+    'https://gulfcoastradar.com',
+    'https://www.gulfcoastradar.com',
+];
+
+const allowedOrigins = new Set(
+    (process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((o) => o.trim().replace(/\/+$/, ''))
+        .filter(Boolean)
+        .concat(DEFAULT_ORIGINS),
+);
+
+// Local development hosts, only when this is not a production deploy.
+const allowLocalhost = process.env.VERCEL_ENV !== 'production' && process.env.NODE_ENV !== 'production';
+
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        const normalized = origin.replace(/\/+$/, '');
+        if (allowedOrigins.has(normalized)) return callback(null, true);
+        if (allowLocalhost && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized)) {
+            return callback(null, true);
+        }
+        // Not an error — an error here becomes a 500. Refusing to send the
+        // header is what makes the browser block the response, which is the
+        // correct outcome and leaves non-browser callers unaffected.
+        return callback(null, false);
+    },
+    credentials: true,
+}));
+
 app.use(express.json({ limit: '10mb' }));
+
+/* ── rate limits on the two doors that cost money ─────────────────────────
+ *
+ * Every phone-verification request spends a Twilio message. Both sign-up
+ * systems are public by necessity, so without a limit a script can run up a
+ * real bill and burn the numbers it targets.
+ *
+ * Keyed per IP. Trust the proxy first, or every request behind Vercel's edge
+ * looks like it comes from the same address and the limit locks out the world.
+ */
+app.set('trust proxy', 1);
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: Number(process.env.AUTH_RATE_LIMIT || 20),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many attempts — wait a few minutes and try again.' },
+});
+
+app.use('/api/business-auth', authLimiter);
+app.use('/api/tourist-auth', authLimiter);
 
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
 // literal require('./...') string so Vercel's bundler statically traces and
 // includes the route file (a dynamic require(variable) is NOT bundled → 404).
+const mountedRouters = [];
+
 function mount(path, loader) {
   try {
     app.use(path, loader());
+    mountedRouters.push(path);
   } catch (e) {
     console.error(`[mount skipped] ${path}: ${e.message}`);
   }
 }
 
-app.get('/', (req, res) => res.json({ status: 'GCR API running', version: '2026-06-17b', endpoints: 'api/gcr/*, api/admin/*, api/dashboard/*, api/public/*, api/auth/*, api/user/*, api/site/*, api/menu-editor/*, api/tourist/*, api/tourist-auth/*' }));
+// The deployment's own identity, read from the build rather than typed here.
+// This used to return a hand-written version string and a hand-written list of
+// endpoints, both of which went stale the moment anything moved — which is why
+// a current deployment looked abandoned from the root URL.
+app.get('/', (req, res) => res.json({
+  status: 'GCR API running',
+  commit: process.env.VERCEL_GIT_COMMIT_SHA || null,
+  environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'development',
+  routers: mountedRouters.length,
+  endpoints: mountedRouters,
+}));
 
 // Auth
 mount('/api/auth', () => require('./routes/auth'));
@@ -46,6 +127,12 @@ mount('/api/site', () => require('./routes/site'));
 mount('/api/menu-editor', () => require('./routes/menu-editor'));
 mount('/api/menu-edit', () => require('./routes/menu-edit'));
 mount('/api/simple', () => require('./routes/simple-menu-edit'));
+
+// Everything the business dashboard reads or writes about its own business.
+// Every handler resolves the slug from the session via entity_owners, so no
+// request can name a business. This is what replaced the dashboard's direct
+// PostgREST access — and with it, the anon key in a public browser bundle.
+mount('/api/business', () => require('./routes/business-data'));
 
 // Business sign-up — phone, six-digit code, account. A SEPARATE system from
 // routes/tourist-auth.js below: different product, different account model,
@@ -120,7 +207,7 @@ mount('/api/dashboard-sms', () => require('./routes/dashboard-sms'));
 mount('/api/embed', () => require('./routes/embed'));
 
 // Apps & Modules
-mount('/api/apps', () => require('./routes/apps'));
+//mount('/api/apps', () => require('./routes/apps')); // UNMOUNTED: superseded by routes/composio.js (the App Store). Both backing tables are empty, and the code no longer matches them — line 12 filters on `active`, which the apps table calls `status`, and line 45 inserts a `provider` field site_apps has no column for. Replaced, not broken: do not repair it.
 //mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/platform', () => require('./routes/platform'));
 

@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
+const { ownerRequired } = require('../middleware/ownerAuth');
+
+// Reads stay public — GCR Unified renders these on tourist-facing pages.
+//
+// Writes did not have a guard at all: the business was whatever slug appeared
+// in the path, so anyone on the internet could POST to a stranger's listing.
+// ownerRequired resolves the business from the session via entity_owners
+// instead, and every write below uses req.entitySlug rather than the slug in
+// the URL. The path keeps its :slug so existing links still work; it is simply
+// no longer what decides whose data is written.
+
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
   process.env.GCR_SUPABASE_SERVICE_KEY
@@ -81,7 +92,7 @@ router.get('/:slug/stats', async (req, res) => {
 
 // ─── POST /api/reviews/:slug ──────────────────────────────────────────────
 // Submit a new review
-router.post('/:slug', async (req, res) => {
+router.post('/:slug', ownerRequired, async (req, res) => {
   try {
     const { reviewer_name, reviewer_email, rating, title, body } = req.body;
 
@@ -96,7 +107,7 @@ router.post('/:slug', async (req, res) => {
     const { data, error } = await db
       .from('entity_reviews')
       .insert({
-        entity_slug: req.params.slug,
+        entity_slug: req.entitySlug,
         reviewer_name: reviewer_name.trim(),
         reviewer_email: reviewer_email.trim(),
         rating: parseInt(rating),
@@ -117,7 +128,7 @@ router.post('/:slug', async (req, res) => {
 
 // ─── PUT /api/reviews/:slug/:id ────────────────────────────────────────────
 // Edit a review (user can edit own within 24hrs)
-router.put('/:slug/:id', async (req, res) => {
+router.put('/:slug/:id', ownerRequired, async (req, res) => {
   try {
     const { reviewer_email, title, body, rating } = req.body;
 
@@ -130,7 +141,7 @@ router.put('/:slug/:id', async (req, res) => {
       .from('entity_reviews')
       .select('*')
       .eq('id', req.params.id)
-      .eq('entity_slug', req.params.slug)
+      .eq('entity_slug', req.entitySlug)
       .single();
 
     if (getError || !review) {
@@ -171,7 +182,7 @@ router.put('/:slug/:id', async (req, res) => {
 
 // ─── DELETE /api/reviews/:slug/:id ────────────────────────────────────────
 // Delete a review
-router.delete('/:slug/:id', async (req, res) => {
+router.delete('/:slug/:id', ownerRequired, async (req, res) => {
   try {
     const { reviewer_email } = req.body;
 
@@ -184,7 +195,7 @@ router.delete('/:slug/:id', async (req, res) => {
       .from('entity_reviews')
       .select('*')
       .eq('id', req.params.id)
-      .eq('entity_slug', req.params.slug)
+      .eq('entity_slug', req.entitySlug)
       .single();
 
     if (getError || !review) {

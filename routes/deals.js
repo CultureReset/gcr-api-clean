@@ -11,6 +11,15 @@
 const express = require('express')
 const router  = express.Router()
 const db      = require('../db')
+const { ownerRequired } = require('../middleware/ownerAuth')
+
+// Reads and the click counter stay public — the deals feed is a tourist-facing
+// surface and a click is anonymous telemetry.
+//
+// Posting a deal is not. The three handlers below took entity_slug straight
+// from the request body, so anyone could publish a deal under any business's
+// name, at any price, with their own phone number on it. They resolve the
+// business from the session now, and the body's entity_slug is ignored.
 
 // ── GET all active deals ─────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
@@ -88,10 +97,10 @@ router.get('/feed', async (req, res) => {
 })
 
 // ── POST self-serve deal submission ──────────────────────────────────────────
-router.post('/submit', async (req, res) => {
+router.post('/submit', ownerRequired, async (req, res) => {
   try {
     const {
-      entity_slug, entity_name, entity_type, entity_subtype,
+      entity_name, entity_type, entity_subtype,
       deal_type, headline, description, image_url,
       original_price, deal_price, price_unit, price_label,
       valid_date, valid_start_time, valid_end_time,
@@ -100,6 +109,9 @@ router.post('/submit', async (req, res) => {
       poster_name, poster_phone,
       source = 'self_serve',
     } = req.body
+
+    // Whose deal this is comes from the session, never the body.
+    const entity_slug = req.entitySlug
 
     // Basic validation
     if (!entity_name) return res.status(400).json({ error: 'entity_name required' })
@@ -174,17 +186,22 @@ router.post('/submit', async (req, res) => {
 
 // ── POST auto-deal from email parser ─────────────────────────────────────────
 // Called internally when email parser detects a cancellation or last-min slot
-router.post('/auto', async (req, res) => {
+router.post('/auto', ownerRequired, async (req, res) => {
   try {
     const {
-      entity_slug, entity_name, entity_type, entity_subtype,
+      entity_name, entity_type, entity_subtype,
       headline, description, deal_price, original_price, price_unit,
       spots_remaining, spots_total, valid_date, valid_start_time,
       source_log_id, claim_phone, claim_url,
     } = req.body
 
-    if (!entity_slug || !headline) {
-      return res.status(400).json({ error: 'entity_slug and headline required' })
+    // Whose deal this is comes from the session, never the body. When the
+    // email parser is wired up to call this server-to-server it will need a
+    // scoped API key (see Part 9), not a slug it can name for itself.
+    const entity_slug = req.entitySlug
+
+    if (!headline) {
+      return res.status(400).json({ error: 'headline required' })
     }
 
     // Auto-deals go live immediately (verified by email parser = trusted source)
@@ -256,7 +273,7 @@ router.post('/auto', async (req, res) => {
 })
 
 // ── POST admin activate a pending deal ────────────────────────────────────────
-router.post('/activate/:id', async (req, res) => {
+router.post('/activate/:id', ownerRequired, async (req, res) => {
   try {
     const { id } = req.params
     const { blast_sms = false, feature = false } = req.body
