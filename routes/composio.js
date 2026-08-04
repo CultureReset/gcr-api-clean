@@ -41,18 +41,46 @@ const TOOL_FIELDS = [
 /* ── catalogue ───────────────────────────────────────────────────────────── */
 
 /** The catalogue as both dashboards render it: tools, categories, and status. */
-async function loadCatalogue({ activeOnly = false } = {}) {
-    const toolQuery = supabase.from('platform_connections').select('*').order('sort_order', { ascending: true });
-    if (activeOnly) toolQuery.eq('is_active', true);
+/**
+ * PostgREST answers at most 1,000 rows unless the request names a range, and
+ * it does so silently — no error, no flag, just a short list. The catalogue
+ * went past that the first time it was synced: 1,070 rows in the table, 1,000
+ * on the screen, and nothing anywhere saying 70 were missing.
+ *
+ * So the range is explicit and the read pages until the table is exhausted.
+ */
+const CATALOGUE_PAGE = 1000;
 
+async function loadCatalogueTools({ activeOnly = false } = {}) {
+    const all = [];
+
+    for (let from = 0; ; from += CATALOGUE_PAGE) {
+        const query = supabase
+            .from('platform_connections')
+            .select('*')
+            .order('sort_order', { ascending: true })
+            .range(from, from + CATALOGUE_PAGE - 1);
+        if (activeOnly) query.eq('is_active', true);
+
+        const { data, error } = await query;
+        if (error) throw new Error(error.message);
+
+        all.push(...(data || []));
+        // A short page is the last page.
+        if (!data || data.length < CATALOGUE_PAGE) break;
+    }
+
+    return all;
+}
+
+async function loadCatalogue({ activeOnly = false } = {}) {
     const [tools, cats] = await Promise.all([
-        toolQuery,
+        loadCatalogueTools({ activeOnly }),
         supabase.from('platform_connection_categories').select('*').order('sort_order', { ascending: true }),
     ]);
-    if (tools.error) throw new Error(tools.error.message);
 
     return {
-        tools: tools.data || [],
+        tools,
         categories: cats.data || [],
         composio_configured: composio.configured(),
     };
