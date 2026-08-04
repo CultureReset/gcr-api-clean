@@ -117,8 +117,10 @@ const conciergeStub = {
         { name: 'check_availability', description: 'a', inputSchema: { type: 'object', properties: {}, required: ['slug'] } },
         { name: 'find_item_prices', description: 'p', inputSchema: { type: 'object', properties: {}, required: ['query'] } },
         { name: 'compare_businesses', description: 'c', inputSchema: { type: 'object', properties: {}, required: ['slugs'] } },
+        { name: 'whats_on', description: 'w', inputSchema: { type: 'object', properties: {} } },
+        { name: 'list_categories', description: 'l', inputSchema: { type: 'object', properties: {} } },
     ],
-    CONCIERGE_TOOL_NAMES: new Set(['search_businesses', 'get_business_details', 'check_availability', 'find_item_prices', 'compare_businesses']),
+    CONCIERGE_TOOL_NAMES: new Set(['search_businesses', 'get_business_details', 'check_availability', 'find_item_prices', 'compare_businesses', 'whats_on', 'list_categories']),
     asInputSchemaTools: () => [],
     runConciergeTool: async (name, input) => {
         conciergeCalls.push({ name, input });
@@ -270,7 +272,7 @@ async function run() {
     // The whole point of this one: an agent can connect with nothing.
     const anon = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     check('no token needed', anon.status === 200);
-    check('five directory tools', anon.body.result.tools.length === 5, String(anon.body.result?.tools?.length));
+    check('seven directory tools', anon.body.result.tools.length === 7, String(anon.body.result?.tools?.length));
 
     const pubInit = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
@@ -295,7 +297,7 @@ async function run() {
     // A token sent to the public server must not grant anything extra, and
     // must not be rejected either — an agent configured once may send one.
     const withToken = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { Authorization: `Bearer ${AUTH}` });
-    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 5);
+    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 7);
 
     console.log(`\n${pass} passed, ${fail} failed\n`);
     server.close();

@@ -1,6 +1,13 @@
 # MCP — connecting an AI to Gulf Coast Radar
 
-Two MCP servers. They are different products and they share only the transport.
+**One API, one deployment, one database.** gcr-api-clean, on the `cyber check`
+Supabase project, exactly as before. Nothing here runs anywhere else.
+
+"MCP server" is the protocol's word for an endpoint, not for a machine. There
+are two of them and they are two routes in the same Express app, the same way
+`/api/gcr` and `/api/admin` are — they share the transport in
+`lib/mcpServer.js` and the database client in `db.js`. They exist separately
+because they answer to different callers, not because they run apart.
 
 | | `/api/mcp/public` | `/api/mcp` |
 | --- | --- | --- |
@@ -26,17 +33,19 @@ That is the whole setup. Paste the URL into the xAI Voice Agent Builder's remote
 
 Everything it returns is already on the public website. A token would protect nothing and would stop the thing scaling — every new surface would need one issued, stored and rotated. It is read-only, scoped to `is_active` businesses, and cannot write. A rate limit (120 requests/minute per IP, `PUBLIC_MCP_RATE_LIMIT`) stops a scraper walking the directory; it is not a password.
 
-## The five tools
+## The seven tools
 
 | Tool | What it answers |
 | --- | --- |
-| `search_businesses` | "who has crab legs", "red snapper charter", "live music tonight" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags |
+| `search_businesses` | "who has crab legs", "red snapper charter" — searches names **and** menus, drinks, trips, fish species, amenities, FAQs, tags |
+| `whats_on` | "what's going on tonight", "who has happy hour right now", "live music this weekend" — events, specials and happy hours across **every** business, filtered by time, on the coast's own Central clock |
+| `list_categories` | "what is there to do here?" — the platform's category list with counts, and the exact `entity_subtype` values to search with |
 | `find_item_prices` | "cheapest dolphin cruise", "margarita under $10" — real rows across menus, drinks, happy hour, offer tiers and retail, sorted low to high |
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
 | `check_availability` | today's remaining spots, for businesses that publish it |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
 
-These are not new. They are the five the tourist chat already runs on, lifted out of `routes/tourist.js` into `lib/conciergeTools.js` so both use one copy. `search_businesses` reaches the same deep index as the website's search bar. Improving the search improves the phone agent, the web chat and the website at the same time.
+Five of these are not new. `search_businesses`, `get_business_details`, `check_availability`, `find_item_prices` and `compare_businesses` are what the tourist chat already runs on, lifted out of `routes/tourist.js` into `lib/conciergeTools.js` so both use one copy. `whats_on` and `list_categories` were added because the site displays them and nothing else could answer by time or by category. `search_businesses` reaches the same deep index as the website's search bar. Improving the search improves the phone agent, the web chat and the website at the same time.
 
 ## The rule that matters on a phone call
 
@@ -171,10 +180,12 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 # Tests
 
 ```
-npm run test:mcp    # 36 checks, no credentials, no network, no database
+npm run verify         # everything below
+npm run test:mcp       # 36 checks — the protocol, the token scoping, the slug scoping
+npm run test:concierge # 32 checks — whats_on's day and time filtering, against a fixed clock
 ```
 
-The stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed. A regression that let a caller name a business would still return a plausible row; it would not build the same query.
+The MCP stub records the queries the router *builds* rather than running them, so the scoping is asserted rather than assumed: a regression that let a caller name a business would still return a plausible row, but would not build the same query. The concierge stub pins the clock to a Wednesday at 16:00 Central, so "is this happening now" means the same thing at any hour of any real day.
 
 # Adding a tool
 

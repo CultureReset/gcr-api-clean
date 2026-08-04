@@ -2754,5 +2754,9 @@ router.get('/lodging-search', async (req, res) => {
 // own page, instead of duplicating ~60 tables' worth of query logic.
 router.buildFullEntity = buildFullEntity;
 router.searchEntitySlugs = searchEntitySlugs;
+// The coast runs on Central time. Anything answering "now" or "tonight" —
+// /live-now here, whats_on in lib/conciergeTools.js — has to agree on what
+// time it is, so there is one clock and it is this one.
+router.getCentralNow = getCentralNow;
 
 module.exports = router;
