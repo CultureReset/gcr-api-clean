@@ -26,9 +26,17 @@ const router  = express.Router()
 const { createClient } = require('@supabase/supabase-js')
 const { callAI } = require('../utils/ai-provider')
 
+// GCR_SUPABASE_* is what the rest of the API — and the deployment — actually
+// sets. This file was the only one reading SUPABASE_URL /
+// SUPABASE_SERVICE_ROLE_KEY, a name that appears nowhere else and is not in
+// .env.example, so createClient threw on load and server.js's fail-safe mount
+// skipped the whole router with only a console warning: every Meta webhook
+// delivery 404'd. The bare names stay as fallbacks for anyone who set them.
 const db = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.GCR_SUPABASE_URL || process.env.SUPABASE_URL,
+  process.env.GCR_SUPABASE_SERVICE_KEY
+    || process.env.SUPABASE_SERVICE_ROLE_KEY
+    || process.env.SUPABASE_SERVICE_KEY
 )
 
 // ── GET /api/meta-webhook — Meta verification handshake ───────────────────────
