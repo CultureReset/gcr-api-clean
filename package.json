@@ -8,7 +8,9 @@
     "dev": "node --watch server.js",
     "check:sql": "node scripts/check-sql-safety.mjs",
     "check:columns": "node scripts/check-capability-columns.mjs",
-    "verify": "npm run check:sql && npm run check:columns"
+    "test:mcp": "node scripts/test-mcp.js",
+    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:concierge",
+    "test:concierge": "node scripts/test-concierge.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

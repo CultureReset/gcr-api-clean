@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const rateLimit = require('express-rate-limit');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -92,6 +93,47 @@ const authLimiter = rateLimit({
 app.use('/api/business-auth', authLimiter);
 app.use('/api/tourist-auth', authLimiter);
 
+/* ── and on the one door that is open to everybody ────────────────────────
+ *
+ * /api/mcp/public takes no token by design — it serves data already on the
+ * public website. That makes it the only unauthenticated endpoint here that
+ * runs real queries, so it gets a ceiling instead of a password.
+ *
+ * ── Why this cannot be keyed on the IP alone ─────────────────────────────
+ *
+ * The caller is usually not the visitor. A hosted voice agent relays every
+ * conversation from its own servers, so a thousand people talking at once
+ * arrive from a handful of addresses — and a per-IP ceiling would throttle the
+ * whole platform at a dozen simultaneous conversations while the visitors sat
+ * there hearing nothing.
+ *
+ * So the bucket is the caller's own credential where there is one: each
+ * signed-in visitor and each guest id gets its own budget no matter whose
+ * servers relayed the request. Only traffic with no identity at all falls back
+ * to the IP, and that bucket is large, because it is shared by everyone behind
+ * one hotel's wifi as well as by a scraper.
+ *
+ * The limit exists to stop somebody walking the entire directory. It is not
+ * here to ration a conversation.
+ */
+const publicMcpLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: Number(process.env.PUBLIC_MCP_RATE_LIMIT || 600),
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+        const credential = (req.headers.authorization || '').trim()
+            || String(req.headers['x-guest-id'] || '').trim();
+        // Hashed, so a token never reaches the limiter's key store in the clear.
+        if (credential) return `id:${crypto.createHash('sha256').update(credential).digest('hex').slice(0, 32)}`;
+        return `ip:${req.ip}`;
+    },
+    message: { error: 'Too many requests — slow down and try again shortly.' },
+});
+
+app.use('/api/mcp/public', publicMcpLimiter);
+app.use('/api/mcp/business', publicMcpLimiter);
+
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
 // literal require('./...') string so Vercel's bundler statically traces and
@@ -148,6 +190,40 @@ mount('/api/simple', () => require('./routes/simple-menu-edit'));
 // request can name a business. This is what replaced the dashboard's direct
 // PostgREST access — and with it, the anon key in a public browser bundle.
 mount('/api/business', () => require('./routes/business-data'));
+
+// One agent that knows every business. The public directory as MCP tools —
+// search, full details, cheapest-first prices, today's availability, side-by-
+// side comparison — so a single voice agent on one phone number, or one web
+// chat, can answer for any business on the platform.
+//
+// Open and read-only by design: everything it returns is already on the public
+// site, so a token would protect nothing and would stop it scaling. The tools
+// come from lib/conciergeTools.js, the same five routes/tourist.js already
+// runs its chat on.
+//
+// Mounted before /api/mcp so the more specific path wins.
+mount('/api/mcp/public', () => require('./routes/mcp-public'));
+
+// The same tools, attached to one business by the slug in the URL:
+//
+//     /api/mcp/business/flora-bama
+//
+// A business's own agent with nothing to provision — standing one up for every
+// business on the platform is a string concatenation, not a token minted and
+// rotated a thousand times. Reads only, same public data. Writing is what
+// /api/mcp and its tokens are for.
+mount('/api/mcp/business/:slug', () => require('./routes/mcp-public').pinned);
+
+// The same data, spoken to instead of clicked on. An MCP server so an outside
+// AI assistant — Grok, or any other MCP client — can read and edit one
+// business's sections in words.
+//
+// It is deliberately NOT a database MCP server. It calls the same schema
+// discovery, table allow-list and column filter as the router above
+// (lib/businessTables.js), so the rule holds: only this API touches Postgres,
+// including when the caller is a model. Which business it acts as comes from
+// the token, never from the request.
+mount('/api/mcp', () => require('./routes/mcp'));
 
 // Business sign-up — phone, six-digit code, account. A SEPARATE system from
 // routes/tourist-auth.js below: different product, different account model,
