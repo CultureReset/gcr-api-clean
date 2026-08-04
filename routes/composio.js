@@ -118,23 +118,55 @@ router.delete('/catalog/:toolId', adminRequired, async (req, res) => {
  * inactive by default — the store shows what you chose to offer, not a dump of
  * every integration in existence.
  */
+/**
+ * Pull the catalogue from Composio.
+ *
+ * RESUMABLE ON PURPOSE. Composio carries over a thousand toolkits behind a
+ * cursor, a hundred at a time, so fetching the lot is a dozen sequential round
+ * trips. Doing that in one request outlives the serverless function: it is
+ * killed mid-flight and the browser sees a dropped connection rather than an
+ * error it can explain. That is exactly what happened the first time this ran.
+ *
+ * So one call does a bounded slice and reports where it got to:
+ *
+ *   POST /sync            {}                     → first slice
+ *   POST /sync            { cursor }             → the next one
+ *                         → { synced, new, next_cursor, done, total_synced }
+ *
+ * The caller repeats while `done` is false. Categories are refreshed on the
+ * first slice only, since they do not change between pages.
+ */
 router.post('/sync', adminRequired, async (req, res) => {
     if (!composio.configured()) {
         return fail(res, 501, 'Composio is not configured on this server.', { hint: 'Set COMPOSIO_API_KEY and redeploy.' });
     }
     const activateAll = req.body?.activate_all === true;
+    const cursor = req.body?.cursor || null;
+    const pages = Math.min(Math.max(Number(req.body?.pages) || 3, 1), 10);
+    const alreadySynced = Number(req.body?.total_synced) || 0;
 
     try {
-        const [toolkits, categories] = await Promise.all([composio.listToolkits(), composio.listCategories()]);
-
-        if (categories.length) {
-            await supabase.from('platform_connection_categories').upsert(
-                categories.map((c, i) => ({ cat_id: c.slug, name: c.name, sort_order: i })),
-                { onConflict: 'cat_id' }
-            );
+        // Categories come with the first slice only — they are a short, separate
+        // list and re-reading them on every page is wasted time in a request
+        // that has a deadline.
+        let categoryCount = 0;
+        if (!cursor) {
+            const categories = await composio.listCategories();
+            categoryCount = categories.length;
+            if (categories.length) {
+                await supabase.from('platform_connection_categories').upsert(
+                    categories.map((c, i) => ({ cat_id: c.slug, name: c.name, sort_order: i })),
+                    { onConflict: 'cat_id' }
+                );
+            }
         }
 
-        const { data: existing } = await supabase.from('platform_connections').select('tool_id');
+        const { toolkits, nextCursor } = await composio.listToolkitsPage({ cursor, pages });
+
+        const { data: existing } = await supabase
+            .from('platform_connections')
+            .select('tool_id')
+            .in('tool_id', toolkits.map((t) => t.tool_id));
         const known = new Set((existing || []).map((r) => r.tool_id));
 
         const rows = toolkits.map((t, i) => {
@@ -154,7 +186,7 @@ router.post('/sync', adminRequired, async (req, res) => {
             if (!known.has(t.tool_id)) {
                 row.is_active = activateAll;
                 row.is_featured = false;
-                row.sort_order = i;
+                row.sort_order = alreadySynced + i;
             }
             return row;
         });
@@ -170,8 +202,11 @@ router.post('/sync', adminRequired, async (req, res) => {
         res.json({
             synced: rows.length,
             new: rows.filter((r) => !known.has(r.tool_id)).length,
-            categories: categories.length,
+            categories: categoryCount,
             activated: activateAll,
+            next_cursor: nextCursor,
+            done: !nextCursor,
+            total_synced: alreadySynced + rows.length,
         });
     } catch (err) {
         fail(res, 502, err.message);
