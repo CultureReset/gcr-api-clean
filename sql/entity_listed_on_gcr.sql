@@ -9,9 +9,11 @@
 -- This column separates the two. `is_active` goes back to meaning "open, not
 -- deleted"; `listed_on_gcr` means "belongs in the directory".
 --
--- The rule is geographic: within 25 miles of the shoreline between New Orleans
--- and Mexico Beach. lib/serviceArea.js holds the coastline and is the single
--- definition — this file mirrors it for the one-off backfill.
+-- The rule is geographic: within 25 miles of the shoreline, from New Orleans
+-- east along the Gulf, around the Florida peninsula and the Keys, and north up
+-- the Atlantic coast to the Georgia line. lib/serviceArea.js holds the 75
+-- anchor towns and is the single definition — the VALUES list below is
+-- generated from it, so the two cannot drift.
 --
 -- ADDITIVE. One column, one index. No existing column is changed and no row is
 -- deleted. The backfill only ever sets the new column.
@@ -43,11 +45,81 @@ create index if not exists entity_listed_on_gcr_idx
  */
 
 with coast(lat, lng) as (values
-  (29.95,-90.07),(30.28,-89.78),(30.31,-89.33),(30.37,-89.09),(30.40,-88.89),
-  (30.37,-88.56),(30.25,-88.11),(30.69,-88.04),(30.52,-87.90),(30.25,-87.70),
-  (30.27,-87.58),(30.29,-87.44),(30.42,-87.22),(30.33,-87.14),(30.39,-86.87),
-  (30.42,-86.62),(30.39,-86.50),(30.38,-86.37),(30.33,-86.17),(30.18,-85.81),
-  (30.16,-85.66),(29.94,-85.42)
+  (29.95,-90.07),
+  (30.28,-89.78),
+  (30.31,-89.33),
+  (30.37,-89.09),
+  (30.4,-88.89),
+  (30.37,-88.56),
+  (30.25,-88.11),
+  (30.69,-88.04),
+  (30.52,-87.9),
+  (30.25,-87.7),
+  (30.27,-87.58),
+  (30.29,-87.44),
+  (30.42,-87.22),
+  (30.33,-87.14),
+  (30.39,-86.87),
+  (30.42,-86.62),
+  (30.39,-86.5),
+  (30.38,-86.37),
+  (30.33,-86.17),
+  (30.18,-85.81),
+  (30.16,-85.66),
+  (29.94,-85.42),
+  (29.81,-85.3),
+  (29.73,-84.98),
+  (29.85,-84.66),
+  (30.03,-84.39),
+  (30.16,-84.21),
+  (29.81,-83.59),
+  (29.67,-83.38),
+  (29.33,-83.14),
+  (29.14,-83.03),
+  (29.03,-82.72),
+  (28.9,-82.59),
+  (28.78,-82.61),
+  (28.47,-82.66),
+  (28.36,-82.69),
+  (28.15,-82.76),
+  (27.97,-82.8),
+  (27.95,-82.46),
+  (27.77,-82.64),
+  (27.5,-82.57),
+  (27.34,-82.53),
+  (27.1,-82.45),
+  (26.93,-82.05),
+  (26.64,-81.87),
+  (26.34,-81.78),
+  (26.14,-81.79),
+  (25.94,-81.72),
+  (25.86,-81.38),
+  (25.14,-80.92),
+  (25.09,-80.45),
+  (24.92,-80.63),
+  (24.71,-81.09),
+  (24.67,-81.35),
+  (24.56,-81.78),
+  (25.47,-80.48),
+  (25.76,-80.19),
+  (25.79,-80.13),
+  (26.12,-80.14),
+  (26.35,-80.08),
+  (26.71,-80.05),
+  (26.93,-80.09),
+  (27.2,-80.25),
+  (27.45,-80.33),
+  (27.64,-80.4),
+  (28.08,-80.61),
+  (28.32,-80.61),
+  (28.61,-80.81),
+  (29.03,-80.93),
+  (29.21,-81.02),
+  (29.58,-81.21),
+  (29.9,-81.31),
+  (30.29,-81.39),
+  (30.33,-81.66),
+  (30.67,-81.46)
 ),
 measured as (
   select e.id,
