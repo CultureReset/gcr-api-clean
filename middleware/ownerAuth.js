@@ -11,6 +11,34 @@
 
 const supabase = require('../db');
 
+/**
+ * Resolve the account behind the bearer token, and nothing more.
+ *
+ * Ownership is deliberately not consulted here. One endpoint needs that
+ * distinction — GET /api/business/me, whose job is to report whether the
+ * account owns anything at all, and which therefore cannot be behind a guard
+ * that answers 403 when it does not. An admin who has not yet picked a
+ * business is in the same position: no ownership row, but they still need the
+ * business picker to render.
+ *
+ * Everything else uses ownerRequired below. This one resolves identity; it
+ * grants no access to any business's data on its own.
+ */
+async function sessionRequired(req, res, next) {
+    const header = req.headers.authorization || '';
+    if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Not signed in.' });
+
+    try {
+        const { data, error } = await supabase.auth.getUser(header.slice(7));
+        if (error || !data?.user) return res.status(401).json({ error: 'That session is not valid.' });
+        req.ownerUserId = data.user.id;
+        req.ownerUser = data.user;
+        return next();
+    } catch {
+        return res.status(401).json({ error: 'That session is not valid.' });
+    }
+}
+
 async function ownerRequired(req, res, next) {
     const header = req.headers.authorization || '';
     if (!header.startsWith('Bearer ')) return res.status(401).json({ error: 'Not signed in.' });
@@ -41,7 +69,17 @@ async function ownerRequired(req, res, next) {
             .eq('user_id', userId)
             .maybeSingle();
 
-        const requested = (req.query?.slug || req.body?.slug || '').trim();
+        // Four ways an admin can name the business they mean, all of them
+        // explicit: the dashboard's own ?business=<slug>, a plain ?slug=, the
+        // body, or the :slug already in the path on the per-section routers
+        // (/api/faqs/:slug and its siblings).
+        //
+        // All four are only honoured for an account platform_admins vouched
+        // for above. For everybody else this block is never reached, and the
+        // slug comes from entity_owners or the request is refused.
+        const requested = (
+            req.query?.slug || req.query?.business || req.body?.slug || req.params?.slug || ''
+        ).trim();
         if (admin && requested) {
             req.ownerUserId = userId;
             req.entitySlug = requested;
@@ -57,4 +95,4 @@ async function ownerRequired(req, res, next) {
     return next();
 }
 
-module.exports = { ownerRequired };
+module.exports = { ownerRequired, sessionRequired };

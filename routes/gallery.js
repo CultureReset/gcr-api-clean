@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 
+const { ownerRequired } = require('../middleware/ownerAuth');
+
+// Reads stay public — GCR Unified renders these on tourist-facing pages.
+//
+// Writes did not have a guard at all: the business was whatever slug appeared
+// in the path, so anyone on the internet could POST to a stranger's listing.
+// ownerRequired resolves the business from the session via entity_owners
+// instead, and every write below uses req.entitySlug rather than the slug in
+// the URL. The path keeps its :slug so existing links still work; it is simply
+// no longer what decides whose data is written.
+
 const db = createClient(
   process.env.GCR_SUPABASE_URL,
   process.env.GCR_SUPABASE_SERVICE_KEY
@@ -66,7 +77,7 @@ router.get('/:slug/categories', async (req, res) => {
 
 // ─── POST /api/gallery/:slug ──────────────────────────────────────────────
 // Upload/add a gallery photo (admin)
-router.post('/:slug', async (req, res) => {
+router.post('/:slug', ownerRequired, async (req, res) => {
   try {
     const { photo_url, caption, category, is_featured, sort_order } = req.body;
 
@@ -77,7 +88,7 @@ router.post('/:slug', async (req, res) => {
     const { data, error } = await db
       .from('entity_gallery')
       .insert({
-        entity_slug: req.params.slug,
+        entity_slug: req.entitySlug,
         photo_url: photo_url.trim(),
         caption: caption?.trim() || null,
         category: category || 'general',
@@ -96,7 +107,7 @@ router.post('/:slug', async (req, res) => {
 
 // ─── PUT /api/gallery/:slug/:id ────────────────────────────────────────────
 // Update gallery photo metadata
-router.put('/:slug/:id', async (req, res) => {
+router.put('/:slug/:id', ownerRequired, async (req, res) => {
   try {
     const { caption, category, is_featured, sort_order } = req.body;
 
@@ -109,7 +120,7 @@ router.put('/:slug/:id', async (req, res) => {
         ...(sort_order !== undefined && { sort_order })
       })
       .eq('id', req.params.id)
-      .eq('entity_slug', req.params.slug)
+      .eq('entity_slug', req.entitySlug)
       .select()
       .single();
 
@@ -122,13 +133,13 @@ router.put('/:slug/:id', async (req, res) => {
 
 // ─── DELETE /api/gallery/:slug/:id ────────────────────────────────────────
 // Delete a gallery photo
-router.delete('/:slug/:id', async (req, res) => {
+router.delete('/:slug/:id', ownerRequired, async (req, res) => {
   try {
     const { error } = await db
       .from('entity_gallery')
       .delete()
       .eq('id', req.params.id)
-      .eq('entity_slug', req.params.slug);
+      .eq('entity_slug', req.entitySlug);
 
     if (error) throw error;
     res.json({ ok: true });

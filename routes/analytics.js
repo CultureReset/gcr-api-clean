@@ -5,6 +5,19 @@
 
 const express = require('express');
 const router = express.Router();
+
+// DELIBERATELY PUBLIC — do not add a guard to the four POST handlers here.
+//
+// These are write endpoints with no authentication, which is what they have to
+// be: they are called from anonymous visitors' browsers on tourist-facing
+// pages, where there is no session to present. They record counts, not content
+// — a pageview, a conversion, an event name, a duration — and nothing they
+// write is readable back without an admin token.
+//
+// The exposure is that someone could inflate a business's numbers. That is
+// worth knowing about and is not worth breaking analytics on every public page
+// to prevent. If it becomes a real problem, rate-limit by IP rather than
+// authenticate.
 const supabase = require('../db');
 
 // ============================================

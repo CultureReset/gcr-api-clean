@@ -21,6 +21,7 @@ const supabase = require('../db');
 const getGcrDb = require('../db');
 
 const router = express.Router();
+const { ownerRequired } = require('../middleware/ownerAuth');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // GET /api/live-photo — public, returns approved photos for a business
@@ -185,7 +186,14 @@ router.post('/', upload.single('photo'), async (req, res) => {
 });
 
 // PUT /api/live-photo/:id — approve or reject (admin)
-router.put('/:id', async (req, res) => {
+// Moderation was open to the internet: anyone could approve or delete any
+// business's customer photos by guessing an id. ownerRequired closes that.
+//
+// STILL OWED: customer_live_photos keys on the legacy site_id, not
+// entity_slug, so there is nothing to filter these two by — an authenticated
+// owner can still reach another business's rows. Add entity_slug to the table
+// and put `.eq('entity_slug', req.entitySlug)` on both queries below.
+router.put('/:id', ownerRequired, async (req, res) => {
     const { status } = req.body; // 'approved' | 'rejected'
     if (!['approved','rejected'].includes(status)) return res.status(400).json({ error: 'status must be approved or rejected' });
     const { error } = await supabase.from('customer_live_photos').update({ status }).eq('id', req.params.id);
@@ -194,7 +202,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/live-photo/:id — remove (admin or restaurant)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', ownerRequired, async (req, res) => {
     const { error } = await supabase.from('customer_live_photos').delete().eq('id', req.params.id);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ ok: true });

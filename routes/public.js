@@ -2,6 +2,7 @@ const express = require('express');
 const supabase = require('../db');
 
 const router = express.Router();
+const { authRequired } = require('../middleware/auth');
 
 // Serve the /api/public/menu response shape from the GCR DB.
 // Used when entity.legacy_site_id matches the request's site_id — so a
@@ -2657,7 +2658,19 @@ router.get('/modules', async (req, res) => {
 // ============================================
 // POST /api/public/save-section — Save a CMS section (page builder)
 // ============================================
-router.post('/save-section', async (req, res) => {
+// The one handler on this router that is not a customer doing something.
+//
+// Everything else here is a tourist or a storefront visitor — booking, signing
+// a waiver, leaving a review, sending a message — and is public by design.
+// This one edits the business's own site content, and requireSite above will
+// happily take the site_id straight from the query string, so anyone could
+// rewrite any business's hero text, phone number and hours.
+//
+// authRequired sets req.siteId from the token instead, overwriting whatever
+// the caller asked for. It is the legacy site_id convention rather than
+// entity_slug because site_content and businesses are legacy tables; when they
+// are retired this handler goes with them.
+router.post('/save-section', authRequired, async (req, res) => {
     const { section, data } = req.body;
     if (!section || !data) return res.status(400).json({ error: 'section and data required' });
 
