@@ -50,21 +50,28 @@ const router = express.Router();
 const newSessionSecret = () => `${crypto.randomBytes(24).toString('base64url')}Aa1!`;
 
 /**
- * The Supabase account identity for a phone number.
+ * The label Supabase files a phone-only account under.
  *
- * Supabase Auth is asked for an EMAIL account, never a phone one. Phone
- * accounts require the phone provider to be switched on in the project, and it
- * is not — auth.users holds 17 accounts and every one of them is email. Twilio
- * Verify is what proves the number; Supabase only has to store the account, so
- * the number is folded into a derived address and nothing else changes.
+ * Supabase requires every account to carry a unique identifier, and it accepts
+ * either an email or a phone number. Phone accounts need Supabase's own phone
+ * provider switched on — it is not, and it should not be, because Twilio Verify
+ * already sends the code. So the account is filed under an email-shaped label
+ * built from the digits: 12515550100@business.invalid
  *
- * The real number lives on the entity and in user_metadata, so it is still
- * queryable and still shown in the dashboard.
+ * NOT A REAL EMAIL ADDRESS. Nothing is ever sent to it, nobody owns the
+ * mailbox, and the business never sees or types it. It exists only so Supabase
+ * can tell one account from another.
  *
- * Its own domain, deliberately not the one tourist sign-up derives. These are
- * separate systems and their address spaces must not collide.
+ * `.invalid` is reserved by RFC 2606 precisely for this: it is guaranteed
+ * never to resolve and can never be registered by anyone. That matters — an
+ * earlier version of this used a made-up subdomain of a real site, which both
+ * implied a mailbox that does not exist and tied these accounts to a domain
+ * this product is not served from.
+ *
+ * The real phone number is kept in user_metadata and on the entity, so it stays
+ * queryable and still shows in the dashboard.
  */
-const PHONE_LOGIN_DOMAIN = process.env.BUSINESS_PHONE_LOGIN_DOMAIN || 'phone.biz.gulfcoastradar.com';
+const PHONE_LOGIN_DOMAIN = process.env.BUSINESS_PHONE_LOGIN_DOMAIN || 'business.invalid';
 const loginEmailFor = (phone) => `${String(phone).replace(/\D/g, '')}@${PHONE_LOGIN_DOMAIN}`;
 
 /* ── Twilio, this file's own ─────────────────────────────────────────────
