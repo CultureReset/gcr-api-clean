@@ -2206,8 +2206,38 @@ router.get('/home-feed', async (req, res) => {
       .order('post_date', { ascending: false })
       .limit(30);
 
+    // A failed query returns { data: null, error }. Writing `|| []` on every
+    // row below turns a database that is down, saturated or unreachable into a
+    // 200 with an empty page — and then caches it for two minutes. That is
+    // indistinguishable from "this business has no happy hour", so an outage
+    // reads on the phone as "my data is gone".
+    //
+    // If every source failed, the database is the problem, not the content.
+    // Say so, with the real driver message, and do not cache the answer.
+    const results = { events: eventsRes, specials: specialsRes, happyHours: hhRes,
+                      liveMusic: liveMusicRes, thingsToDo: thingsRes };
+    const failed = Object.entries(results).filter(([, r]) => r?.error);
+    if (failed.length === Object.keys(results).length) {
+      const detail = failed[0][1].error;
+      console.error('home-feed: every query failed —', detail.message);
+      res.set('Cache-Control', 'no-store');
+      return res.status(503).json({
+        error: 'The database is not answering. This is an outage, not empty data.',
+        detail: detail.message,
+        code: detail.code || null,
+        failed: failed.map(([name]) => name),
+      });
+    }
+    // A partial failure still serves the rows that did arrive, but it must not
+    // be cached as if it were the whole feed.
+    if (failed.length) {
+      console.error('home-feed: partial failure —', failed.map(([n, r]) => `${n}: ${r.error.message}`).join('; '));
+      res.set('Cache-Control', 'no-store');
+    } else {
     res.set('Cache-Control', 'public, max-age=120, s-maxage=120, stale-while-revalidate=300');
+    }
     res.json({
+      degraded:         failed.length ? failed.map(([name]) => name) : undefined,
       events:           eventsRes.data   || [],
       specials:         specialsRes.data || [],
       happyHours:       happyHoursNow,

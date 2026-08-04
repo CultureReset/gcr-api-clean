@@ -118,7 +118,13 @@ app.use('/api/tourist-auth', authLimiter);
  */
 const publicMcpLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: Number(process.env.PUBLIC_MCP_RATE_LIMIT || 600),
+    // 600/min was set against the cost of a chat turn. read_business is not a
+    // chat turn: it calls buildFullEntity, which is 72 queries. 600 of those a
+    // minute is ~43,000 queries/min from one caller — past what the database's
+    // CPU can serve, at which point every other connection times out. 60 keeps
+    // a conversation comfortable and puts the ceiling below the damage line.
+    // Raise it with PUBLIC_MCP_RATE_LIMIT once read_business is cheaper.
+    max: Number(process.env.PUBLIC_MCP_RATE_LIMIT || 60),
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => {
@@ -202,7 +208,30 @@ mount('/api/business', () => require('./routes/business-data'));
 // runs its chat on.
 //
 // Mounted before /api/mcp so the more specific path wins.
+//
+// ── The kill switch ──────────────────────────────────────────────────────
+//
+// These two mounts are the only unauthenticated doors that run real queries,
+// and read_business costs 72 of them per call (buildFullEntity). At the
+// default 600/min ceiling one caller may issue ~43,000 queries a minute,
+// which is enough to saturate the database's CPU and time out every other
+// connection — including the dashboard's, which makes it look like the whole
+// platform is down rather than like one endpoint is busy.
+//
+// Set MCP_PUBLIC_ENABLED=false in Vercel to take both doors off the internet
+// without a code change. The token-scoped /api/mcp below is unaffected: it is
+// authenticated, so it is not the one that can be walked by a stranger.
+const mcpPublicEnabled = String(process.env.MCP_PUBLIC_ENABLED ?? 'true').toLowerCase() !== 'false';
+
+if (mcpPublicEnabled) {
 mount('/api/mcp/public', () => require('./routes/mcp-public'));
+} else {
+    console.warn('[mcp] /api/mcp/public and /api/mcp/business are DISABLED (MCP_PUBLIC_ENABLED=false)');
+    const off = (_req, res) => res.status(503).json({ error: 'Public MCP is temporarily disabled.' });
+    app.all('/api/mcp/public', off);
+    app.all('/api/mcp/public/*', off);
+    app.all('/api/mcp/business/*', off);
+}
 
 // The same tools, attached to one business by the slug in the URL:
 //
@@ -212,7 +241,9 @@ mount('/api/mcp/public', () => require('./routes/mcp-public'));
 // business on the platform is a string concatenation, not a token minted and
 // rotated a thousand times. Reads only, same public data. Writing is what
 // /api/mcp and its tokens are for.
+if (mcpPublicEnabled) {
 mount('/api/mcp/business/:slug', () => require('./routes/mcp-public').pinned);
+}
 
 // The same data, spoken to instead of clicked on. An MCP server so an outside
 // AI assistant — Grok, or any other MCP client — can read and edit one
