@@ -1999,12 +1999,41 @@ router.post('/track', async (req, res) => {
 });
 
 // ─── Business claim submissions ───────────────────────────────────────────────
+// ─── POST /api/gcr/claim ─────────────────────────────────────────────────────
+// "Claim my business". Two shapes, one row:
+//
+//   with entity_slug     from the Claim button on a profile page. The claim is
+//                        tied to a real listing, so approving it is a link, not
+//                        a search — the admin already knows which business.
+//   without entity_slug  from the dashboard's search-and-claim screen, or a
+//                        business that has no listing yet.
+//
+// Grants nothing on its own. An admin reviews it in the dashboard's Claims
+// screen, and linking the account is a separate, deliberate step.
 router.post('/claim', async (req, res) => {
   try {
-    const { business_name, category, contact_name, phone, email, website, message } = req.body || {};
+    const { entity_slug, category, contact_name, phone, email, website, message } = req.body || {};
+    let business_name = req.body?.business_name;
+
+    // A slug is trusted over a typed name: the claim is about a specific row,
+    // and taking the name from the listing stops a claim being filed against
+    // "Flora-Bama" when the listing is called something else.
+    let slug = null;
+    if (entity_slug) {
+      const { data: entity } = await db
+        .from('entity')
+        .select('slug, name')
+        .eq('slug', String(entity_slug).trim())
+        .maybeSingle();
+      if (!entity) return res.status(404).json({ error: 'No such business' });
+      slug = entity.slug;
+      business_name = entity.name || business_name;
+    }
+
     if (!business_name || !phone) return res.status(400).json({ error: 'business_name and phone required' });
-    const { error } = await db.from('business_claims').insert({
-      business_name: business_name.trim(),
+
+    const row = {
+      business_name: String(business_name).trim(),
       category:      category || null,
       contact_name:  contact_name?.trim() || null,
       phone:         phone.trim(),
@@ -2013,9 +2042,23 @@ router.post('/claim', async (req, res) => {
       message:       message?.trim() || null,
       status:        'new',
       created_at:    new Date().toISOString(),
-    });
+    };
+
+    let { error } = await db.from('business_claims').insert({ ...row, entity_slug: slug });
+
+    // sql/business_claims_entity_slug.sql adds that column. Until it is run,
+    // keep taking claims rather than dropping leads on the floor — the slug
+    // goes in the message so nothing is lost, and the admin screen still works.
+    if (error && /entity_slug/.test(error.message || '')) {
+      const note = slug ? `[listing: ${slug}]` : null;
+      ({ error } = await db.from('business_claims').insert({
+        ...row,
+        message: [note, row.message].filter(Boolean).join(' ') || null,
+      }));
+    }
+
     if (error) throw error;
-    res.json({ ok: true });
+    res.json({ ok: true, entity_slug: slug });
   } catch (e) {
     console.error('claim error:', e.message);
     res.status(500).json({ error: e.message });

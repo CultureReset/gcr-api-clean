@@ -7,6 +7,136 @@ const { authRequired } = require('../middleware/auth');
 
 const router = express.Router();
 
+/**
+ * A URL-safe slug from a business name, unique against the `entity` table.
+ *
+ * The slug is the identity everything else hangs off — 309 tables key on
+ * entity_slug — so it is generated once here and never derived again.
+ */
+async function uniqueEntitySlug(name) {
+    const base = String(name)
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 60) || 'business';
+
+    // Pull every slug in the family in one query rather than probing in a loop.
+    const { data } = await supabase
+        .from('entity')
+        .select('slug')
+        .or(`slug.eq.${base},slug.like.${base}-%`);
+
+    const taken = new Set((data || []).map((r) => r.slug));
+    if (!taken.has(base)) return base;
+    for (let n = 2; n < 500; n += 1) {
+        const candidate = `${base}-${n}`;
+        if (!taken.has(candidate)) return candidate;
+    }
+    return `${base}-${crypto.randomBytes(3).toString('hex')}`;
+}
+
+// ============================================
+// POST /api/auth/business-signup — a business signs itself up
+//
+// The slug-first path, and the one to use. It creates the three rows that
+// actually matter together:
+//
+//   entity          the listing, keyed by slug. This is what the ~309
+//                   slug-keyed tables attach to and what GCR displays.
+//   auth user       a real Supabase Auth account.
+//   entity_owners   ownership, keyed by the SUPABASE AUTH id — which is what
+//                   the business dashboard resolves access from.
+//
+// Deliberately different from POST /signup above, which creates a `businesses`
+// row keyed by a site_id uuid. That lineage is invisible to GCR: a business
+// that signs up there gets an account with no listing, no slug, and no
+// dashboard sections. Prefer this route; /signup is kept for existing clients.
+//
+// The new entity is created INACTIVE and hidden from listings. Anyone on the
+// internet can call this, and the directory has 4,067 real businesses in it —
+// a signup should not be able to publish itself onto the public site. The
+// owner can fill everything in from their dashboard straight away; an admin
+// flips is_active when it is real.
+// ============================================
+router.post('/business-signup', async (req, res) => {
+    const email = (req.body?.email || '').trim().toLowerCase();
+    const password = req.body?.password || '';
+    const businessName = (req.body?.business_name || req.body?.businessName || '').trim();
+
+    if (!email || !password || !businessName) {
+        return res.status(400).json({ error: 'email, password and business_name are required' });
+    }
+    if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'That email address is not valid' });
+    }
+
+    let authId = null;
+    let entityId = null;
+
+    try {
+        const slug = await uniqueEntitySlug(businessName);
+
+        // 1. The account.
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: { business_name: businessName, gcr_slug: slug },
+        });
+        if (authError) {
+            const taken = /already|registered|exists/i.test(authError.message || '');
+            return res.status(taken ? 409 : 400).json({
+                error: taken ? 'An account already exists for that email — sign in instead.' : authError.message,
+            });
+        }
+        authId = authData.user.id;
+
+        // 2. The listing.
+        const { data: entity, error: entityError } = await supabase
+            .from('entity')
+            .insert({
+                slug,
+                name: businessName,
+                entity_type: req.body?.entity_type || null,
+                phone: (req.body?.phone || '').trim() || null,
+                email,
+                website_url: (req.body?.website || '').trim() || null,
+                city: (req.body?.city || '').trim() || null,
+                description: (req.body?.description || '').trim() || null,
+                is_active: false,
+                show_in_listings: false,
+            })
+            .select('id, slug, name')
+            .single();
+        if (entityError) throw new Error(`Could not create the listing: ${entityError.message}`);
+        entityId = entity.id;
+
+        // 3. Ownership — the row the dashboard reads access from.
+        const { error: ownerError } = await supabase.from('entity_owners').upsert(
+            { user_id: authId, entity_id: entity.id, entity_slug: entity.slug, role: 'owner' },
+            { onConflict: 'user_id,entity_id' }
+        );
+        if (ownerError) throw new Error(`Could not record ownership: ${ownerError.message}`);
+
+        return res.status(201).json({
+            slug: entity.slug,
+            entity: { id: entity.id, slug: entity.slug, name: entity.name },
+            pending_review: true,
+            message: 'Account created. Your listing is hidden from the public site until it is reviewed.',
+        });
+    } catch (err) {
+        // Nothing half-created: an orphan auth account would block the owner
+        // from ever signing up again with the same address.
+        if (entityId) await supabase.from('entity').delete().eq('id', entityId);
+        if (authId) await supabase.auth.admin.deleteUser(authId);
+        return res.status(500).json({ error: err.message });
+    }
+});
+
 // ============================================
 // POST /api/auth/signup — Create account + business
 // Creates BOTH a Supabase Auth user (for frontend RLS/login)
@@ -240,6 +370,29 @@ router.post('/accept-invite', async (req, res) => {
             await supabase.from('businesses').delete().eq('id', business.id);
             await supabase.auth.admin.deleteUser(authData.user.id);
             return res.status(500).json({ error: 'Failed to create user record: ' + userError.message });
+        }
+
+        // Ownership. Without this row the invite completes, the password is
+        // set, and the business dashboard still says "No business linked" —
+        // it resolves access from entity_owners, not from users.site_id.
+        //
+        // user_id is the SUPABASE AUTH id, not users.id. The dashboard signs in
+        // through Supabase Auth and matches on session.user.id, so a row keyed
+        // by anything else is invisible to it.
+        const { error: ownerError } = await supabase.from('entity_owners').upsert(
+            {
+                user_id: authData.user.id,
+                entity_id: entity.id,
+                entity_slug: entity.slug,
+                role: 'owner',
+            },
+            { onConflict: 'user_id,entity_id' }
+        );
+        if (ownerError) {
+            await supabase.from('users').delete().eq('id', user.id);
+            await supabase.from('businesses').delete().eq('id', business.id);
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            return res.status(500).json({ error: 'Failed to record ownership: ' + ownerError.message });
         }
 
         await supabase.from('business_invites').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', invite.id);

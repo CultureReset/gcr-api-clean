@@ -2815,8 +2815,19 @@ router.post('/link-user', authRequired, async (req, res) => {
     if (!user_email || !entity_slug) return res.status(400).json({ error: 'user_email and entity_slug required' });
 
     // Look up user
-    const { data: user, error: userErr } = await db.from('users').select('id, email, name').eq('email', user_email).maybeSingle();
+    const { data: user, error: userErr } = await db.from('users').select('id, auth_id, email, name').eq('email', user_email).maybeSingle();
     if (userErr || !user) return res.status(404).json({ error: `User not found: ${user_email}` });
+
+    // entity_owners.user_id is the SUPABASE AUTH id. The business dashboard
+    // signs in through Supabase Auth and matches on session.user.id, so a row
+    // written with users.id here would link the account in this table and
+    // still leave the owner staring at "No business linked".
+    if (!user.auth_id) {
+      return res.status(409).json({
+        error: `${user_email} has no Supabase Auth account, so ownership cannot be linked.`,
+        hint: 'Invite them via POST /api/admin/invite-business, which creates one.',
+      });
+    }
 
     // Look up entity
     const { data: entity, error: entErr } = await db.from('entity').select('id, slug, name, entity_type').eq('slug', entity_slug).maybeSingle();
@@ -2824,7 +2835,7 @@ router.post('/link-user', authRequired, async (req, res) => {
 
     // Upsert entity_owners
     const { error: ownerErr } = await db.from('entity_owners').upsert({
-      user_id: user.id,
+      user_id: user.auth_id,
       entity_id: entity.id,
       entity_slug: entity.slug,
       role,
@@ -2914,13 +2925,17 @@ router.delete('/link-user', authRequired, async (req, res) => {
     const { user_email, entity_slug } = req.body;
     if (!user_email || !entity_slug) return res.status(400).json({ error: 'user_email and entity_slug required' });
 
-    const { data: user } = await db.from('users').select('id').eq('email', user_email).maybeSingle();
+    const { data: user } = await db.from('users').select('id, auth_id').eq('email', user_email).maybeSingle();
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    await db.from('entity_owners').delete().eq('user_id', user.id).eq('entity_slug', entity_slug);
+    // Same id space as the POST above: entity_owners is keyed by the Supabase
+    // Auth id. Deleting by users.id would report success and remove nothing.
+    // Both ids are passed so a row written before that was fixed still clears.
+    const ownerIds = [user.auth_id, user.id].filter(Boolean);
+    await db.from('entity_owners').delete().in('user_id', ownerIds).eq('entity_slug', entity_slug);
 
     // Clear quick lookup if it was pointing at this entity
-    const { data: remaining } = await db.from('entity_owners').select('entity_slug').eq('user_id', user.id);
+    const { data: remaining } = await db.from('entity_owners').select('entity_slug').in('user_id', ownerIds);
     if (!remaining || remaining.length === 0) {
       await db.from('users').update({ entity_id: null, entity_slug: null }).eq('id', user.id);
     }
