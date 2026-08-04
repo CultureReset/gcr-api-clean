@@ -36,7 +36,7 @@ That is the whole setup. Paste the URL into the xAI Voice Agent Builder's remote
 
 Everything it returns is already on the public website. A token would protect nothing and would stop the thing scaling — every new surface would need one issued, stored and rotated. It is read-only, scoped to `is_active` businesses, and cannot write. A rate limit (120 requests/minute per IP, `PUBLIC_MCP_RATE_LIMIT`) stops a scraper walking the directory; it is not a password.
 
-## The seven tools
+## The nine tools
 
 | Tool | What it answers |
 | --- | --- |
@@ -47,6 +47,8 @@ Everything it returns is already on the public website. A token would protect no
 | `get_business_details` | the full profile page: hours, menu, policies, fees, deposits, refunds, weather rules, team, reviews |
 | `check_availability` | today's remaining spots, for businesses that publish it |
 | `compare_businesses` | 2–5 side by side on industry facts, prices, fees and policies |
+| `list_sections` | given a slug, every table that business actually has rows in |
+| `read_section` | given a slug and a section, the rows — this is what makes one agent enough for the whole platform |
 
 Five of these are not new. `search_businesses`, `get_business_details`, `check_availability`, `find_item_prices` and `compare_businesses` are what the tourist chat already runs on, lifted out of `routes/tourist.js` into `lib/conciergeTools.js` so both use one copy. `whats_on` and `list_categories` were added because the site displays them and nothing else could answer by time or by category. `search_businesses` reaches the same deep index as the website's search bar. Improving the search improves the phone agent, the web chat and the website at the same time.
 
@@ -132,25 +134,37 @@ the same day with no deploy. And the "won't answer without data" property falls
 out for free: a business that has not filled a table simply has no section for
 it, so there is nothing to read and the agent says so.
 
-## Where the line is, and why there has to be one
+## Every table, every business
 
-The owner's agent (section 3) sees **every** table with rows for its slug. This
-one sees nearly all of them. The exception is not about the schema — it is about
-whose data is in a row.
+Both public servers read **every table keyed by `entity_slug`** — the same set
+the owner's own agent sees. Nothing is enumerated in code, so a hundred thousand
+businesses and every table they use are reachable through the same two tools,
+and a table added to the database is answerable the same day with no deploy.
 
-A `bookings` row is keyed by the business's slug and is a record of a *customer*:
-their name, their number, what they paid, what they signed. This URL takes no
-password, so anyone who could type it would read them.
+That is the design: a business is a slug, every table hangs off a slug, and an
+agent that could only reach a curated subset could not answer an arbitrary
+question about an arbitrary business.
 
-**The line is drawn from the schema, not from a list of table names.** A table
-carrying an `email`, a `user_id`, a `customer_*` field, a card charge or a
-signature holds people; a table carrying `item_name`, `price`, `description` and
-`day_of_week` holds business information. A list of names would be a guess that
-has to be maintained and goes stale the moment a table is added — the columns are
-already in the database and cannot drift from it. A table invented next year with
-ordinary business columns is readable the day it has rows in it.
+### The one switch
 
-And it explains itself, per business:
+```
+PUBLIC_MCP_HIDE_PERSONAL=true
+```
+
+Off by default. Set it and the public servers hold back the tables whose rows
+are records of a *person* rather than of the business — bookings, customers,
+signed waivers — and strip personal columns from whatever is left. It decides by
+reading the schema, not a list of table names: a table carrying an `email`, a
+`user_id`, a `customer_*` field, a card charge or a signature holds people; a
+table carrying `item_name`, `price` and `day_of_week` holds business
+information.
+
+It exists because `/api/mcp/business/:slug` takes no password. With the switch
+off — the default — a booking's customer name and phone number are readable by
+anyone who can type the URL. That is a decision about your customers' data, so
+it is a config value rather than something the code makes for you.
+
+Either way it is visible:
 
 ```bash
 curl https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama/sections
@@ -159,16 +173,12 @@ curl https://gcr-api-clean.vercel.app/api/mcp/business/flora-bama/sections
 ```json
 {
   "readable_by_the_agent": [ { "section": "menu_items", "rows": 214 }, … ],
-  "held_back": [
-    { "section": "bookings", "rows": 89,
-      "reason": "holds a \"customer_name\" column — these rows are about a person" }
-  ]
+  "held_back": []
 }
 ```
 
-Names, counts and reasons — never rows. The reason names the column that decided
-it, so a section on the wrong side is a specific thing to fix rather than an
-argument with a list.
+Names, counts and reasons — never rows. With the switch on, `held_back` names
+the column that decided each one.
 
 ## Errors
 
@@ -266,7 +276,7 @@ Implemented: `initialize`, `tools/list`, `tools/call`, `ping`, `notifications/in
 
 ```
 npm run verify         # everything below
-npm run test:mcp       # 55 checks — the protocol, the token scoping, the slug scoping
+npm run test:mcp       # 60 checks — the protocol, the token scoping, the slug scoping
 npm run test:concierge # 37 checks — whats_on's day/time filtering, and the public/private table line
 ```
 

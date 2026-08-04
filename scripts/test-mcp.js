@@ -109,9 +109,10 @@ const schemaStub = {
     },
     textColumns: async () => ['name'],
     // The public boundary, stubbed to the same shape the real one has.
-    publicTables: async () => ['menu_items', 'faqs'],
-    allowPublicTable: async (n) => (['menu_items', 'faqs'].includes(n) ? n : null),
-    whyPrivate: (t) => (['menu_items', 'faqs'].includes(t) ? null : 'holds a "customer_email" column — these rows are about a person'),
+    publicTables: async () => ['menu_items', 'faqs', 'bookings'],
+    allowPublicTable: async (n) => (['menu_items', 'faqs', 'bookings'].includes(n) ? n : null),
+    publicReason: async () => null,   // switch off: nothing is held back
+    HIDE_PERSONAL: false,
     scrubRow: (row) => {
         const out = {};
         for (const [k, v] of Object.entries(row || {})) {
@@ -293,7 +294,7 @@ async function run() {
     // The whole point of this one: an agent can connect with nothing.
     const anon = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
     check('no token needed', anon.status === 200);
-    check('seven directory tools', anon.body.result.tools.length === 7, String(anon.body.result?.tools?.length));
+    check('nine directory tools', anon.body.result.tools.length === 9, String(anon.body.result?.tools?.length));
 
     const pubInit = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} });
     check('instructions carry the never-guess rule', /never state a price/i.test(pubInit.body.result.instructions));
@@ -312,13 +313,34 @@ async function run() {
     });
     check('business write tools are not reachable here', noSuch.body.error?.code === -32601);
 
+    conciergeCalls.length = 0;
+    calls.length = 0;
+    const anySections = await pubRpc({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'list_sections', arguments: { slug: 'any-business' } },
+    });
+    check('one agent can list any business\'s sections',
+        anySections.body.result.structuredContent.slug === 'any-business');
+    const anyRead = await pubRpc({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'read_section', arguments: { slug: 'other-business', section: 'menu_items' } },
+    });
+    check('and read any of their tables', anyRead.body.result.structuredContent.section === 'menu_items');
+    check('scoped to the slug it was asked for',
+        calls.filter((c) => c.table === 'menu_items').pop()?.eq.entity_slug === 'other-business');
+    const noSlug = await pubRpc({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name: 'read_section', arguments: { section: 'menu_items' } },
+    });
+    check('a read with no slug is refused', noSlug.body.result?.isError === true);
+
     const pubInfo = await fetch(`${PUB()}/info`).then((r) => r.json());
     check('info says it is public', pubInfo.authentication === 'none — public');
 
     // A token sent to the public server must not grant anything extra, and
     // must not be rejected either — an agent configured once may send one.
     const withToken = await pubRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, { Authorization: `Bearer ${AUTH}` });
-    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 7);
+    check('a stray token neither helps nor hurts', withToken.body.result.tools.length === 9);
 
     console.log('\n── attached to a slug (no token at all) ──');
     const PIN = (slug) => `http://127.0.0.1:${server.address().port}/api/mcp/business/${slug}`;
@@ -379,12 +401,15 @@ async function run() {
         JSON.stringify(readQuery.eq));
     check('rows come back', readOne.body.result.structuredContent.rows.length === 1);
 
-    const refused = await pinRpc('flora-bama', {
+    calls.length = 0;
+    const anyTable = await pinRpc('flora-bama', {
         jsonrpc: '2.0', id: 1, method: 'tools/call',
         params: { name: 'read_section', arguments: { section: 'bookings' } },
     });
-    check('a table holding other people is refused', refused.body.result?.isError === true,
-        JSON.stringify(refused.body).slice(0, 140));
+    check('every slug table is readable by default', !anyTable.body.result?.isError,
+        JSON.stringify(anyTable.body).slice(0, 140));
+    check('and still only for the slug in the URL',
+        calls.find((c) => c.table === 'bookings')?.eq.entity_slug === 'flora-bama');
 
     const audit = await fetch(`${PIN('flora-bama')}/sections`).then((r) => r.json());
     check('the boundary reports itself', Array.isArray(audit.readable_by_the_agent) && Array.isArray(audit.held_back));
