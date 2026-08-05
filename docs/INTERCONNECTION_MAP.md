@@ -379,7 +379,7 @@ end. This table is the clearest single view of where the platform actually is:
 |---|---|---|
 | **API** | `businesses`, `site_apps`, `site_content`, `connections`, `apps` | `entity` + ~100 `entity_*`, `entity_owners`, `entity_modules` |
 | bridged by | `dashboard.js` (write mirror) · `public.js` (read mirror) · `entity-resolver.js` | — |
-| **Admin console** | App Manager · Business Apps · Platform Businesses | everything else — 78 of 84 sections |
+| **Admin console** | App Manager · Business Apps · Platform Businesses | everything else — 83 of 86 sections |
 | **Business dash** | *nothing* | **all of it** |
 | **Tourist site** | `Dashboard.jsx` (unroutable) · `/api/public/menu` | everything else |
 | booking | `dashboard.js` engine · `public.js` customer path | `/api/platform` — the canonical one |
