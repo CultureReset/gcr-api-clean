@@ -25,7 +25,7 @@ Companion papers: `gcr-api-clean/docs/BLUEPRINT_VERIFICATION.md`,
 ```
    OPERATOR                BUSINESS                 TOURIST
    Admin-dashboard-main    Dashboards-users-        gcr-unified
-   225 paths               18 paths                 122 paths
+   229 paths               18 paths                 122 paths
    Express JWT role=admin  Supabase → entity_owners Supabase tourist / X-Guest-Id
         │                       │                        │
         │                       │                        ├── + 23 static HTML files,
@@ -44,9 +44,9 @@ Companion papers: `gcr-api-clean/docs/BLUEPRINT_VERIFICATION.md`,
                     ~563 tables · anon writes revoked
 ```
 
-**365 front-end→API calls across 47 routers.** No front end reaches Postgres.
+**369 front-end→API calls across 47 routers.** No front end reaches Postgres.
 
-Also computed on this pass: **20 of the 67 live mounts have no front-end
+Also computed on this pass: **19 of the 67 live mounts have no front-end
 caller.** Most are correct — crons, signed webhooks, outside AI agents,
 third-party embeds and standalone editors. Four are not, and they are §3.
 
@@ -83,7 +83,7 @@ Computed by resolving every path in each front end to the router that serves it.
 | `/api/blog` · `/api/faqs` · `/api/team` · `/api/public` · `/api/transportation` · `/api/artist-bookings` | – | – | 1 each | tourist mini-site sections |
 | `/api/ai-provider` · `/api/apps` · `/api/dashboard-sms` · `/api/embed` · `/api/update` | 1 each | – | – | |
 
-**Totals: Admin 225 · Business 18 · Tourist 122 — 365 distinct paths across
+**Totals: Admin 229 · Business 18 · Tourist 122 — 369 distinct paths across
 47 routers.**
 
 ⟲ Recomputed on the visual-document pass with a stricter extractor (file-path
@@ -399,32 +399,36 @@ named 'request'."* The admin console avoided it; the static surface walked into 
 `Admin-dashboard-main/src/api/endpoints.js`; nothing reads `public/*.html`.
 Pointing the existing audit at those files is the cheapest fix available here.
 
-### 6.9 ⟲ The self-serve sign-up queue has no operator screen
+### 6.9 ⟲ RETRACTED — the sign-up queue does have an operator screen
 
-`business-auth.js /register` — the counterfeit gate — writes a
-`business_signups` row as `pending` and creates the entity with
-`is_active:false, show_in_listings:false`. Nothing self-created goes public
-until an admin says so.
+An earlier revision of this file recorded, as a new finding, that
+`/api/admin/signups` had no front end. **That was wrong, and the cause was
+reading a stale branch.**
 
-`routes/admin-signups.js` exposes exactly the three routes needed to work that
-queue, all `adminRequired`:
+`Admin-dashboard-main`'s working branch had been cut from
+`claude/cybercheck-modular-react-dashboard-7on41c`, the oldest branch in that
+repo. `origin/main` was 14 commits and 1,388 lines of source ahead, and one of
+those commits — `8e41f09` — is titled "Add the sign-up approval queue."
 
-    GET    /api/admin/signups        list
-    GET    /api/admin/signups/:id    read one
-    PATCH  /api/admin/signups/:id    approve or reject
+What exists: `src/modules/platform/Signups.jsx`, 286 lines, routed at
+`/directory/signups` and labelled **Sign-ups**. It calls all three routes
+(`GET /`, `GET /:id`, `PATCH /:id`), shows Waiting / Approved / Rejected
+counts, warns when a submitted name resembles listings already on GCR, links
+through to the listing, and confirms before approving with *"… goes live on
+Gulf Coast Radar. You can reverse this."*
 
-**`grep` over all of `Admin-dashboard-main/src/` finds no reference to
-"signups" anywhere.** `business_signups` is touched by exactly two files in the
-whole platform: `business-auth.js` (writes it) and `admin-signups.js` (reads and
-approves it). No front end calls the second.
+Its own header draws the distinction the retracted finding had missed:
 
-Claims have a screen — `Claims.jsx` → `PATCH /api/admin/gcr/claims/:id`.
-Sign-ups do not. So of the three doors in §5.1, the one that runs through the
-business dashboard's own front page leads to a queue nobody can work: a business
-that signs up stays invisible to the public site until someone calls the API by
-hand.
+> Not the same screen as Claims. A claim asks for control of a listing that
+> already exists; a sign-up IS the listing, and the question is whether it
+> should exist at all.
 
-The API side is complete. This is a missing screen, not a missing capability.
+**Process change, recorded because the failure was procedural rather than
+analytical:** every figure in this file is now computed after fetching all
+remotes and confirming the working branch is not behind any default branch.
+The earlier revision's totals (Admin 225 / 365 calls / 20 orphan mounts) were
+measured against that stale branch; the current ones (Admin 229 / 369 calls /
+19 orphan mounts) are measured against current default branches.
 
 ---
 
