@@ -12,6 +12,8 @@ front end's call surface extracted from its own code, not from its docs.
 | `Dashboards-users-` | `f323f55` | business dashboard |
 | `gcr-unified` | `d8e5d63` | tourist site |
 
+Visual companions (published artifacts) exist for all five documents.
+
 Companion papers: `gcr-api-clean/docs/BLUEPRINT_VERIFICATION.md`,
 `Admin-dashboard-main/docs/BLUEPRINT.md`,
 `Dashboards-users-/docs/BLUEPRINT.md`, `gcr-unified/docs/BLUEPRINT.md`.
@@ -23,11 +25,11 @@ Companion papers: `gcr-api-clean/docs/BLUEPRINT_VERIFICATION.md`,
 ```
    OPERATOR                BUSINESS                 TOURIST
    Admin-dashboard-main    Dashboards-users-        gcr-unified
-   258 paths               28 paths                 101 paths
+   225 paths               18 paths                 122 paths
    Express JWT role=admin  Supabase → entity_owners Supabase tourist / X-Guest-Id
         │                       │                        │
-        │                       │                        ├── + 9 static HTML pages
-        │                       │                        │     (public/, no React)
+        │                       │                        ├── + 23 static HTML files,
+        │                       │                        │     9 of them live URLs (public/, no React)
         └───────────────────────┼────────────────────────┘
                                 ▼
                     ┌───────────────────────┐
@@ -42,7 +44,11 @@ Companion papers: `gcr-api-clean/docs/BLUEPRINT_VERIFICATION.md`,
                     ~563 tables · anon writes revoked
 ```
 
-**387 front-end→API calls across 41 routers.** No front end reaches Postgres.
+**365 front-end→API calls across 47 routers.** No front end reaches Postgres.
+
+Also computed on this pass: **20 of the 67 live mounts have no front-end
+caller.** Most are correct — crons, signed webhooks, outside AI agents,
+third-party embeds and standalone editors. Four are not, and they are §3.
 
 ---
 
@@ -77,7 +83,14 @@ Computed by resolving every path in each front end to the router that serves it.
 | `/api/blog` · `/api/faqs` · `/api/team` · `/api/public` · `/api/transportation` · `/api/artist-bookings` | – | – | 1 each | tourist mini-site sections |
 | `/api/ai-provider` · `/api/apps` · `/api/dashboard-sms` · `/api/embed` · `/api/update` | 1 each | – | – | |
 
-**Totals: Admin 258 · Business 28 · Tourist 101.**
+**Totals: Admin 225 · Business 18 · Tourist 122 — 365 distinct paths across
+47 routers.**
+
+⟲ Recomputed on the visual-document pass with a stricter extractor (file-path
+strings like `src/api/endpoints.js` were previously counted as `/api/` paths,
+and `gcr-unified`'s `public/` surface was previously excluded). The earlier
+figures were 258 / 28 / 101. The shape is unchanged; the numbers are now
+reproducible from one script over all three repos.
 
 Three facts fall out of the matrix:
 
@@ -386,6 +399,35 @@ named 'request'."* The admin console avoided it; the static surface walked into 
 `Admin-dashboard-main/src/api/endpoints.js`; nothing reads `public/*.html`.
 Pointing the existing audit at those files is the cheapest fix available here.
 
+### 6.9 ⟲ The self-serve sign-up queue has no operator screen
+
+`business-auth.js /register` — the counterfeit gate — writes a
+`business_signups` row as `pending` and creates the entity with
+`is_active:false, show_in_listings:false`. Nothing self-created goes public
+until an admin says so.
+
+`routes/admin-signups.js` exposes exactly the three routes needed to work that
+queue, all `adminRequired`:
+
+    GET    /api/admin/signups        list
+    GET    /api/admin/signups/:id    read one
+    PATCH  /api/admin/signups/:id    approve or reject
+
+**`grep` over all of `Admin-dashboard-main/src/` finds no reference to
+"signups" anywhere.** `business_signups` is touched by exactly two files in the
+whole platform: `business-auth.js` (writes it) and `admin-signups.js` (reads and
+approves it). No front end calls the second.
+
+Claims have a screen — `Claims.jsx` → `PATCH /api/admin/gcr/claims/:id`.
+Sign-ups do not. So of the three doors in §5.1, the one that runs through the
+business dashboard's own front page leads to a queue nobody can work: a business
+that signs up stays invisible to the public site until someone calls the API by
+hand.
+
+The API side is complete. This is a missing screen, not a missing capability.
+
+---
+
 ### 6.7 A production `service_role` key is committed in `gcr-unified`
 
 `dump-entire-db.mjs` and `export-supabase-complete.mjs` each carry a hardcoded
@@ -431,7 +473,7 @@ The practical output of the map.
 | Change | Then check |
 |---|---|
 | `buildFullEntity()` in `gcr.js` | all three front ends — it is the only shared router |
-| a table rename in `buildFullEntity`'s output | `Dashboards-users-/src/lib/tableMap.js` (73 entries) — an unmapped key makes every write to that section 404 |
+| a table rename in `buildFullEntity`'s output | `Dashboards-users-/src/lib/tableMap.js` (⟲ 59 entries — 26 real renames, 33 identity) — an unmapped key makes every write to that section 404 |
 | add/remove a slug-keyed table | nothing — discovery picks it up in the business dashboard and `business-profile.js`. **This is the payoff of the whole design.** |
 | `lib/businessTables.js` guards | `/api/business/*` **and** `/api/mcp` — one copy, two consumers |
 | `conciergeTools.js` | tourist `AiChat`, `/api/mcp/public`, `/api/mcp/business/:slug` — one copy, three consumers |
