@@ -114,13 +114,15 @@ not.
 `/api/menu-edit`, `/api/simple`, `/api/links`, `/api/live-photo`, `/api/ocr`,
 `/api/voice-notes` — the standalone editors and utilities.
 
+⟲ **And `/api/cooperatives`, `/api/qr/scan`, `/api/gcr/nfc-card-lead`, `/api/stripe/config` — reached only from `gcr-unified/public/`.** Nine static HTML pages call the API directly without touching React, so a router with no React caller is not necessarily an orphan. The full audit is in `gcr-unified/docs/BLUEPRINT.md` Appendix F.
+
 ### Not correct — real orphans
 
 | Router | Lines | Why it matters |
 |---|---|---|
 | **`/api/google-business`** | 603 | The one non-Composio integration, and the platform's only **proof a business is real** — Google made them verify their address. Fully built, OAuth state signed, tokens encrypted. **No front end offers a "Connect Google" button.** The business dashboard's App Store shows Composio toolkits and not this. |
 | **`/api/analytics`** | 251 | Public pageview/conversion/event ingest. `gcr-unified` tracks through `/api/gcr/track` instead, so this parallel ingest path collects nothing. |
-| **`/api/cooperatives` + `/api/goals`** | 438 | Song crowdfunding and artist goals. `gcr-unified` renders artists (`ArtistLive`, `ArtistProfile`) but never calls either — so the crowdfunding economy has a backend and inbound email webhooks with **no fan-facing surface**. |
+| **`/api/goals`** | 220 | Artist goals. `grep` over both `src/` and `public/` in `gcr-unified` finds **no caller anywhere** — a backend plus inbound email webhooks (`email-webhook.js` writes `goal_contributions`) with no surface at all. ⟲ `/api/cooperatives` (218) was listed here too and is **not** an orphan: `public/song-request.html`, served at the live URL `/:slug/profile`, calls `GET /api/cooperatives/:slug/cooperatives` and `POST …/:id/contribute`. Song crowdfunding is wired — through the static surface, not React. |
 | **`/api/verify-dns`** | 56 | Custom-domain checking with no UI. |
 | **`/api/site` + `/api/user`** | 923 | The legacy `site_id` API. Nothing in these four repos calls them. |
 
@@ -354,6 +356,35 @@ required by `admin-platform.js:1131,1628` and `embed.js:30` — and they are wha
 `Admin-dashboard-main`'s Listing Data, Find a Match and Website Calendar screens
 run on. Deleting either on the strength of §7 would break three operator screens
 and the public embed widget. Detail in `docs/BLUEPRINT_VERIFICATION.md`.
+
+### 6.8 Two static pages call routes that do not exist
+
+Found by opening all 24 files in `gcr-unified/public/` and checking each call
+against `server.js` and the route files.
+
+**`rides.html` posts to `/api/rides/request`.** `server.js:336` has that router
+commented out — *"backing tables don't exist in the live DB […] Superseded by
+`/api/transportation`."* The live replacement is `POST /api/transportation/request`,
+which `TransportationRequest.jsx` and `Reserve.jsx` both already use. The page
+cannot work.
+
+**`review.html` calls `/api/reviews/request` and `/api/reviews/submit`.**
+`routes/reviews.js` has only `GET /:slug`, `GET /:slug/stats`, `POST /:slug`
+(ownerRequired), `PUT /:slug/:id`, `DELETE /:slug/:id`.
+
+`POST /api/reviews/submit` **does not 404** — it binds to `POST /api/reviews/:slug`
+with `slug = "submit"`. Only `ownerRequired` prevents a review being filed against
+a business named "submit."
+
+This is precisely the SHADOWED class that
+`Admin-dashboard-main/scripts/audit-endpoints.mjs` exists to catch, and that
+`menu/Reviews.jsx` explicitly refuses to reproduce — *"`POST /api/reviews/request`
+matching `POST /api/reviews/:slug` would have created a review against a business
+named 'request'."* The admin console avoided it; the static surface walked into it.
+
+**Neither page is covered by any check in any repo.** `audit-endpoints.mjs` reads
+`Admin-dashboard-main/src/api/endpoints.js`; nothing reads `public/*.html`.
+Pointing the existing audit at those files is the cheapest fix available here.
 
 ### 6.7 A production `service_role` key is committed in `gcr-unified`
 
