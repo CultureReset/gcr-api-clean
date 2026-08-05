@@ -728,6 +728,47 @@ mechanically checked against · `sql/business_mcp_tokens.sql` backs `/api/mcp` �
 `sql/composio_connections.sql` backs the App Store · `sql/00_legacy_rename.sql`
 is the two-generations migration.
 
+### 12.4b ⟲ The SQL read — 80 tables, 59 policies, 121 indexes, **zero functions**
+
+Counted across `schema.sql` (663) + 13 files in `sql/` (1,846) + 3 in
+`migrations/` (254).
+
+**Ten of the eleven RPCs this API calls have no `CREATE FUNCTION` anywhere in
+any of the four repositories:**
+
+| RPC | Calls | Where it matters |
+|---|---:|---|
+| `fuzzy_entity_search` | 4 | duplicate prevention, `find-existing-entity.js` + `gcr.js` search |
+| `create_booking_if_available` | 3 | **the atomic anti-overbook guarantee** in `dashboard.js` + `public.js` |
+| `create_booking_hold` | 2 | the hold/release flow in `public.js` |
+| `find_existing_entity` | 1 | the exact-match half of the counterfeit gate |
+| `upsert_preference_score` | 1 | Trip Swipe ranking |
+| `resource_is_available` · `resource_blocked_dates` | 1 each | `availability.js` search/quote |
+| `increment_deal_clicks` · `increment_customer_bookings` | 1 each | counters |
+| `exec_sql` | 1 | arbitrary SQL, called from `tourist.js:322` to self-heal a missing table |
+| `entity_sections` | 1 | `business-data.js:131` |
+
+They exist only in the live database. **Rebuild `cyber check` from this
+repository and the booking-correctness layer is gone** — and it fails quietly,
+because a missing RPC returns an error the calling code mostly swallows.
+
+Two specifics worth carrying:
+
+- **`entity_sections`** is called at `business-data.js:131`, and its only DDL
+  anywhere is `Dashboards-users-/sql/entity_sections.sql` — a file whose siblings
+  all open *"NEVER RUN. This is a proposal."* A live API dependency is defined
+  only in another repo's proposal folder.
+- **`exec_sql`** executes arbitrary SQL. Its definition, and therefore its
+  grants, are not in version control.
+
+`schema.sql` carries 30 tables, 51 policies and 45 indexes — a real baseline, but
+one that stops at tables. `sql/capability_tables.sql` (521, 18 tables, 26
+indexes) is what `check-capability-columns.mjs` validates against, and the reason
+that check passes while the live database disagrees (§12.3).
+
+**Dumping the live function definitions into `sql/functions.sql` is the single
+highest-value SQL change available.**
+
 ### 12.5 `.env.example` — genuinely documentary
 
 Beyond the variable list it records operational facts that exist nowhere else:
