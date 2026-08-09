@@ -162,7 +162,15 @@ router.post('/:slug/bookings', async (req, res) => {
 });
 
 // GET /api/services/:slug/bookings/:booking_id — get individual booking
-router.get('/:slug/bookings/:booking_id', async (req, res) => {
+//
+// Behind a token, for the same reason as the rentals route of the same shape:
+// it returns the whole booking_events row, including the guest's name, email
+// and phone, and nothing but an unguessed booking id was in front of it. No
+// frontend calls this route.
+//
+// A token is not yet proof that the caller owns THIS slug — see the note on
+// the list route below.
+router.get('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
   try {
     const { slug, booking_id } = req.params;
 
