@@ -177,7 +177,16 @@ router.post('/:slug/bookings', async (req, res) => {
 });
 
 // GET /api/rentals/:slug/bookings/:booking_id — get individual booking
-router.get('/:slug/bookings/:booking_id', async (req, res) => {
+//
+// Behind a token. This returns the whole booking_events row — the guest's
+// name, email, phone and what they paid — and the booking id was the only
+// thing standing in front of it. No frontend in any of the four repos calls
+// this route, so requiring a token costs nothing and closes a public read of
+// somebody else's customer.
+//
+// A token is not yet proof that the caller owns THIS slug — see the note on
+// the list route below.
+router.get('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
   try {
     const { slug, booking_id } = req.params;
 
@@ -210,6 +219,18 @@ router.get('/:slug/bookings/:booking_id', async (req, res) => {
 });
 
 // GET /api/rentals/:slug/bookings — get bookings (for owner dashboard)
+//
+// OPEN: "for owner dashboard" is the intent, not what is enforced.
+// authRequired proves a token is valid; it does not prove the token owns this
+// slug. It is also broader than it looks — middleware/auth.js falls through to
+// "any valid Supabase user in this project" and assigns role 'owner', and
+// tourist accounts are Supabase users in that same project. So a tourist
+// signup can read every guest name, email and phone on this route.
+//
+// Closing it needs one decision first: bookable_resources.slug is a resource
+// slug, and entity_owners is keyed by entity_slug, so the ownership path has
+// to be settled before a guard can be written. Same applies to the PATCH
+// below and to the matching routes in services.js and bookings.js.
 router.get('/:slug/bookings', authRequired, async (req, res) => {
   try {
     const { slug } = req.params;
