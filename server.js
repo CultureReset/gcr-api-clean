@@ -134,6 +134,33 @@ const publicMcpLimiter = rateLimit({
 app.use('/api/mcp/public', publicMcpLimiter);
 app.use('/api/mcp/business', publicMcpLimiter);
 
+/* ── the widget runs on somebody else's domain ────────────────────────────
+ *
+ * Every other surface here is one of our own origins, which is why the CORS
+ * allowlist above works. The embeddable calendar is the exception: its whole
+ * purpose is to sit on reeldealcharters.com, and that domain will never be in
+ * a list we maintain. Under the shared policy the browser blocked it, so the
+ * widget could not fetch its own availability from any real customer site.
+ *
+ * These routes are therefore opened to any origin, which is safe precisely
+ * because of what they return: day counts and colours, never a booking row or
+ * a guest. Credentials are off — there is no session to leak, and a cookie
+ * could not be attached even if one existed.
+ *
+ * The lead route is the one exception that accepts personal data, so it is
+ * write-only (it returns an id, never a read) and rate limited per IP.
+ */
+app.use('/api/embed', cors({ origin: '*', credentials: false }));
+
+const embedLeadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: Number(process.env.EMBED_LEAD_RATE_LIMIT || 20),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests — try again in a moment.' },
+});
+app.use('/api/embed/lead', embedLeadLimiter);
+
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
 // literal require('./...') string so Vercel's bundler statically traces and
@@ -184,6 +211,12 @@ mount('/api/site', () => require('./routes/site'));
 mount('/api/menu-editor', () => require('./routes/menu-editor'));
 mount('/api/menu-edit', () => require('./routes/menu-edit'));
 mount('/api/simple', () => require('./routes/simple-menu-edit'));
+
+// The owner's own inventory controls: capacity, corrections, closed dates.
+// MUST be mounted before /api/business — business-data.js ends in a `/:table`
+// catch-all that would otherwise swallow /availability and try to read a table
+// by that name.
+mount('/api/business/availability', () => require('./routes/owner-availability'));
 
 // Everything the business dashboard reads or writes about its own business.
 // Every handler resolves the slug from the session via entity_owners, so no
@@ -371,7 +404,6 @@ mount('/api/services', () => require('./routes/services'));
 // WhatsApp, Voice Notes, OCR, DNS
 //mount('/api/whatsapp', () => require('./routes/whatsapp')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/voice-notes', () => require('./routes/voice-notes'));
-mount('/api/email-parser', () => require('./routes/email-parser'));
 mount('/api/email-parser', () => require('./routes/email-parser'));
 mount('/api/deals', () => require('./routes/deals'));
 mount('/api/ocr', () => require('./routes/ocr'));

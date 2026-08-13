@@ -174,6 +174,88 @@ router.get('/availability/:slug', async (req, res) => {
     }
 });
 
+/* ── intent capture ──────────────────────────────────────────────────────
+ *
+ * POST /api/embed/lead/:slug   { name, phone, email?, sms_consent?, ... }
+ *
+ * The point of the whole loop, and the step the widget used to skip. The
+ * calendar linked straight out to FareHarbor or Airbnb, which meant the
+ * business paid for the traffic, we rendered the availability, and nobody
+ * learned who the customer was. When that customer's confirmation email came
+ * back to the parser there was nothing to match it against.
+ *
+ * Now the handoff goes through here first: a name and a phone number, written
+ * to the same booking_opt_ins table the public Reserve page writes to, with a
+ * click event beside it. The returned opt_in_id is what a later confirmation
+ * joins to — which is what makes a verified review possible at all.
+ *
+ * It is deliberately thin. No availability is decremented and nothing is
+ * reserved: this records that somebody was interested, not that anything was
+ * booked. A lead that never converts simply ages out.
+ */
+router.post('/lead/:slug', async (req, res) => {
+    try {
+        const slug = String(req.params.slug || '').slice(0, 120).trim();
+        const { name, phone, email, sms_consent, consent_text } = req.body || {};
+
+        if (!slug) return res.status(400).json({ error: 'slug required' });
+        if (!phone || !String(phone).trim()) {
+            return res.status(400).json({ error: 'A phone number is required.' });
+        }
+
+        // The slug has to be a real, active business — otherwise this is a free
+        // write endpoint for anyone who wants to fill a table with junk.
+        const { data: entity } = await db
+            .from('entity')
+            .select('slug, booking_url, phone')
+            .eq('slug', slug)
+            .eq('is_active', true)
+            .maybeSingle();
+        if (!entity) return res.status(404).json({ error: 'Unknown business' });
+
+        // Click record first so the opt-in has something to point at. Best
+        // effort: losing attribution is better than losing the lead.
+        let clickId = null;
+        try {
+            const { data: click } = await db
+                .from('tourist_click_events')
+                .insert({
+                    entity_slug: slug,
+                    click_type:  'widget_booking',
+                    target_url:  entity.booking_url || null,
+                })
+                .select('id')
+                .single();
+            clickId = click?.id || null;
+        } catch { /* attribution is best-effort */ }
+
+        const { data: optIn, error } = await db
+            .from('booking_opt_ins')
+            .insert({
+                entity_slug:  slug,
+                click_id:     clickId,
+                name:         name ? String(name).trim().slice(0, 120) : null,
+                phone:        String(phone).trim().slice(0, 40),
+                email:        email ? String(email).trim().slice(0, 200) : null,
+                sms_consent:  !!sms_consent,
+                consent_text: sms_consent ? (consent_text || null) : null,
+            })
+            .select('id')
+            .single();
+
+        if (error) return res.status(500).json({ error: error.message });
+
+        res.json({
+            opt_in_id:   optIn.id,
+            click_id:    clickId,
+            booking_url: entity.booking_url || null,
+            phone:       entity.phone || null,
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 /* ── the script ──────────────────────────────────────────────────────── */
 //
 // Served as a route rather than a static file so it can bake in the API
@@ -192,6 +274,10 @@ function widgetSource(origin) {
   window.__gcrAvailabilityLoaded = true;
 
   var API = ${JSON.stringify(origin)};
+  // Stored verbatim on the opt-in row, because for a consent record what was
+  // agreed to matters as much as that something was.
+  var CONSENT_TEXT = 'I agree to receive text messages about this booking. ' +
+    'Message and data rates may apply. Reply STOP to opt out.';
   var CSS = [
     '.gcrc{font-family:inherit;max-width:420px;color:inherit;font-size:14px}',
     '.gcrc *{box-sizing:border-box}',
@@ -213,6 +299,22 @@ function widgetSource(origin) {
     '.gcrc__day--full,.gcrc__day--blocked{background:currentColor;opacity:.18}',
     '.gcrc__n{font-size:10px;line-height:1;margin-top:2px;opacity:.9}',
     '.gcrc__key{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;opacity:.7}',
+    // Capture step. Inherits the host page's font and colour like everything
+    // else here, so it reads as part of the business's own site rather than a
+    // third-party form dropped into it.
+    '.gcrc__cta{border:1px solid currentColor;background:none;color:inherit;font:inherit;',
+    'font-size:13px;border-radius:6px;padding:6px 12px;cursor:pointer}',
+    '.gcrc__cta:hover:not(:disabled){opacity:.75}.gcrc__cta:disabled{opacity:.4;cursor:default}',
+    '.gcrc__cta--full{width:100%;margin-top:8px;padding:9px 12px}',
+    '.gcrc__cap{margin-top:12px;padding-top:12px;border-top:1px solid currentColor;',
+    'border-top-color:rgba(128,128,128,.3)}',
+    '.gcrc__caph{font-weight:600;font-size:13px;margin-bottom:8px}',
+    '.gcrc__in{width:100%;font:inherit;font-size:14px;padding:9px 10px;margin-bottom:8px;',
+    'border:1px solid rgba(128,128,128,.45);border-radius:6px;background:transparent;color:inherit}',
+    '.gcrc__consent{display:flex;gap:8px;align-items:flex-start;font-size:11px;opacity:.75;',
+    'line-height:1.35;cursor:pointer}',
+    '.gcrc__consent input{margin-top:2px;flex:none}',
+    '.gcrc__note{font-size:12px;opacity:.75;margin-top:4px}',
     '.gcrc__k{display:flex;align-items:center;gap:4px}',
     '.gcrc__sw{width:10px;height:10px;border-radius:3px;display:inline-block}',
     '.gcrc__foot{margin-top:10px;font-size:12px}',
@@ -318,18 +420,101 @@ function widgetSource(origin) {
     if (!data.capacity_known) {
       foot.appendChild(el('span', null, 'Call to confirm availability. '));
     }
-    if (opts.book !== 'off' && data.booking_url) {
-      var a = el('a', null, 'Book now');
-      a.href = data.booking_url;
-      a.target = '_blank';
-      a.rel = 'noopener';
-      foot.appendChild(a);
-    } else if (opts.book !== 'off' && data.phone) {
-      var tel = el('a', null, data.phone);
-      tel.href = 'tel:' + String(data.phone).replace(/[^0-9+]/g, '');
-      foot.appendChild(tel);
+    if (opts.book !== 'off' && (data.booking_url || data.phone)) {
+      var cta = el('button', 'gcrc__cta', data.booking_url ? 'Book now' : 'Call to book');
+      cta.type = 'button';
+      cta.onclick = function () { showCapture(root, slug, data, opts); };
+      foot.appendChild(cta);
     }
     if (foot.childNodes.length) root.appendChild(foot);
+  }
+
+  // ── intent capture ───────────────────────────────────────────────────
+  //
+  // The handoff step. Everything above this point is a display; this is the
+  // only place the widget asks for anything, so it asks for the least it can
+  // and says why. Name and phone, one optional consent box, then straight on
+  // to wherever the business actually takes bookings.
+  //
+  // The destination window is opened synchronously inside the click handler
+  // and pointed at its URL after the request returns. Opening it afterwards
+  // would put it outside the user gesture, and every popup blocker on earth
+  // would eat it.
+  function showCapture(root, slug, data, opts) {
+    var wrap = root.querySelector('.gcrc__cap');
+    if (wrap) { wrap.scrollIntoView({ block: 'nearest' }); return; }
+
+    wrap = el('div', 'gcrc__cap');
+    var heading = el('div', 'gcrc__caph', 'Who should they hold it for?');
+    wrap.appendChild(heading);
+
+    var nameI = el('input', 'gcrc__in');
+    nameI.placeholder = 'Name';
+    nameI.autocomplete = 'name';
+
+    var phoneI = el('input', 'gcrc__in');
+    phoneI.placeholder = 'Mobile number';
+    phoneI.type = 'tel';
+    phoneI.autocomplete = 'tel';
+
+    wrap.appendChild(nameI);
+    wrap.appendChild(phoneI);
+
+    var consentRow = el('label', 'gcrc__consent');
+    var consentBox = el('input');
+    consentBox.type = 'checkbox';
+    consentRow.appendChild(consentBox);
+    consentRow.appendChild(el('span', null, 'Text me about this booking. Message and data rates may apply.'));
+    wrap.appendChild(consentRow);
+
+    var err = el('div', 'gcrc__err');
+    wrap.appendChild(err);
+
+    var go = el('button', 'gcrc__cta gcrc__cta--full', data.booking_url ? 'Continue to booking' : 'Show number');
+    go.type = 'button';
+    wrap.appendChild(go);
+
+    go.onclick = function () {
+      err.textContent = '';
+      if (!phoneI.value.trim()) { err.textContent = 'A mobile number is required.'; return; }
+
+      // Opened now, inside the gesture. Filled in when the request returns.
+      var dest = data.booking_url ? window.open('', '_blank', 'noopener') : null;
+
+      go.disabled = true;
+      go.textContent = 'One moment…';
+
+      fetch(API + '/api/embed/lead/' + encodeURIComponent(slug), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: nameI.value.trim(),
+          phone: phoneI.value.trim(),
+          sms_consent: consentBox.checked,
+          consent_text: consentBox.checked ? CONSENT_TEXT : null
+        })
+      }).then(function (r) {
+        return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || 'Could not continue'); });
+      }).then(function (out) {
+        var url = out.booking_url || data.booking_url;
+        if (url && dest) { dest.location = url; }
+        else if (url) { window.open(url, '_blank', 'noopener'); }
+        wrap.innerHTML = '';
+        wrap.appendChild(el('div', 'gcrc__caph', 'You\\'re all set.'));
+        wrap.appendChild(el('div', 'gcrc__note',
+          url ? 'Finishing up on the booking page.'
+              : 'Call ' + (out.phone || data.phone || '') + ' to confirm.'));
+      }).catch(function (e) {
+        // The lead failed; the customer still gets where they were going.
+        if (dest) { if (data.booking_url) dest.location = data.booking_url; else dest.close(); }
+        go.disabled = false;
+        go.textContent = data.booking_url ? 'Continue to booking' : 'Show number';
+        err.textContent = e.message || 'Could not continue — try again.';
+      });
+    };
+
+    root.appendChild(wrap);
+    nameI.focus();
   }
 
   function shift(month, by) {
