@@ -1,5 +1,14 @@
 # Repo inventory audit — 12 Aug 2026
 
+> **Status update, 13 Aug 2026 — section 2 is now out of date, deliberately.**
+> The ten-file bundle described below as unapplied has since been applied and
+> pushed: `gcr-api-clean` commit `48a8bfe` (74 + 80 checks pass) and
+> `Dashboards-users-` (build and discovery suite pass). Section 2 is kept as
+> the record of what was found, not as current state. Everything in sections
+> 3–6 that isn't the bundle — the key rotation, `PUBLIC_MCP_HIDE_PERSONAL`,
+> the other three duplicate mounts, the admin App Store repoint, the remaining
+> public pages, the menu-editor decision — is still open.
+
 Re-check of the `untitled folder` bundle against the five repos as they stand
 today. Every claim below was run against the cloned working trees, not read off
 the prior documents. Where the prior documents were wrong, it says so.

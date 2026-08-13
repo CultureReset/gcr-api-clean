@@ -1,5 +1,13 @@
 # The bundle, file by file
 
+> **Status update, 13 Aug 2026 — the bundle has been applied.**
+> Section 0 below proves it *was* unapplied when this was written; that is now
+> history. All ten files are in, on `claude/repo-inventory-audit-5zw4yw` in
+> both repos. The per-file descriptions in sections 3 and 4 remain accurate as
+> documentation of what each file does. **Section 6 — what the bundle does not
+> contain — is unaffected and still the live to-do list**, starting with the
+> service_role key rotation and `PUBLIC_MCP_HIDE_PERSONAL=true`.
+
 Every file in `untitled folder`, what it is, which repo it belongs to, which
 exact path it lands at, whether it's backend or UI, and what it does.
 
