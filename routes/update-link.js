@@ -105,10 +105,22 @@ async function validateToken(req, res, next) {
     if (!link) return res.status(404).json({ error: 'Link not found' });
     if (link.expires_at && new Date(link.expires_at) < new Date()) return res.status(410).json({ error: 'Link expired' });
     // Passcode check — skip for GET /update/:token (the redirect page itself)
+    //
+    // A link with no passcode used to fall back to '000000', which is not a
+    // secret. Links are now minted with one, and a row that still has none is
+    // refused rather than accepting the constant. Outstanding pre-fix links
+    // expire within 30 hours, so this self-heals; regenerate any that are
+    // needed sooner.
     if (req.path !== '/') {
-        const expected = link.passcode || '000000';
+        if (!link.passcode) {
+            return res.status(401).json({
+                error: 'This link is no longer valid — ask for a new one.',
+                requires_passcode: true,
+                expired_scheme: true,
+            });
+        }
         const submitted = req.headers['x-link-passcode'] || req.query.passcode;
-        if (submitted !== String(expected)) {
+        if (submitted !== String(link.passcode)) {
             return res.status(401).json({ error: 'Passcode required', requires_passcode: true });
         }
     }
@@ -155,7 +167,11 @@ async function resolveSlug({ entity_id, site_id, biz_name }) {
     return slugify(biz_name);
 }
 
-router.post('/generate', async (req, res) => {
+// Minting a link hands out write access to a business's menu, photos, specials
+// and prices for the next 30 hours. Its siblings (/send-sms, the passcode
+// setter) were always admin-only; this one was not, which meant anyone who
+// could POST a slug could rewrite that business's page. It is admin-only now.
+router.post('/generate', adminRequired, async (req, res) => {
     const { entity_id, site_id, biz_name, link_type = 'full', send_phone, passcode } = req.body;
     const storedId = site_id ? ('s:' + site_id) : entity_id;
     if (!storedId) return res.status(400).json({ error: 'entity_id or site_id required' });
@@ -167,15 +183,22 @@ router.post('/generate', async (req, res) => {
 
     if (existing) return res.json({ token: existing.token, url: linkUrl(existing.token, slug), existing: true });
 
+    // The passcode was accepted in the body and then silently dropped, so every
+    // link ever minted stored NULL — which validateToken used to read as the
+    // default '000000'. It is persisted now, and a link without one is refused
+    // rather than falling back to a guessable constant.
     const token = makeToken();
+    const linkPasscode = String(passcode || '').trim() || String(Math.floor(100000 + Math.random() * 900000));
     const { error } = await supabase.from('update_links').insert({
         entity_id: storedId, link_type, link_date: today, token,
         send_phone: send_phone || null,
+        passcode: linkPasscode,
         expires_at: new Date(Date.now() + 30 * 3600 * 1000).toISOString(),
     }).select().single();
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ token, url: linkUrl(token, slug), existing: false });
+    // Returned so the console can show it to whoever is handing the link over.
+    res.json({ token, url: linkUrl(token, slug), passcode: linkPasscode, existing: false });
 });
 
 // PUT /api/update/links/:token/passcode — set or clear a passcode on a link

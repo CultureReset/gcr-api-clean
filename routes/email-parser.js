@@ -25,6 +25,64 @@ const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
 const db      = require('../db');
+const { businessAccess, assertSlug } = require('../middleware/businessAccess');
+
+// ─── WHO MAY WRITE HERE ──────────────────────────────────────────────────────
+//
+// POST /inbound stays public: SendGrid has no credential to present, and the
+// mail itself is the evidence. Everything else on this router either changes a
+// business's inventory or reads its customers, so it is authenticated and
+// scoped to one slug.
+//
+// POST /manual is the exception that needed thought. It has two callers:
+//
+//   the public Reserve page   an anonymous tourist finishing a reservation
+//   the admin console         staff entering a phone booking by hand
+//
+// So it cannot simply require a session. Instead the public path has to prove
+// it came through the front door: /api/gcr/opt-in issued an opt_in_id against
+// this same slug, which means a name and phone number were captured before the
+// booking was written. That row is the capability. Without it — or with one
+// belonging to a different business — an anonymous caller gets 403, which is
+// what stops a stranger from writing bookings against a business and draining
+// its availability to zero.
+//
+// A public caller is also held to status 'pending'. Only an authenticated
+// caller can assert a booking is confirmed, because only they have seen the
+// evidence for it.
+
+async function manualEntryAllowed(req, res, next) {
+    const header = req.headers.authorization || '';
+
+    // Authenticated caller: full trust, normal scoping.
+    if (header.startsWith('Bearer ')) {
+        return businessAccess(req, res, () => {
+            req.publicBooking = false;
+            next();
+        });
+    }
+
+    // Anonymous caller: an opt-in row for this slug is the only way through.
+    const { entity_slug, opt_in_id } = req.body || {};
+    if (!entity_slug || !opt_in_id) {
+        return res.status(403).json({ error: 'Start your reservation from the business page.' });
+    }
+
+    const { data: optIn, error } = await db
+        .from('booking_opt_ins')
+        .select('id, entity_slug')
+        .eq('id', opt_in_id)
+        .maybeSingle();
+
+    if (error) return res.status(500).json({ error: error.message });
+    if (!optIn || optIn.entity_slug !== String(entity_slug).trim()) {
+        return res.status(403).json({ error: 'Start your reservation from the business page.' });
+    }
+
+    req.publicBooking = true;
+    req.scopeSlug = optIn.entity_slug;
+    next();
+}
 
 // ─── UTILITIES ───────────────────────────────────────────────────────────────
 
@@ -1069,18 +1127,32 @@ async function sendBookingConfirmations(entitySlug, parsed, customerEmail, custo
   }
 }
 
-router.post('/manual', async (req, res) => {
+router.post('/manual', manualEntryAllowed, async (req, res) => {
   try {
     const {
       entity_slug, platform = 'manual', booking_type = 'tour',
       event_date, event_time, end_time, party_size,
       customer_name, activity_name, table_number, seated_time,
-      left_time, confirmation_no, status = 'confirmed', notes,
+      left_time, confirmation_no, notes,
       customer_email, customer_phone, opt_in_id,
     } = req.body;
 
     if (!entity_slug || !event_date) {
       return res.status(400).json({ error: 'entity_slug and event_date required' });
+    }
+
+    // Never the slug the caller typed: for an owner it is the slug they own,
+    // for a public reservation it is the slug the opt-in row was filed against.
+    const slug = req.publicBooking
+      ? req.scopeSlug
+      : assertSlug(req, res, entity_slug);
+    if (!slug) return;
+
+    // An anonymous caller may request a booking, not assert a confirmed one,
+    // and cannot claim it arrived from a third-party platform.
+    const status = req.publicBooking ? 'pending' : (req.body.status || 'confirmed');
+    if (req.publicBooking && parseInt(party_size || 1) > 50) {
+      return res.status(400).json({ error: 'Party size too large — please call the business.' });
     }
 
     const parsed = {
@@ -1096,13 +1168,13 @@ router.post('/manual', async (req, res) => {
 
     const { data: logRow } = await db
       .from('email_parser_log')
-      .insert({ entity_slug, platform, ...parsed, parsed: true, manual: true, created_at: new Date().toISOString() })
+      .insert({ entity_slug: slug, platform, ...parsed, parsed: true, manual: true, created_at: new Date().toISOString() })
       .select('id').single();
 
-    await upsertAvailability(entity_slug, parsed, logRow?.id);
+    await upsertAvailability(slug, parsed, logRow?.id);
 
     if (customer_email || opt_in_id) {
-      sendBookingConfirmations(entity_slug, parsed, customer_email, customer_phone, opt_in_id).catch(() => {});
+      sendBookingConfirmations(slug, parsed, customer_email, customer_phone, opt_in_id).catch(() => {});
     }
 
     res.json({ success: true, parsed, log_id: logRow?.id });
@@ -1117,13 +1189,16 @@ router.post('/manual', async (req, res) => {
  * Accepts JSON array of seating/booking records
  * [{ table_number, party_size, seated_time, left_time, event_date }, ...]
  */
-router.post('/bulk-import', async (req, res) => {
+router.post('/bulk-import', businessAccess, async (req, res) => {
   try {
-    const { entity_slug, records, booking_type = 'restaurant', event_date } = req.body;
+    const { records, booking_type = 'restaurant', event_date } = req.body;
 
-    if (!entity_slug || !Array.isArray(records)) {
+    if (!req.body.entity_slug || !Array.isArray(records)) {
       return res.status(400).json({ error: 'entity_slug and records[] required' });
     }
+
+    const entity_slug = assertSlug(req, res, req.body.entity_slug);
+    if (!entity_slug) return;
 
     const results = [];
     const today = event_date || new Date().toISOString().slice(0,10);
@@ -1206,9 +1281,17 @@ router.get('/availability/:slug', async (req, res) => {
  * Admin: view all parsed emails with filters
  * Query: ?entity_slug=x&date=x&platform=x&status=x&limit=50
  */
-router.get('/log', async (req, res) => {
+// These rows carry customer names, phone numbers and raw email text, so the
+// filter is not optional for anyone but an admin: an owner reads their own
+// business's log and there is no request they can make that says otherwise.
+router.get('/log', businessAccess, async (req, res) => {
   try {
-    const { entity_slug, date, platform, status, limit = 100, offset = 0 } = req.query;
+    const { date, platform, status, limit = 100, offset = 0 } = req.query;
+
+    const entity_slug = req.isAdmin
+      ? (req.query.entity_slug || null)
+      : assertSlug(req, res, req.query.entity_slug);
+    if (!req.isAdmin && !entity_slug) return;
 
     let q = db
       .from('email_parser_log')
@@ -1275,9 +1358,13 @@ const PLATFORM_DESCRIPTIONS = {
  * Business onboarding — set capacity and BCC email address
  * Body: { daily_capacity, capacity_per_slot, bcc_email }
  */
-router.post('/setup/:slug', async (req, res) => {
+// The number every availability figure counts down from. Left open, this is
+// the whole platform's soft underbelly: set a competitor's capacity to 1 and
+// GCR shows them booked solid to every tourist who looks.
+router.post('/setup/:slug', businessAccess, async (req, res) => {
   try {
-    const { slug } = req.params;
+    const slug = assertSlug(req, res, req.params.slug);
+    if (!slug) return;
     const { daily_capacity, capacity_per_slot } = req.body;
 
     if (!daily_capacity) {
@@ -1453,9 +1540,12 @@ router.get('/ical-import/run', async (req, res) => {
 });
 
 // POST /api/email-parser/ical-import/sync-now/:id — manual "sync now" trigger from the dashboard
-router.post('/ical-import/sync-now/:id', async (req, res) => {
+router.post('/ical-import/sync-now/:id', businessAccess, async (req, res) => {
   const { data: row } = await db.from('entity_external_calendars').select('*').eq('id', req.params.id).maybeSingle();
   if (!row) return res.status(404).json({ error: 'Not found' });
+  // The feed row names its own business; check that against the caller rather
+  // than trusting an id that came off the URL.
+  if (!assertSlug(req, res, row.entity_slug)) return;
   await syncExternalCalendar(row);
   res.json({ success: true });
 });
