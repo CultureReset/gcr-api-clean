@@ -15,7 +15,7 @@
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const sqlDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'sql');
@@ -34,9 +34,34 @@ const FORBIDDEN = [
 const problems = [];
 let scanned = 0;
 
-for (const file of readdirSync(sqlDir).filter((f) => f.endsWith('.sql'))) {
+/**
+ * Every .sql file under sql/, at any depth.
+ *
+ * This used to read sql/ alone. The moment a subdirectory appeared
+ * (sql/kernel/) its files were outside the guarantee this script exists to
+ * make, and nothing said so — the run still printed OK. A safety check that
+ * quietly stops covering new files is worse than no check, because the OK is
+ * still believed.
+ */
+function sqlFiles(dir) {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, e.name);
+    // A `test` directory holds fixtures for a throwaway database that is
+    // created and thrown away by scripts/test-kernel-sql.sh. Those files must
+    // be able to delete a row — proving a foreign key refuses a delete means
+    // attempting one. Nothing in here is ever pointed at a real database, and
+    // the runner script is what enforces that, not this exclusion.
+    if (e.isDirectory() && e.name !== 'test') out.push(...sqlFiles(full));
+    else if (e.isFile() && e.name.endsWith('.sql')) out.push(full);
+  }
+  return out.sort();
+}
+
+for (const path of sqlFiles(sqlDir)) {
+  const file = relative(sqlDir, path);
   scanned += 1;
-  const raw = readFileSync(join(sqlDir, file), 'utf8');
+  const raw = readFileSync(path, 'utf8');
   // Strip comments so prose about "we do not drop tables" is not a finding.
   const sql = raw
     .split('\n')
@@ -49,7 +74,7 @@ for (const file of readdirSync(sqlDir).filter((f) => f.endsWith('.sql'))) {
   }
 }
 
-console.log(`SQL files scanned: ${scanned}`);
+console.log(`SQL files scanned: ${scanned} (sql/**/test/ excluded — throwaway fixtures)`);
 
 if (problems.length) {
   console.log(`\n${problems.length} destructive statement${problems.length === 1 ? '' : 's'}:`);
