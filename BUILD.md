@@ -316,6 +316,90 @@ the first customer's account is driven by the fleet rather than at the end.
 
 ---
 
+## 4c. Prior art worth taking: a9gent/mindfs
+
+An AGPL-3.0 Go project — an AI-agent remote access gateway. Not a competitor:
+it is a remote console for your own coding agents, with no tenancy, no policy
+engine, no verification and nothing resembling a tool map. But four of its
+pieces are things on this list, already built and working, and one of them
+settles an open question.
+
+**1. The agent adapter layer.** `agents.json` + `server/internal/agent/`.
+Twenty agent CLIs — Claude Code, Codex, Gemini, Grok, Cursor, Copilot, Cline,
+Kimi, Qwen, OpenCode, **Pi, Hermes, OpenClaw, OMP** — behind three protocols
+(ACP, claude-sdk, codex-sdk). An agent is a JSON record naming its command,
+args, install and update commands, config backup and protocol. Adding one is
+a config entry, not code.
+
+This answers the **harness roster** conflict. The question was never which of
+OpenClaw / Hermes / ZeroClaw / Odysseus to pick. You adapt to
+**ACP — Agent Client Protocol, JSON-RPC 2.0 over ndJSON** — and the roster
+becomes data. Same rule as `capability_implementations`: never let a vendor
+name become the architecture.
+
+**2. The plugin contract.** `plugins/txt-novel.js`:
+
+    module.exports = {
+      name, match: { ext: ".txt" }, fileLoadMode, theme,
+      viewContext(file),   // what the AGENT reads — a text summary
+      process(file),       // what the HUMAN sees — a render tree
+    }
+
+One object declaring both a human rendering and an agent-readable view of the
+same data. That is "three faces of the same data" as a single contract. For
+Ghost it becomes three: `publicView`, `adminView`, `agentContext` — and it is
+the missing concrete shape for the app manifest's component section.
+
+**3. `json-render` — the safe way to let AI build UI.** `design/`. A catalog
+declares the components and actions a model may use, with Zod-typed props;
+`catalog.prompt()` turns the catalog into the system prompt; the model emits a
+component tree, never code; a registry maps each type to a real React
+component. This is exactly "give it a controlled set of primitives" from the
+app-store document, and it is the safe core of the Ghost App Builder.
+
+**4. Relay.** `server/internal/relay/` — an encrypted tunnel reaching a local
+machine with no open firewall ports, plus device binding, credentials, and
+one-click exposure of a local service on a public domain. Alongside it:
+`e2ee/`, `webpush/`, `notify/`, `scheduled/`. For a fleet of ReDroid
+containers sitting behind a customer's router, this is the shape of the
+MeshProvider.
+
+Also worth a look: the task board runs concurrent tasks each in **its own git
+worktree**, with templates configuring agent, model, planning mode and preset
+prompt per stage. And the whole thing ships as one static Go binary under
+10 MB with no runtime dependencies — the right shape for a kiosk or a fleet
+node controller.
+
+### The licensing trap, and it is a real one
+
+**AGPL-3.0.** Running a *modified* version as a network service obliges you to
+offer the complete corresponding source of your modifications to the users of
+that service. Ghost is a network service. So:
+
+| | |
+|---|---|
+| Read it, learn the patterns | Always fine |
+| Reimplement the ideas — adapter registry, plugin contract, catalog-driven UI | Fine. Ideas are not copyrightable. |
+| Copy code into `gcr-api-clean` | Makes what you serve AGPL |
+| Run it unmodified, at arm's length behind your own API | Fine |
+
+Your own OSS catalogue already states this rule for EspoCRM, LinkStack and
+Matomo — keep copyleft services at arm's length behind your own API. Same rule
+here. It is also Go against a Node stack, so lifting code was never the easy
+path: the patterns transfer, the code does not.
+
+*(Unrelated note: the org is `a9gent`, the bio-link product is `a9ent`. Both
+read as leetspeak for "agent" and the domains differ. Treat them as unrelated
+unless something says otherwise.)*
+
+### What it does not touch
+
+Nothing here maps an external tool, verifies a write, or knows what a tenant
+is. It compresses roughly ten items in layers 03, 05, 06 and 09. It does
+nothing at all for Layer 04, which remains the whole moat.
+
+---
+
 ## 5. The checklist
 
 ### Layer 0 — Contracts
@@ -568,7 +652,7 @@ and all of it hangs off the app manifest contract.
 
 1. **SAM's expansion** — three different names across the posters
 2. **Package tier lists** — two posters disagree
-3. **Harness roster** — OpenClaw/Hermes/ZeroClaw vs OpenClaw/Odysseus
+3. ~~**Harness roster**~~ — **answered**: adapt to ACP, make the roster data (see 4c)
 4. **Open-core split** — extract a framework repo, or open this one
 5. **"capability" naming collision** — inventory vs. action
 6. **Organization vs. workspace** — one container or two
