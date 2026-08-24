@@ -217,6 +217,105 @@ down yet, which is the part that is out of order and needs fixing first.**
 
 ---
 
+## 4b. What is left, and what open source actually removes
+
+162 items left. Every one is one of three kinds of work, and they do not cost
+the same thing:
+
+| | |
+|---|---|
+| **assemble** | A mature open-source project or an existing service does the substance. You wire it up. Days, not weeks. |
+| **author** | Nothing exists to download. The design, the decision or the data is yours. |
+| **operate** | Never finishes. A running cost, not a build. |
+
+    assemble   66
+    author     90
+    operate     6
+
+Per layer, which is where it gets interesting:
+
+| Layer | assemble | author | operate |
+|---|---:|---:|---:|
+| 00 Contracts | — | **12** | — |
+| 01 Identity & canonical truth | 2 | 15 | — |
+| 02 Capabilities & policy | 4 | 8 | — |
+| 03 Execution & proof | 16 | 11 | 1 |
+| 04 The Five Maps | — | **10** | 2 |
+| 05 Models & agents | 5 | 2 | — |
+| 06 The six ecosystems | 3 | 13 | — |
+| 07 Surfaces | 25 | 11 | — |
+| 08 Cross-cutting | 5 | 3 | 2 |
+| 09 Developer marketplace | 6 | 5 | 1 |
+
+**Layer 07 is 25 assemble against 11 author.** That is the public page and the
+owner dashboard — the A9ENT-shaped part. Profile renderer, listings, lead
+capture, QR and NFC, theming, analytics, photo enhancement, booking: every one
+of those is something you configure rather than write. And the six-to-ten-week
+estimate in that teardown was for somebody starting at zero. This is not zero:
+there is already a database with 4,067 businesses and 11,147 menu items, an API
+that talks to it, a dashboard shell, a connections catalog of 1,070 tools, and
+the kernel schema. That layer is not ten weeks.
+
+**Layer 04 is zero assemble.** Not low — zero. There is no open-source map of
+Toast's controls, none of Google Business Profile's admin, nothing that says the
+hours field moved last Tuesday. Playwright gives you a browser; it does not give
+you the map, and the map is the product.
+
+**Layer 00 is zero assemble for a different reason:** a contract is a decision.
+Nobody can publish your capability vocabulary or your canonical field paths, and
+everything above inherits whatever you pick.
+
+So what the open-source stack does is real and specific. It takes the plumbing
+to near zero, which frees the calendar for the map. It does not shorten the map.
+
+### What is genuinely assembled, and from what
+
+| | |
+|---|---|
+| Browser execution | Playwright |
+| Android execution | ReDroid in Docker, ADB, scrcpy, DroidRun |
+| Authorization | OpenFGA |
+| Policy | OPA |
+| Secrets | OpenBao |
+| Workflow | Temporal, or a Postgres queue to start |
+| Mesh | Tailscale, NATS, WireGuard |
+| Sandbox | Cloudflare Sandbox, Gondolin |
+| Models | Ollama, llama.cpp, vLLM |
+| Agents | Hermes, Pi Agent Core |
+| Builders | Grok Build, Pi |
+| Analytics | Umami |
+| Photo enhancement | Real-ESRGAN, GFPGAN, CodeFormer |
+| Video | FFmpeg for motion; a rented API only for true generative |
+| Booking | Cal.com / Cal.diy |
+| Profile rendering | LinkStack / LittleLink concepts |
+| Signing | Sigstore, cosign |
+| Observability | OpenTelemetry |
+| Billing | Stripe |
+| QR / vCard / NFC | Commodity libraries |
+
+### What has to be authored, and cannot be shortened
+
+1. **The Tool Digital Twin** — `tool_controls`, field maps, control fingerprints,
+   the repair loop. Original data acquisition, per tool, forever.
+2. **The contracts** — IDs, envelopes, errors, event types, capability keys,
+   canonical field paths.
+3. **Classifying the 319 business-scoped tables.**
+4. **Populating `entity_owners`.**
+5. **Verification strategy per capability** — how you read back a Google hours
+   change is not how you read back a Toast price change.
+6. **The app manifest contract** — the seam the whole marketplace hangs off.
+7. **`source_priority_rules`, locations, customer identity, bookable objects.**
+
+### What never finishes
+
+Daily test fleet · map acquisition at scale · rate-limit, ToS and ban pacing ·
+egress and device reputation · security review · marketplace moderation.
+
+These are staffing and operating decisions, not sprints, and they start the day
+the first customer's account is driven by the fleet rather than at the end.
+
+---
+
 ## 5. The checklist
 
 ### Layer 0 — Contracts
