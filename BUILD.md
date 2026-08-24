@@ -453,13 +453,21 @@ the first customer's account is driven by the fleet rather than at the end.
 
 ### Layer 7 — Surfaces
 
+> **Correction, 2026-08-24.** This layer was first written from the spec
+> documents rather than from the code, and it badly understated what exists.
+> There are 281 UI files across the three front-ends — a working owner
+> dashboard with phone auth, a business picker, twelve section renderers,
+> inline editing and an app-store view; a public app with thirty-odd pages
+> including a real business profile; and an admin dashboard of 135 files. The
+> items below are what is genuinely missing, not the whole layer.
+
 **Owner dashboard** (`Dashboards-users-`)
 
 - [ ] `GET /api/business/workspace` — the manifest endpoint
 - [ ] Rewrite `lib/businessTables.js` to read `table_registry` instead of "has an `entity_slug` column"
 - [ ] Gut the table sweep in `src/pages/Dashboard.jsx`; render from the manifest
-- [ ] Workspace / business switcher
-- [ ] Connected Accounts screen ("credit accounts")
+- [x] Workspace / business switcher — `pages/BusinessPicker.jsx`
+- [x] Connected Accounts screen — `pages/AppStore.jsx` over `/api/connections`
 - [ ] Install screens for all six ecosystems
 - [ ] Receipts / activity screen — where a business sees what Ghost did for them
 - [ ] Conflict-resolution screen
@@ -467,9 +475,9 @@ the first customer's account is driven by the fleet rather than at the end.
 
 **Public front-facing layer** — the A9ENT-shaped part
 
-- [ ] Public profile renderer, driven by `visibility_class`
+- [x] Public profile renderer — `gcr-unified/pages/BusinessDetail.jsx`, though not yet driven by `visibility_class`
 - [ ] Listings / menu / hours rendered from canonical truth
-- [ ] Lead and submission capture → `CUSTOMER_SUBMISSION`
+- [x] Lead and submission capture — claim, book service, book rental, confirmation. Not yet classified.
 - [ ] QR and NFC sharing rails
 - [ ] Theming per business
 - [ ] Link-in-bio surface
@@ -479,7 +487,7 @@ the first customer's account is driven by the fleet rather than at the end.
 - [ ] Display variants per section — list, cards, accordion, modal, carousel, tab, button
 - [ ] Website widgets — `<ghost-app business="cobalt" app="menu">` on the owner's own site
 - [ ] White-label rendering — a chamber site showing permitted Ghost data, not a copy of it
-- [ ] Consumer home and Explore — For You / Following / Nearby
+- [x] Consumer home and Explore — Home, Browse, CategoryPage, Deals, Events, Swipe, Itinerary
 - [ ] Structured feed posts referencing a real object, so the card stays current when the object changes
 - [ ] Social graph — entities, relationships, follows, saved items
 - [ ] Design system with controlled customization — theme, accent, font pair, radius, order, visibility. No arbitrary CSS.
