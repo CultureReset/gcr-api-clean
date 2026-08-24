@@ -114,6 +114,86 @@ is short.
 
 ---
 
+## 3b. The Universal App Store document — this is not a separate platform
+
+It is the same platform, described from the top down. What has been built so far
+is the same platform from the bottom up. They meet, and the join is clean.
+
+The strongest evidence is that the document independently re-derives structures
+that are already in the kernel, without knowing they exist:
+
+| That document says | Already in the kernel |
+|---|---|
+| §32 `data_sources`, `field_sources` | `source_field_observations` |
+| §39 conflict UX — *"Google 9 PM vs Ghost 10 PM, which is authoritative?"* | `data_conflicts` + `data_conflict_options` |
+| §33 `data_change_log` with `actor_type` owner/staff/integration/AI/system | `platform_events.actor_kind` |
+| §42 install → dashboard visible → routes enabled → MCP tools available | Install controls visibility |
+| §46 *"never add an industry field to the core business table"* | `table_registry` classification |
+| §34 permission gateway — who / what business / what app / what action | Capability + policy layer |
+| §35 third-party apps never get database credentials | `plugin_catalog.runtime = 'sandbox'` |
+| §38 the app contract — tables, routes, components, events, permissions | `app_catalog` |
+
+The Google-versus-Ghost closing-time example in §39 is, word for word, the case
+already written into `sql/kernel/test/assertions.sql`. Two independent
+derivations landing on the same structure is the strongest signal available that
+the structure is right.
+
+**So it is one platform.** Building it separately would mean two event buses,
+two permission systems, two conflict resolvers and two copies of provenance —
+and the rule in `CLAUDE.md` about a guard that exists twice drifting until one
+has a hole applies at platform scale, not just to a function.
+
+### What genuinely can ship separately, and later
+
+Not the app store. **The third-party developer marketplace** — developer
+accounts, payouts, moderation, security review, revenue splits, community apps
+in a sandbox. That is roughly twenty tables and an entire trust problem, and
+none of it is needed to run Ghost Apps you wrote yourself.
+
+**The app manifest is the seam.** If the manifest contract is right now — data
+models, components, actions, events, permissions, routes, version — then a
+first-party app and a community app are the same object, and the marketplace
+becomes additive later rather than a rewrite. Get the manifest wrong and the
+marketplace is a second platform.
+
+### One thing in that document corrects what was built
+
+§32 puts source priority **on the business, per field**:
+
+    Menu price:  1. Toast   2. Owner Dashboard   3. Website
+    Hours:       1. Owner Dashboard   2. Google   3. Yelp
+
+The kernel has `authority_rank` on each observation — a property of the
+observation, set by whatever collected it. That is the wrong place. The
+restaurant is the one who knows that Toast owns their prices and they own their
+hours, and it differs per business and per field. `source_priority_rules` is
+needed, and `authority_rank` becomes the fallback when no rule exists.
+
+This is the answer to the open question flagged as *conflict authority ranking*.
+It was never a platform-wide ranking. It is per business, per field, set by the
+owner.
+
+### What the document adds that the kernel has no answer for
+
+- **`profile_sections`** — the business drags sections into order and picks how
+  each renders. This is the MySpace half of the product and nothing in the
+  kernel touches it.
+- **App slots** — `hero`, `content`, `sidebar`, `feed`, `modal`, `full_page`,
+  `floating_action`. An app declares which it supports.
+- **Apps own tables.** `table_registry` classifies a table but does not record
+  which app owns it, so uninstalling Menu cannot hide the menu tables.
+- **Locations.** Every industry table in that document carries `location_id`.
+  The kernel has businesses and parent/child businesses, and no locations.
+- **One customer identity across every business** — phone-based, separate from
+  the business-side `users`, with each business seeing only what it may.
+- **Structured feed posts** that reference a real object rather than carrying
+  text — an availability change renders as a live card. This hangs off
+  `platform_events` naturally and is a genuinely good idea.
+- **A bookable-object abstraction** across charter departures, cruise
+  departures, restaurant reservations, rentals and appointments.
+
+---
+
 ## 4. The build order, and why it is this order
 
 From `Flow_.html`, and it is right:
@@ -166,9 +246,14 @@ down yet, which is the part that is out of order and needs fixing first.**
 - [ ] **Classify the 319 business-scoped tables.** Until this is done the registry-driven dashboard shows nothing. This is real, unglamorous work and it is on the critical path.
 - [~] `source_field_observations`, `data_conflicts`, `data_conflict_options`
 - [ ] Conflict-detection job — nothing writes conflicts yet
-- [?] **Authority ranking** — who wins between owner-declared, Google, Yelp, POS, website? `authority_rank` exists; the actual ranking does not. No document specifies it.
+- [ ] **Authority ranking** — answered: it is set per business, per field, by the owner. Not a platform-wide ranking. Implement as `source_priority_rules` below.
 - [ ] Conflict-resolution screen in the dashboard
 - [ ] Migration plan for the 582 tables across the `site_id` / `business_id` / `entity_slug` generations
+- [?] **Locations.** Every industry table in the app-store document carries `location_id`. The kernel has businesses and parent/child businesses, and no locations. A separate `business_locations`, or a child entity per location?
+- [ ] **`source_priority_rules`** — per business, per field, an ordered list of sources. Replaces `authority_rank` as the primary answer; the rank becomes the fallback when no rule exists.
+- [ ] **One customer identity across every business** — phone-based, separate from the business-side `users`, with each business seeing only what it is permitted to
+- [ ] Bookable-object abstraction — charter departure, cruise departure, reservation slot, rental, appointment
+- [ ] `external_bookings` — external booking id ↔ internal object, per source
 
 ### Layer 2 — Capabilities, permissions, policy, secrets, workflows
 
@@ -259,6 +344,12 @@ down yet, which is the part that is out of order and needs fixing first.**
 - [ ] **Install controls visibility, enforced end to end.** No install row → no nav, no permission, no route that answers. Song Request is the test.
 - [ ] Install / uninstall flows
 - [ ] Plugin sandboxing actually enforced (`runtime = 'sandbox'` is currently just a column)
+- [ ] **`table_registry.owner_app_key`** — an app owns its tables, so uninstalling Menu hides the menu tables
+- [ ] **The app manifest contract** — data models, components, actions, events, permissions, routes, billing, version. This is the seam that lets the marketplace be additive later instead of being a second platform.
+- [ ] App versions and release channels
+- [ ] App data namespacing for third-party apps — `community.band-vote.*`, isolated
+- [ ] Industry templates — a named bundle of installs, and nothing more
+- [ ] Uninstall disables; it never deletes the business's data
 - [?] Package/plan tiers — two documents disagree on the list
 
 ### Layer 7 — Surfaces
@@ -284,6 +375,15 @@ down yet, which is the part that is out of order and needs fixing first.**
 - [ ] Theming per business
 - [ ] Link-in-bio surface
 - [ ] SEO and social cards
+- [ ] **`profile_sections`** — the business drags sections into order. This is the MySpace half of the product.
+- [ ] **App slots** — `hero`, `content`, `sidebar`, `feed`, `modal`, `full_page`, `floating_action`; an app declares which it supports
+- [ ] Display variants per section — list, cards, accordion, modal, carousel, tab, button
+- [ ] Website widgets — `<ghost-app business="cobalt" app="menu">` on the owner's own site
+- [ ] White-label rendering — a chamber site showing permitted Ghost data, not a copy of it
+- [ ] Consumer home and Explore — For You / Following / Nearby
+- [ ] Structured feed posts referencing a real object, so the card stays current when the object changes
+- [ ] Social graph — entities, relationships, follows, saved items
+- [ ] Design system with controlled customization — theme, accent, font pair, radius, order, visibility. No arbitrary CSS.
 
 **Admin dashboard** (`admin-dashboard-main`)
 
@@ -308,6 +408,25 @@ down yet, which is the part that is out of order and needs fixing first.**
 - [ ] QR menu on the table
 - [ ] Kiosk
 - [ ] Song Request
+
+### Layer 9 — The developer marketplace *(ships last, behind the manifest)*
+
+The one part that genuinely can be built separately and later — not because it
+is unimportant, but because none of it is needed to run apps you wrote yourself,
+and all of it hangs off the app manifest contract.
+
+- [ ] `developer_accounts`, `developer_organizations`, `developer_members`, `developer_payout_accounts`
+- [ ] Marketplace listings, prices, purchases, subscriptions, reviews, refunds
+- [ ] `marketplace_transactions`, `developer_earnings`, `developer_payouts`, `platform_fees`
+- [ ] Revenue split, and the pricing models a developer may choose
+- [ ] App moderation, version review, security scans
+- [ ] Sandboxed app runtime — third-party code reaches data only through the SDK and the permission gateway
+- [ ] Permission consent screen at install — what the app gets, and what it explicitly does not
+- [ ] Developer test business, pre-populated
+- [ ] Developer SDK
+- [ ] **Ghost App Builder** — no-code and AI, emitting the same manifest as the SDK
+- [ ] Builder primitives — data types, UI components, actions, triggers
+- [ ] Automation builder — when / if / then, in the owner's language
 
 ### Layer 8 — Cross-cutting (Section 28 and children)
 
@@ -355,8 +474,9 @@ about yet, and each one can stop the project:
 1. **Tool map acquisition at scale.** Who maps 3,000 Toast controls. Who reviews
    AI-discovered controls before they are trusted. What the daily test fleet
    costs to run. This is the single largest unanswered question.
-2. **Conflict authority ranking.** The schema has a column for it. Nothing says
-   what the ranking is.
+2. ~~**Conflict authority ranking.**~~ **Answered** by §32 of the app-store
+   document: it is not a platform-wide ranking, it is set per business, per
+   field, by the owner. Needs `source_priority_rules`.
 3. **Rate limits, ToS, and account bans.** The failure mode is a customer's
    Instagram account suspended because of something Ghost did on their behalf.
 4. **The 582-table migration** across three generations of tenant key.
