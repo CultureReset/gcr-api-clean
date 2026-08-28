@@ -190,6 +190,7 @@ mount('/api/simple', () => require('./routes/simple-menu-edit'));
 // request can name a business. This is what replaced the dashboard's direct
 // PostgREST access — and with it, the anon key in a public browser bundle.
 mount('/api/business', () => require('./routes/business-data'));
+mount('/api/billing', () => require('./routes/billing'));
 
 // One agent that knows every business. The public directory as MCP tools —
 // search, full details, cheapest-first prices, today's availability, side-by-
