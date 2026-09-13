@@ -43,6 +43,24 @@ must name a slug explicitly and is checked against `platform_admins` first.
 Same rule for MCP: which business a token acts as comes from
 `business_mcp_tokens`, and no tool takes a slug argument.
 
+## The booking platform
+
+`routes/booking.js` and `lib/bookingCore.js` are the modular booking engine —
+charters, parasailing, rentals, tours, appointments. **See BOOKING_PLATFORM.md
+before touching it.** Two rules carry most of the weight:
+
+- **A vertical is a row, not a branch.** `booking_templates` holds each trade
+  as data. There is no per-vertical code and there must never be — if a new
+  kind of business will not fit the columns, add a column, not an `if`.
+- **A browser posts quantities; the server posts back an amount.** `/quote`
+  and `/checkout` price through the same function so they cannot drift. Never
+  take a price, a discount or a deposit from a request.
+
+Payments are Stripe Connect destination charges keyed by slug
+(`lib/stripeConnect.js`, `payment_accounts`). This is deliberately NOT
+`routes/stripe.js`, which stores businesses' own secret keys — do not route new
+booking money through that one.
+
 ## Shared guards
 
 `lib/businessTables.js` holds the schema discovery, the table allow-list and
@@ -55,5 +73,6 @@ Work goes on `claude/new-session-1e1dj0`.
 
 ## Checks
 
-    npm run verify      # sql safety, capability columns, MCP protocol + scoping
-    npm run test:mcp    # 27 checks, no credentials or network needed
+    npm run verify        # sql safety, capability columns, MCP, concierge, booking
+    npm run test:mcp      # 27 checks, no credentials or network needed
+    npm run test:booking  # 85 checks: booking pricing, availability, route guards

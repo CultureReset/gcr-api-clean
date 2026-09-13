@@ -734,6 +734,42 @@ router.patch('/settings', ownerRequired, handle(async (req, res) => {
 }));
 
 /* ============================================================
+ * THE WIDGET — somewhere for customers to actually book.
+ * ============================================================ */
+//
+// A booking API with no front door is a booking API nobody uses. These two
+// routes are that front door:
+//
+//   /api/booking/embed.js      a script tag for a site the business has
+//   /api/booking/page/:slug    a hosted page for a business with no site
+//
+// Both serve the same widget from lib/bookingWidget.js, so the checkout has
+// one implementation rather than two that drift. Neither takes a session:
+// they are public assets, cached, and the widget itself only ever calls the
+// /public/ routes below.
+
+const widget = require('../lib/bookingWidget');
+
+router.get('/embed.js', (_req, res) => {
+    res.type('application/javascript');
+    // Long cache, because this file changes on deploy and a stale copy for
+    // an hour is better than a fetch on every page view of every business.
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+    // Deliberately open: the whole point is that it loads from a business's
+    // own Wix, Squarespace or WordPress site, none of which we know.
+    res.set('Access-Control-Allow-Origin', '*');
+    res.send(widget.WIDGET_JS);
+});
+
+router.get('/page/:slug', (req, res) => {
+    const base = (process.env.BOOKING_EMBED_BASE_URL || '').replace(/\/+$/, '') ||
+        (req.protocol + '://' + req.get('host'));
+    res.type('html');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(widget.pageHtml(req.params.slug, base));
+});
+
+/* ============================================================
  * PUBLIC — a customer, one named business.
  * ============================================================ */
 
