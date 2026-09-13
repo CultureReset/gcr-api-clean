@@ -75,4 +75,4 @@ Work goes on `claude/new-session-1e1dj0`.
 
     npm run verify        # sql safety, capability columns, MCP, concierge, booking
     npm run test:mcp      # 27 checks, no credentials or network needed
-    npm run test:booking  # 85 checks: booking pricing, availability, route guards
+    npm run test:booking  # 87 checks: booking pricing, availability, route guards

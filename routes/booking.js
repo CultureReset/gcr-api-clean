@@ -605,7 +605,7 @@ router.post('/orders/:id/refund', ownerRequired, handle(async (req, res) => {
 
     const { data: payment } = await supabase.from('booking_payments')
         .select('provider_object_id').eq('booking_id', booking.id).eq('kind', 'payment')
-        .eq('status', 'succeeded').order('created_at', { ascending: false }).maybeSingle();
+        .eq('status', 'succeeded').order('created_at', { ascending: false }).limit(1).maybeSingle();
     if (!payment || !payment.provider_object_id) {
         return fail(res, 400, 'No Stripe payment is recorded against this booking.');
     }
@@ -1118,9 +1118,11 @@ router.post('/public/:slug/checkout', handle(async (req, res) => {
             title: product.name,
             description: [date, time].filter(Boolean).join(' at ') +
                 (quote.deposit_due < quote.total ? ' — deposit' : ''),
-            successUrl: (body.success_url || base + '/book/manage/' + booking.id) +
-                (String(body.success_url || '').includes('?') ? '&' : '?') + 't=' + manageToken(booking.id) + '&paid=1',
-            cancelUrl: body.cancel_url || (base + '/book/' + slug + '?cancelled=1'),
+            successUrl: withParams(
+                safeReturnUrl(body.success_url, base + '/book/manage/' + booking.id),
+                't=' + manageToken(booking.id) + '&paid=1',
+            ),
+            cancelUrl: safeReturnUrl(body.cancel_url, base + '/book/' + slug + '?cancelled=1'),
             expiresAt: Math.floor(Date.now() / 1000) + Math.max(30, HOLD_MINUTES) * 60,
         });
     } catch (err) {
@@ -1151,6 +1153,38 @@ router.post('/public/:slug/checkout', handle(async (req, res) => {
 
 function manageUrl(bookingId) {
     return connect.publicBase() + '/book/manage/' + bookingId + '?t=' + manageToken(bookingId);
+}
+
+/**
+ * Where Stripe may send a customer afterwards.
+ *
+ * The widget supplies this, and the widget runs on whatever site the
+ * business embedded it in — so the value arrives from a browser and cannot
+ * be trusted. Handed to Stripe unchecked it is an open redirect on the back
+ * of a real payment: a customer who genuinely just paid is delivered to
+ * somewhere of an attacker's choosing, at the exact moment they are most
+ * willing to believe a page asking for card details again.
+ *
+ * So: http(s) only (no javascript:, no data:), a sane length, and anything
+ * that fails falls back to the booking's own manage page rather than being
+ * rejected — a payment must not fail over a bad return URL.
+ */
+function safeReturnUrl(candidate, fallback) {
+    const raw = String(candidate || '').trim();
+    if (!raw || raw.length > 500) return fallback;
+    try {
+        const url = new URL(raw);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return fallback;
+        return url.toString();
+    } catch {
+        return fallback;
+    }
+}
+
+/** Append a query parameter to a URL that may or may not already have one. */
+function withParams(url, params) {
+    const joiner = url.includes('?') ? '&' : '?';
+    return url + joiner + params;
 }
 
 /** Tell the business a booking landed. Best-effort — never blocks a sale. */
@@ -1253,7 +1287,7 @@ router.post('/public/booking/:id/cancel', handle(async (req, res) => {
     if (refund.refund_cents > 0) {
         const { data: payment } = await supabase.from('booking_payments')
             .select('provider_object_id').eq('booking_id', booking.id).eq('kind', 'payment')
-            .eq('status', 'succeeded').order('created_at', { ascending: false }).maybeSingle();
+            .eq('status', 'succeeded').order('created_at', { ascending: false }).limit(1).maybeSingle();
         if (payment && payment.provider_object_id) {
             try {
                 await connect.refundPayment({
@@ -1525,4 +1559,7 @@ async function notifyCustomer(booking, product) {
 }
 
 module.exports = router;
+// Exported for scripts/test-booking-routes.js, which checks these two
+// directly rather than only through a request.
 module.exports.manageToken = manageToken;
+module.exports.safeReturnUrl = safeReturnUrl;

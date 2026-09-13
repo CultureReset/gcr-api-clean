@@ -42,6 +42,11 @@ function rowsFor(state) {
     return rows;
 }
 
+/** `.limit(n)` really truncates — that is the whole point of adding one. */
+function capped(rows, state) {
+    return state.limit == null ? rows : rows.slice(0, state.limit);
+}
+
 function result(state) {
     if (state.op === 'insert' || state.op === 'upsert') {
         const payload = Array.isArray(state.payload) ? state.payload : [state.payload];
@@ -49,11 +54,39 @@ function result(state) {
         return { data: state.wantsOne ? written[0] : written, error: null, count: written.length };
     }
     if (state.op === 'update' || state.op === 'delete') {
-        const rows = rowsFor(state).map((r) => Object.assign({}, r, state.payload || {}));
-        return { data: state.wantsOne ? (rows[0] || null) : rows, error: null, count: rows.length };
+        const rows = capped(rowsFor(state).map((r) => Object.assign({}, r, state.payload || {})), state);
+        if (state.wantsOne) return Object.assign(singleRow(rows, state), { count: rows.length });
+        return { data: rows, error: null, count: rows.length };
     }
-    const rows = rowsFor(state);
-    return { data: state.wantsOne ? (rows[0] || null) : rows, error: null, count: rows.length };
+    const rows = capped(rowsFor(state), state);
+    if (state.wantsOne) return Object.assign(singleRow(rows, state), { count: rows.length });
+    return { data: rows, error: null, count: rows.length };
+}
+
+/**
+ * PostgREST's single-row behaviour, reproduced faithfully.
+ *
+ * `.single()` errors on none OR many; `.maybeSingle()` tolerates none but
+ * still errors on many. That second case is the one worth imitating: a
+ * handler that asks for one row where two can legitimately exist looks
+ * fine in every test until real data has two, and then fails on exactly
+ * the records that matter most. A fake that quietly returned the first row
+ * would hide that class of bug rather than catch it.
+ */
+function singleRow(rows, state) {
+    if (rows.length > 1) {
+        return {
+            data: null,
+            error: {
+                code: 'PGRST116',
+                message: `JSON object requested, multiple (or no) rows returned (${rows.length} in ${state.table})`,
+            },
+        };
+    }
+    if (!rows.length && state.strictSingle) {
+        return { data: null, error: { code: 'PGRST116', message: 'no rows returned' } };
+    }
+    return { data: rows[0] || null, error: null };
 }
 
 function builder(table) {
@@ -70,7 +103,7 @@ function builder(table) {
         update(payload) { state.op = 'update'; state.payload = payload; return chain; },
         upsert(payload, options) { state.op = 'upsert'; state.payload = payload; state.onConflict = options; return chain; },
         delete() { state.op = 'delete'; return chain; },
-        single() { state.wantsOne = true; return chain; },
+        single() { state.wantsOne = true; state.strictSingle = true; return chain; },
         maybeSingle() { state.wantsOne = true; return chain; },
     };
 
@@ -81,7 +114,8 @@ function builder(table) {
             return chain;
         };
     }
-    for (const op of ['order', 'limit', 'range']) {
+    chain.limit = function (n) { state.limit = n; return chain; };
+    for (const op of ['order', 'range']) {
         chain[op] = function () { return chain; };
     }
 
@@ -416,6 +450,64 @@ async function run() {
         eq(res.body.payment_required, false);
         ok(res.body.confirmation_code, 'they still get a reference');
         ok(!res.body.checkout_url, 'and no payment page');
+    });
+
+    await check('a refund finds the latest payment when there is more than one', async () => {
+        // A deposit and then a balance is two succeeded payments on one
+        // booking. Asking for a single row without a limit errors on exactly
+        // the bookings most likely to need refunding.
+        db.tables.bookings = [{
+            id: 'b1', entity_slug: 'my-charters', amount_paid: 500, refunded_amount: 0,
+            product_id: null, date: '2030-07-04', start_time: '06:00',
+        }];
+        db.tables.booking_payments = [
+            { id: 'pay1', booking_id: 'b1', kind: 'payment', status: 'succeeded', provider_object_id: 'pi_deposit' },
+            { id: 'pay2', booking_id: 'b1', kind: 'payment', status: 'succeeded', provider_object_id: 'pi_balance' },
+        ];
+        const res = await call('POST', '/api/booking/orders/b1/refund', { body: { amount: 100 } });
+        // Stripe is not configured in the harness, so the refund itself
+        // cannot succeed — but it must get as far as trying, rather than
+        // falling over on the lookup.
+        ok(res.status !== 404, 'the booking was found');
+        ok(!/no stripe payment is recorded/i.test((res.body && res.body.error) || ''),
+            'the payment lookup survived two rows: ' + ((res.body && res.body.error) || res.status));
+    });
+
+    await check('a return URL from the browser cannot become an open redirect', async () => {
+        const productId = '11111111-1111-4111-8111-111111111111';
+        db.tables.entity = [{ id: 'e1', slug: 'my-charters', name: 'My Charters' }];
+        db.tables.booking_products = [{
+            id: productId, entity_slug: 'my-charters', name: 'Trip', active: true,
+            schedule_mode: 'open_date', capacity_mode: 'seats', capacity: 10,
+            min_party: 1, currency: 'usd', deposit_mode: 'none', questions: [],
+        }];
+        db.tables.booking_rates = [{
+            id: '22222222-2222-4222-8222-222222222222', entity_slug: 'my-charters', product_id: productId,
+            label: 'Adult', pricing_mode: 'per_person', amount: 150, active: true, occupies_capacity: true,
+        }];
+
+        // deposit_mode 'none' means no Stripe call, so this exercises the
+        // sanitiser rather than the checkout session. The unit below covers
+        // the values themselves.
+        const res = await call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: productId, date: '2030-07-04',
+                items: [{ rate_id: '22222222-2222-4222-8222-222222222222', qty: 1 }],
+                customer_name: 'A', customer_email: 'a@example.com',
+                success_url: 'javascript:alert(document.cookie)',
+            },
+        });
+        eq(res.status, 200, 'a bad return URL must not fail the booking');
+
+        const { safeReturnUrl } = require('../routes/booking');
+        eq(safeReturnUrl('javascript:alert(1)', 'https://safe.example'), 'https://safe.example');
+        eq(safeReturnUrl('data:text/html,<script>', 'https://safe.example'), 'https://safe.example');
+        eq(safeReturnUrl('', 'https://safe.example'), 'https://safe.example');
+        eq(safeReturnUrl('not a url at all', 'https://safe.example'), 'https://safe.example');
+        eq(safeReturnUrl('x'.repeat(600), 'https://safe.example'), 'https://safe.example');
+        eq(safeReturnUrl('https://their-site.example/thanks', 'https://safe.example'),
+            'https://their-site.example/thanks', 'a real page on their own site still works');
     });
 
     await check('a manage link without the right token is refused', async () => {

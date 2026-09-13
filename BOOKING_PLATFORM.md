@@ -63,7 +63,7 @@ not seeded yet.
 | `lib/bookingWidget.js` | the customer-facing checkout, as one file |
 | `routes/booking.js` | the API: owner, public, webhook |
 | `scripts/test-booking.js` | 56 offline checks on the engine |
-| `scripts/test-booking-routes.js` | 29 offline checks on the routes |
+| `scripts/test-booking-routes.js` | 31 offline checks on the routes |
 
 Dashboard side, in `Dashboards-users-`: `src/pages/Bookings.jsx` and
 `src/booking/`.
@@ -179,7 +179,7 @@ the business's own website.
 ## Checks
 
 ```
-npm run test:booking    # 85 checks, no credentials or network
+npm run test:booking    # 87 checks, no credentials or network
 npm run verify          # everything, including the above
 ```
 
