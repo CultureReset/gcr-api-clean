@@ -189,6 +189,12 @@ mount('/api/simple', () => require('./routes/simple-menu-edit'));
 // Every handler resolves the slug from the session via entity_owners, so no
 // request can name a business. This is what replaced the dashboard's direct
 // PostgREST access — and with it, the anon key in a public browser bundle.
+// A business's own automations — what the operator pushed to it, at the
+// version it has, with its own settings. Mounted before /api/business so the
+// literal path wins over that router's /:table catch-all; the slug still comes
+// from the session and never from the request.
+mount('/api/business/automations', () => require('./routes/automations').ownerRouter);
+
 mount('/api/business', () => require('./routes/business-data'));
 
 // One agent that knows every business. The public directory as MCP tools —
@@ -249,6 +255,16 @@ mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 // but scoped by an admin token across every business instead of resolving one
 // business from entity_owners. Every route is adminRequired.
 mount('/api/admin/platform', () => require('./routes/admin-platform'));
+
+// The automation builder. Build a trigger + steps in the admin console,
+// publish a version, push it to every business (or some) — the "cloud update"
+// for dashboards. Businesses run the version they were given, never the draft.
+mount('/api/admin/automations', () => require('./routes/automations'));
+
+// The two doors with no dashboard session: the hourly cron tick that runs
+// scheduled automations, and the per-install webhook URLs (a random token is
+// the credential; no slug is ever in the URL).
+mount('/api/automations', () => require('./routes/automations').publicRouter);
 
 // Composio connections — the tool catalog and which business connected what.
 mount('/api/admin/connections', () => require('./routes/composio'));
