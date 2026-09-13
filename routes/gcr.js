@@ -2460,15 +2460,42 @@ router.post('/availability-search', async (req, res) => {
   }
 });
 
-// GET /api/gcr/social-posts/feed — all active social posts across all entities for the swipe deck
+// GET /api/gcr/social-posts/feed — the public feed, newest first.
+//
+// Two readers: the Live Feed page and the swipe deck.
+//
+// ── What the card columns are for ───────────────────────────────────────
+//
+// A row here is one of two things. Either it is a real post on Instagram,
+// Facebook or TikTok, in which case post_url embeds and speaks for itself —
+// or it is written in the admin console, which is how anything that is not
+// already a social post gets into the feed: a notice, an announcement, a
+// storm warning, anything about the coast rather than about one business.
+//
+// Those carry card_title, card_entity_name and card_city instead of an
+// embeddable URL. The select used to omit all three, so an authored post
+// reached the page with no title and nothing to identify it, and the page
+// dropped it on the floor. They are read now.
+//
+// ── placement ───────────────────────────────────────────────────────────
+//
+// `show_on_home` is the admin's "put this in the feed" switch, and nothing
+// was reading it. ?placement=home honours it. It is opt-in rather than the
+// default because the swipe deck reads this same endpoint, and switching the
+// filter on for everybody would silently empty decks that work today.
 router.get('/social-posts/feed', async (req, res) => {
   try {
     const limit  = Math.min(parseInt(req.query.limit)  || 20, 50)
     const offset = Math.max(parseInt(req.query.offset) || 0,  0)
-    const { data, error } = await db
+
+    let q = db
       .from('social_posts')
-      .select('id, entity_slug, source, post_url, image_url, video_url, caption, media_type, post_date, platform_post_id')
+      .select('id, entity_slug, source, post_url, image_url, video_url, caption, media_type, post_date, platform_post_id, card_title, card_type, card_entity_name, card_city')
       .eq('is_active', true)
+
+    if (req.query.placement === 'home') q = q.eq('show_on_home', true)
+
+    const { data, error } = await q
       .order('post_date', { ascending: false })
       .range(offset, offset + limit - 1)
     if (error) return res.status(500).json({ error: error.message })
