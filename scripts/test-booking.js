@@ -611,6 +611,217 @@ check('every template the database ships parses into a product', () => {
     }
 });
 
+
+/* ── stays: the whole span, not just the arrival ────────────────────── */
+
+const RENTAL = {
+    id: 'rental-1',
+    schedule_mode: 'date_range',
+    capacity_mode: 'exclusive',
+    capacity: 1,
+    min_party: 1,
+    max_party: 8,
+    min_nights: 2,
+    booking_window_days: 365,
+    deposit_mode: 'percent',
+    deposit_value: 50,
+    currency: 'usd',
+    base_occupancy: 4,
+    extra_guest_fee: 25,
+};
+const NIGHTLY = [{ id: 'r-night', label: 'Nightly rate', pricing_mode: 'per_night', amount: 250, active: true, occupies_capacity: true }];
+
+check('a stay over an occupied middle night is refused', () => {
+    // THE BUG THIS EXISTS FOR: checking only the arrival date lets a
+    // five-night booking sail straight over a night already sold.
+    const claims = [{ date: '2030-07-06', end_date: '2030-07-08', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id }];
+    const stay = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: claims, from: '2030-07-04', to: '2030-07-09', now: NOW,
+    });
+    eq(stay.ok, false);
+    eq(stay.reason, 'unavailable');
+    ok(stay.unavailable.indexOf('2030-07-06') !== -1, 'names the night that is gone');
+    ok(/already taken/.test(stay.error), stay.error);
+});
+
+check('a stay clear of everything is allowed', () => {
+    const claims = [{ date: '2030-07-20', end_date: '2030-07-22', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id }];
+    const stay = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: claims, from: '2030-07-04', to: '2030-07-09', now: NOW,
+    });
+    ok(stay.ok, stay.error);
+    eq(stay.night_count, 5);
+});
+
+check('the checkout date is free for the next arrival', () => {
+    // A stay of the 4th to the 8th occupies four nights and leaves on the
+    // morning of the 8th. Counting the 8th as taken loses a night of
+    // revenue on every single turnover.
+    const claims = [{ date: '2030-07-04', end_date: '2030-07-08', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id }];
+    const backToBack = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: claims, from: '2030-07-08', to: '2030-07-11', now: NOW,
+    });
+    ok(backToBack.ok, 'arriving the day they leave: ' + backToBack.error);
+
+    const overlaps = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: claims, from: '2030-07-07', to: '2030-07-11', now: NOW,
+    });
+    eq(overlaps.ok, false, 'but the 7th really is taken');
+});
+
+check('a turnover gap holds the night after a departure', () => {
+    const withGap = Object.assign({}, RENTAL, { turnover_days: 1 });
+    const claims = [{ date: '2030-07-04', end_date: '2030-07-08', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id }];
+    const tooSoon = core.availabilityForStay({
+        product: withGap, schedules: [], claims: claims, from: '2030-07-08', to: '2030-07-11', now: NOW,
+    });
+    eq(tooSoon.ok, false, 'the cleaner gets the 8th');
+    const nextDay = core.availabilityForStay({
+        product: withGap, schedules: [], claims: claims, from: '2030-07-09', to: '2030-07-11', now: NOW,
+    });
+    ok(nextDay.ok, nextDay.error);
+});
+
+check('minimum and maximum stay lengths are enforced', () => {
+    const tooShort = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: [], from: '2030-07-04', to: '2030-07-05', now: NOW,
+    });
+    eq(tooShort.reason, 'min_nights');
+
+    const capped = Object.assign({}, RENTAL, { max_nights: 7 });
+    const tooLong = core.availabilityForStay({
+        product: capped, schedules: [], claims: [], from: '2030-07-04', to: '2030-07-20', now: NOW,
+    });
+    eq(tooLong.reason, 'max_nights');
+});
+
+check('a date can demand a longer stay than the product does', () => {
+    // A holiday weekend wanting three nights when the property normally
+    // takes two.
+    const calendar = { '2030-07-04': { min_nights: 3 } };
+    const stay = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: [], calendar: calendar, from: '2030-07-04', to: '2030-07-06', now: NOW,
+    });
+    eq(stay.reason, 'min_nights');
+    ok(/3 nights/.test(stay.error), stay.error);
+});
+
+check('changeover days are enforced in both directions', () => {
+    const saturdayToSaturday = Object.assign({}, RENTAL, { arrival_days: [6], departure_days: [6] });
+    const wrongArrival = core.availabilityForStay({
+        product: saturdayToSaturday, schedules: [], claims: [], from: '2030-07-04', to: '2030-07-13', now: NOW,
+    });
+    eq(wrongArrival.reason, 'closed_to_arrival');
+    ok(/Saturday/.test(wrongArrival.error), wrongArrival.error);
+
+    const right = core.availabilityForStay({
+        product: saturdayToSaturday, schedules: [], claims: [], from: '2030-07-06', to: '2030-07-13', now: NOW,
+    });
+    ok(right.ok, right.error);
+});
+
+check('a single date can be closed, or closed only to arrivals', () => {
+    const shut = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: [], calendar: { '2030-07-05': { closed: true } },
+        from: '2030-07-04', to: '2030-07-07', now: NOW,
+    });
+    eq(shut.ok, false);
+    ok(shut.unavailable.indexOf('2030-07-05') !== -1);
+
+    const noArrivals = core.availabilityForStay({
+        product: RENTAL, schedules: [], claims: [], calendar: { '2030-07-04': { closed_to_arrival: true } },
+        from: '2030-07-04', to: '2030-07-07', now: NOW,
+    });
+    eq(noArrivals.reason, 'closed_to_arrival');
+});
+
+check('a departure on or before the arrival is refused', () => {
+    eq(core.availabilityForStay({ product: RENTAL, claims: [], from: '2030-07-04', to: '2030-07-04', now: NOW }).reason, 'bad_range');
+    eq(core.availabilityForStay({ product: RENTAL, claims: [], from: '2030-07-04', to: '2030-07-02', now: NOW }).reason, 'bad_range');
+});
+
+check('several identical rooms fill up one at a time', () => {
+    const hotel = Object.assign({}, RENTAL, { capacity_mode: 'units', capacity: 3, min_nights: 1 });
+    const twoSold = [
+        { date: '2030-07-04', end_date: '2030-07-06', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id },
+        { date: '2030-07-04', end_date: '2030-07-06', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id },
+    ];
+    ok(core.availabilityForStay({ product: hotel, claims: twoSold, from: '2030-07-04', to: '2030-07-06', now: NOW }).ok,
+        'the third room is still there');
+
+    const threeSold = twoSold.concat([{ date: '2030-07-04', end_date: '2030-07-06', status: 'active', kind: 'booking', party: 1, product_id: RENTAL.id }]);
+    eq(core.availabilityForStay({ product: hotel, claims: threeSold, from: '2030-07-04', to: '2030-07-06', now: NOW }).ok, false);
+});
+
+/* ── nightly pricing ────────────────────────────────────────────────── */
+
+check('a flat nightly rate multiplies by the nights', () => {
+    const q = core.quote({
+        product: RENTAL, rates: NIGHTLY, extras: [],
+        cart: { date: '2030-07-04', end_date: '2030-07-07', items: [{ rate_id: 'r-night', qty: 1 }] },
+    });
+    ok(q.ok, q.error);
+    eq(q.total, 750, '3 nights × $250');
+});
+
+check('the rate calendar prices each night on its own', () => {
+    const calendar = {
+        '2030-07-04': { price: 500 },
+        '2030-07-05': { price: 500 },
+        // the 6th has no override and falls back to the flat rate
+    };
+    const q = core.quote({
+        product: RENTAL, rates: NIGHTLY, extras: [], calendar: calendar,
+        cart: { date: '2030-07-04', end_date: '2030-07-07', items: [{ rate_id: 'r-night', qty: 1 }] },
+    });
+    ok(q.ok, q.error);
+    eq(q.total, 1250, '500 + 500 + 250, not an average times three');
+});
+
+check('the departure night is never charged for', () => {
+    const q = core.quote({
+        product: RENTAL, rates: NIGHTLY, extras: [],
+        cart: { date: '2030-07-04', end_date: '2030-07-05', items: [{ rate_id: 'r-night', qty: 1 }] },
+    });
+    eq(q.total, 250, 'one night, not two');
+});
+
+check('extra guests are charged per night above the base occupancy', () => {
+    const q = core.quote({
+        product: RENTAL, rates: NIGHTLY, extras: [],
+        cart: { date: '2030-07-04', end_date: '2030-07-07', items: [{ rate_id: 'r-night', qty: 1 }] },
+    });
+    // qty 1 on a per_night rate is one booking, so party falls back to 1.
+    eq(q.total, 750, 'a party inside the base occupancy pays nothing extra');
+
+    const withGuests = core.quote({
+        product: RENTAL,
+        rates: NIGHTLY.concat([{ id: 'r-guest', label: 'Guest', pricing_mode: 'per_person', amount: 0, active: true, occupies_capacity: false, capacity_weight: 0 }]),
+        extras: [],
+        cart: { date: '2030-07-04', end_date: '2030-07-07', items: [{ rate_id: 'r-night', qty: 1 }, { rate_id: 'r-guest', qty: 6 }] },
+    });
+    eq(withGuests.party_size, 6);
+    eq(withGuests.total, 900, '750 + 2 extra guests × $25 × 3 nights');
+});
+
+check('a cleaning fee is charged once, not per night', () => {
+    const extras = [{ id: 'x-clean', name: 'Cleaning', price: 150, pricing_mode: 'per_booking', required: true, max_qty: 1, active: true }];
+    const q = core.quote({
+        product: RENTAL, rates: NIGHTLY, extras: extras,
+        cart: { date: '2030-07-04', end_date: '2030-07-07', items: [{ rate_id: 'r-night', qty: 1 }] },
+    });
+    eq(q.total, 900, '750 + one cleaning fee');
+});
+
+check('a deposit on a stay is a share of the whole stay', () => {
+    const q = core.quote({
+        product: RENTAL, rates: NIGHTLY, extras: [],
+        cart: { date: '2030-07-04', end_date: '2030-07-07', items: [{ rate_id: 'r-night', qty: 1 }] },
+    });
+    eq(q.deposit_due, 375, 'half of 750');
+    eq(q.balance_due, 375);
+});
+
 /* ── report ─────────────────────────────────────────────────────────── */
 
 if (failures.length) {

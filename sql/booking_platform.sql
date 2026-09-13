@@ -623,3 +623,69 @@ on conflict (id) do nothing;
 insert into public.platform_fee_rules (scope, percent, fixed_cents, note)
 select 'global', 0, 0, 'Default: no platform fee until one is configured.'
 where not exists (select 1 from public.platform_fee_rules where scope = 'global');
+
+
+-- ============================================================
+-- 15. LODGING AND CHANNELS  (applied as a later migration)
+-- ============================================================
+-- Stay rules live on booking_products rather than in a lodging-only
+-- table: a multi-day jet ski hire is a stay too, and a second table
+-- would have made lodging a special case of itself.
+alter table public.booking_products add column if not exists min_nights integer not null default 1;
+alter table public.booking_products add column if not exists max_nights integer;
+alter table public.booking_products add column if not exists turnover_days integer not null default 0;
+alter table public.booking_products add column if not exists arrival_days integer[];
+alter table public.booking_products add column if not exists departure_days integer[];
+alter table public.booking_products add column if not exists base_occupancy integer;
+alter table public.booking_products add column if not exists extra_guest_fee numeric(10,2) not null default 0;
+
+-- Per-date pricing and stay rules. A PMS lives or dies on this table: one
+-- price for a product is useless when the 4th of July is worth triple a
+-- Tuesday in November.
+create table if not exists public.booking_rate_calendar (
+  id                  uuid primary key default gen_random_uuid(),
+  entity_slug         text not null,
+  product_id          uuid not null,
+  date                date not null,
+  price               numeric(10,2),
+  min_nights          integer,
+  closed              boolean not null default false,
+  closed_to_arrival   boolean not null default false,
+  closed_to_departure boolean not null default false,
+  note                text,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+create unique index if not exists booking_rate_calendar_day_idx on public.booking_rate_calendar (product_id, date);
+create index if not exists booking_rate_calendar_slug_idx on public.booking_rate_calendar (entity_slug, date);
+
+-- Channels. An iCal feed in either direction: 'import' pulls Airbnb, Vrbo
+-- or Booking.com reservations in so a night sold there closes here;
+-- 'export' hands them a URL so a night sold here closes there.
+create table if not exists public.booking_channels (
+  id              uuid primary key default gen_random_uuid(),
+  entity_slug     text not null,
+  product_id      uuid,
+  resource_id     uuid,
+  name            text not null,
+  kind            text not null default 'ical',
+  direction       text not null default 'import',
+  url             text,
+  export_token    text,
+  active          boolean not null default true,
+  last_synced_at  timestamptz,
+  last_status     text,
+  last_error      text,
+  events_imported integer not null default 0,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+create index if not exists booking_channels_slug_idx on public.booking_channels (entity_slug, active);
+create index if not exists booking_channels_product_idx on public.booking_channels (product_id);
+create unique index if not exists booking_channels_export_token_idx
+  on public.booking_channels (export_token) where export_token is not null;
+
+alter table public.booking_rate_calendar enable row level security;
+alter table public.booking_channels      enable row level security;
+revoke all on public.booking_rate_calendar from anon, authenticated;
+revoke all on public.booking_channels      from anon, authenticated;

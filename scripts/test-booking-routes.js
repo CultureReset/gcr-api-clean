@@ -530,6 +530,233 @@ async function run() {
         eq(res.body.booking.confirmation_code, 'BK-1');
     });
 
+    /* ── stays, channels and the admin surface ── */
+
+    const STAY_PRODUCT = '33333333-3333-4333-8333-333333333333';
+    const STAY_RATE = '44444444-4444-4444-8444-444444444444';
+
+    function seedRental() {
+        db.tables.entity = [{ id: 'e1', slug: 'my-charters', name: 'My Charters' }];
+        db.tables.booking_products = [{
+            id: STAY_PRODUCT, entity_slug: 'my-charters', name: 'Beach House', active: true,
+            schedule_mode: 'date_range', capacity_mode: 'exclusive', capacity: 1,
+            min_party: 1, min_nights: 2, currency: 'usd', deposit_mode: 'none', questions: [],
+        }];
+        db.tables.booking_rates = [{
+            id: STAY_RATE, entity_slug: 'my-charters', product_id: STAY_PRODUCT,
+            label: 'Nightly', pricing_mode: 'per_night', amount: 250, active: true, occupies_capacity: true,
+        }];
+    }
+
+    await check('checkout refuses a stay that spans an occupied night', async () => {
+        seedRental();
+        // Someone already has the 6th and 7th.
+        db.tables.booking_calendar = [{
+            id: 'c1', entity_slug: 'my-charters', date: '2030-07-06', end_date: '2030-07-08',
+            status: 'active', kind: 'booking', party: 1, product_id: STAY_PRODUCT,
+        }];
+        return call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: STAY_PRODUCT, date: '2030-07-04', end_date: '2030-07-09',
+                items: [{ rate_id: STAY_RATE, qty: 1 }],
+                customer_name: 'A', customer_email: 'a@example.com',
+            },
+        }).then((res) => {
+            eq(res.status, 409, 'a five-night stay over a taken night must be refused');
+            ok(/already taken/.test(res.body.error || ''), res.body.error);
+            eq(queries('bookings', 'insert').length, 0, 'and nothing was written');
+        });
+    });
+
+    await check('checkout allows a stay that is clear, and prices every night', async () => {
+        seedRental();
+        db.tables.booking_calendar = [];
+        return call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: STAY_PRODUCT, date: '2030-07-04', end_date: '2030-07-07',
+                items: [{ rate_id: STAY_RATE, qty: 1 }],
+                customer_name: 'A', customer_email: 'a@example.com',
+            },
+        }).then((res) => {
+            eq(res.status, 200, res.body && res.body.error);
+            const insert = queries('bookings', 'insert')[0];
+            eq(insert.payload.total_amount, 750, '3 nights × $250');
+            eq(insert.payload.end_date, '2030-07-07');
+        });
+    });
+
+    await check('a stay shorter than the minimum is refused', async () => {
+        seedRental();
+        db.tables.booking_calendar = [];
+        return call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: STAY_PRODUCT, date: '2030-07-04', end_date: '2030-07-05',
+                items: [{ rate_id: STAY_RATE, qty: 1 }],
+                customer_name: 'A', customer_email: 'a@example.com',
+            },
+        }).then((res) => {
+            eq(res.status, 400);
+            ok(/minimum of 2 nights/.test(res.body.error || ''), res.body.error);
+        });
+    });
+
+    await check('a stay with no departure date is refused', async () => {
+        seedRental();
+        return call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: STAY_PRODUCT, date: '2030-07-04',
+                items: [{ rate_id: STAY_RATE, qty: 1 }],
+                customer_name: 'A', customer_email: 'a@example.com',
+            },
+        }).then((res) => eq(res.status, 400));
+    });
+
+    await check('the rate calendar can only be set on your own product', async () => {
+        db.tables.booking_products = [{ id: STAY_PRODUCT, entity_slug: 'someone-else' }];
+        const res = await call('PUT', `/api/booking/products/${STAY_PRODUCT}/calendar`, {
+            body: { from: '2030-08-01', to: '2030-08-31', price: 1 },
+        });
+        eq(res.status, 404);
+        eq(queries('booking_rate_calendar', 'upsert').length, 0);
+    });
+
+    await check('a season of nightly prices is set in one call', async () => {
+        db.tables.booking_products = [{ id: STAY_PRODUCT, entity_slug: 'my-charters' }];
+        const res = await call('PUT', `/api/booking/products/${STAY_PRODUCT}/calendar`, {
+            body: { from: '2030-08-01', to: '2030-08-07', price: 320, min_nights: 3 },
+        });
+        eq(res.status, 200);
+        eq(res.body.dates, 7);
+        const rows = queries('booking_rate_calendar', 'upsert')[0].payload;
+        eq(rows.length, 7);
+        eq(rows[0].entity_slug, 'my-charters');
+        eq(rows[0].price, 320);
+        eq(rows[0].date, '2030-08-01');
+    });
+
+    await check('a weekend rate hits only the weekends in the span', async () => {
+        db.tables.booking_products = [{ id: STAY_PRODUCT, entity_slug: 'my-charters' }];
+        const res = await call('PUT', `/api/booking/products/${STAY_PRODUCT}/calendar`, {
+            body: { from: '2030-08-01', to: '2030-08-31', price: 400, days_of_week: [5, 6] },
+        });
+        eq(res.status, 200);
+        const rows = queries('booking_rate_calendar', 'upsert')[0].payload;
+        ok(rows.length > 0 && rows.length < 31, 'only some dates: got ' + rows.length);
+        ok(rows.every((r) => [5, 6].includes(new Date(r.date + 'T00:00:00Z').getUTCDay())),
+            'every date written is a Friday or a Saturday');
+    });
+
+    await check('a calendar write is capped so one call cannot set a decade', async () => {
+        db.tables.booking_products = [{ id: STAY_PRODUCT, entity_slug: 'my-charters' }];
+        const res = await call('PUT', `/api/booking/products/${STAY_PRODUCT}/calendar`, {
+            body: { from: '2030-01-01', to: '2035-01-01', price: 1 },
+        });
+        eq(res.status, 400);
+    });
+
+    await check('a channel needs a calendar link to import from', async () => {
+        const res = await call('POST', '/api/booking/channels', { body: { name: 'Airbnb', direction: 'import' } });
+        eq(res.status, 400);
+        ok(/calendar link/.test(res.body.error || ''), res.body.error);
+    });
+
+    await check('another business\'s channel cannot be synced or deleted', () => {
+        db.tables.booking_channels = [{ id: 'ch1', entity_slug: 'someone-else', name: 'Airbnb', direction: 'import' }];
+        return call('POST', '/api/booking/channels/ch1/sync').then((res) => {
+            eq(res.status, 404);
+            return call('DELETE', '/api/booking/channels/ch1');
+        }).then((res) => eq(res.status, 404));
+    });
+
+    await check('an export feed is refused for an unknown or malformed token', async () => {
+        db.tables.booking_channels = [];
+        return fetch(base + '/api/booking/ical/notahexstring.ics')
+            .then((res) => {
+                eq(res.status, 404, 'malformed');
+                return fetch(base + '/api/booking/ical/' + 'a'.repeat(32) + '.ics');
+            })
+            .then((res) => eq(res.status, 404, 'well-formed but unknown'));
+    });
+
+    await check('the export feed names no guest', async () => {
+        db.tables.booking_channels = [{
+            id: 'ch1', entity_slug: 'my-charters', name: 'Airbnb',
+            direction: 'export', export_token: 'b'.repeat(32), active: true,
+        }];
+        db.tables.booking_calendar = [{
+            id: 'cal1', entity_slug: 'my-charters', date: '2030-07-04', end_date: '2030-07-08',
+            status: 'active', kind: 'booking', source: 'direct', product_id: null,
+        }];
+        return fetch(base + '/api/booking/ical/' + 'b'.repeat(32) + '.ics')
+            .then((res) => {
+                eq(res.status, 200);
+                ok(/text\/calendar/.test(res.headers.get('content-type')), 'content type');
+                return res.text();
+            })
+            .then((body) => {
+                ok(body.includes('BEGIN:VCALENDAR'), 'is a calendar');
+                ok(body.includes('Reserved'), 'says the dates are gone');
+                ok(!/customer|email|@|phone/i.test(body), 'and nothing about who booked');
+            });
+    });
+
+    await check('the channel cron refuses without its secret', async () => {
+        const res = await fetch(base + '/api/booking/cron/sync-channels');
+        ok(res.status === 503 || res.status === 403, 'got ' + res.status);
+    });
+
+    await check('template management is admin-only', async () => {
+        db.tables.platform_admins = [];
+        return call('GET', '/api/booking/admin/templates').then((res) => {
+            eq(res.status, 403, 'an ordinary owner is not an admin');
+            return call('PUT', '/api/booking/admin/templates/horseback_rides', { body: { name: 'Horseback Rides' } });
+        }).then((res) => {
+            eq(res.status, 403);
+            eq(queries('booking_templates', 'upsert').length, 0);
+        });
+    });
+
+    await check('an admin can add a vertical, and it is proven before it saves', async () => {
+        db.tables.platform_admins = [{ user_id: 'user-1' }];
+
+        const bad = await call('PUT', '/api/booking/admin/templates/horseback_rides', {
+            body: { name: 'Horseback Rides', schedule_mode: 'telepathy' },
+        });
+        eq(bad.status, 400, 'an invented schedule mode is refused');
+
+        const badId = await call('PUT', '/api/booking/admin/templates/Horseback Rides!', {
+            body: { name: 'Horseback Rides' },
+        });
+        eq(badId.status, 400, 'and so is an id that is not an id');
+
+        const good = await call('PUT', '/api/booking/admin/templates/horseback_rides', {
+            body: {
+                name: 'Horseback Rides', category: 'land', icon: '🐴',
+                schedule_mode: 'fixed_times',
+                defaults: { capacity: 8, capacity_mode: 'seats', schedule: { kind: 'weekly', times: ['09:00'] } },
+                rate_template: [{ label: 'Rider', pricing_mode: 'per_person', amount: 60 }],
+            },
+        });
+        eq(good.status, 200, good.body && good.body.error);
+        const written = queries('booking_templates', 'upsert')[0].payload;
+        eq(written.id, 'horseback_rides');
+        eq(written.name, 'Horseback Rides');
+    });
+
+    await check('retiring a vertical deactivates rather than deletes it', async () => {
+        db.tables.platform_admins = [{ user_id: 'user-1' }];
+        db.tables.booking_templates = [{ id: 'horseback_rides', name: 'Horseback Rides', active: true }];
+        return call('DELETE', '/api/booking/admin/templates/horseback_rides').then((res) => {
+            eq(res.status, 200);
+            eq(queries('booking_templates', 'delete').length, 0, 'products made from it keep their template_id');
+            eq(queries('booking_templates', 'update')[0].payload.active, false);
+        });
+    });
+
     /* ── the webhook ── */
 
     await check('an unsigned webhook is rejected', async () => {

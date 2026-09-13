@@ -46,6 +46,7 @@ const supabase = require('../db');
 const { ownerRequired } = require('../middleware/ownerAuth');
 const core = require('../lib/bookingCore');
 const connect = require('../lib/stripeConnect');
+const channels = require('../lib/channelSync');
 
 const router = express.Router();
 
@@ -156,6 +157,29 @@ async function loadProduct(slug, productId, options) {
         schedules: activeOnly(schedules.data),
         extras: activeOnly(extras.data),
     };
+}
+
+/**
+ * A product's per-date prices and stay rules, as a map keyed by date.
+ *
+ * Empty is a valid answer and the common one: a product with no calendar
+ * has no overrides, and every night falls back to its flat rate.
+ */
+async function loadRateCalendar(slug, productId, from, to) {
+    if (!UUID_RE.test(String(productId || ''))) return {};
+    let query = supabase
+        .from('booking_rate_calendar')
+        .select('date, price, min_nights, closed, closed_to_arrival, closed_to_departure')
+        .eq('entity_slug', slug)
+        .eq('product_id', productId)
+        .limit(800);
+    if (from) query = query.gte('date', core.toDate(from));
+    if (to) query = query.lte('date', core.toDate(to));
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    const map = {};
+    (data || []).forEach(function (row) { map[core.toDate(row.date)] = row; });
+    return map;
 }
 
 /** The HMAC that lets a customer open their own booking with no account. */
@@ -513,6 +537,186 @@ Object.keys(COLLECTIONS).forEach(function (name) {
         res.json({ ok: true });
     }));
 });
+
+/* ── the rate calendar ──────────────────────────────────────────────── */
+//
+// Per-date prices and stay rules. A lodging product lives or dies on this:
+// one flat price is useless when a holiday weekend is worth triple a
+// Tuesday in November. Any product may have one; only date_range products
+// currently read the per-night side of it.
+
+router.get('/products/:id/calendar', ownerRequired, handle(async (req, res) => {
+    const from = core.toDate(req.query.from) || new Date().toISOString().slice(0, 10);
+    const to = core.toDate(req.query.to) || core.addDays(from, 120);
+    const calendar = await loadRateCalendar(req.entitySlug, req.params.id, from, to);
+    res.json({ product_id: req.params.id, from: from, to: to, days: Object.values(calendar) });
+}));
+
+/**
+ * Set a run of dates at once.
+ *
+ * Owners think in spans — "August is $320 a night, three-night minimum" —
+ * not in individual days, so the API takes a span. Sending a null price
+ * clears the override and the date falls back to the product's flat rate.
+ */
+router.put('/products/:id/calendar', ownerRequired, handle(async (req, res) => {
+    const slug = req.entitySlug;
+    const productId = req.params.id;
+
+    const { data: owned } = await supabase.from('booking_products')
+        .select('id').eq('entity_slug', slug).eq('id', productId).maybeSingle();
+    if (!owned) return fail(res, 404, 'No such product.');
+
+    const from = core.toDate(req.body && req.body.from);
+    const to = core.toDate(req.body && req.body.to) || from;
+    if (!from) return fail(res, 400, 'A from date is required.');
+
+    const dates = core.datesBetween(from, to, 400);
+    if (!dates.length) return fail(res, 400, 'That date range is empty.');
+    if (dates.length > 370) return fail(res, 400, 'Set at most a year at a time.');
+
+    // Only weekdays named in `days_of_week`, when given — that is how a
+    // weekend rate is set across a whole season in one call.
+    const days = Array.isArray(req.body.days_of_week) && req.body.days_of_week.length
+        ? req.body.days_of_week.map(Number)
+        : null;
+    const targets = days ? dates.filter(function (d) { return days.indexOf(core.dayOfWeek(d)) !== -1; }) : dates;
+    if (!targets.length) return fail(res, 400, 'No dates in that range match those days.');
+
+    const patch = only(req.body, ['price', 'min_nights', 'closed', 'closed_to_arrival', 'closed_to_departure', 'note']);
+    if (!Object.keys(patch).length) return fail(res, 400, 'Nothing to set.');
+
+    const now = new Date().toISOString();
+    const rows = targets.map(function (date) {
+        return Object.assign({ entity_slug: slug, product_id: productId, date: date, updated_at: now }, patch);
+    });
+
+    const { error } = await supabase.from('booking_rate_calendar')
+        .upsert(rows, { onConflict: 'product_id,date' });
+    if (error) throw new Error(error.message);
+
+    res.json({ ok: true, dates: targets.length, from: targets[0], to: targets[targets.length - 1] });
+}));
+
+router.delete('/products/:id/calendar', ownerRequired, handle(async (req, res) => {
+    const from = core.toDate(req.query.from);
+    const to = core.toDate(req.query.to) || from;
+    if (!from) return fail(res, 400, 'A from date is required.');
+    const { error } = await supabase.from('booking_rate_calendar').delete()
+        .eq('entity_slug', req.entitySlug).eq('product_id', req.params.id)
+        .gte('date', from).lte('date', to);
+    if (error) throw new Error(error.message);
+    res.json({ ok: true });
+}));
+
+/* ── channels ───────────────────────────────────────────────────────── */
+//
+// Airbnb, Vrbo and Booking.com in both directions over iCal. See
+// lib/channelSync.js for why iCal rather than a channel-manager contract.
+
+const CHANNEL_FIELDS = ['name', 'direction', 'url', 'product_id', 'resource_id', 'active'];
+
+router.get('/channels', ownerRequired, handle(async (req, res) => {
+    const { data, error } = await supabase.from('booking_channels')
+        .select('*').eq('entity_slug', req.entitySlug).order('created_at').limit(200);
+    if (error) throw new Error(error.message);
+    const base = channelBase(req);
+    res.json({
+        channels: (data || []).map(function (c) {
+            return Object.assign({}, c, {
+                // The export URL is derived, never stored as a secret —
+                // and only ever shown to the owner it belongs to.
+                feed_url: c.direction === 'export' && c.export_token
+                    ? base + '/api/booking/ical/' + c.export_token + '.ics'
+                    : null,
+            });
+        }),
+    });
+}));
+
+router.post('/channels', ownerRequired, handle(async (req, res) => {
+    const slug = req.entitySlug;
+    const row = only(req.body, CHANNEL_FIELDS);
+    if (!row.name) return fail(res, 400, 'Give this channel a name, like "Airbnb".');
+
+    row.direction = row.direction === 'export' ? 'export' : 'import';
+    if (row.direction === 'import' && !row.url) {
+        return fail(res, 400, 'Paste the calendar link you copied from that channel.');
+    }
+    if (row.product_id) {
+        const { data: owned } = await supabase.from('booking_products')
+            .select('id').eq('entity_slug', slug).eq('id', row.product_id).maybeSingle();
+        if (!owned) return fail(res, 404, 'No such product.');
+    }
+    row.entity_slug = slug;
+    row.kind = 'ical';
+
+    const { data, error } = await supabase.from('booking_channels').insert(row).select('*').single();
+    if (error) throw new Error(error.message);
+
+    // An export channel's URL is a function of its id, so it can only be
+    // written once the row exists.
+    let channel = data;
+    if (channel.direction === 'export') {
+        const token = channels.exportToken(channel.id);
+        const { data: withToken } = await supabase.from('booking_channels')
+            .update({ export_token: token }).eq('id', channel.id).select('*').single();
+        channel = withToken || channel;
+    }
+
+    // Pull it straight away: an owner who pastes a link wants to see it
+    // work, not wait for a cron.
+    let sync = null;
+    if (channel.direction === 'import') sync = await channels.importChannel(channel);
+
+    res.status(201).json({
+        channel: Object.assign({}, channel, {
+            feed_url: channel.export_token
+                ? channelBase(req) + '/api/booking/ical/' + channel.export_token + '.ics'
+                : null,
+        }),
+        sync: sync,
+    });
+}));
+
+router.patch('/channels/:id', ownerRequired, handle(async (req, res) => {
+    const patch = only(req.body, CHANNEL_FIELDS);
+    if (!Object.keys(patch).length) return fail(res, 400, 'Nothing to change.');
+    patch.updated_at = new Date().toISOString();
+    const { data, error } = await supabase.from('booking_channels').update(patch)
+        .eq('entity_slug', req.entitySlug).eq('id', req.params.id).select('*').maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return fail(res, 404, 'No such channel.');
+    res.json({ channel: data });
+}));
+
+router.delete('/channels/:id', ownerRequired, handle(async (req, res) => {
+    const slug = req.entitySlug;
+    const { data: channel } = await supabase.from('booking_channels')
+        .select('id, name').eq('entity_slug', slug).eq('id', req.params.id).maybeSingle();
+    if (!channel) return fail(res, 404, 'No such channel.');
+
+    // Its imported claims go with it, or dates stay blocked by a feed
+    // nobody is reading any more.
+    const source = 'ical:' + String(channel.name || 'channel').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+    await supabase.from('booking_calendar').delete().eq('entity_slug', slug).eq('source', source);
+    await supabase.from('booking_channels').delete().eq('entity_slug', slug).eq('id', req.params.id);
+    res.json({ ok: true });
+}));
+
+router.post('/channels/:id/sync', ownerRequired, handle(async (req, res) => {
+    const { data: channel } = await supabase.from('booking_channels')
+        .select('*').eq('entity_slug', req.entitySlug).eq('id', req.params.id).maybeSingle();
+    if (!channel) return fail(res, 404, 'No such channel.');
+    if (channel.direction !== 'import') return fail(res, 400, 'That channel is an export — there is nothing to pull.');
+    const result = await channels.importChannel(channel);
+    res.json(result);
+}));
+
+function channelBase(req) {
+    return (process.env.BOOKING_EMBED_BASE_URL || '').replace(/\/+$/, '') ||
+        (req.protocol + '://' + req.get('host'));
+}
 
 /* ── orders ─────────────────────────────────────────────────────────── */
 
@@ -881,6 +1085,23 @@ router.get('/public/:slug/availability', handle(async (req, res) => {
     const to = core.toDate(req.query.to) || (req.query.date ? from : core.addDays(from, 30));
     const claims = await loadClaims(slug, from, core.addDays(to, 1), productId);
 
+    // A stay is a different question from a day: "are these nights free
+    // together", not "is each of them open". When the caller names both
+    // ends, answer the question they actually asked.
+    if (loaded.product.schedule_mode === 'date_range' && req.query.to && req.query.from) {
+        const calendar = await loadRateCalendar(slug, productId, from, to);
+        const stay = core.availabilityForStay({
+            product: loaded.product,
+            schedules: loaded.schedules,
+            claims: claims,
+            calendar: calendar,
+            resourceId: req.query.resource_id || null,
+            from: from,
+            to: to,
+        });
+        return res.json({ product_id: productId, from: from, to: to, stay: stay });
+    }
+
     const days = core.availabilityForRange({
         product: loaded.product,
         schedules: loaded.schedules,
@@ -927,11 +1148,18 @@ async function priceCart(slug, body) {
         }) || null;
     }
 
+    // Per-night rates price from the calendar, so a quote for the 4th of
+    // July is not a quote for a Tuesday in November.
+    const calendar = loaded.product.schedule_mode === 'date_range'
+        ? await loadRateCalendar(slug, productId, body.date, body.end_date)
+        : {};
+
     const quote = core.quote({
         product: loaded.product,
         rates: loaded.rates,
         extras: loaded.extras,
         promo: promo,
+        calendar: calendar,
         cart: {
             date: body.date,
             end_date: body.end_date,
@@ -980,7 +1208,32 @@ router.post('/public/:slug/checkout', handle(async (req, res) => {
     const time = body.time ? core.toClock(core.toMinutes(body.time)) : null;
 
     // ── the seats have to still exist ──
-    if (product.schedule_mode !== 'request') {
+    // ── a stay is checked night by night, not just on its arrival date ──
+    //
+    // availabilityForDate answers about ONE date. A booking that spans
+    // nights needs every one of them free, and checking only the arrival
+    // is how a five-night stay gets sold straight over a night that was
+    // already taken in the middle.
+    if (product.schedule_mode === 'date_range') {
+        if (!date) return fail(res, 400, 'Please pick an arrival date.');
+        const endDate = core.toDate(body.end_date);
+        if (!endDate) return fail(res, 400, 'Please pick a departure date.');
+
+        await releaseExpiredHolds(slug);
+        const claims = await loadClaims(slug, date, core.addDays(endDate, 1), product.id);
+        const calendar = await loadRateCalendar(slug, product.id, date, endDate);
+
+        const stay = core.availabilityForStay({
+            product: product,
+            schedules: loaded.schedules,
+            claims: claims,
+            calendar: calendar,
+            resourceId: body.resource_id || null,
+            from: date,
+            to: endDate,
+        });
+        if (!stay.ok) return fail(res, stay.reason === 'unavailable' ? 409 : 400, stay.error);
+    } else if (product.schedule_mode !== 'request') {
         if (!date) return fail(res, 400, 'Please pick a date.');
         await releaseExpiredHolds(slug);
         const claims = await loadClaims(slug, date, core.addDays(date, 1), product.id);
@@ -1316,6 +1569,152 @@ router.post('/public/booking/:id/cancel', handle(async (req, res) => {
     if (updated) await syncCalendar(updated);
 
     res.json({ ok: true, refunded: refunded, policy: refund.reason });
+}));
+
+/* ============================================================
+ * THE OUTBOUND FEED — what Airbnb and Vrbo poll.
+ * ============================================================ */
+//
+// Unauthenticated by necessity: a channel polls this on a schedule with
+// no way to hold a credential. The token in the path is the whole guard,
+// which is what every platform does with these links — and the body says
+// only that dates are taken, never who took them.
+
+router.get('/ical/:token.ics', handle(async (req, res) => {
+    const token = String(req.params.token || '').replace(/\.ics$/, '');
+    if (!/^[0-9a-f]{32}$/.test(token)) return fail(res, 404, 'Not found.');
+
+    const { data: channel } = await supabase.from('booking_channels')
+        .select('*').eq('export_token', token).maybeSingle();
+    if (!channel || channel.active === false) return fail(res, 404, 'Not found.');
+
+    const body = await channels.exportCalendar(channel);
+    res.type('text/calendar');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.set('Content-Disposition', 'attachment; filename="bookings.ics"');
+    res.send(body);
+}));
+
+/**
+ * Pull every import feed. Called by a scheduler, not a person.
+ *
+ * Guarded by a shared secret rather than a session, because a cron has no
+ * session — and left open when no secret is set would let anyone make
+ * this deployment hammer other people's servers.
+ */
+router.get('/cron/sync-channels', handle(async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return fail(res, 503, 'CRON_SECRET is not set, so scheduled syncing is off.');
+    const given = req.get('authorization') === 'Bearer ' + secret || req.query.key === secret;
+    if (!given) return fail(res, 403, 'Not authorised.');
+
+    const results = await channels.syncAll({ limit: parseInt(req.query.limit, 10) || 200 });
+    res.json({
+        ok: true,
+        channels: results.length,
+        imported: results.reduce(function (total, r) { return total + (r.imported || 0); }, 0),
+        failed: results.filter(function (r) { return !r.ok; }).length,
+        results: results,
+    });
+}));
+
+/* ============================================================
+ * ADMIN — the verticals themselves.
+ * ============================================================ */
+//
+// "A vertical is a row" is only true if somebody can write the row. This
+// is that: platform_admins can add, edit and retire booking templates
+// from a form instead of a SQL console.
+//
+// Checked against platform_admins server-side, the same way
+// middleware/ownerAuth.js does it — an admin claim in a request is worth
+// nothing on its own.
+
+async function adminRequired(req, res, next) {
+    const header = req.headers.authorization || '';
+    if (!header.startsWith('Bearer ')) return fail(res, 401, 'Not signed in.');
+    try {
+        const { data, error } = await supabase.auth.getUser(header.slice(7));
+        if (error || !data?.user) return fail(res, 401, 'That session is not valid.');
+        const { data: admin } = await supabase.from('platform_admins')
+            .select('user_id').eq('user_id', data.user.id).maybeSingle();
+        if (!admin) return fail(res, 403, 'This is an admin-only area.');
+        req.adminUserId = data.user.id;
+        return next();
+    } catch {
+        return fail(res, 401, 'That session is not valid.');
+    }
+}
+
+const TEMPLATE_FIELDS = ['id', 'name', 'category', 'icon', 'tagline', 'description',
+    'schedule_mode', 'defaults', 'rate_template', 'addon_template', 'question_template',
+    'active', 'sort_order'];
+
+router.get('/admin/templates', adminRequired, handle(async (_req, res) => {
+    const { data, error } = await supabase.from('booking_templates')
+        .select('*').order('sort_order').limit(500);
+    if (error) throw new Error(error.message);
+    res.json({ templates: data || [] });
+}));
+
+/**
+ * Add or replace a vertical.
+ *
+ * The template is instantiated before it is saved. A template that cannot
+ * produce a working product is a broken button in every business's
+ * dashboard, and the cheapest place to find that out is here.
+ */
+router.put('/admin/templates/:id', adminRequired, handle(async (req, res) => {
+    const id = String(req.params.id || '').trim();
+    if (!/^[a-z0-9_]{2,60}$/.test(id)) {
+        return fail(res, 400, 'An id is lowercase letters, numbers and underscores, like "horseback_rides".');
+    }
+
+    const row = only(req.body, TEMPLATE_FIELDS);
+    row.id = id;
+    if (!row.name) return fail(res, 400, 'A template needs a name.');
+
+    const MODES = ['fixed_times', 'duration_slots', 'date_range', 'open_date', 'request'];
+    if (row.schedule_mode && MODES.indexOf(row.schedule_mode) === -1) {
+        return fail(res, 400, 'schedule_mode must be one of: ' + MODES.join(', '));
+    }
+
+    // Prove it works before it reaches anyone's App Store.
+    try {
+        const built = core.productFromTemplate(row, '__preflight__');
+        if (!built.product.name) throw new Error('it produced a product with no name');
+        const rates = built.rates.map(function (r, i) { return Object.assign({ id: 'preflight-' + i }, r); });
+        if (rates.length) {
+            const priced = core.quote({
+                product: built.product,
+                rates: rates,
+                extras: [],
+                cart: { date: core.addDays(new Date().toISOString().slice(0, 10), 30), items: [{ rate_id: 'preflight-0', qty: 1 }] },
+            });
+            if (!priced.ok) throw new Error('a booking of one could not be priced — ' + priced.error);
+        }
+    } catch (err) {
+        return fail(res, 400, 'That template would not work: ' + err.message);
+    }
+
+    const { data, error } = await supabase.from('booking_templates')
+        .upsert(row, { onConflict: 'id' }).select('*').single();
+    if (error) throw new Error(error.message);
+    res.json({ template: data });
+}));
+
+/**
+ * Retire a vertical.
+ *
+ * Deactivates rather than deletes: products already created from it carry
+ * its id, and fee rules can be scoped to it.
+ */
+router.delete('/admin/templates/:id', adminRequired, handle(async (req, res) => {
+    const { data, error } = await supabase.from('booking_templates')
+        .update({ active: false }).eq('id', req.params.id).select('id').maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return fail(res, 404, 'No such template.');
+    res.json({ ok: true, deactivated: true });
 }));
 
 /* ============================================================
