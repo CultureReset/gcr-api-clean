@@ -56,6 +56,11 @@ before touching it.** Two rules carry most of the weight:
   and `/checkout` price through the same function so they cannot drift. Never
   take a price, a discount or a deposit from a request.
 
+Lodging is the same engine: a `date_range` product with `per_night` rates.
+Stays are checked night by night (`availabilityForStay`) — checking only
+the arrival date double-books. iCal channel sync (`lib/channelSync.js`)
+keeps Airbnb and Vrbo in step; an all-day `DTEND` is EXCLUSIVE.
+
 Payments are Stripe Connect destination charges keyed by slug
 (`lib/stripeConnect.js`, `payment_accounts`). This is deliberately NOT
 `routes/stripe.js`, which stores businesses' own secret keys — do not route new
@@ -75,4 +80,4 @@ Work goes on `claude/new-session-1e1dj0`.
 
     npm run verify        # sql safety, capability columns, MCP, concierge, booking
     npm run test:mcp      # 27 checks, no credentials or network needed
-    npm run test:booking  # 87 checks: booking pricing, availability, route guards
+    npm run test:booking  # 134 checks: pricing, availability, route guards, iCal

@@ -1685,13 +1685,23 @@ router.put('/admin/templates/:id', adminRequired, handle(async (req, res) => {
         if (!built.product.name) throw new Error('it produced a product with no name');
         const rates = built.rates.map(function (r, i) { return Object.assign({ id: 'preflight-' + i }, r); });
         if (rates.length) {
+            // Price the SMALLEST booking this template actually permits,
+            // not a booking of one. A trade with a two-person minimum is
+            // perfectly valid, and testing it with a party of one would
+            // reject it for obeying its own rule.
+            const party = Math.max(1, parseInt(built.product.min_party, 10) || 1);
             const priced = core.quote({
                 product: built.product,
                 rates: rates,
                 extras: [],
-                cart: { date: core.addDays(new Date().toISOString().slice(0, 10), 30), items: [{ rate_id: 'preflight-0', qty: 1 }] },
+                cart: {
+                    date: core.addDays(new Date().toISOString().slice(0, 10), 30),
+                    items: [{ rate_id: 'preflight-0', qty: party }],
+                },
             });
-            if (!priced.ok) throw new Error('a booking of one could not be priced — ' + priced.error);
+            if (!priced.ok) {
+                throw new Error('its smallest allowed booking (' + party + ') could not be priced — ' + priced.error);
+            }
         }
     } catch (err) {
         return fail(res, 400, 'That template would not work: ' + err.message);

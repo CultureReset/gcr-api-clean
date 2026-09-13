@@ -22,8 +22,17 @@ head, and what has to be signed first — and all four are columns.
 one writes an ordinary product row plus its rates, extras and hours, and from
 that moment the vertical has no further existence: the owner edits normal rows.
 
-Adding "Horseback Rides" is an `INSERT`. It appears in the dashboard
-immediately, with its own prices and hours, with no deploy.
+Adding "Horseback Rides" is an `INSERT` — and since a platform admin can
+now write that row from `PUT /api/booking/admin/templates/:id`, it is a
+form rather than a SQL console. The template is instantiated and priced
+before it saves, because a template that cannot produce a bookable
+product is a broken button in every business's App Store.
+
+This is tested rather than asserted: `scripts/test-booking-routes.js`
+drives an invented trade — llama trekking, which appears in no list and
+no switch anywhere — from an admin creating it, through an owner
+switching it on, to a customer being quoted $245 and booked, with its own
+invented required question enforced along the way.
 
 If you find yourself about to write `if (template_id === '…')`, the field you
 need is missing. Add the field.
@@ -62,8 +71,10 @@ not seeded yet.
 | `lib/stripeConnect.js` | Connect onboarding, destination charges, refunds |
 | `lib/bookingWidget.js` | the customer-facing checkout, as one file |
 | `routes/booking.js` | the API: owner, public, webhook |
-| `scripts/test-booking.js` | 56 offline checks on the engine |
-| `scripts/test-booking-routes.js` | 31 offline checks on the routes |
+| `lib/channelSync.js` | iCal import and export (Airbnb, Vrbo, Booking.com) |
+| `scripts/test-booking.js` | 72 offline checks on the engine |
+| `scripts/test-booking-routes.js` | 49 offline checks on the routes |
+| `scripts/test-channel-sync.js` | 13 offline checks on real feed bodies |
 
 Dashboard side, in `Dashboards-users-`: `src/pages/Bookings.jsx` and
 `src/booking/`.
@@ -179,7 +190,7 @@ the business's own website.
 ## Checks
 
 ```
-npm run test:booking    # 87 checks, no credentials or network
+npm run test:booking    # 134 checks, no credentials or network
 npm run verify          # everything, including the above
 ```
 
@@ -192,8 +203,55 @@ that records every query the handlers build — so it asserts on the *filters*,
 not just the response. A handler that fetched the right rows while filtering on
 the wrong slug would pass a response-shape test and fails this one.
 
-Both suites have been confirmed to fail when the code is wrong: a seeded
-rounding bug and a seeded cross-tenant leak were each caught.
+All three suites have been confirmed to fail when the code is wrong.
+Seeded and caught by name: a rounding bug, a cross-tenant leak, a
+single-night stay check, and an unwired stay check on the route.
+
+---
+
+---
+
+## Lodging, and channels
+
+A property is option two, and it is the same engine: a `date_range`
+product with `per_night` rates, the way a charter is a `fixed_times`
+product with `per_person` rates. What a stay needs that a departure does
+not is columns — `min_nights`, `max_nights`, `turnover_days`,
+`arrival_days`, `departure_days`, `base_occupancy`, `extra_guest_fee` —
+plus `booking_rate_calendar` for per-date prices and per-date rules.
+
+**A stay is checked night by night.** `availabilityForStay` verifies every
+night of a span. Checking only the arrival date is how a five-night
+booking gets sold over a night that was already taken, and it was a real
+bug here before it was a test.
+
+**The checkout date is not an occupied night.** A stay from the 4th to the
+8th occupies four nights; the guest leaves on the morning of the 8th and
+the next arrival can have it. Counting it as occupied loses a night of
+revenue on every single turnover. This is also exactly what iCal means by
+`DTEND` on an all-day event.
+
+### Why iCal and not a channel manager
+
+Airbnb, Vrbo and Booking.com all publish a per-listing `.ics` feed and all
+accept one back, with no contract, no certification and no partner
+programme. It polls rather than pushes — minutes-late, not instant — but
+it works today, for free, for everybody.
+
+A channel-manager API (Channex.io, Beds24) is faster and pushes both ways,
+and can be added beside this later. It is not the one to start with,
+because it needs an account, a contract and per-OTA certification before
+a single night syncs.
+
+The RFC 5545 parsing is `node-ical` (Apache-2.0) and the writing is
+`ical-generator` (MIT). Folded lines, escaped commas, TZID and all-day
+`DTEND` semantics are a decade of other people's bug reports, and
+`scripts/test-channel-sync.js` runs real Airbnb, Vrbo and Booking.com feed
+bodies through them.
+
+Export feeds carry no guest name, email, phone or amount — an export URL
+is a long-lived unauthenticated link, so it says only that dates are gone.
+It never echoes a channel's own claims back at it either.
 
 ---
 
@@ -213,6 +271,19 @@ Honest list, in rough order of when it will be missed:
 - **Rescheduling.** A customer can cancel from their link but not move a
   booking. `routes/platform.js` has a reschedule flow to model it on.
 - **Owner calendar view.** `GET /calendar` returns every claim; nothing draws
-  it yet — the Bookings tab is a list.
+  it yet — the Bookings tab is a list. The rate calendar has a month view,
+  but it shows prices rather than bookings.
 - **Per-product questions in the dashboard.** Templates seed them and the
   widget renders them; editing them needs a UI.
+- **The admin template UI.** The API is there and tested; there is no screen
+  for it yet, so adding a vertical is currently a `PUT` rather than a form.
+- **The widget does not yet do stays.** It handles dates, slots and parties;
+  a check-in/check-out picker with per-night prices is still to come, so
+  lodging is bookable through the API but not yet through the embed.
+- **A duplicate of `routes/platform.js`.** That file is a working booking
+  engine of its own — records, calendar, availability, public page, submit,
+  cancel, reschedule, waivers, reminders. This platform was built beside it
+  rather than into it. Two engines is one too many, and the merge — moving
+  server-side pricing and Connect into `platform.js` — is the obvious
+  cleanup whenever there is appetite for it. Note that `platform.js:1572`
+  takes `amount_paid` straight from the request body.

@@ -840,6 +840,163 @@ async function run() {
         }
     });
 
+    /* ── the modularity claim, actually tested ── */
+
+    await check('a vertical nobody wrote code for works end to end', async () => {
+        // The whole architecture rests on "a vertical is a row, not a
+        // branch". This drives an invented trade — one that exists nowhere
+        // in this codebase, in any list, in any switch — from an admin
+        // creating it, through an owner switching it on, to a customer
+        // being quoted and booked. If any layer needed to know what a
+        // llama is, this fails.
+        db.tables.platform_admins = [{ user_id: 'user-1' }];
+
+        const created = await call('PUT', '/api/booking/admin/templates/llama_trekking', {
+            body: {
+                name: 'Llama Trekking',
+                category: 'wilderness',          // a category that is not in the UI's label map
+                icon: '🦙',
+                tagline: 'Guided treks, at a llama\'s pace.',
+                schedule_mode: 'fixed_times',
+                defaults: {
+                    capacity_mode: 'seats', capacity: 5, duration_minutes: 180,
+                    min_party: 2, max_party: 5, lead_time_minutes: 1440,
+                    // A fixed far-future date keeps this test independent of
+                    // the clock; the window has to reach it.
+                    booking_window_days: 3650,
+                    deposit_mode: 'percent', deposit_value: 20, requires_waiver: true,
+                    cancellation_policy: { free_until_hours: 72 },
+                    schedule: { kind: 'weekly', days_of_week: [5, 6, 0], times: ['08:00', '14:00'] },
+                },
+                rate_template: [
+                    { label: 'Trekker', pricing_mode: 'per_person', amount: 95 },
+                    { label: 'Child on a lead llama', pricing_mode: 'per_person', amount: 55, age_max: 12 },
+                ],
+                addon_template: [{ name: 'Packed lunch', price: 18, pricing_mode: 'per_person' }],
+                question_template: [{ key: 'boots', label: 'Boot size', type: 'text', required: true }],
+            },
+        });
+        eq(created.status, 200, created.body && created.body.error);
+        const template = queries('booking_templates', 'upsert')[0].payload;
+
+        // The owner switches it on. The API reads the template back from
+        // the database, so the fake must now serve what was just written.
+        db.reset();
+        db.tables.entity_owners = [{ user_id: 'user-1', entity_slug: 'my-charters' }];
+        db.tables.booking_templates = [template];
+
+        const installed = await call('POST', '/api/booking/products', { body: { template_id: 'llama_trekking' } });
+        eq(installed.status, 201, installed.body && installed.body.error);
+
+        const product = queries('booking_products', 'insert')[0].payload;
+        eq(product.capacity, 5, 'its capacity came from the row');
+        eq(product.min_party, 2);
+        eq(product.requires_waiver, true);
+        eq(product.template_id, 'llama_trekking');
+
+        const rateRows = queries('booking_rates', 'insert')[0].payload;
+        eq(rateRows.length, 2, 'both price tiers were written');
+        const scheduleRows = queries('booking_schedules', 'insert')[0].payload;
+        eq(scheduleRows[0].times, ['08:00', '14:00'], 'and its departure times');
+
+        // A customer prices it. Everything below is the ordinary public
+        // path — no llama-shaped code anywhere in it.
+        const PRODUCT_ID = '55555555-5555-4555-8555-555555555555';
+        const ADULT = '66666666-6666-4666-8666-666666666666';
+        const CHILD = '77777777-7777-4777-8777-777777777777';
+
+        db.reset();
+        db.tables.entity = [{ id: 'e1', slug: 'my-charters', name: 'My Charters' }];
+        db.tables.booking_products = [Object.assign({}, product, {
+            id: PRODUCT_ID, active: true, currency: 'usd', questions: template.question_template,
+        })];
+        // The written row first, then the ids it gets in the database —
+        // the other way round, the template's own product_id wins and the
+        // rates hang off a product that does not exist.
+        db.tables.booking_rates = [
+            Object.assign({}, rateRows[0], { id: ADULT, product_id: PRODUCT_ID, entity_slug: 'my-charters' }),
+            Object.assign({}, rateRows[1], { id: CHILD, product_id: PRODUCT_ID, entity_slug: 'my-charters' }),
+        ];
+        db.tables.booking_schedules = [
+            Object.assign({}, scheduleRows[0], { id: 's1', product_id: PRODUCT_ID, entity_slug: 'my-charters' }),
+        ];
+        db.tables.booking_extras = [];
+
+        // 2030-08-03 is a Saturday, which this trade runs on.
+        const quoted = await call('POST', '/api/booking/public/my-charters/quote', {
+            token: null,
+            body: {
+                product_id: PRODUCT_ID, date: '2030-08-03',
+                items: [{ rate_id: ADULT, qty: 2 }, { rate_id: CHILD, qty: 1 }],
+            },
+        });
+        eq(quoted.status, 200, quoted.body && quoted.body.error);
+        eq(quoted.body.total, 245, '2 × 95 + 1 × 55');
+        eq(quoted.body.deposit_due, 49, '20% of 245');
+        eq(quoted.body.party_size, 3);
+
+        // And books it, answering the question the template invented.
+        const booked = await call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: PRODUCT_ID, date: '2030-08-03', time: '08:00',
+                items: [{ rate_id: ADULT, qty: 2 }, { rate_id: CHILD, qty: 1 }],
+                customer_name: 'A Trekker', customer_email: 'trekker@example.com',
+                answers: { boots: 'UK 9' },
+            },
+        });
+        // deposit_mode percent means it wants a card, and Stripe is not
+        // configured in the harness — so 503 is the correct refusal and
+        // proves the whole path ran. Anything else means it broke earlier.
+        eq(booked.status, 503, booked.body && booked.body.error);
+        ok(/card payments yet/i.test(booked.body.error || ''), booked.body.error);
+
+        // The same trade, paid on the day, goes all the way through.
+        db.tables.booking_products = [Object.assign({}, db.tables.booking_products[0], { deposit_mode: 'none' })];
+        const onTheDay = await call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: PRODUCT_ID, date: '2030-08-03', time: '08:00',
+                items: [{ rate_id: ADULT, qty: 2 }, { rate_id: CHILD, qty: 1 }],
+                customer_name: 'A Trekker', customer_email: 'trekker@example.com',
+                answers: { boots: 'UK 9' },
+            },
+        });
+        eq(onTheDay.status, 200, onTheDay.body && onTheDay.body.error);
+        const booking = queries('bookings', 'insert')[0].payload;
+        eq(booking.total_amount, 245, 'priced by the server, not the browser');
+        eq(booking.party_size, 3);
+        eq(booking.answers.boots, 'UK 9', 'the invented question was captured');
+        eq(booking.template_id, 'llama_trekking');
+    });
+
+    await check('a required question invented by a template is enforced', async () => {
+        const PRODUCT_ID = '55555555-5555-4555-8555-555555555555';
+        const ADULT = '66666666-6666-4666-8666-666666666666';
+        db.tables.entity = [{ id: 'e1', slug: 'my-charters' }];
+        db.tables.booking_products = [{
+            id: PRODUCT_ID, entity_slug: 'my-charters', name: 'Llama Trekking', active: true,
+            schedule_mode: 'open_date', capacity_mode: 'seats', capacity: 5,
+            min_party: 1, currency: 'usd', deposit_mode: 'none',
+            questions: [{ key: 'boots', label: 'Boot size', type: 'text', required: true }],
+        }];
+        db.tables.booking_rates = [{
+            id: ADULT, entity_slug: 'my-charters', product_id: PRODUCT_ID,
+            label: 'Trekker', pricing_mode: 'per_person', amount: 95, active: true, occupies_capacity: true,
+        }];
+
+        const res = await call('POST', '/api/booking/public/my-charters/checkout', {
+            token: null,
+            body: {
+                product_id: PRODUCT_ID, date: '2030-08-03',
+                items: [{ rate_id: ADULT, qty: 1 }],
+                customer_name: 'A', customer_email: 'a@example.com',
+            },
+        });
+        eq(res.status, 400);
+        ok(/Boot size is required/.test(res.body.error || ''), res.body.error);
+    });
+
     /* ── report ── */
 
     if (failures.length) {
