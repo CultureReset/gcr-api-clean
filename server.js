@@ -69,6 +69,19 @@ app.use(cors({
     credentials: true,
 }));
 
+/* ── the one route that must NOT be parsed as JSON ────────────────────────
+ *
+ * Stripe signs the exact bytes it sent. Parsing the body and re-serialising
+ * it changes those bytes — key order, whitespace, unicode escapes — and the
+ * signature then fails against a payload that is otherwise identical. So
+ * the booking webhook takes the raw buffer, and it has to be registered
+ * BEFORE express.json to get it.
+ *
+ * express.raw marks the body as read, so express.json below skips this path
+ * rather than fighting over it.
+ */
+app.use('/api/booking/webhook/stripe', express.raw({ type: 'application/json', limit: '1mb' }));
+
 app.use(express.json({ limit: '10mb' }));
 
 /* ── rate limits on the two doors that cost money ─────────────────────────
@@ -301,6 +314,12 @@ mount('/api/embed', () => require('./routes/embed'));
 //mount('/api/apps', () => require('./routes/apps')); // UNMOUNTED: superseded by routes/composio.js (the App Store). Both backing tables are empty, and the code no longer matches them — line 12 filters on `active`, which the apps table calls `status`, and line 45 inserts a `provider` field site_apps has no column for. Replaced, not broken: do not repair it.
 //mount('/api/modules', () => require('./routes/modules')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/platform', () => require('./routes/platform'));
+
+// The modular booking platform: products, rates, schedules, availability,
+// server-side pricing and Stripe Connect checkout. Verticals (charters,
+// parasailing, rentals, tours) are rows in booking_templates, not code —
+// see sql/booking_platform.sql and lib/bookingCore.js.
+mount('/api/booking', () => require('./routes/booking'));
 
 // Google Business Profile. Remounted: oauth_tokens now exists and is keyed by
 // entity_slug, the routes resolve the business from entity_owners instead of
