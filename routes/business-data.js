@@ -201,6 +201,95 @@ router.get('/industries', ownerRequired, async (req, res) => {
     res.json({ industries });
 });
 
+/* ── the business's own pages ─────────────────────────────────────────────
+ *
+ * Everything else in this file works on slug tables: rows carrying an
+ * entity_slug, discovered from the live schema, no list of them anywhere. The
+ * business's own links are not that. They are columns on `entity` itself,
+ * whose key is `slug` and not `entity_slug` — so lib/businessTables.js does
+ * not classify it as a business table, /:table below cannot reach it, and
+ * discovery in the dashboard never sees it.
+ *
+ * That is correct and should stay correct: `entity` also carries is_active,
+ * listed_on_gcr, entity_type and the slug itself, none of which a business may
+ * set for itself. But it left a business with no way to tell the platform
+ * where its own Facebook page is.
+ *
+ * So this is the deliberate exception, and it is narrow on purpose: a fixed
+ * list of four link columns, named here rather than discovered. Nothing about
+ * this endpoint grows when a column is added to `entity` — which is the
+ * property that makes it safe to point at a table this file otherwise refuses
+ * to touch.
+ */
+
+/** The only columns of `entity` a business may write. Not schema-derived. */
+const PROFILE_LINK_COLUMNS = [
+    'social_facebook',
+    'social_instagram',
+    'social_tiktok',
+    'website_url',
+];
+
+// GET /api/business/profile — this business's own links.
+//
+// Registered before /:table. Express matches in order, so the catch-all would
+// otherwise swallow "profile" and look for a table by that name.
+router.get('/profile', ownerRequired, async (req, res) => {
+    const { data, error } = await supabase
+        .from('entity')
+        .select(PROFILE_LINK_COLUMNS.join(', '))
+        .eq('slug', req.entitySlug)
+        .maybeSingle();
+    if (error) return fail(res, 500, error.message);
+    if (!data) return fail(res, 404, 'That business is no longer listed.');
+
+    res.json(data);
+});
+
+/**
+ * Store an address something else can actually open.
+ *
+ * The dashboard tidies what it sends, but it is not the only caller and a
+ * value that arrives as "facebook.com/x" is stored verbatim otherwise —
+ * scheme-less, which is a link that works when a person clicks it and fails
+ * when anything automated fetches it. Whatever reads these later should not
+ * have to guess, so the scheme is settled here rather than at each reader.
+ */
+const withScheme = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`);
+
+// PATCH /api/business/profile — set them.
+router.patch('/profile', ownerRequired, async (req, res) => {
+    const updates = {};
+    for (const column of PROFILE_LINK_COLUMNS) {
+        if (req.body?.[column] === undefined) continue;
+        const value = req.body[column];
+        // An empty box means "remove it", which is a null rather than ''.
+        const trimmed = typeof value === 'string' ? value.trim() : '';
+        updates[column] = trimmed ? withScheme(trimmed) : null;
+    }
+
+    if (!Object.keys(updates).length) {
+        return fail(res, 400, 'Nothing to update.');
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    // The slug is the session's, exactly as everywhere else in this file.
+    const { error } = await supabase
+        .from('entity')
+        .update(updates)
+        .eq('slug', req.entitySlug);
+    if (error) return fail(res, 500, error.message);
+
+    const { data } = await supabase
+        .from('entity')
+        .select(PROFILE_LINK_COLUMNS.join(', '))
+        .eq('slug', req.entitySlug)
+        .maybeSingle();
+
+    res.json(data || {});
+});
+
 /* ── one section, for refreshing after an edit ───────────────────────────── */
 
 // GET /api/business/:table — this business's rows in one table, paged.
