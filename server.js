@@ -134,6 +134,26 @@ const publicMcpLimiter = rateLimit({
 app.use('/api/mcp/public', publicMcpLimiter);
 app.use('/api/mcp/business', publicMcpLimiter);
 
+/* ── and on the booking form, which spends someone else's money ───────────
+ *
+ * POST /api/email-parser/manual is open because the reservation form on the
+ * public site posts to it and a visitor has no account. It writes a row into
+ * a business's availability and then sends mail and SMS to an address the
+ * caller chose, so an unmetered one is both a way to fill a restaurant with
+ * reservations nobody is coming to and a way to send texts on the platform's
+ * account. The handler already refuses to mark a public request `confirmed`;
+ * this decides how many of them one caller may make.
+ */
+const bookingLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: Number(process.env.BOOKING_RATE_LIMIT || 20),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many reservation requests — try again later.' },
+});
+
+app.use('/api/email-parser/manual', bookingLimiter);
+
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
 // literal require('./...') string so Vercel's bundler statically traces and
@@ -371,7 +391,6 @@ mount('/api/services', () => require('./routes/services'));
 // WhatsApp, Voice Notes, OCR, DNS
 //mount('/api/whatsapp', () => require('./routes/whatsapp')); // UNMOUNTED: backing tables don't exist in the live DB — booking types now run through the ONE universal engine (/api/platform). Remount only after a real slug-keyed table exists.
 mount('/api/voice-notes', () => require('./routes/voice-notes'));
-mount('/api/email-parser', () => require('./routes/email-parser'));
 mount('/api/email-parser', () => require('./routes/email-parser'));
 mount('/api/deals', () => require('./routes/deals'));
 mount('/api/ocr', () => require('./routes/ocr'));

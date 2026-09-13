@@ -14,17 +14,37 @@
  *
  * TO ADD A NEW PLATFORM: add one entry to EXTRACTORS below. That's it.
  *
- * POST /api/email-parser/inbound         ← Sendgrid/Postmark webhook
- * POST /api/email-parser/manual          ← Admin manual entry
- * POST /api/email-parser/bulk-import     ← Restaurant bulk daily import (CSV/JSON)
- * GET  /api/email-parser/availability/:slug  ← Frontend reads this
+ * POST /api/email-parser/inbound         ← Sendgrid/Postmark webhook (open by design)
+ * POST /api/email-parser/manual          ← PUBLIC booking form (rate limited)
+ * POST /api/email-parser/bulk-import     ← Restaurant bulk daily import (admin)
+ * GET  /api/email-parser/availability/:slug  ← PUBLIC, read by the website
  * GET  /api/email-parser/log             ← Admin views parsed emails
+ *
+ * ── Who may call what ───────────────────────────────────────────────────────
+ *
+ * Three of these are reachable without a token, and each one is that way for a
+ * reason rather than by omission:
+ *
+ *   /inbound              a mail provider posts here. It has no session to
+ *                         present; the webhook itself is the caller.
+ *   /manual               the reservation form on the public site posts here.
+ *                         A visitor booking a table has no account.
+ *   /availability/:slug   the business profile and reservation pages read it.
+ *
+ * Everything else — the log, the setup screens, bulk import, the calendar
+ * sync — is operator surface and carries `adminRequired`.
+ *
+ * The two open write paths are therefore narrowed rather than guarded: a
+ * public booking may only ever land as `pending`, must name a real listing,
+ * and is rate limited in server.js. See the notes on each handler.
  */
 
 const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
+const jwt     = require('jsonwebtoken');
 const db      = require('../db');
+const { adminRequired } = require('../middleware/auth');
 
 // ─── UTILITIES ───────────────────────────────────────────────────────────────
 
@@ -1069,6 +1089,63 @@ async function sendBookingConfirmations(entitySlug, parsed, customerEmail, custo
   }
 }
 
+/**
+ * Is there an operator behind this request?
+ *
+ * Unlike the middleware this answers rather than refuses, because /manual
+ * serves both the public and the operator and has to stay open to the first.
+ * A missing or bad token is not an error here — it just means the caller is a
+ * member of the public, which is the ordinary case.
+ *
+ * Accepts either credential the platform issues: the Express JWT an admin
+ * signs in with, or a Supabase session belonging to a business owner.
+ */
+async function operatorFromRequest(req) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  const token = header.slice(7);
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { role: decoded.role || 'owner' };
+  } catch {
+    // Not an Express JWT. Try a business-owner session.
+  }
+
+  try {
+    const { data, error } = await db.auth.getUser(token);
+    if (error || !data?.user) return null;
+    const { data: owned } = await db
+      .from('entity_owners')
+      .select('entity_slug')
+      .eq('user_id', data.user.id)
+      .limit(1);
+    return owned?.length ? { role: 'owner' } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * POST /manual — a reservation request.
+ *
+ * Open on purpose: `Reserve.jsx` on the public site posts here, and a visitor
+ * booking a table has no account to authenticate with. `entity_slug` comes
+ * from the request for the same reason — the caller is not the business, so
+ * there is no session to resolve it from. That makes this the one write path
+ * the "slug is never taken from the request" rule cannot cover, so the slug is
+ * checked against `entity` instead of trusted.
+ *
+ * Two things follow from being open, and both matter:
+ *
+ *   A request is never a booking. `status` used to default to `confirmed` and
+ *   was taken from the body, so anyone could post a confirmed reservation into
+ *   a business's availability and count its seats down. A public caller now
+ *   only ever writes `pending`; an operator with a token may set any status.
+ *
+ *   It sends mail and SMS to an address the caller supplies, which is a
+ *   sender someone else's inbox pays for. server.js rate limits this path.
+ */
 router.post('/manual', async (req, res) => {
   try {
     const {
@@ -1083,6 +1160,19 @@ router.post('/manual', async (req, res) => {
       return res.status(400).json({ error: 'entity_slug and event_date required' });
     }
 
+    // An operator token is optional here. Its only effect is that a request
+    // from one is trusted to say what state the booking is in.
+    const isOperator = Boolean(await operatorFromRequest(req));
+
+    // A slug nobody can book is not a booking. Without this an open endpoint
+    // writes availability rows for businesses that do not exist.
+    const { data: listing } = await db
+      .from('entity')
+      .select('slug')
+      .eq('slug', entity_slug)
+      .maybeSingle();
+    if (!listing) return res.status(404).json({ error: 'No such business.' });
+
     const parsed = {
       platform, booking_type, event_date: parseDate(event_date),
       event_time: event_time ? parseTime(event_time) : null,
@@ -1091,7 +1181,9 @@ router.post('/manual', async (req, res) => {
       customer_name, activity_name, table_number,
       seated_time: seated_time ? parseTime(seated_time) : null,
       left_time: left_time ? parseTime(left_time) : null,
-      confirmation_no, status, notes,
+      confirmation_no,
+      status: isOperator ? status : 'pending',
+      notes,
     };
 
     const { data: logRow } = await db
@@ -1117,7 +1209,7 @@ router.post('/manual', async (req, res) => {
  * Accepts JSON array of seating/booking records
  * [{ table_number, party_size, seated_time, left_time, event_date }, ...]
  */
-router.post('/bulk-import', async (req, res) => {
+router.post('/bulk-import', adminRequired, async (req, res) => {
   try {
     const { entity_slug, records, booking_type = 'restaurant', event_date } = req.body;
 
@@ -1162,8 +1254,19 @@ router.post('/bulk-import', async (req, res) => {
 
 /**
  * GET /api/email-parser/availability/:slug
- * Frontend reads real-time availability for a business
- * Returns today + next 14 days of availability data
+ *
+ * PUBLIC — the business profile and the reservation page both read this, so it
+ * takes no token. Two consequences that were not being honoured:
+ *
+ *   It used to return `today_detail`: a row per guest from email_parser_log,
+ *   carrying customer_name alongside their table and seating times. Neither
+ *   caller has ever read that field, and it is the guest list of a business
+ *   served to anybody who asks for it. Removed.
+ *
+ *   `visible_on_profile` is how a business keeps its numbers off its public
+ *   page. Every other public reader honours it — gcr.js, embed.js, and the
+ *   availability engine's publicOnly mode. This one did not, so hiding your
+ *   availability hid it everywhere except here. It now filters the same way.
  */
 router.get('/availability/:slug', async (req, res) => {
   try {
@@ -1175,6 +1278,7 @@ router.get('/availability/:slug', async (req, res) => {
       .from('business_availability')
       .select('*')
       .eq('entity_slug', slug)
+      .eq('visible_on_profile', true)
       .gte('availability_date', today)
       .lte('availability_date', future)
       .order('availability_date')
@@ -1182,19 +1286,10 @@ router.get('/availability/:slug', async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    // Also get today's seating detail for restaurants
-    const { data: todaySeating } = await db
-      .from('email_parser_log')
-      .select('table_number, party_size, seated_time, left_time, event_time, customer_name, activity_name, status')
-      .eq('entity_slug', slug)
-      .eq('event_date', today)
-      .order('seated_time');
-
     res.json({
       entity_slug: slug,
       today,
       availability: data || [],
-      today_detail: todaySeating || [],
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1206,7 +1301,7 @@ router.get('/availability/:slug', async (req, res) => {
  * Admin: view all parsed emails with filters
  * Query: ?entity_slug=x&date=x&platform=x&status=x&limit=50
  */
-router.get('/log', async (req, res) => {
+router.get('/log', adminRequired, async (req, res) => {
   try {
     const { entity_slug, date, platform, status, limit = 100, offset = 0 } = req.query;
 
@@ -1275,7 +1370,7 @@ const PLATFORM_DESCRIPTIONS = {
  * Business onboarding — set capacity and BCC email address
  * Body: { daily_capacity, capacity_per_slot, bcc_email }
  */
-router.post('/setup/:slug', async (req, res) => {
+router.post('/setup/:slug', adminRequired, async (req, res) => {
   try {
     const { slug } = req.params;
     const { daily_capacity, capacity_per_slot } = req.body;
@@ -1313,7 +1408,7 @@ router.post('/setup/:slug', async (req, res) => {
  * GET /api/email-parser/setup/:slug
  * Returns current capacity config + BCC address for a business
  */
-router.get('/setup/:slug', async (req, res) => {
+router.get('/setup/:slug', adminRequired, async (req, res) => {
   try {
     const { slug } = req.params;
     const { data, error } = await db
@@ -1440,9 +1535,18 @@ async function syncExternalCalendar(row) {
   }
 }
 
-// GET /api/email-parser/ical-import/run — Vercel cron hits this hourly
+// GET /api/email-parser/ical-import/run — Vercel cron hits this hourly.
+//
+// The secret is required, not optional. Guarding it with `if (CRON_SECRET)`
+// meant the protection disappeared in exactly the case that needs it most: a
+// deployment where the variable was never set answered this to anybody, and
+// said nothing about it.
 router.get('/ical-import/run', async (req, res) => {
-  if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
+  if (!process.env.CRON_SECRET) {
+    console.error('[email-parser] CRON_SECRET is not set — refusing to run the iCal import.');
+    return res.status(503).json({ error: 'Calendar import is not configured.' });
+  }
+  if ((req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const { data: rows } = await db.from('entity_external_calendars').select('*');
@@ -1452,8 +1556,13 @@ router.get('/ical-import/run', async (req, res) => {
   res.json({ success: true, synced: (rows || []).length });
 });
 
-// POST /api/email-parser/ical-import/sync-now/:id — manual "sync now" trigger from the dashboard
-router.post('/ical-import/sync-now/:id', async (req, res) => {
+// POST /api/email-parser/ical-import/sync-now/:id — manual "sync now" trigger.
+//
+// Operator surface. The business dashboard reaches the same work through
+// routes/dashboard.js, which checks that the feed belongs to the business
+// asking and then calls syncExternalCalendar in-process rather than posting
+// back to this route without a token.
+router.post('/ical-import/sync-now/:id', adminRequired, async (req, res) => {
   const { data: row } = await db.from('entity_external_calendars').select('*').eq('id', req.params.id).maybeSingle();
   if (!row) return res.status(404).json({ error: 'Not found' });
   await syncExternalCalendar(row);

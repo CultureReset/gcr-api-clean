@@ -450,10 +450,10 @@ router.get('/integrations', adminRequired, async (req, res) => {
 // to?" — not a field someone remembered to fill in, but what has actually
 // arrived. These routes aggregate it.
 //
-// NOTE: routes/email-parser.js has no auth at all, and its GET /log returns
-// raw_text, customer_name, from_email and confirmation_no. These routes are
-// adminRequired and omit raw_text by default, so the dashboard never needs the
-// open one.
+// NOTE: GET /api/email-parser/log returns raw_text, customer_name, from_email
+// and confirmation_no. It is adminRequired now — it used to be open — but
+// these routes are still the ones to use: they omit raw_text by default, so
+// the dashboard reads no more of a guest's email than it needs to show.
 
 /**
  * The extractor list is read lazily from routes/email-parser.js. A top-level
@@ -674,8 +674,8 @@ router.get('/capacity', adminRequired, async (req, res) => {
 });
 
 // Set the capacity the parser counts down from. POST /api/email-parser/setup/
-// :slug does the same write but has no auth on it at all, so the dashboard
-// uses this instead.
+// :slug does the same write; it is adminRequired now too, but the dashboard
+// stays on this one, which is where the rest of its platform writes go.
 router.put('/capacity/:slug', adminRequired, async (req, res) => {
     try {
         const { daily_capacity, capacity_per_slot } = req.body || {};

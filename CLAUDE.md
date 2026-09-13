@@ -51,9 +51,14 @@ One copy — a security check that exists twice drifts until one has a hole.
 
 ## Branch
 
-Work goes on `claude/new-session-1e1dj0`.
+Work goes on `claude/admin-dashboard-repo-review-47q2vc`.
 
 ## Checks
 
     npm run verify      # sql safety, capability columns, MCP protocol + scoping
-    npm run test:mcp    # 27 checks, no credentials or network needed
+    npm run test:mcp    # 74 checks, no credentials or network needed
+
+`check:columns` validates `routes/capabilities.js` against `sql/*.sql`, not
+against the database. Both sides were written from the same wrong schema, so it
+passes green over a capability layer that does not match production. Green here
+is not evidence about the live database. See HANDOFF.md §5.1.

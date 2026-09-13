@@ -1,9 +1,20 @@
 -- ############################################################
--- ##  DO NOT RUN. See HANDOFF.md in the repository root.    ##
+-- ##  BANNER WITHDRAWN — but confirm before running.        ##
+-- ##  See HANDOFF.md §2 in the repository root.             ##
 -- ##                                                        ##
--- ##  This file was written against the WRONG database and  ##
--- ##  has never been validated against the real one         ##
--- ##  (Supabase project "cyber check" / mkepugvdlktfsossumox).##
+-- ##  This file used to carry the blanket "written against  ##
+-- ##  the WRONG database" banner. That claim does not hold  ##
+-- ##  for this file: CLAUDE.md records platform_connections ##
+-- ##  as live on "cyber check" with ~1,070 rows and uses it ##
+-- ##  as the telltale for identifying the right project,    ##
+-- ##  and routes/composio.js reads it in production.        ##
+-- ##                                                        ##
+-- ##  Everything below is `create table if not exists` and  ##
+-- ##  re-runnable ALTERs, so against that database it is a  ##
+-- ##  no-op rather than a hazard. Still: count the rows     ##
+-- ##  yourself first. Reconciling two documents is an       ##
+-- ##  inference, and an inference is what HANDOFF.md §1 is  ##
+-- ##  a monument to.                                        ##
 -- ############################################################
 
 -- Composio connections.

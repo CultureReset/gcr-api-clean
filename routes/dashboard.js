@@ -3493,18 +3493,29 @@ router.post('/ical/external/:id/sync-now', async (req, res) => {
     const entitySlug = await resolveOwnedEntitySlug(req);
     if (!entitySlug) return res.status(404).json({ error: 'This account is not linked to a GCR listing yet' });
 
+    // The whole row: syncExternalCalendar reads ical_url, entity_slug,
+    // source_label and resource_id off it.
     const { data: row } = await supabase
         .from('entity_external_calendars')
-        .select('id')
+        .select('*')
         .eq('id', req.params.id)
         .eq('entity_slug', entitySlug)
         .maybeSingle();
     if (!row) return res.status(404).json({ error: 'Not found' });
 
-    const base = process.env.PUBLIC_API_BASE_URL || 'https://gcr-api-clean.vercel.app';
-    const r = await fetch(`${base}/api/email-parser/ical-import/sync-now/${row.id}`, { method: 'POST' });
-    const d = await r.json().catch(() => ({}));
-    res.json(d);
+    // Run the sync in-process. This used to POST back to
+    // /api/email-parser/ical-import/sync-now, which worked only because that
+    // route had no auth — the hop carried no credential to give it. Calling
+    // the function directly keeps the ownership check above as the only thing
+    // that decides, and drops a network round trip to ourselves.
+    try {
+        const { syncExternalCalendar } = require('./email-parser');
+        await syncExternalCalendar(row);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[dashboard] iCal sync failed:', err.message);
+        res.status(500).json({ error: 'Could not sync that calendar.' });
+    }
 });
 
 // ============================================
