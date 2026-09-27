@@ -225,6 +225,11 @@ mount('/api/mcp/business/:slug', () => require('./routes/mcp-public').pinned);
 // the token, never from the request.
 mount('/api/mcp', () => require('./routes/mcp'));
 
+// A business's Ghost boxes: enrol from the dashboard; the box calls out to
+// heartbeat, pull queued requests and answer them. Only gcr-api-clean holds
+// the tables; the business is always the session's or the node token's.
+mount('/api/nodes', () => require('./routes/nodes'));
+
 // Business sign-up — phone, six-digit code, account. A SEPARATE system from
 // routes/tourist-auth.js below: different product, different account model,
 // no shared code. Changing one must never move the other.
