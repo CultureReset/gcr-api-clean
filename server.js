@@ -40,6 +40,9 @@ const DEFAULT_ORIGINS = [
     'https://admin-dashboard-main-cyber-check.vercel.app',
     // The public tourist site
     'https://gcr-unified.vercel.app',
+    // The modular app (Vercel project: app-build); its "My Ghost" page uses /api/nodes
+    'https://app-build.vercel.app',
+    'https://app-build-cyber-check.vercel.app',
 ];
 
 const allowedOrigins = new Set(
