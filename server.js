@@ -257,6 +257,7 @@ mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 // but scoped by an admin token across every business instead of resolving one
 // business from entity_owners. Every route is adminRequired.
 mount('/api/admin/platform', () => require('./routes/admin-platform'));
+mount('/api/admin/ghost', () => require('./routes/admin-ghost'));
 
 // Composio connections — the tool catalog and which business connected what.
 mount('/api/admin/connections', () => require('./routes/composio'));
