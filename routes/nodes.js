@@ -60,12 +60,19 @@ async function nodeRequired(req, res, next) {
 
 // ── owner side ─────────────────────────────────────────────────────────────
 
-// GET /api/nodes — this business's boxes
+// One login, one box, one phone. A box belongs to the user who enrolled it,
+// inside their business: two logins at the same business never see or drive
+// each other's box (and so never each other's Android). Only an admin acting
+// as a business sees all of that business's boxes.
+const mine = (query, req) =>
+    req.actingAsAdmin ? query.eq('entity_slug', req.entitySlug)
+        : query.eq('entity_slug', req.entitySlug).eq('created_by', req.ownerUserId);
+
+// GET /api/nodes — this user's boxes
 router.get('/', ownerRequired, async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await mine(supabase
         .from('ghost_nodes')
-        .select('id, name, token_hint, version, health, created_at, last_seen_at, revoked_at')
-        .eq('entity_slug', req.entitySlug)
+        .select('id, name, token_hint, version, health, created_at, last_seen_at, revoked_at'), req)
         .order('created_at', { ascending: true });
     if (error) return tableError(res, error);
     res.json({ nodes: data || [] });
@@ -92,11 +99,10 @@ router.post('/', ownerRequired, async (req, res) => {
 
 // DELETE /api/nodes/:id — revoke a box's token
 router.delete('/:id', ownerRequired, async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await mine(supabase
         .from('ghost_nodes')
         .update({ revoked_at: nowIso() })
-        .eq('id', req.params.id)
-        .eq('entity_slug', req.entitySlug)
+        .eq('id', req.params.id), req)
         .select('id');
     if (error) return tableError(res, error);
     if (!data?.length) return res.status(404).json({ error: 'No such box.' });
@@ -110,11 +116,10 @@ router.post('/:id/requests', ownerRequired, async (req, res) => {
     if (!['GET', 'POST'].includes(method) || !forwardable(path)) {
         return res.status(400).json({ error: 'That request cannot be sent to a box.' });
     }
-    const { data: node, error: nodeError } = await supabase
+    const { data: node, error: nodeError } = await mine(supabase
         .from('ghost_nodes')
         .select('id, revoked_at')
-        .eq('id', req.params.id)
-        .eq('entity_slug', req.entitySlug)
+        .eq('id', req.params.id), req)
         .maybeSingle();
     if (nodeError) return tableError(res, nodeError);
     if (!node || node.revoked_at) return res.status(404).json({ error: 'No such box.' });
@@ -137,12 +142,11 @@ router.post('/:id/requests', ownerRequired, async (req, res) => {
 
 // GET /api/nodes/:id/requests/:rid — the answer, when the box has served it
 router.get('/:id/requests/:rid', ownerRequired, async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await mine(supabase
         .from('ghost_node_requests')
         .select('id, method, path, status, response_status, response_body, created_at, dispatched_at, completed_at')
         .eq('id', req.params.rid)
-        .eq('node_id', req.params.id)
-        .eq('entity_slug', req.entitySlug)
+        .eq('node_id', req.params.id), req)
         .maybeSingle();
     if (error) return tableError(res, error);
     if (!data) return res.status(404).json({ error: 'No such request.' });
@@ -151,11 +155,10 @@ router.get('/:id/requests/:rid', ownerRequired, async (req, res) => {
 
 // GET /api/nodes/:id/requests — recent activity for one box
 router.get('/:id/requests', ownerRequired, async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await mine(supabase
         .from('ghost_node_requests')
         .select('id, method, path, status, response_status, created_at, completed_at')
-        .eq('node_id', req.params.id)
-        .eq('entity_slug', req.entitySlug)
+        .eq('node_id', req.params.id), req)
         .order('created_at', { ascending: false })
         .limit(50);
     if (error) return tableError(res, error);

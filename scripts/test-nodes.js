@@ -135,6 +135,12 @@ async function call(server, method, url, { token, body } = {}) {
         check('an allowed request is queued', r.status === 202 && r.json.request.status === 'queued');
         const queued = calls.find((c) => c.table === 'ghost_node_requests' && c.insert);
         check('queued request carries the session slug', queued.insert.entity_slug === 'flora-bama');
+        const listed = calls.filter((c) => c.table === 'ghost_nodes' && !c.insert && !c.update && !c.eq.token_hash);
+        check('every owner lookup is scoped to the login, not just the business',
+            listed.length > 0 && listed.every((c) => c.eq.created_by === 'user-1' && c.eq.entity_slug === 'flora-bama'),
+            JSON.stringify(listed.map((c) => c.eq)));
+        const answers = calls.filter((c) => c.table === 'ghost_node_requests' && !c.insert && !c.update && c.eq.status !== 'queued');
+        check('reading an answer is scoped to the login', answers.every((c) => c.eq.created_by === 'user-1'));
 
         // Box side
         r = await call(server, 'GET', '/api/nodes/pull');
