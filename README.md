@@ -1,5 +1,85 @@
-# Force redeploy at Thu May 28 14:07:58 CDT 2026
+# gcr-api-clean
 
+**The one backend.** Every screen, every app and every AI agent talks to this
+API, and **only this API talks to the database** (Supabase project `cyber check`,
+see `CLAUDE.md`). No dashboard and no MCP server holds a database key. Production:
+`gcr-api-clean.vercel.app` (Express on Vercel).
+
+It started as the Gulf Coast Radar directory backend and now also carries the
+Ghost product: the relay to each box, the fleet view, the App Store, billing and
+the automation builder. Those Ghost parts sit in the same service and the same
+database as the directory.
+
+![Where this repo sits in the whole system](docs/images/where-it-fits.png)
+
+## Who it serves
+
+| Caller | Mount | Auth |
+| --- | --- | --- |
+| Admin console (`Admin-dashboard-main`) | `/api/admin/*` | admin token (`adminRequired`) |
+| Business dashboard (`Dashboards-users-`) and Modular app | `/api/business/*`, `/api/store`, `/api/nodes`, `/api/billing` | business session (`ownerRequired`) |
+| A Ghost box | `/api/nodes/heartbeat`, `/pull`, `/requests/:rid/response` | a node token (only its hash is stored) |
+| AI agents | `/api/mcp`, `/api/mcp/public`, `/api/mcp/business/:slug` | business MCP token |
+| Public sites (`gcr-unified`) | `/api/gcr`, `/api/public`, `/api/tourist*` … | none / tourist session |
+
+There are about 80 mounted routers; `server.js` is the list.
+
+## Two rules that hold everywhere
+
+**The slug is never taken from the request.** `middleware/ownerAuth.js` resolves
+which business a caller is from the session token via `entity_owners`, and
+handlers filter on `req.entitySlug`, never on the URL, query or body. The one
+exception is an admin, who must name a slug explicitly and is checked against
+`platform_admins` first. Same for MCP: which business a token acts as comes from
+`business_mcp_tokens`, and no tool takes a slug argument.
+
+**One copy of the guards.** `lib/businessTables.js` holds schema discovery, the
+table allow-list and the column filter. `routes/business-data.js` and
+`routes/mcp.js` both use it. Tables that carry `entity_slug` but must never be
+written by a business (`billing_subscription`, `store_installs`, `store_grants`,
+`entity_automations`…) are held back there.
+
+## The Ghost parts
+
+| Piece | Where | Tables (SQL) |
+| --- | --- | --- |
+| **Relay** to each box: an owner enrols a box, sends it a request, reads the answer. The box calls out, nothing calls in. One login = one box. | `routes/nodes.js` | `ghost_nodes`, `ghost_node_requests` (`sql/ghost_nodes.sql`) |
+| **Fleet view** (read-only): every box, its release, online or not | `routes/admin-ghost.js` | same |
+| **App Store**: items, versions, plans, grants, deployments, installs; entitlement is free OR plan OR grant; a version that widens access is offered, never forced | `routes/store.js`, `lib/entitlements.js`, `lib/storeManifest.js`, `lib/audience.js` | `store_*` (`sql/store.sql`) |
+| **Billing**: plans and limits are rows, grace period before restriction | `routes/billing.js`, `lib/billing.js` | `billing_*` (`sql/billing.sql`) |
+| **Automation builder** | `routes/automations.js`, `lib/automationEngine.js` | `sql/automations.sql` |
+
+The store, billing, relay and automation tables are applied to the live
+database. All of them have row-level security on and nothing granted to `anon` or
+`authenticated`.
+
+## Run it
+
+```bash
+npm install
+npm run dev        # node --watch server.js
+npm start
+```
+
+Configuration is environment variables (names only here): `GCR_SUPABASE_URL`,
+`GCR_SUPABASE_SERVICE_KEY`, `JWT_SECRET`, `CRON_SECRET`, `CORS_ORIGINS`,
+`ANTHROPIC_API_KEY`, `COMPOSIO_API_KEY`, `BREVO_API_KEY`, plus the rest in
+`.env.example`.
+
+## Checks
+
+```bash
+npm run verify     # sql safety, capability columns, and every suite below
+npm run test:mcp   # MCP protocol and scoping
+npm run test:nodes # relay
+npm run test:ghost-admin
+npm run test:automations
+npm run test:billing
+npm run test:store # 50 checks against an in-memory database
+npm run test:concierge
+```
+
+None of them needs credentials or a network.
 
 ## Automation builder
 
