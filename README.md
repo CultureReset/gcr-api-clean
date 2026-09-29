@@ -18,6 +18,77 @@ calls; it polls `routes/nodes.js` (heartbeat, pull, respond).
 
 ![Where this repo sits in the whole system](docs/images/where-it-fits.png)
 
+<!-- branches:start -->
+## Branches
+
+*Read from GitHub on 2026-09-29. 53 branches.*
+
+- **Default branch on GitHub:** `main`.
+- **`claude/repo-code-analysis-y4n1k7`** is where this README and the audit fixes live. It contains every commit on `main` and more (this README, the audit fixes and the screenshots).
+- **42 other branches hold commits that `claude/repo-code-analysis-y4n1k7` does not have.** The newest is `claude/linux-build-cleanup-dfpu0e` (last commit 2026-09-15, 1 commit not in the work branch). Check those before assuming the work branch is the whole story.
+
+<details><summary>All 53 branches</summary>
+
+| Branch | Last commit | Not in the work branch | Last commit message |
+| --- | --- | --- | --- |
+| `claude/repo-code-analysis-y4n1k7` (work branch) | 2026-09-29 | - | this README and the audit fixes |
+| `claude/linux-build-cleanup-dfpu0e` | 2026-09-15 | 1 | docs: README — this repo's own CLAUDE.md already has the real rules |
+| `claude/modular-booking-platform-wdq0kk` | 2026-09-13 | 6 | Prove the modularity claim with an invented vertical, and fix the prefli |
+| `claude/admin-dashboard-automation-builder-s0j5ht` | 2026-09-13 | 0 | Add the automation builder: engine, routes, tables, tests |
+| `claude/admin-dashboard-repo-review-47q2vc` | 2026-09-13 | 3 | Serve the feed the columns an authored post is made of |
+| `claude/review-codebase-zips-hck9hd` | 2026-08-28 | 0 | Billing, ported from Huly, with the plan table taken out of the code |
+| `claude/new-session-66c2e9` | 2026-08-26 | 3 | revert(devices): Take the device layer back out of this API |
+| `claude/user-dashboard-credit-accounts-qjbqsl` | 2026-08-24 | 6 | Record a9gent/mindfs as prior art, and close the harness-roster question |
+| `claude/repo-inventory-audit-5zw4yw` | 2026-08-13 | 5 | Add one document tying the vision, the repo audit, and the session's com |
+| `claude/gcr-api-review-o45xml` | 2026-08-09 | 1 | Close a public read of customer bookings, and mount email-parser once |
+| `claude/gcr-api-claim-docs-g4e42t` | 2026-08-05 | 8 | Retract 6.9 — the sign-up queue does have a screen |
+| `claude/gcr-unified-loading-au5vrz` | 2026-08-04 | 1 | Give the public MCP door a kill switch, and stop an outage reading as em |
+| `main` (default) | 2026-08-04 | 0 | Stop the runaway image-liveness cron from the one path still answering |
+| `claude/new-session-1e1dj0` | 2026-08-04 | 20 | Fix the ceiling that would have throttled every conversation at once |
+| `claude/platform-integration-launch-test-abi95i` | 2026-08-04 | 0 | Add a script that says which database the API is actually talking to |
+| `claude/tourist-dashboard-layout-hi2yxu` | 2026-08-04 | 2 | Add a checker that records which images actually load |
+| `claude/dashboard-inventory-purposes-m5wtba` | 2026-08-04 | 0 | Extend the service area to the whole Florida shoreline |
+| `claude/gcr-unified-listing-layouts-fmjr7q` | 2026-08-04 | 4 | Give the artist page the shows it already had |
+| `claude/cybercheck-modular-react-dashboard-7on41c` | 2026-08-03 | 0 | Text the dashboard: ask a question, get an answer from real data |
+| `claude/booking-aggregator-platform-llup2x` | 2026-08-02 | 2 | Complete the modular booking platform: spine + all six verticals |
+| `claude/synd-blue-notification-code-hqsgx4` | 2026-08-02 | 2 | Make parser actions explicit per rule |
+| `claude/cybercheck-qr-redirects-a085rf` | 2026-08-02 | 0 | Serve QR scans as a real 302 instead of a client-side JS hop |
+| `claude/booking-platforms-location-ie8zg9` | 2026-07-27 | 1 | Add full technical audit notes (routes, bugs, security, feature matrix) |
+| `claude/gcr-api-sms-functionality-5r2zb5` | 2026-07-26 | 7 | Add read-only reconciliation report across all 5 legacy Supabase project |
+| `claude/image-upload-batch-pdsr4c` | 2026-07-26 | 2 | Make booking atomic in the live engine |
+| `claude/cybercheck-twilio-hardcoding-pj7eyo` | 2026-07-26 | 0 | Point invite/reset links at GCR unified, not the legacy Trip Swipe app |
+| `claude/business-data-url-validation-p4l9x8` | 2026-07-26 | 3 | Wire drink item modifiers/sizing into the API (public, admin, menu-edito |
+| `claude/photo-migration-queue-resume-6dkij9` | 2026-07-26 | 2 | Add edge function that copies legacy photos into production storage |
+| `claude/twilio-verification-sid-506poy` | 2026-07-26 | 0 | Clean up debugging aids now that phone OTP is confirmed working |
+| `claude/reset-cybercheck-admin-login-9dxuw9` | 2026-07-25 | 0 | Add missing admin routes for App Manager and Raw Data Paste features |
+| `claude/gcr-unified-integration-6cghed` | 2026-07-25 | 289 | Blend fuzzy name matching into search ranking, add autocomplete endpoint |
+| `claude/repo-review-image-check-lje1gv` | 2026-07-25 | 289 | Fall back to any available photo when hero_image_url is missing or broke |
+| `claude/cybercheck-lead-form-integration-nkovqk` | 2026-07-24 | 291 | Default NFC card lead owner alerts to info@cybercheckinc.com |
+| `temporary-cybercheck-export-20260724` | 2026-07-21 | 288 | Generalize the photo rehost tool to every external host, not just Google |
+| `claude/session-lvki6x` | 2026-07-21 | 286 | Menu sections carry structured schedule fields in the entity payload |
+| `claude/new-session-na3vlg` | 2026-07-21 | 285 | Fix five confirmed bugs found in tonight's full-codebase read |
+| `claude/universal-booking-platform-t3zdhu` | 2026-07-20 | 281 | Fix AI concierge reading zero pricing/whats_included due to non-existent |
+| `claude/database-repo-restructure-fyz0dx` | 2026-07-17 | 280 | Fix meeting_points query: alias latitude/longitude to lat/lng |
+| `feature/universal-entity-graph` | 2026-07-15 | 265 | Start live database and code audit record |
+| `claude/data-structure-impl-sg0g6w` | 2026-07-12 | 263 | Fix two pre-existing bugs blocking /api/public/menu entirely |
+| `claude/web-scraper-en11yf` | 2026-07-10 | 238 | Add Yelp Orange Beach scraper with full business-detail phase |
+| `claude/trip-swipe-bug-tcue5d` | 2026-07-09 | 239 | feat: include gcr_deals in buildFullEntity response |
+| `claude/gcr-unified-dashboard-sgmaeh` | 2026-07-09 | 242 | platform.js ownership resolves through the shared entity resolver |
+| `claude/open-all-757nqr` | 2026-07-08 | 234 | Merge branch 'claude/data-structure-assessment-80j1gq' into main |
+| `claude/data-structure-assessment-80j1gq` | 2026-07-08 | 231 | Fix broken self-signup, add menu-editor dashboard bridge |
+| `claude/fishing-charter-booking-block-qy3l1o` | 2026-07-07 | 219 | Richer marina facts; offering images in payload |
+| `claude/gcr-listing-data-sources-0w1qb2` | 2026-07-07 | 210 | Populate AI-facing fields in Wharf import, normalize tag taxonomy |
+| `claude/project-additions-ho3s7k` | 2026-07-06 | 186 | Fix broken returning-tourist sign-in: getUserByEmail doesn't exist |
+| `claude/supabase-images-gcr-urls-hzxqzl` | 2026-07-04 | 175 | Detect payment source from body text too, not just From header |
+| `claude/repo-overview-i1n9da` | 2026-07-03 | 171 | Honor seq_from/seq_to/limit on GET /api/qr for print-sheet + batch views |
+| `claude/gcr-unified-api-clean-xr4029` | 2026-07-02 | 118 | Universal AI context + public.js wiring (read-path, additive) |
+| `claude/gcr-unified-data-gaps-xxyarl` | 2026-07-02 | 166 | Await taxonomy-backed category lookups, add GET /api/gcr/taxonomy |
+| `Test` | 2026-06-27 | 119 | fix: entity_events joins artist table — artist_slug, artist_image, artis |
+
+</details>
+
+<!-- branches:end -->
+
 ## Who it serves
 
 | Caller | Mount | Auth |
