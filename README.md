@@ -49,9 +49,11 @@ written by a business (`billing_subscription`, `store_installs`, `store_grants`,
 | **Billing**: plans and limits are rows, grace period before restriction | `routes/billing.js`, `lib/billing.js` | `billing_*` (`sql/billing.sql`) |
 | **Automation builder** | `routes/automations.js`, `lib/automationEngine.js` | `sql/automations.sql` |
 
-The store, billing, relay and automation tables are applied to the live
-database. All of them have row-level security on and nothing granted to `anon` or
-`authenticated`.
+The store and billing tables are applied to the live database, and were checked
+there on 2026-09-29: row-level security on, nothing granted to `anon` or
+`authenticated`. The relay and automation tables were applied earlier; their SQL
+files enable row-level security and revoke public access, but that was not
+re-checked on the live database.
 
 ## Run it
 
