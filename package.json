@@ -11,7 +11,8 @@
     "test:mcp": "node scripts/test-mcp.js",
     "test:nodes": "node scripts/test-nodes.js",
     "test:ghost-admin": "node scripts/test-ghost-admin.js",
-    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:nodes && npm run test:ghost-admin && npm run test:concierge",
+    "test:automations": "node scripts/test-automations.js",
+    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:nodes && npm run test:ghost-admin && npm run test:automations && npm run test:concierge",
     "test:concierge": "node scripts/test-concierge.js",
     "vercel-build": "node scripts/stop-image-cron.mjs"
   },

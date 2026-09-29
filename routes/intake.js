@@ -152,6 +152,12 @@ router.post('/', async (req, res) => {
         // notification, never the submission.
         const fanout = await notify('intake.created', { ...request, links: clean }, request.id);
 
+        // Any automation a business has listening for this fires too. Runs
+        // after the save and never throws, same rule as the webhooks.
+        if (request.entity_slug) {
+            await require('../lib/automationEngine').emitEvent('intake.created', request.entity_slug, { ...request, links: clean });
+        }
+
         res.status(201).json({ id: request.id, links: clean.length, notified: fanout });
     } catch (e) {
         res.status(500).json({ error: e.message });
