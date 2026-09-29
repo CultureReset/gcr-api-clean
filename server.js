@@ -200,6 +200,9 @@ mount('/api/business/automations', () => require('./routes/automations').ownerRo
 
 mount('/api/business', () => require('./routes/business-data'));
 mount('/api/billing', () => require('./routes/billing'));
+// The business's store: what it may have (free, its plan, or a grant), what it
+// has, and "update available". Business from the session only (routes/store.js).
+mount('/api/store', () => require('./routes/store').ownerRouter);
 
 // One agent that knows every business. The public directory as MCP tools —
 // search, full details, cheapest-first prices, today's availability, side-by-
@@ -265,6 +268,8 @@ mount('/api/admin/setup-questions', () => require('./routes/setup-questions'));
 // business from entity_owners. Every route is adminRequired.
 mount('/api/admin/platform', () => require('./routes/admin-platform'));
 mount('/api/admin/ghost', () => require('./routes/admin-ghost'));
+// The operator's store: items, versions, plans, grants, pushes, rollbacks.
+mount('/api/admin/store', () => require('./routes/store'));
 
 // The automation builder. Build a trigger + steps in the admin console,
 // publish a version, push it to every business (or some) — the "cloud update"
