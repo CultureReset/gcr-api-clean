@@ -91,3 +91,16 @@ create index if not exists billing_usage_slug on billing_usage (entity_slug);
 insert into billing_plan (key, name, description, price_monthly, sort_order, is_default)
 values ('free', 'Free', 'Everything a business needs to be listed.', 0, 0, true)
 on conflict (key) do nothing;
+
+-- Only the API's service role touches these tables, like the rest of the
+-- database: row-level security on with no policies, nothing granted to anon or
+-- authenticated. A business reaches its plan and usage through the API only.
+alter table billing_plan         enable row level security;
+alter table billing_plan_limit   enable row level security;
+alter table billing_subscription enable row level security;
+alter table billing_usage        enable row level security;
+
+revoke all on billing_plan         from anon, authenticated;
+revoke all on billing_plan_limit   from anon, authenticated;
+revoke all on billing_subscription from anon, authenticated;
+revoke all on billing_usage        from anon, authenticated;

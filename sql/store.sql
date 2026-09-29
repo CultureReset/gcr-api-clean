@@ -146,3 +146,10 @@ alter table public.store_plan_items  enable row level security;
 alter table public.store_grants      enable row level security;
 alter table public.store_deployments enable row level security;
 alter table public.store_installs    enable row level security;
+
+revoke all on public.store_items       from anon, authenticated;
+revoke all on public.store_versions    from anon, authenticated;
+revoke all on public.store_plan_items  from anon, authenticated;
+revoke all on public.store_grants      from anon, authenticated;
+revoke all on public.store_deployments from anon, authenticated;
+revoke all on public.store_installs    from anon, authenticated;
