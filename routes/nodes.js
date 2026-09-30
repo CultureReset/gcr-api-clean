@@ -98,6 +98,24 @@ router.post('/', ownerRequired, async (req, res) => {
 });
 
 
+// GET /api/nodes/:id/mcp-tokens — list metadata only; raw tokens are never recoverable.
+router.get('/:id/mcp-tokens', ownerRequired, async (req, res) => {
+    const { data: node, error: nodeError } = await mine(supabase
+        .from('ghost_nodes')
+        .select('id')
+        .eq('id', req.params.id), req)
+        .maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node) return res.status(404).json({ error: 'No such Ghost.' });
+    const { data, error } = await supabase
+        .from('ghost_mcp_tokens')
+        .select('id, node_id, label, token_hint, created_at, last_used_at, revoked_at')
+        .eq('node_id', req.params.id)
+        .order('created_at', { ascending: true });
+    if (error) return tableError(res, error);
+    res.json({ credentials: data || [] });
+});
+
 // POST /api/nodes/:id/mcp-token — mint a credential for Paperclip/another MCP client.
 // It is scoped to exactly this user's Ghost. The raw value is returned once.
 router.post('/:id/mcp-token', ownerRequired, async (req, res) => {
