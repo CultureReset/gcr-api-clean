@@ -154,6 +154,7 @@ async function runTool(name, args = {}, caller) {
     }
     if (name === 'nextgent_ghost_request_status') {
         const id = String(args.request_id || '');
+        if (!/^[0-9a-f-]{36}$/i.test(id)) return toolError('Invalid relay request ID.');
         const { data, error } = await supabase
             .from('ghost_node_requests')
             .select('id, method, path, status, response_status, response_body, created_at, dispatched_at, completed_at')
@@ -162,9 +163,16 @@ async function runTool(name, args = {}, caller) {
             .maybeSingle();
         if (error) throw new Error('Unable to read Ghost request status.');
         if (!data) return toolError('No request with that ID exists for this Ghost.');
-        const actionStatus = data.response_body?.action?.status || null;
-        const verified = actionStatus === 'VERIFIED' && Boolean(data.response_body?.receipt);
-        return content({ request: data, verified, instruction: 'If the response body contains task_id, use nextgent_ghost_action_status. Report success only when the local action is VERIFIED and a verification receipt is available.' });
+        const actionStatus = data.response_body?.action?.status || data.response_body?.status || null;
+        const receiptAvailable = (data.path || '').endsWith('/receipt')
+            ? data.response_status === 200
+            : Boolean(data.response_body?.receipt);
+        return content({
+            request: data,
+            action_status: actionStatus,
+            receipt_available: receiptAvailable,
+            instruction: 'A successful action requires both action_status VERIFIED and a successful receipt response. If the intent response contains task_id, check action status and request the receipt separately when it is still pending.',
+        });
     }
     if (name === 'nextgent_ghost_action_status' || name === 'nextgent_ghost_action_receipt') {
         const id = String(args.action_id || '');
