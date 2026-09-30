@@ -97,6 +97,56 @@ router.post('/', ownerRequired, async (req, res) => {
     res.status(201).json({ node: data, token });
 });
 
+
+// POST /api/nodes/:id/mcp-token — mint a credential for Paperclip/another MCP client.
+// It is scoped to exactly this user's Ghost. The raw value is returned once.
+router.post('/:id/mcp-token', ownerRequired, async (req, res) => {
+    const label = String(req.body?.label || 'Paperclip').trim().slice(0, 80) || 'Paperclip';
+    const token = 'gcr_ghostmcp_' + crypto.randomBytes(32).toString('hex');
+    const { data: node, error: nodeError } = await mine(supabase
+        .from('ghost_nodes')
+        .select('id, entity_slug, revoked_at')
+        .eq('id', req.params.id), req)
+        .maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node || node.revoked_at) return res.status(404).json({ error: 'No such active Ghost.' });
+
+    const { data, error } = await supabase
+        .from('ghost_mcp_tokens')
+        .insert({
+            node_id: node.id,
+            entity_slug: node.entity_slug,
+            label,
+            token_hash: hashToken(token),
+            token_hint: token.slice(-6),
+            created_by: req.ownerUserId || null,
+        })
+        .select('id, node_id, label, token_hint, created_at')
+        .single();
+    if (error) return tableError(res, error);
+    res.status(201).json({ credential: data, token });
+});
+
+// DELETE /api/nodes/:id/mcp-token/:tokenId — revoke one Paperclip connection.
+router.delete('/:id/mcp-token/:tokenId', ownerRequired, async (req, res) => {
+    const { data: node, error: nodeError } = await mine(supabase
+        .from('ghost_nodes')
+        .select('id')
+        .eq('id', req.params.id), req)
+        .maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node) return res.status(404).json({ error: 'No such Ghost.' });
+    const { data, error } = await supabase
+        .from('ghost_mcp_tokens')
+        .update({ revoked_at: nowIso() })
+        .eq('id', req.params.tokenId)
+        .eq('node_id', req.params.id)
+        .select('id');
+    if (error) return tableError(res, error);
+    if (!data?.length) return res.status(404).json({ error: 'No such MCP credential.' });
+    res.json({ revoked: true });
+});
+
 // DELETE /api/nodes/:id — revoke a box's token
 router.delete('/:id', ownerRequired, async (req, res) => {
     const { data, error } = await mine(supabase
