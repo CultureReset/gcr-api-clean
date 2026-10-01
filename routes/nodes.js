@@ -33,10 +33,10 @@ const forwardable = (path) =>
     typeof path === 'string' && !path.includes('..') && FORWARDABLE.some((p) => path.startsWith(p));
 
 const missingTable = (error) =>
-    /ghost_node/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
+    /ghost_node|ghost_mcp_tokens/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
 const tableError = (res, error) =>
     res.status(missingTable(error) ? 501 : 500).json({
-        error: missingTable(error) ? 'Ghost nodes are not set up on this database yet (run sql/ghost_nodes.sql).' : error.message,
+        error: missingTable(error) ? (/ghost_mcp_tokens|ghost_node_requests.*idempotency_key/i.test(error.message) ? 'Ghost MCP integration is not set up yet (run sql/ghost_mcp_tokens.sql).' : 'Ghost nodes are not set up on this database yet (run sql/ghost_nodes.sql).') : error.message,
     });
 
 // ── the box's guard ────────────────────────────────────────────────────────
@@ -95,6 +95,74 @@ router.post('/', ownerRequired, async (req, res) => {
         .single();
     if (error) return tableError(res, error);
     res.status(201).json({ node: data, token });
+});
+
+
+// GET /api/nodes/:id/mcp-tokens — list metadata only; raw tokens are never recoverable.
+router.get('/:id/mcp-tokens', ownerRequired, async (req, res) => {
+    const { data: node, error: nodeError } = await mine(supabase
+        .from('ghost_nodes')
+        .select('id')
+        .eq('id', req.params.id), req)
+        .maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node) return res.status(404).json({ error: 'No such Ghost.' });
+    const { data, error } = await supabase
+        .from('ghost_mcp_tokens')
+        .select('id, node_id, label, token_hint, created_at, last_used_at, revoked_at')
+        .eq('node_id', req.params.id)
+        .order('created_at', { ascending: true });
+    if (error) return tableError(res, error);
+    res.json({ credentials: data || [] });
+});
+
+// POST /api/nodes/:id/mcp-token — mint a credential for Paperclip/another MCP client.
+// It is scoped to exactly this user's Ghost. The raw value is returned once.
+router.post('/:id/mcp-token', ownerRequired, async (req, res) => {
+    const label = String(req.body?.label || 'Paperclip').trim().slice(0, 80) || 'Paperclip';
+    const token = 'gcr_ghostmcp_' + crypto.randomBytes(32).toString('hex');
+    const { data: node, error: nodeError } = await mine(supabase
+        .from('ghost_nodes')
+        .select('id, entity_slug, revoked_at')
+        .eq('id', req.params.id), req)
+        .maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node || node.revoked_at) return res.status(404).json({ error: 'No such active Ghost.' });
+
+    const { data, error } = await supabase
+        .from('ghost_mcp_tokens')
+        .insert({
+            node_id: node.id,
+            entity_slug: node.entity_slug,
+            label,
+            token_hash: hashToken(token),
+            token_hint: token.slice(-6),
+            created_by: req.ownerUserId || null,
+        })
+        .select('id, node_id, label, token_hint, created_at')
+        .single();
+    if (error) return tableError(res, error);
+    res.status(201).json({ credential: data, token });
+});
+
+// DELETE /api/nodes/:id/mcp-token/:tokenId — revoke one Paperclip connection.
+router.delete('/:id/mcp-token/:tokenId', ownerRequired, async (req, res) => {
+    const { data: node, error: nodeError } = await mine(supabase
+        .from('ghost_nodes')
+        .select('id')
+        .eq('id', req.params.id), req)
+        .maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node) return res.status(404).json({ error: 'No such Ghost.' });
+    const { data, error } = await supabase
+        .from('ghost_mcp_tokens')
+        .update({ revoked_at: nowIso() })
+        .eq('id', req.params.tokenId)
+        .eq('node_id', req.params.id)
+        .select('id');
+    if (error) return tableError(res, error);
+    if (!data?.length) return res.status(404).json({ error: 'No such MCP credential.' });
+    res.json({ revoked: true });
 });
 
 // DELETE /api/nodes/:id — revoke a box's token
