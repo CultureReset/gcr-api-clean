@@ -23,7 +23,7 @@ const INSTRUCTIONS = [
     'resolves capabilities, enforces policy, requests owner approval by SMS when needed,',
     'executes on the owner\'s physical Android device, and verifies the result.',
     'A queued request is not completed. A pending SMS approval is not completed.',
-    'Report success only when the action status or receipt says VERIFIED.',
+    'Use an idempotency key when submitting an action. Report success only when action status is VERIFIED and a successful verification receipt is available.',
     'Use nextgent_ghost_capabilities before asking the owner to perform an action.',
 ].join('\n');
 
@@ -55,7 +55,26 @@ async function authenticate(req) {
     return { tokenId: token.id, nodeId: node.id, entitySlug: node.entity_slug, createdBy: token.created_by, label: token.label };
 }
 
-async function enqueue(caller, method, path, body = null) {
+function stableJson(value) {
+    if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
+    if (value && typeof value === 'object') {
+        return '{' + Object.keys(value).sort().map((key) => JSON.stringify(key) + ':' + stableJson(value[key])).join(',') + '}';
+    }
+    return JSON.stringify(value);
+}
+
+async function findIdempotentRequest(caller, key) {
+    const { data, error } = await supabase
+        .from('ghost_node_requests')
+        .select('id, method, path, body, status, created_at')
+        .eq('node_id', caller.nodeId)
+        .eq('idempotency_key', key)
+        .maybeSingle();
+    if (error) throw new Error('Unable to check request idempotency.');
+    return data;
+}
+
+async function enqueue(caller, method, path, body = null, idempotencyKey = null) {
     const { data: liveNode, error: nodeError } = await supabase
         .from('ghost_nodes')
         .select('id, entity_slug, revoked_at')
@@ -65,6 +84,15 @@ async function enqueue(caller, method, path, body = null) {
     if (!liveNode || liveNode.revoked_at || liveNode.entity_slug !== caller.entitySlug) {
         throw new Error('This Ghost has been revoked.');
     }
+    if (idempotencyKey) {
+        const existing = await findIdempotentRequest(caller, idempotencyKey);
+        if (existing) {
+            if (existing.method !== method || existing.path !== path || stableJson(existing.body) !== stableJson(body)) {
+                throw new Error('That idempotency key already belongs to a different Ghost request.');
+            }
+            return existing;
+        }
+    }
     const { data, error } = await supabase
         .from('ghost_node_requests')
         .insert({
@@ -73,10 +101,16 @@ async function enqueue(caller, method, path, body = null) {
             method,
             path,
             body,
+            ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
             created_by: caller.createdBy || null,
         })
         .select('id, status, created_at')
         .single();
+    if (error?.code === '23505' && idempotencyKey) {
+        const existing = await findIdempotentRequest(caller, idempotencyKey);
+        if (existing && existing.method === method && existing.path === path && stableJson(existing.body) === stableJson(body)) return existing;
+        throw new Error('That idempotency key already belongs to a different Ghost request.');
+    }
     if (error) throw new Error('Unable to queue a Ghost request.');
     return data;
 }
@@ -95,8 +129,11 @@ const TOOLS = [
         description: 'Submit a short, explicit owner request to the local NEXT GENT intent catalog. Unknown or ambiguous requests do not execute. The local policy may require the owner to reply YES by SMS. This returns a relay request ID; it does not mean the action has completed.',
         inputSchema: {
             type: 'object',
-            properties: { text: { type: 'string', minLength: 1, maxLength: 2000, description: 'The exact requested action in plain language.' } },
-            required: ['text'],
+            properties: {
+                text: { type: 'string', minLength: 1, maxLength: 2000, description: 'The exact requested action in plain language.' },
+                idempotency_key: { type: 'string', minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9._:-]{8,128}$', description: 'Unique key for this intended action; reuse the same key if retrying the call.' },
+            },
+            required: ['text', 'idempotency_key'],
             additionalProperties: false,
         },
         annotations: { destructiveHint: true, readOnlyHint: false, openWorldHint: false },
@@ -145,11 +182,13 @@ async function runTool(name, args = {}, caller) {
     }
     if (name === 'nextgent_ghost_submit_intent') {
         const text = typeof args.text === 'string' ? args.text.trim() : '';
+        const idempotencyKey = typeof args.idempotency_key === 'string' ? args.idempotency_key.trim() : '';
         if (!text || text.length > 2000) return toolError('text must contain 1–2000 characters.');
+        if (!/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) return toolError('idempotency_key must be 8–128 letters, numbers, dots, underscores, colons, or hyphens.');
         return content({
             queued: true,
             warning: 'This is a request, not a completed action. Check the relay response, then the action status and receipt.',
-            ...(await enqueue(caller, 'POST', '/intent', { text, requested_by: 'paperclip' })),
+            ...(await enqueue(caller, 'POST', '/intent', { text, requested_by: 'paperclip' }, idempotencyKey)),
         });
     }
     if (name === 'nextgent_ghost_request_status') {

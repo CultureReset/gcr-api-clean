@@ -36,7 +36,7 @@ const missingTable = (error) =>
     /ghost_node|ghost_mcp_tokens/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
 const tableError = (res, error) =>
     res.status(missingTable(error) ? 501 : 500).json({
-        error: missingTable(error) ? (/ghost_mcp_tokens/.test(error.message) ? 'Ghost MCP credentials are not set up yet (run sql/ghost_mcp_tokens.sql).' : 'Ghost nodes are not set up on this database yet (run sql/ghost_nodes.sql).') : error.message,
+        error: missingTable(error) ? (/ghost_mcp_tokens|ghost_node_requests.*idempotency_key/i.test(error.message) ? 'Ghost MCP integration is not set up yet (run sql/ghost_mcp_tokens.sql).' : 'Ghost nodes are not set up on this database yet (run sql/ghost_nodes.sql).') : error.message,
     });
 
 // ── the box's guard ────────────────────────────────────────────────────────

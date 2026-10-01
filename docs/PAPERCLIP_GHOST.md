@@ -7,7 +7,7 @@ Paperclip connects through its built-in **Apps → Connect an app → Connect yo
 3. In Paperclip, connect the remote MCP server at `https://<your-gcr-api-host>/api/mcp/ghost` and set `Authorization: Bearer <token>`.
 4. Enable only the NEXT GENT Ghost tools needed by the Paperclip agent.
 5. Let the Ghost poll the existing outbound relay. An MCP tool call queues work; it does not connect inbound to the owner's box.
-6. For a requested action, check the relay request response, then use the returned `task_id` with action status/receipt tools. The phone's local NEXT GENT policy and SMS YES approval remain authoritative. Report completion only on a VERIFIED receipt.
+6. For a requested action, supply a unique `idempotency_key` and reuse it on retries, check the relay request response, then use the returned `task_id` with action status/receipt tools. The phone's local NEXT GENT policy and SMS YES approval remain authoritative. Report completion only on a VERIFIED receipt.
 7. Revoke the Paperclip credential from the owner dashboard or revoke the Ghost node. Either action prevents future execution through that credential.
 
-This server exposes only the Ghost's mapped capability list, a natural-language intent submission, request status, action status and verification receipt. It does not expose a generic URL/path proxy, arbitrary shell, credentials, or another owner's node. Paperclip's other Apps, Connections, provider credentials and integrations remain Paperclip-native.
+This server exposes only the Ghost's mapped capability list, a natural-language intent submission, request status, action status and verification receipt. Action submissions require an idempotency key; the database enforces one queued submission per Ghost and key. It does not expose a generic URL/path proxy, arbitrary shell, credentials, or another owner's node. Paperclip's other Apps, Connections, provider credentials and integrations remain Paperclip-native.

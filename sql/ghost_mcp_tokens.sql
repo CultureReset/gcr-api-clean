@@ -18,11 +18,23 @@ create table if not exists public.ghost_mcp_tokens (
     revoked_at   timestamptz
 );
 
+-- The relay uses a nullable idempotency key for at-most-once action submission.
+-- Existing dashboard callers may leave it null; Paperclip action calls must set it.
+alter table public.ghost_node_requests
+    add column if not exists idempotency_key text;
+
+create unique index if not exists ghost_node_requests_node_idempotency_idx
+    on public.ghost_node_requests (node_id, idempotency_key)
+    where idempotency_key is not null;
+
 create index if not exists ghost_mcp_tokens_node_idx
     on public.ghost_mcp_tokens (node_id);
 
 alter table public.ghost_mcp_tokens enable row level security;
-revoke all on public.ghost_mcp_tokens from anon, authenticated;
+revoke all on table public.ghost_mcp_tokens from public, anon, authenticated;
+grant all on public.ghost_mcp_tokens to service_role;
+
+notify pgrst, 'reload schema';
 
 comment on table public.ghost_mcp_tokens is
     'Hashed MCP credentials scoped to one Ghost node. Revoke by node/token id; revoking the Ghost also disables its agent credentials.';
