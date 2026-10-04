@@ -65,3 +65,39 @@ alter table public.business_phone_numbers enable row level security;
 revoke all on public.business_phone_numbers from anon, authenticated;
 
 notify pgrst, 'reload schema';
+
+-- forwarding_codes   how an owner forwards their own line to the Phone
+--                    Agent number, per network type. {e164} and {national}
+--                    are filled with the number. These are the standard
+--                    network codes (GSM supplementary-service codes, and the
+--                    *72 family many North American carriers use); a carrier
+--                    with its own codes is another row.
+create table if not exists public.forwarding_codes (
+    key                text primary key,
+    label              text not null,
+    network            text,
+    when_forwarded     text,
+    enable_template    text not null,
+    disable_template   text,
+    note               text,
+    sort_order         integer not null default 100
+);
+
+insert into public.forwarding_codes (key, label, network, when_forwarded, enable_template, disable_template, sort_order) values
+    ('gsm-unanswered',   'Forward calls you do not answer',     'gsm',  'no_answer',   '**61*{e164}#', '##61#', 10),
+    ('gsm-busy',         'Forward calls when you are busy',      'gsm',  'busy',        '**67*{e164}#', '##67#', 20),
+    ('gsm-unreachable',  'Forward calls when your phone is off', 'gsm',  'unreachable', '**62*{e164}#', '##62#', 30),
+    ('gsm-all',          'Forward every call',                   'gsm',  'always',      '**21*{e164}#', '##21#', 40),
+    ('star72-all',       'Forward every call',                   'star', 'always',      '*72{national}', '*73',  50),
+    ('star71-unanswered','Forward calls you do not answer',      'star', 'no_answer',   '*71{national}', '*73',  60)
+on conflict (key) do nothing;
+
+-- nextgent_installs: what the install payload said about itself, so the live
+-- handlers (routes/telephony-live.js) know the agent's instructions.
+alter table public.nextgent_installs add column if not exists capabilities text[] not null default '{}';
+alter table public.nextgent_installs add column if not exists instructions text;
+
+alter table public.forwarding_codes enable row level security;
+revoke all on public.forwarding_codes from anon, authenticated;
+
+notify pgrst, 'reload schema';

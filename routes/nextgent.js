@@ -14,6 +14,7 @@
 //   POST   /unlink                 the business leaves (export first if asked)
 //   POST   /usage                  AI spend from LiteLLM, per company and period
 //   PUT    /items/:itemKey/price   the price Paperclip's store set for an item
+//   PUT    /numbers/:phone/registration  where a number's texting registration stands
 //
 // Tokens are returned once, in the response that created them. Only their
 // hashes are stored (lib/businessTokens.js).
@@ -31,6 +32,7 @@ const entitlements = require('../lib/entitlements');
 const billingStripe = require('../lib/billingStripe');
 const secretBox = require('../lib/secretBox');
 const { exportBusiness } = require('../lib/exportBusiness');
+const phoneAgent = require('../lib/phoneAgent');
 
 const router = express.Router();
 router.use(serviceSigned);
@@ -247,6 +249,17 @@ router.post('/installs', async (req, res) => {
         return fail(res, 400, err.message);
     }
 
+    // What the item's manifest says about itself: capabilities (e.g.
+    // telephony, which makes it a Phone Agent) and the agent's instructions,
+    // kept for the live call and text handlers.
+    const capabilities = Array.isArray(b.capabilities) ? b.capabilities.map((c) => str(c)).filter(Boolean).slice(0, 50) : [];
+    if (b.telephony && typeof b.telephony === 'object' && !capabilities.includes('telephony')) capabilities.push('telephony');
+    const instructions = typeof b.instructions === 'string' ? b.instructions.slice(0, 20000) : null;
+    const manifestFields = {
+        ...(capabilities.length ? { capabilities } : {}),
+        ...(instructions ? { instructions } : {}),
+    };
+
     const routine = b.routine;
     if (kind === 'automation' && routine) {
         if (!/^https:\/\//i.test(str(routine.webhookUrl)) || !str(routine.webhookSecret)) {
@@ -271,7 +284,7 @@ router.post('/installs', async (req, res) => {
     if (existing) {
         if (existing.company_id !== companyId) return fail(res, 409, 'That installId belongs to another company.');
         if (existing.status !== 'active') return fail(res, 409, 'That install was removed; install again with a new installId.');
-        const patch = { permissions, version: b.version ?? existing.version, updated_at: new Date().toISOString() };
+        const patch = { permissions, version: b.version ?? existing.version, updated_at: new Date().toISOString(), ...manifestFields };
         if (kind === 'automation' && routine) {
             patch.routine_webhook_url = str(routine.webhookUrl);
             patch.routine_webhook_secret = secretBox.seal(str(routine.webhookSecret), ROUTINE_SECRET_PURPOSE);
@@ -310,6 +323,18 @@ router.post('/installs', async (req, res) => {
         return fail(res, err.status || 500, err.message);
     }
 
+    // A Phone Agent gets its own number before the install is recorded, so a
+    // number that cannot be bought leaves nothing half-made behind.
+    let number = null;
+    if (phoneAgent.wantsNumber({ ...b, capabilities }, itemKey)) {
+        try {
+            number = await phoneAgent.provisionNumber({ slug, companyId, installId, payload: b });
+        } catch (err) {
+            if (charge.charged) await billingStripe.removeInstallCharge(installId);
+            return fail(res, err.status && err.status < 500 ? 502 : (err.status || 502), `Could not get a phone number: ${err.message}`);
+        }
+    }
+
     const { error: insertError } = await supabase.from('nextgent_installs').insert({
         install_id: installId,
         company_id: companyId,
@@ -321,10 +346,29 @@ router.post('/installs', async (req, res) => {
         routine_webhook_url: kind === 'automation' && routine ? str(routine.webhookUrl) : null,
         routine_webhook_secret: sealedSecret,
         status: 'active',
+        ...manifestFields,
     });
     if (insertError) {
         if (charge.charged) await billingStripe.removeInstallCharge(installId);
+        if (number) await phoneAgent.releaseForInstall(installId);
         return fail(res, 500, insertError.message);
+    }
+
+    let phone;
+    if (number) {
+        try {
+            await phoneAgent.chargeNumber(number, { installCharged: !!charge.charged, itemKey });
+        } catch (err) {
+            await phoneAgent.releaseForInstall(installId);
+            if (charge.charged) await billingStripe.removeInstallCharge(installId);
+            await supabase.from('nextgent_installs').update({ status: 'removed', removed_at: new Date().toISOString() }).eq('install_id', installId);
+            return fail(res, err.status || 502, `The number could not be billed, so it was released: ${err.message}`);
+        }
+        phone = {
+            number: number.phone_number,
+            registrationStatus: number.registration_status,
+            forwarding: await phoneAgent.forwardingFor(number.phone_number),
+        };
     }
 
     // Agents and apps get a token holding only what the owner approved.
@@ -348,6 +392,7 @@ router.post('/installs', async (req, res) => {
 
     res.status(201).json({
         ...(token ? { token } : {}),
+        ...(phone ? { phone } : {}),
         charged: !!charge.charged,
         ...(charge.charged ? { priceCents: charge.priceCents, interval: charge.interval } : {}),
     });
@@ -365,8 +410,9 @@ router.delete('/installs/:installId', async (req, res) => {
             .eq('install_id', installId)
             .select('install_id');
         const charges = await billingStripe.removeInstallCharge(installId);
+        const numbersReleased = await phoneAgent.releaseForInstall(installId);
         if (!data?.length && !revoked) return fail(res, 404, 'No such install.');
-        res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed });
+        res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed, numbersReleased });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
@@ -404,6 +450,7 @@ router.post('/unlink', async (req, res) => {
             .eq('company_id', companyId).eq('status', 'active');
         for (const row of installs || []) {
             await billingStripe.removeInstallCharge(row.install_id);
+            await phoneAgent.releaseForInstall(row.install_id);
         }
         await supabase.from('nextgent_installs')
             .update({ status: 'removed', removed_at: new Date().toISOString() })
@@ -446,6 +493,22 @@ router.post('/usage', async (req, res) => {
             periodStart: start.toISOString(), periodEnd: end.toISOString(), spendUsd: spend,
         });
         res.json({ recorded: true, ...out });
+    } catch (err) {
+        fail(res, err.status || 500, err.message);
+    }
+});
+
+/* ── PUT /numbers/:phone/registration ─────────────────────────────────── */
+
+// The texting registration (A2P 10DLC) is filed outside this API; whoever
+// handles it reports where it stands here. Texts from the number are allowed
+// only once it is approved (lib/messages.js).
+router.put('/numbers/:phone/registration', async (req, res) => {
+    try {
+        const row = await phoneAgent.setRegistration(req.params.phone, {
+            status: str(req.body?.status), ref: str(req.body?.ref) || null, note: str(req.body?.note) || null,
+        });
+        res.json({ number: row.phone_number, registrationStatus: row.registration_status });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
