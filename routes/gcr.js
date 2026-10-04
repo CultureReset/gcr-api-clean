@@ -1305,10 +1305,44 @@ async function searchEntitySlugs(rawTerm) {
   return { slugs: [...matchedSlugs], fuzzy };
 }
 
+// Search results are public directory data, so an identical search (same
+// words, same rounded location, same filters) can be answered from memory for
+// a minute. Typing "fish", backspacing, and typing it again — or two visitors
+// searching the same thing — then costs nothing. Bounded so a warm function
+// instance can't grow without limit.
+const SEARCH_CACHE_TTL_MS = 60 * 1000;
+const SEARCH_CACHE_MAX = 300;
+const searchCache = new Map();
+function searchCacheGet(key) {
+  const hit = searchCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > SEARCH_CACHE_TTL_MS) { searchCache.delete(key); return null; }
+  return hit.body;
+}
+function searchCacheSet(key, body) {
+  if (searchCache.size >= SEARCH_CACHE_MAX) searchCache.delete(searchCache.keys().next().value);
+  searchCache.set(key, { at: Date.now(), body });
+}
+
+// Google Places photo links saved without an API key answer 403, so the image
+// never draws. Some 20k gallery rows and ~700 cover images are like that.
+// Search shows one thumbnail per card, so pick one that will actually load.
+const isKeylessGooglePhoto = (url) => /places\.googleapis\.com/.test(url || '') && !/[?&]key=/.test(url || '');
+// A search card is ~100px wide; asking Google for 1600px wastes the bandwidth.
+const thumbUrl = (url) => (url || '').replace(/maxHeightPx=\d+/, 'maxHeightPx=400').replace(/maxWidthPx=\d+/, 'maxWidthPx=400');
+
 router.post('/search', async (req, res) => {
   try {
-    const { query: q, city, limit = 50, lat, lng, radius } = req.body;
+    const { query: q, city, lat, lng, radius } = req.body;
     if (!q || !q.trim()) return res.status(400).json({ error: 'Query required' });
+    const limit = Math.min(Math.max(parseInt(req.body.limit) || 50, 1), 100);
+
+    // Location is rounded to ~1km for the cache key — closer than that doesn't
+    // change the ranking enough to be worth a separate entry.
+    const round = (v) => (v == null || v === '' ? '' : Number(v).toFixed(2));
+    const cacheKey = JSON.stringify([q.toLowerCase().trim(), city || '', limit, round(lat), round(lng), radius || '']);
+    const cached = searchCacheGet(cacheKey);
+    if (cached) return res.json(cached);
 
     const term = q.toLowerCase().trim();
     const keywords = term.split(/\s+/).filter(k => k.length >= 2);
@@ -1319,7 +1353,13 @@ router.post('/search', async (req, res) => {
     // (searchEntitySlugs only reaches for pg_trgm when substring matching comes
     // up completely empty — a good default for the AI concierge, which wants
     // precise matches, not lookalikes).
-    const { slugs: _matchedList, fuzzy: fuzzyFallbackUsed } = await searchEntitySlugs(q);
+    //
+    // The always-on fuzzy lookup below doesn't depend on the substring results,
+    // so both start at once instead of one after the other.
+    const [{ slugs: _matchedList, fuzzy: fuzzyFallbackUsed }, { data: fuzzyRows }] = await Promise.all([
+      searchEntitySlugs(q),
+      db.rpc('fuzzy_entity_search', { search_term: term, match_limit: 30 }),
+    ]);
     const matchedSlugs = new Set(_matchedList);
 
     // The user-facing search box needs more forgiveness than that: typing one
@@ -1331,7 +1371,6 @@ router.post('/search', async (req, res) => {
     // ranking below can weigh a strong exact/substring hit over a loose fuzzy
     // one instead of treating them the same.
     const fuzzySimilarity = {};
-    const { data: fuzzyRows } = await db.rpc('fuzzy_entity_search', { search_term: term, match_limit: 30 });
     let fuzzyMatch = fuzzyFallbackUsed;
     (fuzzyRows || []).forEach(r => {
       fuzzySimilarity[r.slug] = r.similarity;
@@ -1431,8 +1470,15 @@ router.post('/search', async (req, res) => {
         const fl = f.toLowerCase();
         return keywords.some(k => fl.includes(k));
       });
-      const nameScore = score(e.name, e.subtitle);
-      const itemScore = menuItems.length ? score(menuItems[0].item_name, menuItems[0].description) : 0;
+      // A multi-word query ("fish tacos") rarely appears whole in a name, so
+      // fall back to how many of its words the name holds — "El Paso Tacos"
+      // should beat a charter boat that only matched "fish" in a tag.
+      const nameLower = (e.name || '').toLowerCase();
+      const nameWords = keywords.length > 1 ? (keywords.filter(k => nameLower.includes(k)).length / keywords.length) * 50 : 0;
+      const nameScore = Math.max(score(e.name, e.subtitle), nameWords);
+      // Best-matching item, not whichever came back first: a place whose menu
+      // has "Fish Tacos" scores as an exact item match.
+      const itemScore = menuItems.reduce((best, it) => Math.max(best, score(it.item_name, it.description)), 0);
       // Each matched feature adds a strong, cumulative boost so amenity coverage drives ranking.
       const featureScore = matchedFeatures.length * 40;
       const distance_miles = (userLat && userLng && e.latitude && e.longitude)
@@ -1449,9 +1495,15 @@ router.post('/search', async (req, res) => {
       const fuzzyScore = (fuzzySimilarity[e.slug] || 0) * 30;
       const relevance = Math.max(nameScore, itemScore) + featureScore + (e.rating || 0) + proximityScore + fuzzyScore;
 
+      // One working thumbnail per card, not the business's whole gallery —
+      // the gallery was three quarters of the response and the card shows one.
+      const photo = (photoMap[e.slug] || []).find(p => p.url && !isKeylessGooglePhoto(p.url));
+      const hero = isKeylessGooglePhoto(e.hero_image_url) ? null : thumbUrl(e.hero_image_url) || null;
+
       return {
         ...e,
-        photos: photoMap[e.slug] || [],
+        hero_image_url: hero,
+        photos: photo ? [{ ...photo, url: thumbUrl(photo.url) }] : [],
         matched_menu_items: menuItems,
         matched_specials: specials,
         matched_events: events,
@@ -1511,14 +1563,16 @@ router.post('/search', async (req, res) => {
       return bScore - aScore;
     });
 
-    res.json({
+    const body = {
       query: q,
       results,
       items: flattenedItems,
       total: results.length,
       total_items: flattenedItems.length,
       fuzzy_match: fuzzyMatch,
-    });
+    };
+    searchCacheSet(cacheKey, body);
+    res.json(body);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

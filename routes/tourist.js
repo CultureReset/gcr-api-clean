@@ -1317,7 +1317,7 @@ HOW TO CHAT:
 - Warm, casual, fun — like texting a friend who's a local. Short sentences.
 - Drop in local flavor: "trust me on this one", "locals don't even tell tourists about this spot"
 - Ask follow-ups to keep it going: "How many in your group?", "Date night or family?", "Crab or oysters mood?"
-- Recommend 1-2 specific spots — not a list of 5. Use the slug from the data so the app can link to it.
+- Recommend 1-2 specific spots — not a list of 5. Write each place as a link to its page: [Business Name](/business/slug) using the slug from the data, so the traveler can tap straight to it. Never show a bare slug.
 - Add a local tip: "Get there before 6 or you'll wait 45 min", "Sit on the patio if you can"
 - Reference their saved places naturally if relevant ("since you already saved Harbor Docks…")
 
@@ -1428,12 +1428,20 @@ HARD RULES:
         let finalReply = '';
         let loopMessages = [...messages];
 
-        for (let i = 0; i < 4; i++) {
+        // Answering "cheapest crab legs near the Wharf that's open late" can
+        // take a search, a details read and a price lookup before the answer.
+        // Four rounds wasn't enough for that, and running out of rounds sent
+        // back "Try rephrasing!" with nothing in it. The last round withholds
+        // the tools so the model has to answer from what it has already read.
+        const MAX_ROUNDS = 8;
+        for (let i = 0; i < MAX_ROUNDS; i++) {
+            const lastRound = i === MAX_ROUNDS - 1;
             const response = await client.messages.create({
                 model: 'claude-sonnet-4-6',
                 max_tokens: 2048,
                 system: systemPrompt,
                 tools,
+                ...(lastRound ? { tool_choice: { type: 'none' } } : {}),
                 messages: loopMessages
             });
 
@@ -1444,15 +1452,19 @@ HARD RULES:
 
             if (response.stop_reason === 'tool_use') {
                 loopMessages.push({ role: 'assistant', content: response.content });
-                const toolResultMsgs = [];
-                for (const block of response.content) {
-                    if (block.type !== 'tool_use') continue;
-                    const result = await executeTool(block.name, block.input);
+                // Several lookups asked for in one round run at the same time
+                // rather than one after another.
+                const calls = response.content.filter(b => b.type === 'tool_use');
+                const results = await Promise.all(calls.map(block =>
+                    executeTool(block.name, block.input).catch(err => ({ error: err.message }))
+                ));
+                const toolResultMsgs = calls.map((block, k) => {
+                    const result = results[k] || {};
                     if (result.saved_key)   toolResults.push({ tool: block.name, saved_key: result.saved_key, category: result.category });
                     if (result.updated_key) toolResults.push({ tool: block.name, updated_key: result.updated_key });
                     if (result.deleted_key) toolResults.push({ tool: block.name, deleted_key: result.deleted_key });
-                    toolResultMsgs.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) });
-                }
+                    return { type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) };
+                });
                 loopMessages.push({ role: 'user', content: toolResultMsgs });
                 continue;
             }
