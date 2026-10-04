@@ -14,9 +14,9 @@
 //
 // routes/tourist-auth.js does something that looks similar for Trip Swipe
 // tourists. It is a different product with a different account model, and the
-// two share no code on purpose. This file has its own Twilio client, its own
-// credential resolution, and its own routes. Changing one must never move the
-// other. Do not merge them.
+// two keep their own routes and accounts. The phone codes themselves are the
+// one copy in lib/phoneVerification.js; each flow asks for codes under its own
+// purpose, so a tourist's code can never sign in a business or the reverse.
 //
 // ── Nothing goes live on its own ────────────────────────────────────────
 //
@@ -27,11 +27,11 @@
 // before it is public. That is the counterfeit gate.
 
 const express = require('express');
-const twilio = require('twilio');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const db = require('../db');
 const { isInServiceArea, SERVICE_AREA_MILES } = require('../lib/serviceArea');
+const phoneCodes = require('../lib/phoneVerification');
 
 const router = express.Router();
 
@@ -103,8 +103,8 @@ const newSessionSecret = () => `${crypto.randomBytes(24).toString('base64url')}A
  *
  * Supabase requires every account to carry a unique identifier, and it accepts
  * either an email or a phone number. Phone accounts need Supabase's own phone
- * provider switched on — it is not, and it should not be, because Twilio Verify
- * already sends the code. So the account is filed under an email-shaped label
+ * provider switched on — it is not, and it should not be, because
+ * lib/phoneVerification.js already sends the code. So the account is filed under an email-shaped label
  * built from the digits: 12515550100@business.invalid
  *
  * NOT A REAL EMAIL ADDRESS. Nothing is ever sent to it, nobody owns the
@@ -123,89 +123,31 @@ const newSessionSecret = () => `${crypto.randomBytes(24).toString('base64url')}A
 const PHONE_LOGIN_DOMAIN = process.env.BUSINESS_PHONE_LOGIN_DOMAIN || 'business.invalid';
 const loginEmailFor = (phone) => `${String(phone).replace(/\D/g, '')}@${PHONE_LOGIN_DOMAIN}`;
 
-/* ── Twilio, this file's own ─────────────────────────────────────────────
+/* ── phone codes ─────────────────────────────────────────────────────────
  *
- * Verify — not Programmable Messaging. Verify sends through Twilio's own
- * verified infrastructure rather than our long code, so it does NOT depend on
- * A2P 10DLC campaign registration. A pending campaign does not block sign-up.
- *
- * Credentials come from env first, then platform_config (service-key only,
- * never exposed to the anon key). The env's TWILIO_ACCOUNT_SID has historically
- * held an API Key SID (SK...) where an Account SID (AC...) belongs, which the
- * constructor rejects outright — so both shapes are tried and the first that
- * authenticates is cached.
+ * lib/phoneVerification.js, the one copy: our own codes through lib/telephony
+ * (whichever carrier is live), stored only as an HMAC, a few tries each.
+ * Sign-up and sign-in use separate purposes, so a sign-up code cannot sign in.
  */
+const SIGNUP = 'business_signup';
+const SIGNIN = 'business_signin';
 
-let cachedClient = null;
-let cachedServiceSid = null;
-let configPromise = null;
-
-function platformConfig() {
-    if (!configPromise) {
-        configPromise = Promise.resolve(
-            db.from('platform_config')
-                .select('key, value')
-                .in('key', ['twilio_account_sid', 'twilio_auth_token', 'twilio_verify_service_sid'])
-        )
-            .then(({ data }) => Object.fromEntries((data || []).map((r) => [r.key, (r.value || '').trim()])))
-            .catch(() => ({}));
+/** Send a code; answers false (and logs) when it could not go. */
+async function sendCode(phone, purpose, label) {
+    try {
+        await phoneCodes.startVerification(phone, { purpose });
+        return true;
+    } catch (err) {
+        console.error(`[business-auth] ${label} failed:`, err.message);
+        return false;
     }
-    return configPromise;
 }
 
-async function client() {
-    if (cachedClient) return cachedClient;
-
-    const cfg = await platformConfig();
-    const envSid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
-    const envTok = (process.env.TWILIO_AUTH_TOKEN || '').trim();
-    const dbSid = cfg.twilio_account_sid || '';
-    const dbTok = cfg.twilio_auth_token || '';
-
-    const accountSid = dbSid.startsWith('AC') ? dbSid : (envSid.startsWith('AC') ? envSid : '');
-
-    const candidates = [];
-    const seen = new Set();
-    const add = (sid, tok, opts) => {
-        if (!sid || !tok) return;
-        const key = `${sid}:${tok}:${opts?.accountSid || ''}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        try { candidates.push(twilio(sid, tok, opts)); } catch { /* malformed pair */ }
-    };
-
-    for (const tok of [envTok, dbTok]) {
-        if (envSid.startsWith('AC')) add(envSid, tok);
-        if (envSid.startsWith('SK') && accountSid) add(envSid, tok, { accountSid });
-        if (accountSid) add(accountSid, tok);
-    }
-
-    if (!candidates.length) throw new Error('Texting is not configured on this server.');
-
-    for (const candidate of candidates) {
-        try {
-            await candidate.api.v2010.accounts(candidate.accountSid).fetch();
-            cachedClient = candidate;
-            return candidate;
-        } catch { /* try the next pairing */ }
-    }
-    throw new Error('Texting is not configured on this server.');
-}
-
-async function verifyService() {
-    const c = await client();
-    if (!cachedServiceSid) {
-        const cfg = await platformConfig();
-        const fromConfig = [(process.env.TWILIO_VERIFY_SERVICE_SID || '').trim(), cfg.twilio_verify_service_sid || '']
-            .find((sid) => sid.startsWith('VA'));
-        if (fromConfig) {
-            cachedServiceSid = fromConfig;
-        } else {
-            const services = await c.verify.v2.services.list({ limit: 20 });
-            cachedServiceSid = (services[0] || await c.verify.v2.services.create({ friendlyName: 'Gulf Coast Radar' })).sid;
-        }
-    }
-    return c.verify.v2.services(cachedServiceSid);
+/** null when the code is right, else the answer to send back. */
+async function codeProblem(phone, code, purpose, { consume = true } = {}) {
+    const check = await phoneCodes.checkVerification(phone, code, { purpose, consume });
+    if (check.ok) return null;
+    return check.code === 'mismatch' ? 'That code is not right.' : 'That code is not right, or it expired.';
 }
 
 /** E.164, assuming US when no country code is given. */
@@ -316,10 +258,7 @@ router.post('/phone', async (req, res) => {
         });
     }
 
-    try {
-        await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
-    } catch (err) {
-        console.error('[business-auth] verify send failed:', err.message);
+    if (!(await sendCode(phone, SIGNUP, 'verify send'))) {
         return res.status(502).json({ error: 'Could not send the code — try again in a moment.' });
     }
     res.json({ success: true, phone });
@@ -332,12 +271,9 @@ router.post('/verify', async (req, res) => {
     const code = String(req.body?.code || '').trim();
     if (!looksLikePhone(phone) || !code) return res.status(400).json({ error: 'Phone and code required.' });
 
-    try {
-        const check = await (await verifyService()).verificationChecks.create({ to: phone, code });
-        if (check?.status !== 'approved') return res.status(400).json({ error: 'That code is not right.' });
-    } catch {
-        return res.status(400).json({ error: 'That code is not right, or it expired.' });
-    }
+    // Checked, not used up: /register checks the same code again.
+    const problem = await codeProblem(phone, code, SIGNUP, { consume: false });
+    if (problem) return res.status(400).json({ error: problem });
     res.json({ success: true, phone });
 });
 
@@ -357,8 +293,7 @@ router.get('/similar', async (req, res) => {
 //
 // The code is deliberately re-checked rather than trusted from /verify: that
 // route returns nothing an attacker cannot forge, so it is a UX convenience,
-// not an authorisation. Twilio Verify allows a second check inside the same
-// verification window.
+// not an authorisation. /verify does not use the code up; this does.
 router.post('/register', async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     const code = String(req.body?.code || '').trim();
@@ -378,12 +313,8 @@ router.post('/register', async (req, res) => {
     let authId = null;
     let entityId = null;
 
-    try {
-        const check = await (await verifyService()).verificationChecks.create({ to: phone, code });
-        if (check?.status !== 'approved') return res.status(400).json({ error: 'That code is not right.' });
-    } catch {
-        return res.status(400).json({ error: 'That code is not right, or it expired.' });
-    }
+    const problem = await codeProblem(phone, code, SIGNUP);
+    if (problem) return res.status(400).json({ error: problem });
 
     try {
         // Who already looks like this. Recorded either way — a reviewer needs
@@ -554,10 +485,7 @@ router.post('/signin', async (req, res) => {
     // Deliberately does NOT reveal whether the number has an account. Telling
     // a stranger which numbers are registered is a free directory of every
     // business owner on the platform. The code simply never arrives.
-    try {
-        await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
-    } catch (err) {
-        console.error('[business-auth] signin send failed:', err.message);
+    if (!(await sendCode(phone, SIGNIN, 'signin send'))) {
         return res.status(502).json({ error: 'Could not send the code — try again in a moment.' });
     }
     res.json({ success: true, phone });
@@ -570,12 +498,8 @@ router.post('/signin-verify', async (req, res) => {
     const code = String(req.body?.code || '').trim();
     if (!looksLikePhone(phone) || !code) return res.status(400).json({ error: 'Phone and code required.' });
 
-    try {
-        const check = await (await verifyService()).verificationChecks.create({ to: phone, code });
-        if (check?.status !== 'approved') return res.status(400).json({ error: 'That code is not right.' });
-    } catch {
-        return res.status(400).json({ error: 'That code is not right, or it expired.' });
-    }
+    const problem = await codeProblem(phone, code, SIGNIN);
+    if (problem) return res.status(400).json({ error: problem });
 
     // The account behind the number, found in our own table. business_signups
     // already records user_id against the phone at registration, so this is a

@@ -26,6 +26,7 @@ const supabase = require('../db');
 const { paperclipRequired } = require('../middleware/ownerAuth');
 const { companyForSlug, linkCompany } = require('../lib/companyLinks');
 const telephony = require('../lib/telephony');
+const phoneCodes = require('../lib/phoneVerification');
 const { notifyPlatform } = require('../lib/notify');
 const { envInt } = require('../lib/env');
 
@@ -34,26 +35,14 @@ const router = express.Router();
 const fail = (res, status, error, extra) => res.status(status).json({ error, ...(extra || {}) });
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
-// Tunables, from env (documented in .env.example). The fallbacks keep a
-// missing variable from disabling claims, not from being configured.
-const codeDigits = () => Math.min(envInt('CLAIM_CODE_DIGITS', 6), 9);
-const codeTtlMinutes = () => envInt('CLAIM_CODE_TTL_MINUTES', 10);
-const maxAttempts = () => envInt('CLAIM_MAX_ATTEMPTS', 5);
+// Tunables, from env (documented in .env.example). The code itself — digits,
+// how long it lasts, how many tries, its secret — is lib/phoneVerification.js
+// (VERIFY_*), the one copy of phone codes; this file only adds how often a
+// listing may be rung.
 const maxStartsPerHour = () => envInt('CLAIM_MAX_STARTS_PER_HOUR', 5);
 
-function codeSecret() {
-    const s = process.env.CLAIM_CODE_SECRET || process.env.NEXTGENT_SERVICE_SECRET;
-    if (!s) throw Object.assign(new Error('CLAIM_CODE_SECRET (or NEXTGENT_SERVICE_SECRET) is not set.'), { status: 503 });
-    return s;
-}
-
-/** HMAC of the code bound to its claim id, so a hash cannot be replayed onto another claim. */
-const hashCode = (claimId, code) => crypto.createHmac('sha256', codeSecret()).update(`${claimId}:${code}`).digest('hex');
-
-function newCode() {
-    const digits = codeDigits();
-    return String(crypto.randomInt(0, 10 ** digits)).padStart(digits, '0');
-}
+/** A claim's code is a phone code for this purpose, so it cannot be used for another claim. */
+const purposeFor = (claimId) => `claim:${claimId}`;
 
 /** "4 8 1 5 1 6" — read digit by digit on a call. */
 const spoken = (code) => code.split('').join(' ');
@@ -149,15 +138,9 @@ router.post('/start', paperclipRequired, async (req, res) => {
     }
 
     const claimId = crypto.randomUUID();
-    const code = newCode();
-    const expiresAt = new Date(Date.now() + codeTtlMinutes() * 60 * 1000).toISOString();
-    let codeHash;
-    try {
-        codeHash = hashCode(claimId, code);
-    } catch (err) {
-        return fail(res, err.status || 500, err.message);
-    }
+    const expiresAt = new Date(Date.now() + phoneCodes.codeLifetimeMinutes() * 60 * 1000).toISOString();
 
+    // The claim record. The code itself lives with lib/phoneVerification.js.
     const { error: insertError } = await supabase.from('claim_codes').insert({
         id: claimId,
         company_id: req.paperclip.companyId,
@@ -165,29 +148,32 @@ router.post('/start', paperclipRequired, async (req, res) => {
         entity_slug: slug,
         phone,
         channel,
-        code_hash: codeHash,
         expires_at: expiresAt,
     });
     if (insertError) return fail(res, 503, `Claims are not set up on this database yet: ${insertError.message}`);
 
     try {
-        if (channel === 'sms') {
-            await telephony.sendSms({
-                to: phone,
-                from: process.env.PLATFORM_NUMBER || undefined,
-                text: `${code} is the code to claim ${entity.name}. It expires in ${codeTtlMinutes()} minutes. If you did not ask for it, ignore this text.`,
-            });
-        } else {
-            await telephony.placeCall({
-                to: phone,
-                from: process.env.PLATFORM_NUMBER || undefined,
-                say: `This is an automated call. The code to claim ${entity.name} is ${spoken(code)}. Again, ${spoken(code)}.`,
-                clientState: { purpose: 'claim', claimId },
-            });
-        }
+        await phoneCodes.startVerification(phone, {
+            purpose: purposeFor(claimId),
+            // By text when the line takes texts, by an automated call that reads
+            // the digits when it does not — always to the listing's phone.
+            deliver: ({ code, minutes }) => (channel === 'sms'
+                ? telephony.sendSms({
+                    to: phone,
+                    from: process.env.PLATFORM_NUMBER || undefined,
+                    text: `${code} is the code to claim ${entity.name}. It expires in ${minutes} minutes. If you did not ask for it, ignore this text.`,
+                })
+                : telephony.placeCall({
+                    to: phone,
+                    from: process.env.PLATFORM_NUMBER || undefined,
+                    say: `This is an automated call. The code to claim ${entity.name} is ${spoken(code)}. Again, ${spoken(code)}.`,
+                    clientState: { purpose: 'claim', claimId },
+                })),
+        });
     } catch (err) {
         await supabase.from('claim_codes').update({ expires_at: new Date().toISOString() }).eq('id', claimId);
-        return fail(res, 502, `Could not reach the listing's phone: ${err.message}`, { reviewAvailable: true });
+        if (err.status === 502) return fail(res, 502, `Could not reach the listing's phone: ${err.message.replace(/^Could not send the code: /, '')}`, { reviewAvailable: true });
+        return fail(res, err.status || 500, err.message);
     }
 
     res.status(201).json({ status: 'code_sent', claimId, channel, phoneHint: telephony.phoneHint(phone), expiresAt });
@@ -206,26 +192,20 @@ router.post('/verify', paperclipRequired, async (req, res) => {
     if (!claim || claim.company_id !== req.paperclip.companyId) return fail(res, 404, 'No such claim.');
     if (claim.verified_at) return fail(res, 409, 'That code was already used.');
     if (new Date(claim.expires_at).getTime() < Date.now()) return fail(res, 410, 'That code has expired. Ask for a new one.');
-    if (claim.attempts >= maxAttempts()) return fail(res, 429, 'Too many tries. Ask for a new code.');
 
-    // Count the attempt before checking it, and only if nobody else counted
-    // it first: two guesses in flight cannot share one attempt.
-    const used = claim.attempts + 1;
-    const { data: counted } = await supabase.from('claim_codes')
-        .update({ attempts: used })
-        .eq('id', claimId).eq('attempts', used - 1)
-        .select('id');
-    if (!counted?.length) return fail(res, 409, 'Try again.');
-
-    let match = false;
-    try {
-        const expected = Buffer.from(hashCode(claimId, code), 'hex');
-        const stored = Buffer.from(claim.code_hash, 'hex');
-        match = expected.length === stored.length && crypto.timingSafeEqual(expected, stored);
-    } catch (err) {
-        return fail(res, err.status || 500, err.message);
+    // One copy of the check, tries and expiry: lib/phoneVerification.js.
+    const result = await phoneCodes.checkVerification(claim.phone, code, { purpose: purposeFor(claimId) });
+    if (!result.ok) {
+        switch (result.code) {
+        case 'mismatch':
+        case 'invalid':
+            return fail(res, 400, 'That code is not right.', result.attemptsLeft !== undefined ? { attemptsLeft: result.attemptsLeft } : undefined);
+        case 'too_many': return fail(res, 429, 'Too many tries. Ask for a new code.');
+        case 'busy': return fail(res, 409, 'Try again.');
+        case 'unavailable': return fail(res, 503, result.reason);
+        default: return fail(res, 410, 'That code has expired. Ask for a new one.');
+        }
     }
-    if (!match) return fail(res, 400, 'That code is not right.', { attemptsLeft: Math.max(0, maxAttempts() - used) });
 
     try {
         await linkCompany({ companyId: claim.company_id, slug: claim.entity_slug, linkedBy: `paperclip:${req.paperclip.userId}` });

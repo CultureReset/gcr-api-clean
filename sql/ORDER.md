@@ -52,6 +52,7 @@ one kept place; the old place is left untouched until the "Later" step.
 | # | File | What it does |
 | - | ---- | ------------ |
 | 19 | `nextgent_prices_fold.sql` | copies `store_items.price_cents / price_interval / stripe_price_id` into `billing_item_prices` (needs 11 and 12). Apply **before** deploying the code that stops reading the `store_items` prices, or priced items read as free until it runs |
+| 20 | `nextgent_claims_codes.sql` | `claim_codes.code_hash` may be empty: a claim's code is now a phone code (`phone_verification_codes`, purpose `claim:<id>`). Apply **before** deploying, or new claims answer 503 |
 
 ### Later (not a file here yet)
 

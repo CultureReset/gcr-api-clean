@@ -225,6 +225,94 @@ section('3. item prices live in billing_item_prices', async () => {
     check('ORDER.md lists the fold and the later column drop', /nextgent_prices_fold\.sql/.test(order) && /price_cents/.test(order));
 });
 
+/* ── 4. phone codes: lib/phoneVerification.js ───────────────────────────── */
+
+section('4. claims and business sign-up use lib/phoneVerification.js', async () => {
+    const fs = require('fs');
+    const telephony = require(path.join(ROOT, 'lib/telephony'));
+    const saved = { isConfigured: telephony.isConfigured, lookupNumber: telephony.lookupNumber, placeCall: telephony.placeCall, sendSms: telephony.sendSms };
+    const calls = [];
+    const texts = [];
+    let canText = false;
+    Object.assign(telephony, {
+        isConfigured: () => true,
+        lookupNumber: async () => ({ canText }),
+        placeCall: async (a) => { calls.push(a); return { id: 'call-1' }; },
+        sendSms: async (a) => { texts.push(a); return { id: `m-${texts.length}`, provider: 'stub' }; },
+    });
+    T.entity.push({ slug: 'listing', name: 'The Listing', phone: '+15550400000' }, { slug: 'listing-2', name: 'Second', phone: '+15550500000' });
+    T.claim_codes = [];
+    T.phone_verification_codes = [];
+    T.business_claims = [];
+    T.business_signups = [];
+
+    const app = express();
+    app.use(express.json());
+    app.use('/api/claims', require(path.join(ROOT, 'routes/claims.js')));
+    app.use('/api/business-auth', require(path.join(ROOT, 'routes/business-auth.js')));
+    const server = await listen(app);
+    try {
+        const me = pc({ company_id: 'co-claim', sub: 'pc-claimer' });
+        const start = await hit(server, { token: me, method: 'POST', p: '/api/claims/start', body: { entitySlug: 'listing' } });
+        check('a landline claim is a call', start.status === 201 && start.body.channel === 'voice', JSON.stringify(start.body));
+        const say = calls.at(-1)?.say || '';
+        const digits = (say.match(/is ((?:\d ){5,8}\d)\./) || [])[1] || '';
+        const code = digits.replace(/ /g, '');
+        check('that reads the code digit by digit, twice', /^\d{6}$/.test(code) && say.split(digits).length === 3 && calls.at(-1).to === '+15550400000', say);
+        const claim = T.claim_codes.find((c) => c.id === start.body.claimId);
+        check('the claim row holds no code', claim && !claim.code_hash && claim.channel === 'voice');
+        const pv = T.phone_verification_codes.find((r) => r.purpose === `claim:${claim.id}`);
+        check('the code is a phone code for this claim, hashed', pv && pv.phone === '+15550400000' && !JSON.stringify(pv).includes(code));
+
+        const wrong = await hit(server, { token: me, method: 'POST', p: '/api/claims/verify', body: { claimId: claim.id, code: code === '000000' ? '111111' : '000000' } });
+        check('a wrong code: 400 with attempts left', wrong.status === 400 && wrong.body.error === 'That code is not right.' && wrong.body.attemptsLeft === 4, JSON.stringify(wrong.body));
+
+        // A second claim's code does not open the first.
+        canText = true;
+        const other = await hit(server, { token: pc({ company_id: 'co-other' }), method: 'POST', p: '/api/claims/start', body: { entitySlug: 'listing-2' } });
+        const otherCode = (texts.at(-1)?.text.match(/^(\d+) is the code to claim Second/) || [])[1];
+        check('a mobile claim is a text with its own wording', other.body.channel === 'sms' && !!otherCode && texts.at(-1).from === '+15550000001');
+        const crossed = await hit(server, { token: me, method: 'POST', p: '/api/claims/verify', body: { claimId: claim.id, code: otherCode } });
+        check('another claim\'s code does not work', crossed.status === 400 || otherCode === code);
+
+        const right = await hit(server, { token: me, method: 'POST', p: '/api/claims/verify', body: { claimId: claim.id, code } });
+        check('the right code links the company', right.status === 200 && right.body.linked && T.company_links.some((l) => l.company_id === 'co-claim' && l.entity_slug === 'listing'));
+        const again = await hit(server, { token: me, method: 'POST', p: '/api/claims/verify', body: { claimId: claim.id, code } });
+        check('and is not accepted twice', again.status === 409);
+
+        const tooMany = pc({ company_id: 'co-other' });
+        for (let i = 0; i < 5; i += 1) await hit(server, { token: tooMany, method: 'POST', p: '/api/claims/verify', body: { claimId: other.body.claimId, code: otherCode === '000000' ? '111111' : '000000' } });
+        const locked = await hit(server, { token: tooMany, method: 'POST', p: '/api/claims/verify', body: { claimId: other.body.claimId, code: otherCode } });
+        check('too many tries: 429', locked.status === 429 && locked.body.error === 'Too many tries. Ask for a new code.');
+
+        // Business sign-up and sign-in.
+        texts.length = 0;
+        const sent = await hit(server, { method: 'POST', p: '/api/business-auth/phone', body: { phone: '(251) 555-0123' } });
+        const signupCode = (texts.at(-1)?.text.match(/(\d{6})/) || [])[1];
+        check('sign-up texts our own code', sent.status === 200 && texts.at(-1)?.to === '+12515550123' && !!signupCode);
+        const peek = await hit(server, { method: 'POST', p: '/api/business-auth/verify', body: { phone: '2515550123', code: signupCode } });
+        const peek2 = await hit(server, { method: 'POST', p: '/api/business-auth/verify', body: { phone: '2515550123', code: signupCode } });
+        check('/verify confirms it without using it up (register checks it again)', peek.status === 200 && peek2.status === 200);
+        const live = T.phone_verification_codes.find((r) => r.phone === '+12515550123' && r.purpose === 'business_signup' && !r.consumed_at);
+        check('and a right peek spends no try', live && live.attempts === 0);
+        const bad = await hit(server, { method: 'POST', p: '/api/business-auth/verify', body: { phone: '2515550123', code: signupCode === '000000' ? '111111' : '000000' } });
+        check('a wrong code reads as before', bad.status === 400 && bad.body.error === 'That code is not right.');
+        const crossPurpose = await hit(server, { method: 'POST', p: '/api/business-auth/signin-verify', body: { phone: '2515550123', code: signupCode } });
+        check('a sign-up code cannot sign in', crossPurpose.status === 400);
+        await hit(server, { method: 'POST', p: '/api/business-auth/signin', body: { phone: '2515550123' } });
+        const signinCode = (texts.at(-1)?.text.match(/(\d{6})/) || [])[1];
+        const signin = await hit(server, { method: 'POST', p: '/api/business-auth/signin-verify', body: { phone: '2515550123', code: signinCode } });
+        check('a sign-in code is accepted (then no account is found)', signin.status === 404 && /No business/.test(signin.body.error));
+    } finally {
+        server.close();
+        Object.assign(telephony, saved);
+    }
+    for (const f of ['routes/claims.js', 'routes/business-auth.js']) {
+        const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+        check(`${f} keeps no code hashing or Twilio client of its own`, !/createHmac|timingSafeEqual|require\('twilio'\)|verificationChecks/.test(src));
+    }
+});
+
 /* ── 10. helpers: one copy each ─────────────────────────────────────────── */
 
 section('10. routine signing, envInt, defaultPlanKey, Google token encryption', async () => {

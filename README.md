@@ -97,7 +97,7 @@ calls; it polls `routes/nodes.js` (heartbeat, pull, respond).
 | --- | --- | --- |
 | Admin console (`Admin-dashboard-main`) | `/api/admin/*` | admin JWT from `POST /api/admin/login` (`adminRequired`; `routes/admin.js` carries its own copy of the check, which also accepts the `ADMIN_SECRET` key) |
 | Business dashboard (`Dashboards-users-`) and Modular app | `/api/business/*`, `/api/store`, `/api/nodes`, `/api/billing` | business session (`ownerRequired`) |
-| Business sign-up and sign-in | `/api/business-auth` | phone number plus a Twilio Verify code; the session is minted by the API |
+| Business sign-up and sign-in | `/api/business-auth` | phone number plus our own phone code (`lib/phoneVerification.js`, any carrier); the session is minted by the API |
 | Older dashboards and owner sites (the `site_id` model) | `/api/dashboard`, `/api/site`, `/api/auth`, `/api/user`, `/api/stripe`, `/api/square`, `/api/qr`, owner side of `/api/platform` | legacy JWT (`authRequired`): the business is the `site_id` in the token, not an `entity_slug` |
 | A Ghost box | `/api/nodes/heartbeat`, `/pull`, `/requests/:rid/response` | a node token (only its hash is stored) |
 | AI agents | `/api/mcp` (read and edit one business) | business MCP token (`gcr_mcp_…`) or a business dashboard session |
