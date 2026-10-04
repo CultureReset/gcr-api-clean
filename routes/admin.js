@@ -2264,7 +2264,25 @@ router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
     if (notes !== undefined) updates.notes = notes;
     const { error } = await db.from('business_claims').update(updates).eq('id', req.params.id);
     if (error) throw error;
-    res.json({ ok: true });
+
+    // A claim filed from Paperclip (routes/claims.js) is linked to that
+    // company when an admin approves it — the review fallback of the claim flow.
+    let link = null;
+    if (status === 'approved') {
+      const { data: claim } = await db.from('business_claims').select('*').eq('id', req.params.id).maybeSingle();
+      if (claim?.paperclip_company_id && claim?.entity_slug) {
+        try {
+          link = await require('../lib/companyLinks').linkCompany({
+            companyId: claim.paperclip_company_id,
+            slug: claim.entity_slug,
+            linkedBy: `admin:${req.admin?.userId || req.admin?.id || 'key'}`,
+          });
+        } catch (e) {
+          return res.status(e.status || 500).json({ ok: false, error: `Approved, but not linked: ${e.message}` });
+        }
+      }
+    }
+    res.json({ ok: true, ...(link ? { linked: link } : {}) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

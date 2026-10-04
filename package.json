@@ -15,11 +15,12 @@
     "test:automations": "node scripts/test-automations.js",
     "test:billing": "node scripts/test-billing.js",
     "test:store": "node scripts/test-store.js",
-    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:nodes && npm run test:ghost-mcp && npm run test:ghost-admin && npm run test:automations && npm run test:billing && npm run test:store && npm run test:concierge && npm run test:paperclip-auth && npm run test:telephony",
+    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:nodes && npm run test:ghost-mcp && npm run test:ghost-admin && npm run test:automations && npm run test:billing && npm run test:store && npm run test:concierge && npm run test:paperclip-auth && npm run test:telephony && npm run test:nextgent",
     "test:concierge": "node scripts/test-concierge.js",
     "vercel-build": "node scripts/stop-image-cron.mjs",
     "test:paperclip-auth": "node scripts/test-paperclip-auth.js",
-    "test:telephony": "node scripts/test-telephony.js"
+    "test:telephony": "node scripts/test-telephony.js",
+    "test:nextgent": "node scripts/test-nextgent.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

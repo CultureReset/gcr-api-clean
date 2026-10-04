@@ -245,6 +245,13 @@ mount('/api/business/automations', () => require('./routes/automations').ownerRo
 
 mount('/api/business', () => require('./routes/business-data'));
 mount('/api/billing', () => require('./routes/billing'));
+
+// NEXT GENT (CONTRACT §4): the calls Paperclip makes, each one HMAC-signed
+// (lib/serviceSigning.js); the claim flow, signed in with a Paperclip token
+// whose company is not linked yet; and where the owner's notifications go.
+mount('/api/nextgent', () => require('./routes/nextgent'));
+mount('/api/claims', () => require('./routes/claims'));
+mount('/api/notify-settings', () => require('./routes/notify-settings'));
 // The business's store: what it may have (free, its plan, or a grant), what it
 // has, and "update available". Business from the session only (routes/store.js).
 mount('/api/store', () => require('./routes/store').ownerRouter);
