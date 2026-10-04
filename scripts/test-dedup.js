@@ -424,6 +424,29 @@ section('7. no provider SDK or provider credentials outside lib/telephony', asyn
     check('telephony.status names the live carrier without the key', tel.provider === 'telnyx' && tel.configured && tel.keyEnv === 'TELNYX_API_KEY' && tel.fingerprint === '…test');
 });
 
+/* ── 8. one Messages API: /api/owner/messages ───────────────────────────── */
+
+section('8. /api/owner/messages covers everything /api/business/messages did', async () => {
+    const fs = require('fs');
+    const owner = require(path.join(ROOT, 'routes/owner.js'));
+    const have = new Set(owner.stack.filter((l) => l.route).flatMap((l) => Object.keys(l.route.methods).map((m) => `${m.toUpperCase()} ${l.route.path}`)));
+    // Every route the removed router had, and where it lives now.
+    const moved = {
+        'GET /': 'GET /messages',
+        'GET /numbers': 'GET /messages/numbers',
+        'GET /threads/:id': 'GET /messages/threads/:id',
+        'POST /threads/:id/take-over': 'POST /messages/threads/:id/takeover',
+        'POST /consent': 'POST /messages/consent',
+        'POST /': 'POST /messages',
+        'PATCH /:id': 'PATCH /messages/:id',
+        'POST /:id/send': 'POST /messages/:id/send',
+    };
+    const lost = Object.entries(moved).filter(([, now]) => !have.has(now)).map(([was]) => was);
+    check('every route of the removed router has a home in routes/owner.js', !lost.length, lost.join(', '));
+    check('routes/messages.js is gone', !fs.existsSync(path.join(ROOT, 'routes/messages.js')));
+    check('and /api/business/messages is not mounted', !/\/api\/business\/messages/.test(fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8')));
+});
+
 /* ── 10. helpers: one copy each ─────────────────────────────────────────── */
 
 section('10. routine signing, envInt, defaultPlanKey, Google token encryption', async () => {

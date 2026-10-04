@@ -8,10 +8,19 @@
 //
 //   GET   /bookings?from&to                 { bookings: [...] }
 //   GET   /payments?from&to                 { payments: [...] }
+//   GET   /messages                         { slug, threads, waiting_for_approval, text_log } (the full inbox)
+//   POST  /messages                         { channel, to, subject?, body, hold? } -> { message }
 //   GET   /messages/threads                 { threads: [...] }
 //   GET   /messages/threads/:id             { thread, messages: [...] }
 //   POST  /messages/threads/:id/send        { text } -> { message }
 //   POST  /messages/threads/:id/takeover    { owner: bool } -> { thread }
+//   PATCH /messages/:id                     { body?, subject? } -> { message } (one that has not gone)
+//   POST  /messages/:id/send                send a held or refused message now -> { message }
+//   POST  /messages/consent                 { phone, granted?, text?, source? } -> { consent }
+//   GET   /messages/numbers                 { numbers: [...] } (the business's numbers, texting registration)
+//
+// This is the one Messages API (the copy at /api/business/messages was folded
+// in here). The rules for what may be sent live in lib/messages.js.
 //   GET   /intake/forwarding                { address, confirmation }
 //   GET   /intake/senders                   { senders }
 //   POST  /intake/senders/:id/approve|block { sender, processed? }
@@ -94,7 +103,7 @@ router.get('/payments', async (req, res) => {
 
 /* ── messages ─────────────────────────────────────────────────────────── */
 
-const messageOut = (m) => ({ id: m.id, direction: m.direction, text: m.body, at: m.sent_at || m.created_at, author: m.author, status: m.status, status_reason: m.status_reason || undefined });
+const messageOut = (m) => ({ id: m.id, direction: m.direction, text: m.body, subject: m.subject || undefined, at: m.sent_at || m.created_at, author: m.author, status: m.status, status_reason: m.status_reason || undefined });
 
 router.get('/messages/threads', async (req, res) => {
     try {
@@ -147,8 +156,71 @@ router.post('/messages/threads/:id/send', async (req, res) => {
 
 router.post('/messages/threads/:id/takeover', async (req, res) => {
     try {
-        const t = await messages.setTakeOver(req.entitySlug, req.params.id, req.body?.owner !== false, who(req));
+        // `owner` (this API) or `on` (the folded-in /api/business/messages).
+        const on = req.body?.owner ?? req.body?.on;
+        const t = await messages.setTakeOver(req.entitySlug, req.params.id, on !== false, who(req));
         res.json({ thread: { id: t.id, handled_by: t.mode === 'owner' ? 'owner' : 'agent' } });
+    } catch (err) { fail(res, err); }
+});
+
+/** The full inbox: threads with their last message, the waiting count, the older text log. */
+router.get('/messages', async (req, res) => {
+    try {
+        res.json({ slug: req.entitySlug, ...(await messages.inbox(req.entitySlug, { limit: req.query.limit })) });
+    } catch (err) { fail(res, err); }
+});
+
+/** A new message to a customer; `hold` keeps it for the owner to send later. */
+router.post('/messages', async (req, res) => {
+    const b = req.body || {};
+    try {
+        const msg = await messages.sendMessage({
+            slug: req.entitySlug,
+            channel: b.channel,
+            to: b.to,
+            subject: b.subject,
+            body: b.body,
+            requireApproval: b.hold === true,
+            author: 'owner',
+        });
+        res.status(msg.status === 'sent' ? 201 : 202).json({ message: msg });
+    } catch (err) { fail(res, err); }
+});
+
+/** Record a customer's yes or no to texts. */
+router.post('/messages/consent', async (req, res) => {
+    try {
+        const row = await messages.recordConsent(req.entitySlug, req.body?.phone, {
+            granted: req.body?.granted !== false,
+            source: typeof req.body?.source === 'string' ? req.body.source.slice(0, 80) : 'owner',
+            text: typeof req.body?.text === 'string' ? req.body.text.slice(0, 1000) : null,
+            by: who(req),
+        });
+        res.status(201).json({ consent: row });
+    } catch (err) { fail(res, err); }
+});
+
+/** The business's numbers and where their texting registration stands. */
+router.get('/messages/numbers', async (req, res) => {
+    const { data, error } = await supabase.from('business_phone_numbers')
+        .select('phone_number, purpose, status, registration_status, registration_note, registration_updated_at, created_at, released_at')
+        .eq('entity_slug', req.entitySlug).order('created_at', { ascending: false });
+    if (error) return res.status(503).json({ error: `Numbers are not set up on this database yet: ${error.message}` });
+    res.json({ numbers: data || [] });
+});
+
+/** Edit a message that has not gone yet. */
+router.patch('/messages/:id', async (req, res) => {
+    try {
+        res.json({ message: await messages.editMessage(req.entitySlug, req.params.id, req.body || {}) });
+    } catch (err) { fail(res, err); }
+});
+
+/** Send a held (or refused) message now. */
+router.post('/messages/:id/send', async (req, res) => {
+    try {
+        const msg = await messages.sendExisting(req.entitySlug, req.params.id);
+        res.status(msg?.status === 'sent' ? 200 : 202).json({ message: msg });
     } catch (err) { fail(res, err); }
 });
 

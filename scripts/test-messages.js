@@ -67,7 +67,8 @@ require(path.join(ROOT, 'lib/telephony/telnyx.js'))._setFetch(async (url, init) 
 const { check, done } = checker();
 const app = express();
 app.use(express.json());
-app.use('/api/business/messages', require(path.join(ROOT, 'routes/messages.js')));
+// The one Messages API (the /api/business/messages copy was folded into it).
+app.use('/api/owner', require(path.join(ROOT, 'routes/owner.js')));
 app.use('/api/mcp', require(path.join(ROOT, 'routes/mcp.js')));
 const server = app.listen(0, run);
 const url = (p) => `http://127.0.0.1:${server.address().port}${p}`;
@@ -109,34 +110,34 @@ async function run() {
         check('opted out: blocked', t4.body.result.structuredContent.reason === 'opted_out');
 
         console.log('\n── owner Messages screen ──');
-        const consent = await call('POST', '/api/business/messages/consent', { phone: '251-555-0188', text: 'Said yes at the counter' });
+        const consent = await call('POST', '/api/owner/messages/consent', { phone: '251-555-0188', text: 'Said yes at the counter' });
         check('the owner records consent', consent.status === 201 && T.message_consent[0].entity_slug === 'shop');
-        const t5 = await call('POST', '/api/business/messages', { channel: 'sms', to: '251-555-0188', body: 'Thanks for coming!' });
+        const t5 = await call('POST', '/api/owner/messages', { channel: 'sms', to: '251-555-0188', body: 'Thanks for coming!' });
         check('then the owner can text them', t5.body.message?.status === 'sent', JSON.stringify(t5.body));
-        const held = await call('POST', '/api/business/messages', { channel: 'email', to: 'x@y.test', subject: 'Draft', body: 'v1', hold: true });
+        const held = await call('POST', '/api/owner/messages', { channel: 'email', to: 'x@y.test', subject: 'Draft', body: 'v1', hold: true });
         check('a held message waits for approval', held.body.message.status === 'pending_approval');
-        const edited = await call('PATCH', `/api/business/messages/${held.body.message.id}`, { body: 'v2' });
+        const edited = await call('PATCH', `/api/owner/messages/${held.body.message.id}`, { body: 'v2' });
         check('it can be edited before it goes', edited.body.message.body === 'v2' && edited.body.message.edited_at);
-        const go = await call('POST', `/api/business/messages/${held.body.message.id}/send`);
+        const go = await call('POST', `/api/owner/messages/${held.body.message.id}/send`);
         check('and sent', go.body.message.status === 'sent' && emails.at(-1).html.includes('v2'));
-        const again = await call('PATCH', `/api/business/messages/${held.body.message.id}`, { body: 'v3' });
+        const again = await call('PATCH', `/api/owner/messages/${held.body.message.id}`, { body: 'v3' });
         check('a sent message cannot be edited', again.status === 409);
 
-        const inbox = await call('GET', '/api/business/messages');
+        const inbox = await call('GET', '/api/owner/messages');
         const thread = inbox.body.threads.find((t) => t.customer_address === '+12515550188');
         check('the inbox lists threads with their last message', thread?.last_message?.body === 'Thanks for coming!');
-        await call('POST', `/api/business/messages/threads/${thread.id}/take-over`, { on: true });
+        await call('POST', `/api/owner/messages/threads/${thread.id}/takeover`, { on: true });
         const t6 = await rpc(TOK_SEND, 'tools/call', { name: 'send_message', arguments: { channel: 'sms', to: '251-555-0188', body: 'Agent here' } });
         check('after the owner takes over, an agent is blocked', t6.body.result.structuredContent.reason === 'owner_has_taken_over');
-        const t7 = await call('POST', '/api/business/messages', { channel: 'sms', to: '251-555-0188', body: 'Owner here' });
+        const t7 = await call('POST', '/api/owner/messages', { channel: 'sms', to: '251-555-0188', body: 'Owner here' });
         check('the owner still can', t7.body.message.status === 'sent');
-        const conv = await call('GET', `/api/business/messages/threads/${thread.id}`);
-        check('the thread reads in order, the refused one included', conv.body.messages.map((m) => m.body).join('|') === 'Hello|Thanks for coming!|Agent here|Owner here', conv.body.messages.map((m) => m.body).join('|'));
+        const conv = await call('GET', `/api/owner/messages/threads/${thread.id}`);
+        check('the thread reads in order, the refused one included', conv.body.messages.map((m) => m.text).join('|') === 'Hello|Thanks for coming!|Agent here|Owner here', conv.body.messages.map((m) => m.text).join('|'));
 
         session = { entitySlug: 'other', authVia: 'paperclip' };
-        const foreign = await call('GET', `/api/business/messages/threads/${thread.id}`);
+        const foreign = await call('GET', `/api/owner/messages/threads/${thread.id}`);
         check('another business cannot read the thread', foreign.status === 404);
-        const foreignSend = await call('POST', `/api/business/messages/${held.body.message.id}/send`);
+        const foreignSend = await call('POST', `/api/owner/messages/${held.body.message.id}/send`);
         check('or send its messages', foreignSend.status === 404);
         session = { entitySlug: 'shop', authVia: 'paperclip' };
 

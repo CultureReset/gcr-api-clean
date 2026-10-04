@@ -245,11 +245,8 @@ mount('/api/business/availability', () => require('./routes/owner-availability')
 // from the session and never from the request.
 mount('/api/business/automations', () => require('./routes/automations').ownerRouter);
 
-// The Messages screen: inbox, send, edit, take over (lib/messages.js rules).
-// Before /api/business for the same reason as the two above.
-mount('/api/business/messages', () => require('./routes/messages'));
-
-// The owner app's screens (Play-user): bookings, payments, messages, intake,
+// The owner app's screens (Play-user): bookings, payments, messages (the one
+// Messages API: inbox, send, edit, held, consent, numbers, take over), intake,
 // profile, export. Business from the session only (routes/owner.js).
 mount('/api/owner', () => require('./routes/owner'));
 
