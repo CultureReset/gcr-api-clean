@@ -1,0 +1,6 @@
+{
+  "description": "A teammate is invited to a business. Data: business_name, inviter, role, accept_link. {{brand}} is PLATFORM_NAME.",
+  "required": ["business_name", "inviter", "role", "accept_link"],
+  "subject": "{{inviter}} invited you to {{business_name}} on {{brand}}",
+  "html": "<div style=\"font-family:system-ui,sans-serif;max-width:560px\"><h2 style=\"font-size:18px\">You're invited to {{business_name}}</h2><p>{{inviter}} added you to {{business_name}} on {{brand}} as <strong>{{role}}</strong>.</p><p><a href=\"{{accept_link}}\" style=\"display:inline-block;padding:10px 16px;background:#111;color:#fff;border-radius:6px;text-decoration:none\">Accept the invitation</a></p><p style=\"color:#666;font-size:13px\">If you weren't expecting this, you can ignore this email.</p></div>"
+}

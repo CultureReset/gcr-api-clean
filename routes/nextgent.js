@@ -15,6 +15,7 @@
 //   POST   /usage                  AI spend from LiteLLM, per company and period
 //   PUT    /items/:itemKey/price   the price Paperclip's store set for an item
 //   PUT    /numbers/:phone/registration  where a number's texting registration stands
+//   POST   /email                  a platform email from templates/email (e.g. team-invite)
 //
 // Tokens are returned once, in the response that created them. Only their
 // hashes are stored (lib/businessTokens.js).
@@ -493,6 +494,22 @@ router.post('/usage', async (req, res) => {
             periodStart: start.toISOString(), periodEnd: end.toISOString(), spendUsd: spend,
         });
         res.json({ recorded: true, ...out });
+    } catch (err) {
+        fail(res, err.status || 500, err.message);
+    }
+});
+
+/* ── POST /email ──────────────────────────────────────────────────────── */
+
+// A platform email Paperclip asks for (team invites, …): a template from
+// templates/email, sent through utils/email.js. companyId, when given, must
+// be linked; the business name in the data is Paperclip's to supply.
+router.post('/email', async (req, res) => {
+    const b = req.body || {};
+    try {
+        if (b.companyId && !(await slugForCompany(str(b.companyId)))) return fail(res, 409, 'This company is not linked to a business.');
+        const out = await require('../lib/emailTemplates').sendTemplate({ to: b.to, template: str(b.template), data: b.data || {} });
+        res.status(out.sent ? 200 : 502).json(out);
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
