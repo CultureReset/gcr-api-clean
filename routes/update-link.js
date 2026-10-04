@@ -76,7 +76,24 @@ async function syncToGcr(siteId, type, data) {
 // Texts go through lib/telephony via utils/sms (platform sender, opt-outs, log).
 const telephony = require('../lib/telephony');
 const { sendSms } = require('../utils/sms');
+const { envInt } = require('../lib/env');
 function makeToken()  { return crypto.randomBytes(24).toString('hex'); }
+
+// The passcode on a link: UPDATE_LINK_PASSCODE_DIGITS digits from crypto, and
+// at most UPDATE_LINK_PASSCODE_ATTEMPTS wrong guesses before the link is
+// locked (update_links.passcode_attempts, sql/nextgent_update_links.sql).
+const passcodeDigits = () => Math.min(Math.max(envInt('UPDATE_LINK_PASSCODE_DIGITS', 6), 4), 9);
+const maxPasscodeAttempts = () => envInt('UPDATE_LINK_PASSCODE_ATTEMPTS', 5);
+function makePasscode() {
+    const digits = passcodeDigits();
+    return String(crypto.randomInt(0, 10 ** digits)).padStart(digits, '0');
+}
+/** Constant-time: the same work whether the first or the last digit differs. */
+function passcodeMatches(expected, given) {
+    const a = crypto.createHash('sha256').update(String(expected)).digest();
+    const b = crypto.createHash('sha256').update(String(given ?? '')).digest();
+    return crypto.timingSafeEqual(a, b);
+}
 function slugify(s) {
     return String(s || '').toLowerCase().trim()
         .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
@@ -84,10 +101,11 @@ function slugify(s) {
 }
 // LINKS_BASE_URL is where the link editor is hosted. Without it the link is a
 // path the caller has to put on its own host.
-function linkUrl(tok, slug) {
+function linkUrl(tok, slug, passcode = null) {
     const base = (process.env.LINKS_BASE_URL || '').replace(/\/$/, '');
-    if (slug) return `${base}/${slug}/edit?token=${tok}`;
-    return `${base}/menu-editor.html?token=${tok}`;
+    const code = passcode ? `&passcode=${encodeURIComponent(passcode)}` : '';
+    if (slug) return `${base}/${slug}/edit?token=${tok}${code}`;
+    return `${base}/menu-editor.html?token=${tok}${code}`;
 }
 
 // Mark link submitted (fire-and-forget)
@@ -117,8 +135,15 @@ async function validateToken(req, res, next) {
                 expired_scheme: true,
             });
         }
+        const tried = link.passcode_attempts || 0;
+        if (tried >= maxPasscodeAttempts()) {
+            return res.status(401).json({ error: 'This link is no longer valid — ask for a new one.', requires_passcode: true, locked: true });
+        }
         const submitted = req.headers['x-link-passcode'] || req.query.passcode;
-        if (submitted !== String(link.passcode)) {
+        if (!passcodeMatches(link.passcode, submitted)) {
+            // Count the miss. Until sql/nextgent_update_links.sql adds the
+            // column this update fails quietly and the compare alone holds.
+            await supabase.from('update_links').update({ passcode_attempts: tried + 1 }).eq('token', token);
             return res.status(401).json({ error: 'Passcode required', requires_passcode: true });
         }
     }
@@ -186,7 +211,7 @@ router.post('/generate', adminRequired, async (req, res) => {
     // default '000000'. It is persisted now, and a link without one is refused
     // rather than falling back to a guessable constant.
     const token = makeToken();
-    const linkPasscode = String(passcode || '').trim() || String(Math.floor(100000 + Math.random() * 900000));
+    const linkPasscode = String(passcode || '').trim() || makePasscode();
     const { error } = await supabase.from('update_links').insert({
         entity_id: storedId, link_type, link_date: today, token,
         send_phone: send_phone || null,
@@ -218,13 +243,22 @@ router.post('/send-sms', adminRequired, async (req, res) => {
     let { data: link } = await supabase.from('update_links').select('*')
         .eq('entity_id', storedId).eq('link_type', link_type).eq('link_date', today).maybeSingle();
 
+    // The texted link must validate: validateToken refuses a link without a
+    // passcode, and this route used to mint one without. A link minted before
+    // passcodes were persisted gets one here too.
     if (!link) {
         const token = makeToken();
         const ins = await supabase.from('update_links').insert({
             entity_id: storedId, link_type, link_date: today, token, send_phone: phone,
+            passcode: makePasscode(),
             expires_at: new Date(Date.now() + 30 * 3600 * 1000).toISOString(),
         }).select().single();
         link = ins.data;
+    } else if (!link.passcode) {
+        const passcode = makePasscode();
+        const { error } = await supabase.from('update_links').update({ passcode }).eq('token', link.token);
+        if (error) return res.status(500).json({ error: error.message });
+        link = { ...link, passcode };
     }
 
     let name = biz_name || 'your business';
@@ -238,7 +272,8 @@ router.post('/send-sms', adminRequired, async (req, res) => {
         if (entity?.name) name = entity.name;
         slug = slugify(entity?.slug || entity?.name || biz_name);
     }
-    const url = linkUrl(link.token, slug);
+    // The passcode rides in the URL, where validateToken reads it (req.query.passcode).
+    const url = linkUrl(link.token, slug, link.passcode);
     if (!/^https?:\/\//.test(url)) return res.status(503).json({ success: false, error: 'LINKS_BASE_URL is not set, so there is no link to text.', url, token: link.token });
 
     if (!telephony.isConfigured()) return res.json({ success: false, error: 'Texting is not configured', url, token: link.token });
@@ -248,7 +283,8 @@ router.post('/send-sms', adminRequired, async (req, res) => {
         slug || null, 'update_link', link.id || null);
     if (!sent.success) return res.json({ success: false, error: sent.reason, url, token: link.token });
 
-    res.json({ success: true, url, token: link.token, sent_to: phone });
+    // The passcode is returned so the console can show it to whoever hands the link over.
+    res.json({ success: true, url, token: link.token, passcode: link.passcode, sent_to: phone });
 });
 
 router.get('/status/:entity_id', adminRequired, async (req, res) => {
@@ -1395,3 +1431,4 @@ router.delete('/:token/secondary-hours/:id', validateToken, async (req, res) => 
 });
 
 module.exports = router;
+module.exports._makePasscode = makePasscode;
