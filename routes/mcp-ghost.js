@@ -74,7 +74,7 @@ async function findIdempotentRequest(caller, key) {
     return data;
 }
 
-async function enqueue(caller, method, path, body = null, idempotencyKey = null) {
+async function enqueue(caller, method, path, body = null, idempotencyKey = null, taskId = null) {
     const { data: liveNode, error: nodeError } = await supabase
         .from('ghost_nodes')
         .select('id, entity_slug, revoked_at')
@@ -102,6 +102,7 @@ async function enqueue(caller, method, path, body = null, idempotencyKey = null)
             path,
             body,
             ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+            ...(taskId ? { paperclip_task_id: taskId } : {}),
             created_by: caller.createdBy || null,
         })
         .select('id, status, created_at')
@@ -114,6 +115,12 @@ async function enqueue(caller, method, path, body = null, idempotencyKey = null)
     if (error) throw new Error('Unable to queue a Ghost request.');
     return data;
 }
+
+const TASK_ID_PATTERN = '^[A-Za-z0-9._:-]{1,128}$';
+const taskIdArg = (args) => {
+    const t = typeof args?.task_id === 'string' ? args.task_id.trim() : '';
+    return t && new RegExp(TASK_ID_PATTERN).test(t) ? t : null;
+};
 
 const TOOLS = [
     {
@@ -132,6 +139,7 @@ const TOOLS = [
             properties: {
                 text: { type: 'string', minLength: 1, maxLength: 2000, description: 'The exact requested action in plain language.' },
                 idempotency_key: { type: 'string', minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9._:-]{8,128}$', description: 'Unique key for this intended action; reuse the same key if retrying the call.' },
+                task_id: { type: 'string', minLength: 1, maxLength: 128, pattern: TASK_ID_PATTERN, description: 'The Paperclip task this action is for. Its receipt is posted to that task.' },
             },
             required: ['text', 'idempotency_key'],
             additionalProperties: false,
@@ -168,7 +176,10 @@ const TOOLS = [
         description: 'Read the independent verification receipt for a local action. A 409 or queued response means it is not ready; do not claim success.',
         inputSchema: {
             type: 'object',
-            properties: { action_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,80}$' } },
+            properties: {
+                action_id: { type: 'string', pattern: '^[A-Za-z0-9_-]{1,80}$' },
+                task_id: { type: 'string', minLength: 1, maxLength: 128, pattern: TASK_ID_PATTERN, description: 'The Paperclip task the receipt belongs to (otherwise the instruction\'s task is used).' },
+            },
             required: ['action_id'],
             additionalProperties: false,
         },
@@ -188,7 +199,7 @@ async function runTool(name, args = {}, caller) {
         return content({
             queued: true,
             warning: 'This is a request, not a completed action. Check the relay response, then the action status and receipt.',
-            ...(await enqueue(caller, 'POST', '/intent', { text, requested_by: 'paperclip' }, idempotencyKey)),
+            ...(await enqueue(caller, 'POST', '/intent', { text, requested_by: 'paperclip', ...(taskIdArg(args) ? { task_id: taskIdArg(args) } : {}) }, idempotencyKey, taskIdArg(args))),
         });
     }
     if (name === 'nextgent_ghost_request_status') {
@@ -217,7 +228,7 @@ async function runTool(name, args = {}, caller) {
         const id = String(args.action_id || '');
         if (!/^[A-Za-z0-9_-]{1,80}$/.test(id)) return toolError('Invalid action ID.');
         const suffix = name === 'nextgent_ghost_action_receipt' ? '/receipt' : '';
-        return content({ queued: true, ...(await enqueue(caller, 'GET', '/actions/' + encodeURIComponent(id) + suffix)) });
+        return content({ queued: true, ...(await enqueue(caller, 'GET', '/actions/' + encodeURIComponent(id) + suffix, null, null, suffix ? taskIdArg(args) : null)) });
     }
     return toolError('Unknown Ghost MCP tool.');
 }

@@ -440,10 +440,12 @@ router.post('/requests/:rid/response', nodeRequired, async (req, res) => {
         })
         .eq('id', req.params.rid)
         .eq('node_id', req.node.id)
-        .select('id');
+        .select('*');
     if (error) return tableError(res, error);
     if (!data?.length) return res.status(404).json({ error: 'No such request for this box.' });
-    res.json({ ok: true });
+    // A receipt in the answer goes to Paperclip against its task (plan §11).
+    const receipt = await require('../lib/ghostReceipts').postReceipt(data[0]).catch((e) => ({ posted: false, reason: e.message }));
+    res.json({ ok: true, receipt_posted: !!receipt.posted });
 });
 
 module.exports = router;
