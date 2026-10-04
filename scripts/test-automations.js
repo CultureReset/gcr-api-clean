@@ -13,6 +13,8 @@
 // the assertions read "the insert carried the session's slug" rather than
 // "the insert returned something".
 
+// Schedules are read in DEFAULT_TIMEZONE when a trigger names none.
+process.env.DEFAULT_TIMEZONE = 'America/Chicago';
 const path = require('path');
 const Module = require('module');
 const express = require('express');
@@ -202,7 +204,8 @@ function check(label, ok, detail) {
     check('sms went to the business\'s own setting', smsCalls.length === 1 && smsCalls[0].to === '251-555-0100');
     check('sms body used the inserted row', smsCalls[0]?.body === 'Posted Tonight: Bushwacker for Flora-Bama');
     const rec = calls.find((c) => c.table === 'automation_runs' && c.insert);
-    check('a run row was written with the step log', rec && rec.insert.status === 'ok' && rec.insert.steps_log.length === 4);
+    const fin = calls.find((c) => c.table === 'automation_runs' && c.update && c.update.status);
+    check('a run row was written first, then finished with the step log', rec && rec.insert.status === 'running' && fin && fin.update.status === 'ok' && fin.update.steps_log.length === 4);
     const touched = calls.find((c) => c.table === 'entity_automations' && c.update);
     check('the install\'s last_run was updated', touched && touched.update.last_run_status === 'ok' && touched.eq.id === 'inst-1');
 

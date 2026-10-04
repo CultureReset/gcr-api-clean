@@ -904,10 +904,13 @@ async function mirrorToCalendar(entitySlug, parsed, emailLogId) {
       updated_at: new Date().toISOString(),
     };
     const { data: existing } = await db.from('booking_calendar')
-      .select('id').eq('entity_slug', entitySlug).eq('source', source)
+      .select('*').eq('entity_slug', entitySlug).eq('source', source)
       .eq('external_uid', row.external_uid).maybeSingle();
-    if (existing) await db.from('booking_calendar').update(row).eq('id', existing.id);
-    else await db.from('booking_calendar').insert(row);
+    let saved = null;
+    if (existing) ({ data: saved } = await db.from('booking_calendar').update(row).eq('id', existing.id).select('*').maybeSingle());
+    else ({ data: saved } = await db.from('booking_calendar').insert(row).select('*').maybeSingle());
+    // booking.created / changed / cancelled for the business's automations.
+    await require('../lib/businessEvents').bookingSaved(entitySlug, existing || null, saved || { ...row, id: existing?.id });
   } catch (e) {
     console.warn('[email-parser] calendar mirror failed:', e.message);
   }

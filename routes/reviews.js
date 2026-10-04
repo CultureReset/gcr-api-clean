@@ -120,6 +120,9 @@ router.post('/:slug', ownerRequired, async (req, res) => {
       .single();
 
     if (error) throw error;
+    await require('../lib/businessEvents').reviewReceived(req.entitySlug, {
+      id: data?.id, reviewer_name: data?.reviewer_name, rating: data?.rating, title: data?.title, text: data?.body,
+    });
     res.status(201).json({ ok: true, review: data });
   } catch (err) {
     res.status(500).json({ error: err.message });

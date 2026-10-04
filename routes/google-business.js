@@ -470,6 +470,10 @@ router.post('/sync-reviews', ownerRequired, async (req, res) => {
                 status:          'published',
                 created_at:      gr.createTime            || new Date().toISOString()
             });
+            await require('../lib/businessEvents').reviewReceived(req.entitySlug, {
+                source: 'google', google_review_id: googleId, reviewer_name: gr.reviewer?.displayName || null,
+                rating: starMap[gr.starRating] || null, text: gr.comment.trim(),
+            });
             imported++;
         }
 

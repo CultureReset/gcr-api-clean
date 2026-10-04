@@ -36,6 +36,7 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 12 | `nextgent_prices.sql` | `billing_item_prices` (prices Paperclip's store sets, CONTRACT §12) |
 | 13 | `nextgent_phone.sql` | phone verification codes; `business_phone_numbers` (Phone Agent numbers and their texting registration), forwarding codes, live conversations, AI keys |
 | 14 | `nextgent_messages.sql` | `message_threads`, `business_messages`, `message_consent` (messages.send, the Messages screen) |
+| 15 | `nextgent_automations.sql` | `automation_waits`; needs `automations.sql` and `booking_ingestion_tables.sql` |
 
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.

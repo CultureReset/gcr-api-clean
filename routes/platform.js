@@ -765,9 +765,12 @@ async function calendarSyncBooking(slug, bookingId, record) {
             updated_at: new Date().toISOString()
         };
         const { data: existing } = await supabase.from('booking_calendar')
-            .select('id').eq('booking_id', bookingId).maybeSingle();
-        if (existing) await supabase.from('booking_calendar').update(entry).eq('id', existing.id);
-        else await supabase.from('booking_calendar').insert(entry);
+            .select('*').eq('booking_id', bookingId).maybeSingle();
+        let saved = null;
+        if (existing) ({ data: saved } = await supabase.from('booking_calendar').update(entry).eq('id', existing.id).select('*').maybeSingle());
+        else ({ data: saved } = await supabase.from('booking_calendar').insert(entry).select('*').maybeSingle());
+        // booking.created / changed / cancelled for the business's automations.
+        await require('../lib/businessEvents').bookingSaved(slug, existing || null, saved || entry);
     } catch (e) { console.error('[calendar] sync failed:', e.message); }
 }
 
@@ -1355,6 +1358,9 @@ router.post('/reviews', async (req, res) => {
             approved: true
         });
         if (error) throw error;
+        await require('../lib/businessEvents').reviewReceived(b.entity_slug, {
+            reviewer_name: reviewerName, rating, text: String(text || '').slice(0, 2000), verified_purchase: true, booking_id: b.id,
+        });
         rec.reviewed = new Date().toISOString();
         await supabase.from('bookings').update({ details: rec }).eq('id', b.id);
 
