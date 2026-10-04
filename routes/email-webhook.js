@@ -3,6 +3,9 @@ const crypto = require('crypto');
 const db = require('../db');
 const { sendSms } = require('../utils/sms');
 const venmoExtractor = require('../extractors/venmo');
+const { slugFromAddress } = require('../lib/forwardingAddress');
+const intake = require('../lib/intake');
+const { recordPayment } = require('../lib/payments');
 const cashappExtractor = require('../extractors/cashapp');
 
 const router = express.Router();
@@ -48,6 +51,28 @@ router.post('/email', express.urlencoded({ extended: false }), async (req, res) 
     const sourceType = detectSource(from);
     const emailHash = computeEmailHash(from, subject, text);
     const siteId = req.query.site_id || (to || '').split('@')[0];
+
+    // Mail sent to a business's own forwarding address (lib/forwardingAddress.js)
+    // goes through the same intake checks as routes/email-parser.js: a mail
+    // provider's forwarding confirmation is kept for the owner, and a sender
+    // the business has not approved waits for review.
+    const businessSlug = slugFromAddress(to);
+    if (businessSlug) {
+      const confirmation = await intake.matchConfirmation({ from, subject, text, html });
+      if (confirmation) {
+        await intake.recordConfirmation(businessSlug, confirmation, { from, subject });
+        return res.status(200).json({ status: 'forwarding_confirmation', provider: confirmation.provider });
+      }
+      const senderState = await intake.checkSender(businessSlug, from, { subject });
+      if (senderState !== 'known') {
+        await db.from('email_webhook_log').insert({
+          from_email: from, to_email: to, subject, source_type: sourceType,
+          status: senderState === 'blocked' ? 'blocked_sender' : 'needs_review',
+          email_hash: emailHash, matched_site_id: businessSlug,
+        });
+        return res.status(200).json({ status: senderState === 'blocked' ? 'blocked_sender' : 'held_for_review' });
+      }
+    }
 
     // Check for duplicate
     const { data: existing } = await db
@@ -98,6 +123,20 @@ router.post('/email', express.urlencoded({ extended: false }), async (req, res) 
         logEntry.status = 'needs_review';
         await db.from('email_webhook_log').insert(logEntry);
         return res.status(200).json({ status: 'needs_review' });
+      }
+
+      // A payment to a business: claimed until matched (lib/payments.js),
+      // and payment.received for its automations.
+      if (businessSlug) {
+        await recordPayment(businessSlug, {
+          amount: parsed.amount,
+          currency: parsed.currency || process.env.DEFAULT_CURRENCY || null,
+          payer: parsed.senderName || null,
+          source: sourceType,
+          status: 'claimed',
+          reference: parsed.transactionId || parsed.reqCode || emailHash,
+          details: { req_code: parsed.reqCode || null, confidence: parsed.confidence },
+        });
       }
 
       // Find matching request (song, cooperative, or goal)

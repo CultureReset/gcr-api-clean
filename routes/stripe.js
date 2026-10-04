@@ -883,6 +883,22 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
                 status: 'confirmed'
             }).eq('id', bookingId);
             if (error) console.error('[stripe webhook] failed to mark booking paid:', bookingId, error.message);
+            // Verified by Stripe's signature: recorded as such, and
+            // payment.received for the business's automations.
+            if (verified) {
+                const { data: booking } = await supabase.from('bookings').select('entity_slug').eq('id', bookingId).maybeSingle();
+                if (booking?.entity_slug) {
+                    await require('../lib/payments').recordPayment(booking.entity_slug, {
+                        amountCents: Number.isInteger(data.amount_received) ? data.amount_received : data.amount,
+                        currency: data.currency,
+                        payer: data.receipt_email || null,
+                        source: 'stripe',
+                        status: 'verified',
+                        reference: data.id,
+                        details: { booking_id: bookingId },
+                    });
+                }
+            }
         }
     } else if (type === 'payment_intent.payment_failed') {
         const bookingId = data.metadata?.booking_id;

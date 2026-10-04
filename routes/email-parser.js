@@ -1002,6 +1002,61 @@ async function upsertAvailability(entitySlug, parsed, emailLogId) {
   }
 }
 
+// ─── THE PARSER LOG ───────────────────────────────────────────────────────────
+
+/** The columns a parsed booking fills on email_parser_log. */
+function parserLogFields(parsed) {
+  return {
+    platform: parsed?.platform || 'unknown',
+    booking_type: parsed?.booking_type || null,
+    event_date: parsed?.event_date || null,
+    event_time: parsed?.event_time || null,
+    end_time: parsed?.end_time || null,
+    party_size: parsed?.party_size || null,
+    customer_name: parsed?.customer_name || null,
+    activity_name: parsed?.activity_name || null,
+    table_number: parsed?.table_number || null,
+    seated_time: parsed?.seated_time || null,
+    left_time: parsed?.left_time || null,
+    confirmation_no: parsed?.confirmation_no || null,
+    status: parsed?.status || 'unknown',
+    parsed: !!parsed,
+  };
+}
+
+/** Insert a log row; without sql/nextgent_intake.sql the intake_state column is left out. */
+async function insertParserLog(row) {
+  let { data, error } = await db.from('email_parser_log').insert(row).select('id').single();
+  if (error && /intake_state/.test(error.message || '')) {
+    const { intake_state, ...rest } = row;
+    ({ data, error } = await db.from('email_parser_log').insert(rest).select('id').single());
+  }
+  if (error) console.error('[email-parser] log insert failed:', error.message);
+  return data || null;
+}
+
+/**
+ * The owner approved a sender: read what was held from it. Returns how many
+ * emails were processed.
+ */
+async function processHeld(entitySlug, sender) {
+  const { data: rows } = await db.from('email_parser_log')
+    .select('id, from_email, subject, raw_text')
+    .eq('entity_slug', entitySlug).eq('intake_state', 'held')
+    .ilike('from_email', `%${String(sender).replace(/[%_]/g, '')}%`)
+    .limit(200);
+  let processed = 0;
+  for (const row of rows || []) {
+    const parsed = detectAndExtract(row.from_email, row.subject, row.raw_text || '', '');
+    await db.from('email_parser_log')
+      .update({ ...parserLogFields(parsed), intake_state: parsed?.event_date ? 'processed' : 'review' })
+      .eq('id', row.id);
+    if (parsed?.event_date) await upsertAvailability(entitySlug, parsed, row.id);
+    processed += 1;
+  }
+  return processed;
+}
+
 // ─── ROUTES ───────────────────────────────────────────────────────────────────
 
 /**
@@ -1033,38 +1088,43 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
 
     // Determine entity slug from TO address
     const entitySlug = slugFromTo(to);
+    const intake = require('../lib/intake');
+
+    // A mail provider asking to confirm forwarding: keep the code for the
+    // owner's onboarding screen; it is not a booking.
+    if (entitySlug) {
+      const confirmation = await intake.matchConfirmation({ from, subject, text, html });
+      if (confirmation) {
+        await intake.recordConfirmation(entitySlug, confirmation, { from, subject });
+        await insertParserLog({
+          entity_slug: entitySlug, from_email: from, to_email: to, subject, raw_text: '',
+          platform: `forwarding_confirmation:${confirmation.provider}`, status: 'unknown', parsed: false,
+          email_hash: hash, created_at: new Date().toISOString(), intake_state: 'processed',
+        });
+        return;
+      }
+    }
+
+    // Unknown senders wait for the owner (lib/intake.js tells them once).
+    const senderState = entitySlug ? await intake.checkSender(entitySlug, from, { subject }) : 'known';
 
     // Parse
-    const parsed = detectAndExtract(from, subject, text, html);
+    const parsed = senderState === 'known' ? detectAndExtract(from, subject, text, html) : null;
 
     // Log it
-    const { data: logRow } = await db
-      .from('email_parser_log')
-      .insert({
+    const logRow = await insertParserLog({
+        ...parserLogFields(parsed),
         entity_slug: entitySlug,
         from_email: from,
         to_email: to,
         subject,
         raw_text: text.slice(0, 5000),
-        platform: parsed?.platform || 'unknown',
-        booking_type: parsed?.booking_type || null,
-        event_date: parsed?.event_date || null,
-        event_time: parsed?.event_time || null,
-        end_time: parsed?.end_time || null,
-        party_size: parsed?.party_size || null,
-        customer_name: parsed?.customer_name || null,
-        activity_name: parsed?.activity_name || null,
-        table_number: parsed?.table_number || null,
-        seated_time: parsed?.seated_time || null,
-        left_time: parsed?.left_time || null,
-        confirmation_no: parsed?.confirmation_no || null,
-        status: parsed?.status || 'unknown',
-        parsed: !!parsed,
         email_hash: hash,
         created_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single();
+        intake_state: senderState === 'known' ? (parsed?.event_date ? 'processed' : 'review') : 'held',
+    });
+
+    if (senderState !== 'known') return;
 
     // Update availability
     if (entitySlug && parsed && parsed.event_date) {
@@ -1072,7 +1132,7 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     } else if (entitySlug) {
       // Nothing could be read out of it, so it waits in the review queue —
       // and the owner hears about it (lib/notify.js; never throws).
-      require('../lib/notify').notifyOwner(entitySlug, {
+      await require('../lib/notify').notifyOwner(entitySlug, {
         kind: 'review',
         title: 'A forwarded email needs a look',
         body: `From ${from}\n${subject}`.slice(0, 500),
@@ -1568,3 +1628,5 @@ module.exports.EXTRACTORS = EXTRACTORS;
 // Exported so the admin router can trigger a sync in-process instead of
 // making an HTTP call back to this same server. Behaviour is unchanged.
 module.exports.syncExternalCalendar = syncExternalCalendar;
+module.exports.processHeld = processHeld;
+module.exports.detectAndExtract = detectAndExtract;

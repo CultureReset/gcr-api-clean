@@ -6,6 +6,7 @@
 --                     mode 'agent' lets agents and automations answer;
 --                     'owner' means the owner took it over and nothing
 --                     automatic sends into it until they hand it back.
+--                     owner_read_at: what the owner has seen (unread counts).
 -- business_messages   every message in and out: owner, agent, automation,
 --                     customer. status: draft | pending_approval | queued |
 --                     sent | failed | blocked | received. A blocked message
@@ -30,6 +31,7 @@ create table if not exists public.message_threads (
     taken_over_at     timestamptz,
     taken_over_by     text,
     last_message_at   timestamptz,
+    owner_read_at     timestamptz,
     created_at        timestamptz not null default now(),
 
     constraint message_threads_channel_check check (channel in ('email', 'sms', 'voice')),
