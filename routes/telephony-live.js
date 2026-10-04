@@ -55,11 +55,15 @@ async function onText({ from, to, text, messageId }) {
     const body = String(text || '').trim();
 
     // Opt-out and opt-in words apply to every number, before anything answers.
+    // STOP is per business: to a business's number it revokes that business's
+    // consent (lib/messages.js reads the revoked row for every purpose, so its
+    // confirmations stop too) and touches no other business. To the platform
+    // number, which texts for everyone, it goes on the platform-wide list.
     const { numberRow } = require('../lib/phoneAgent');
     const number = await numberRow(ours);
     if (KEYWORDS.stop.test(body)) {
-        await supabase.from('sms_opt_outs').insert({ phone: customer }).then(() => {}, () => {});
         if (number) await messages.recordConsent(number.entity_slug, customer, { granted: false, source: 'sms_keyword', text: body }).catch(() => {});
+        else await supabase.from('sms_opt_outs').insert({ phone: customer }).then(() => {}, () => {});
         return { handled: 'stop' };
     }
     if (number && KEYWORDS.start.test(body)) {

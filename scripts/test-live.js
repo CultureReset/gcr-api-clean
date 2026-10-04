@@ -140,7 +140,13 @@ async function run() {
         const out = T.business_messages.find((m) => m.direction === 'out');
         check('the reply goes through messages.send from the registered number', out?.status === 'sent' && sentTexts().at(-1).from === '+15550200000');
         await hook('messaging', text('+12515550122', '+15550200000', 'STOP'));
-        check('STOP records the opt-out and revokes consent', T.sms_opt_outs.some((o) => o.phone === '+12515550122') && T.message_consent.some((c) => c.status === 'revoked'));
+        // STOP is per business (DECISIONS.md #6): it revokes this business's
+        // consent, which blocks every text it sends to that phone, and no one else's.
+        check('STOP to a business number revokes that business\'s consent', T.message_consent.some((c) => c.entity_slug === 'shop' && c.phone === '+12515550122' && c.status === 'revoked'));
+        check('and does not go on the platform-wide list', !T.sms_opt_outs.some((o) => o.phone === '+12515550122'), JSON.stringify(T.sms_opt_outs));
+        const messages = require(path.join(ROOT, 'lib/messages.js'));
+        check('so the business cannot text them, a confirmation included', (await messages.textCustomer({ slug: 'shop', to: '+12515550122', body: 'Confirmed', purpose: 'transactional' })).reason === 'consent_revoked');
+        check('while another business still can', (await messages.textCustomer({ slug: 'other', to: '+12515550122', body: 'Confirmed', purpose: 'transactional' })).success);
         llmCalls.length = 0;
         await hook('messaging', text('+12515550122', '+15550200000', 'hello again'));
         check('after STOP the agent\'s reply is blocked', T.business_messages.filter((m) => m.direction === 'out').at(-1).status === 'blocked');
@@ -148,6 +154,8 @@ async function run() {
         console.log('\n── the platform number ──');
         await hook('messaging', text('+12515550133', '+15550000001', 'SOLD OUT fish'));
         check('staff commands still work on the platform number', sentTexts().at(-1)?.text === 'Marked sold out.' && sentTexts().at(-1).from === '+15550000001');
+        await hook('messaging', text('+12515550133', '+15550000001', 'STOP'));
+        check('STOP to the platform number, which texts for everyone, goes on the platform-wide list', T.sms_opt_outs.some((o) => o.phone === '+12515550133'));
 
         console.log('\n── a call to the concierge ──');
         telnyxCalls.length = 0;
