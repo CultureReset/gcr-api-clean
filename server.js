@@ -72,7 +72,13 @@ app.use(cors({
     credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
+// The raw bytes are kept alongside the parsed body: a signature is over what
+// was sent, not over a re-serialised object. lib/serviceSigning.js (NEXT GENT
+// service calls), the Telnyx webhook check and the Stripe webhook read it.
+app.use(express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => { req.rawBody = buf; },
+}));
 
 /* ── rate limits on the two doors that cost money ─────────────────────────
  *

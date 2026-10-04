@@ -31,11 +31,14 @@
 // one — the same property that makes the dashboard safe. A read-scoped token
 // gets the four read tools and is refused the three writes.
 
-const crypto = require('crypto');
 const supabase = require('../db');
-const { ownerRequired } = require('../middleware/ownerAuth');
-const { getSchema, allowTable, cleanBody, textColumns } = require('../lib/businessTables');
+const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth');
+const {
+    getSchema, allowTable, cleanBody, textColumns,
+    permits, canAny, tablesFor, resourceForTable, normalizePermissions, scopeForPermissions,
+} = require('../lib/businessTables');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
+const { TOKEN_PREFIX, mintToken, lookupToken, missingTable } = require('../lib/businessTokens');
 
 const SERVER_INFO = { name: 'gcr-api-clean', title: 'Gulf Coast Radar — business', version: '1.0.0' };
 
@@ -68,11 +71,6 @@ const INSTRUCTIONS = [
  * answer is to revoke it and mint another.
  */
 
-const TOKEN_PREFIX = 'gcr_mcp_';
-const hashToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex');
-const missingTable = (error) =>
-    /business_mcp_tokens/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
-
 async function authenticate(req) {
     const header = (req.headers.authorization || '').trim();
     if (!header) return { reason: 'No bearer token.' };
@@ -83,48 +81,24 @@ async function authenticate(req) {
     if (!raw) return { reason: 'No bearer token.' };
 
     if (raw.startsWith(TOKEN_PREFIX)) {
-        const { data, error } = await supabase
-            .from('business_mcp_tokens')
-            .select('id, entity_slug, label, scope, revoked_at')
-            .eq('token_hash', hashToken(raw))
-            .maybeSingle();
-
-        if (error) {
-            if (missingTable(error)) {
-                return { reason: 'MCP tokens are not set up on this database yet (business_mcp_tokens is missing).' };
-            }
-            return { reason: error.message };
-        }
-        if (!data) return { reason: 'That token is not valid.' };
-        if (data.revoked_at) return { reason: 'That token has been revoked.' };
-
-        // Best effort: a failed timestamp update must not fail the call.
-        supabase
-            .from('business_mcp_tokens')
-            .update({ last_used_at: new Date().toISOString() })
-            .eq('id', data.id)
-            .then(() => {}, () => {});
-
-        return { slug: data.entity_slug, scope: data.scope || 'read', via: 'token', label: data.label };
+        const found = await lookupToken(raw);
+        if (found.reason) return { reason: found.reason };
+        // permissions null = a legacy token, governed by scope alone.
+        return {
+            slug: found.slug,
+            scope: found.scope,
+            permissions: found.permissions,
+            installId: found.installId,
+            via: 'token',
+            label: found.label,
+        };
     }
 
-    let userId;
-    try {
-        const { data, error } = await supabase.auth.getUser(raw);
-        if (error || !data?.user) return { reason: 'That token is not valid.' };
-        userId = data.user.id;
-    } catch {
-        return { reason: 'That token is not valid.' };
-    }
-
-    const { data: owned } = await supabase
-        .from('entity_owners')
-        .select('entity_slug')
-        .eq('user_id', userId)
-        .limit(1);
-    if (!owned?.length) return { reason: 'This account is not linked to a business.' };
-
-    return { slug: owned[0].entity_slug, scope: 'write', via: 'session', label: 'dashboard session' };
+    // A dashboard session: a Supabase access token or a Paperclip business
+    // token, resolved by the same code the dashboard's guards use.
+    const session = await resolveSessionSlug(raw);
+    if (session.reason) return { reason: session.reason };
+    return { slug: session.slug, scope: 'write', permissions: null, via: session.via, label: 'dashboard session' };
 }
 
 /* ── the tools ────────────────────────────────────────────────────────────
@@ -244,8 +218,12 @@ const TOOLS = [
 
 const WRITE_TOOLS = new Set(['create_row', 'update_row', 'delete_row']);
 
-/** Tools this caller may actually see. A read token is not shown the writes. */
-const toolsFor = (caller) => (caller.scope === 'write' ? TOOLS : TOOLS.filter((t) => !WRITE_TOOLS.has(t.name)));
+/**
+ * Tools this caller may actually see. A token that may not write anything is
+ * not shown the writes. Which sections each tool reaches is decided per call by
+ * lib/businessTables.js (permits), the same check routes/business-data.js uses.
+ */
+const toolsFor = (caller) => (canAny(caller, 'write') ? TOOLS : TOOLS.filter((t) => !WRITE_TOOLS.has(t.name)));
 
 /* ── running a tool ───────────────────────────────────────────────────── */
 
@@ -263,18 +241,30 @@ async function mapLimit(items, limit, worker) {
     await Promise.all(runners);
 }
 
-/** Resolve a section name, or explain why it is not one. */
-async function section(name) {
+/**
+ * Resolve a section name and check this caller may `action` it, or explain why
+ * not. The check is lib/businessTables.js permits() — one copy.
+ */
+async function section(name, caller, action) {
     if (typeof name !== 'string' || !name.trim()) throw new Error('A section name is required.');
     const table = await allowTable(name.trim());
     if (!table) throw new Error(`There is no section called "${name}". Call list_sections to see what this business has.`);
+    const { columns } = await getSchema();
+    const allowed = Array.isArray(action)
+        ? action.some((a) => permits(caller, table, columns[table], a))
+        : permits(caller, table, columns[table], action);
+    if (!allowed) {
+        const resource = resourceForTable(table, columns[table]) || 'this data';
+        const verb = Array.isArray(action) ? action[0] : action;
+        throw new Error(`This connection is not allowed to ${verb} ${resource}. Ask the business owner to approve it.`);
+    }
     return table;
 }
 
 async function runTool(name, args, caller) {
     const a = args && typeof args === 'object' ? args : {};
 
-    if (WRITE_TOOLS.has(name) && caller.scope !== 'write') {
+    if (WRITE_TOOLS.has(name) && !canAny(caller, 'write')) {
         return toolError('This connection is read-only. Ask the business owner for a token with write access.');
     }
 
@@ -285,19 +275,20 @@ async function runTool(name, args, caller) {
                 .select('name, entity_type')
                 .eq('slug', caller.slug)
                 .maybeSingle();
-            const { tables } = await getSchema();
+            const tables = await tablesFor(caller, 'read');
             return content({
                 slug: caller.slug,
                 name: entity?.name || null,
                 industry: entity?.entity_type || null,
-                can_write: caller.scope === 'write',
+                can_write: canAny(caller, 'write'),
+                permissions: caller.permissions ?? undefined,
                 connection: caller.label || caller.via,
                 sections_available: tables.length,
             });
         }
 
         case 'list_sections': {
-            const { tables } = await getSchema();
+            const tables = await tablesFor(caller, 'read');
             const found = [];
             await mapLimit(tables, COUNT_CONCURRENCY, async (table) => {
                 // head:true asks Postgres for the count without shipping rows.
@@ -314,7 +305,7 @@ async function runTool(name, args, caller) {
         }
 
         case 'describe_section': {
-            const table = await section(a.section);
+            const table = await section(a.section, caller, ['read', 'write']);
             const { columns } = await getSchema();
             return content({
                 section: table,
@@ -330,7 +321,7 @@ async function runTool(name, args, caller) {
         }
 
         case 'read_section': {
-            const table = await section(a.section);
+            const table = await section(a.section, caller, 'read');
             const limit = Math.min(Math.max(Number(a.limit) || 50, 1), ROW_LIMIT);
             const offset = Math.max(Number(a.offset) || 0, 0);
 
@@ -368,7 +359,7 @@ async function runTool(name, args, caller) {
         }
 
         case 'create_row': {
-            const table = await section(a.section);
+            const table = await section(a.section, caller, 'write');
             const values = await cleanBody(table, a.values);
             if (!Object.keys(values).length) {
                 return toolError('No usable columns in values. Call describe_section to see what this section accepts.');
@@ -385,7 +376,7 @@ async function runTool(name, args, caller) {
         }
 
         case 'update_row': {
-            const table = await section(a.section);
+            const table = await section(a.section, caller, 'write');
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
             const values = await cleanBody(table, a.values);
             if (!Object.keys(values).length) {
@@ -403,7 +394,7 @@ async function runTool(name, args, caller) {
         }
 
         case 'delete_row': {
-            const table = await section(a.section);
+            const table = await section(a.section, caller, 'write');
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
             const { data, error } = await supabase
                 .from(table)
@@ -438,43 +429,46 @@ const router = createMcpRouter({
 router.get('/tokens', ownerRequired, async (req, res) => {
     const { data, error } = await supabase
         .from('business_mcp_tokens')
-        .select('id, label, scope, token_hint, created_at, last_used_at, revoked_at')
+        .select('*')
         .eq('entity_slug', req.entitySlug)
         .order('created_at', { ascending: false });
     if (error) {
         if (missingTable(error)) return res.status(503).json({ error: 'MCP tokens are not set up on this database yet.' });
         return res.status(500).json({ error: error.message });
     }
-    res.json({ slug: req.entitySlug, tokens: data || [] });
+    // select('*') so the permission columns show when sql/nextgent_link.sql is
+    // applied; the hash never leaves this API.
+    const tokens = (data || []).map(({ token_hash, ...row }) => row);
+    res.json({ slug: req.entitySlug, tokens });
 });
 
 router.post('/tokens', ownerRequired, async (req, res) => {
     const label = String(req.body?.label || req.body?.name || 'AI assistant').trim().slice(0, 80);
-    const scope = req.body?.scope === 'write' ? 'write' : 'read';
 
-    // 32 random bytes. Long enough that guessing is not a threat model, so the
-    // stored hash can be a plain sha256 and the lookup stays one indexed read.
-    const token = TOKEN_PREFIX + crypto.randomBytes(32).toString('base64url');
+    // Optional resource:action list (CONTRACT §6). Without it the token is a
+    // legacy one, governed by scope alone.
+    let permissions = null;
+    try {
+        permissions = normalizePermissions(req.body?.permissions);
+    } catch (err) {
+        return res.status(400).json({ error: err.message });
+    }
+    const scope = permissions ? scopeForPermissions(permissions) : (req.body?.scope === 'write' ? 'write' : 'read');
 
-    const { data, error } = await supabase
-        .from('business_mcp_tokens')
-        .insert({
-            entity_slug: req.entitySlug,
+    try {
+        const { row, token } = await mintToken({
+            slug: req.entitySlug,
             label,
             scope,
-            token_hash: hashToken(token),
-            token_hint: token.slice(-6),
-            created_by: req.ownerUserId,
-        })
-        .select('id, label, scope, token_hint, created_at')
-        .single();
-    if (error) {
-        if (missingTable(error)) return res.status(503).json({ error: 'MCP tokens are not set up on this database yet.' });
-        return res.status(500).json({ error: error.message });
+            permissions,
+            companyId: req.paperclip?.companyId ?? null,
+            createdBy: req.ownerUserId || null,
+        });
+        // The only time the token itself exists outside the client's config.
+        res.status(201).json({ ...row, token, note: 'Copy this now — it is not stored and cannot be shown again.' });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.status === 503 ? 'MCP tokens are not set up on this database yet.' : err.message });
     }
-
-    // The only time the token itself exists outside the client's config.
-    res.status(201).json({ ...data, token, note: 'Copy this now — it is not stored and cannot be shown again.' });
 });
 
 router.delete('/tokens/:id', ownerRequired, async (req, res) => {

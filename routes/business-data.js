@@ -46,11 +46,63 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // lib/businessTables.js so routes/mcp.js applies exactly the same three guards
 // to an AI assistant that this file applies to the dashboard. One copy only —
 // a second copy of a security check drifts until one of them has a hole in it.
-const { getSchema, allowTable, cleanBody } = require('../lib/businessTables');
+const { getSchema, allowTable, allowTableFor, cleanBody, tablesFor } = require('../lib/businessTables');
+const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
 const router = express.Router();
 
 const fail = (res, code, message, extra) => res.status(code).json({ error: message, ...(extra || {}) });
+
+/* ── who may use the section routes ──────────────────────────────────────
+ *
+ * The dashboard's session (Supabase or Paperclip, via ownerRequired), or a
+ * business token (gcr_mcp_…) an installed app was issued. Either way the slug
+ * comes from the table that vouched for the caller, and req.businessCaller
+ * carries { scope, permissions } for lib/businessTables.js to check — the same
+ * check routes/mcp.js runs. A session is the owner: write scope, no
+ * permission list, so every section.
+ *
+ * Only these section routes take a token. The rest of the owner API (billing,
+ * the store, token minting) stays session-only, so an app's token cannot mint
+ * itself a wider one.
+ */
+async function businessCaller(req, res, next) {
+    const header = req.headers.authorization || '';
+    const raw = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    if (isBusinessToken(raw)) {
+        const found = await lookupToken(raw);
+        if (found.reason) return fail(res, 401, found.reason);
+        req.entitySlug = found.slug;
+        req.businessCaller = { scope: found.scope, permissions: found.permissions, installId: found.installId };
+        return next();
+    }
+    return ownerRequired(req, res, () => {
+        req.businessCaller = { scope: 'write', permissions: null };
+        next();
+    });
+}
+
+/** The section named in the URL, if it exists and this caller may `action` it. */
+async function sectionFor(req, res, action) {
+    let table;
+    let permitted;
+    try {
+        table = await allowTable(req.params.table);
+        permitted = table && await allowTableFor(req.businessCaller, table, action);
+    } catch (err) {
+        fail(res, 502, err.message);
+        return null;
+    }
+    if (!table) {
+        fail(res, 400, `Not a business section: ${req.params.table}`);
+        return null;
+    }
+    if (!permitted) {
+        fail(res, 403, `This connection is not allowed to ${action} ${req.params.table}.`);
+        return null;
+    }
+    return table;
+}
 
 /* ── who am I ─────────────────────────────────────────────────────────────
  *
@@ -64,6 +116,25 @@ const fail = (res, code, message, extra) => res.status(code).json({ error: messa
  * isAdmin true — and every handler below it stays ownerRequired.
  */
 router.get('/me', sessionRequired, async (req, res) => {
+    // A Paperclip sign-in: the business is the company's link, if any.
+    if (req.authVia === 'paperclip') {
+        const slug = req.linkedSlug || null;
+        let name = null;
+        if (slug) {
+            const { data: entity } = await supabase.from('entity').select('name').eq('slug', slug).maybeSingle();
+            name = entity?.name || null;
+        }
+        return res.json({
+            slug,
+            name,
+            role: req.paperclip.role,
+            isAdmin: !!req.paperclip.isAdmin,
+            hasAccess: !!slug,
+            user_id: req.paperclip.userId,
+            company_id: req.paperclip.companyId,
+        });
+    }
+
     const userId = req.ownerUserId;
 
     const [{ data: owned, error: ownerError }, { data: admin }] = await Promise.all([
@@ -92,9 +163,11 @@ router.get('/me', sessionRequired, async (req, res) => {
 /* ── the schema the edit forms build themselves from ───────────────────── */
 
 // GET /api/business/schema — replaces the dashboard's PostgREST OpenAPI read.
-router.get('/schema', ownerRequired, async (req, res) => {
+router.get('/schema', businessCaller, async (req, res) => {
     try {
-        const { tables, columns, at } = await getSchema();
+        const { columns: all, at } = await getSchema();
+        const tables = await tablesFor(req.businessCaller, 'read');
+        const columns = Object.fromEntries(tables.map((t) => [t, all[t]]));
         res.json({ tables, columns, cached_at: new Date(at).toISOString() });
     } catch (err) {
         fail(res, 502, err.message);
@@ -137,23 +210,26 @@ async function sweepViaRpc(slug) {
     return out;
 }
 
-router.get('/sections', ownerRequired, async (req, res) => {
+router.get('/sections', businessCaller, async (req, res) => {
     const slug = req.entitySlug;
 
-    let schema;
+    let readable;
     try {
-        schema = await getSchema();
+        readable = await tablesFor(req.businessCaller, 'read');
     } catch (err) {
         return fail(res, 502, err.message);
     }
+    const allowed = new Set(readable);
 
     const viaRpc = await sweepViaRpc(slug);
     if (viaRpc) {
-        return res.json({ slug, sections: viaRpc, tables_scanned: schema.tables.length, via: 'rpc' });
+        // The RPC returns every table; a token sees only what it may read.
+        const sections = Object.fromEntries(Object.entries(viaRpc).filter(([t]) => allowed.has(t)));
+        return res.json({ slug, sections, tables_scanned: readable.length, via: 'rpc' });
     }
 
     const sections = {};
-    await mapLimit(schema.tables, SWEEP_CONCURRENCY, async (table) => {
+    await mapLimit(readable, SWEEP_CONCURRENCY, async (table) => {
         const { data, error } = await supabase
             .from(table)
             .select('*')
@@ -163,7 +239,7 @@ router.get('/sections', ownerRequired, async (req, res) => {
         if (!error && data && data.length) sections[table] = data;
     });
 
-    res.json({ slug, sections, tables_scanned: schema.tables.length, via: 'sweep' });
+    res.json({ slug, sections, tables_scanned: readable.length, via: 'sweep' });
 });
 
 /* ── the industry list, from the database rather than a constant ───────── */
@@ -204,14 +280,9 @@ router.get('/industries', ownerRequired, async (req, res) => {
 /* ── one section, for refreshing after an edit ───────────────────────────── */
 
 // GET /api/business/:table — this business's rows in one table, paged.
-router.get('/:table', ownerRequired, async (req, res) => {
-    let table;
-    try {
-        table = await allowTable(req.params.table);
-    } catch (err) {
-        return fail(res, 502, err.message);
-    }
-    if (!table) return fail(res, 400, `Not a business section: ${req.params.table}`);
+router.get('/:table', businessCaller, async (req, res) => {
+    const table = await sectionFor(req, res, 'read');
+    if (!table) return;
 
     const limit = Math.min(Number(req.query.limit) || 200, ROW_LIMIT);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -233,14 +304,9 @@ router.get('/:table', ownerRequired, async (req, res) => {
  */
 
 // POST /api/business/:table
-router.post('/:table', ownerRequired, async (req, res) => {
-    let table;
-    try {
-        table = await allowTable(req.params.table);
-    } catch (err) {
-        return fail(res, 502, err.message);
-    }
-    if (!table) return fail(res, 400, `Not a business section: ${req.params.table}`);
+router.post('/:table', businessCaller, async (req, res) => {
+    const table = await sectionFor(req, res, 'write');
+    if (!table) return;
 
     const values = await cleanBody(table, req.body);
 
@@ -255,14 +321,9 @@ router.post('/:table', ownerRequired, async (req, res) => {
 });
 
 // PATCH /api/business/:table/:id
-router.patch('/:table/:id', ownerRequired, async (req, res) => {
-    let table;
-    try {
-        table = await allowTable(req.params.table);
-    } catch (err) {
-        return fail(res, 502, err.message);
-    }
-    if (!table) return fail(res, 400, `Not a business section: ${req.params.table}`);
+router.patch('/:table/:id', businessCaller, async (req, res) => {
+    const table = await sectionFor(req, res, 'write');
+    if (!table) return;
 
     const values = await cleanBody(table, req.body);
     if (!Object.keys(values).length) return fail(res, 400, 'Nothing to change.');
@@ -280,14 +341,9 @@ router.patch('/:table/:id', ownerRequired, async (req, res) => {
 });
 
 // DELETE /api/business/:table/:id
-router.delete('/:table/:id', ownerRequired, async (req, res) => {
-    let table;
-    try {
-        table = await allowTable(req.params.table);
-    } catch (err) {
-        return fail(res, 502, err.message);
-    }
-    if (!table) return fail(res, 400, `Not a business section: ${req.params.table}`);
+router.delete('/:table/:id', businessCaller, async (req, res) => {
+    const table = await sectionFor(req, res, 'write');
+    if (!table) return;
 
     const { data, error } = await supabase
         .from(table)

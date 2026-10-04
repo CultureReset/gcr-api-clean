@@ -23,6 +23,9 @@
 
 const jwt = require('jsonwebtoken');
 const supabase = require('../db');
+const paperclip = require('../lib/paperclipAuth');
+const { isPaperclipAdmin } = require('./ownerAuth');
+const { slugForCompany } = require('../lib/companyLinks');
 
 async function businessAccess(req, res, next) {
     const header = req.headers.authorization || '';
@@ -42,6 +45,29 @@ async function businessAccess(req, res, next) {
         }
     } catch {
         // Not an Express JWT — fall through to the owner session below.
+    }
+
+    // A Paperclip business token (CONTRACT §1): the company's linked business,
+    // or any business for an instance admin listed in platform_admins.
+    if (paperclip.isPaperclipToken(token)) {
+        try {
+            const claims = await paperclip.verifyToken(token);
+            const admin = claims.role === 'instance_admin' && await isPaperclipAdmin(claims.sub);
+            req.authVia = 'paperclip';
+            req.paperclip = { userId: claims.sub, companyId: claims.company_id, role: claims.role, isAdmin: !!admin };
+            if (admin) {
+                req.isAdmin = true;
+                req.scopeSlug = null;
+                return next();
+            }
+            const slug = await slugForCompany(claims.company_id);
+            if (!slug) return res.status(403).json({ error: 'This company is not linked to a business.' });
+            req.scopeSlug = slug;
+            req.ownerRole = claims.role;
+            return next();
+        } catch (err) {
+            return res.status(err.status || 401).json({ error: err.message || 'That session is not valid.' });
+        }
     }
 
     // Business owner: a Supabase access token resolved through entity_owners.

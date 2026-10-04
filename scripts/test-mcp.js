@@ -38,6 +38,7 @@ function builder(table, verb) {
         limit: (n) => { rec.limit = n; return self; },
         not: () => self,
         in: () => self,
+        is: (k, v) => { rec.is = [k, v]; return self; },
         maybeSingle: () => Promise.resolve(result(rec)),
         single: () => Promise.resolve(result(rec)),
         then: (res, rej) => Promise.resolve(result(rec)).then(res, rej),
@@ -49,12 +50,13 @@ const TOKEN_ROW = {
     id: 'tok-1', entity_slug: 'flora-bama', label: 'Grok', scope: 'write', revoked_at: null,
 };
 let tokenScope = 'write';
+let tokenPermissions = null; // null = a legacy token
 let entityExists = true;
 
 function result(rec) {
     if (rec.table === 'business_mcp_tokens') {
         if (rec.update) return { data: [{ id: 'tok-1' }], error: null };
-        return { data: { ...TOKEN_ROW, scope: tokenScope }, error: null };
+        return { data: { ...TOKEN_ROW, scope: tokenScope, permissions: tokenPermissions }, error: null };
     }
     if (rec.table === 'entity') {
         // entityExists false stands in for a slug nobody has, or a delisted one.
@@ -92,8 +94,29 @@ const dbStub = {
     },
 };
 
+// The permission rules are the real ones — only the schema read is stubbed —
+// so these tests exercise the one copy routes/business-data.js uses too.
+const realTables = require(path.join(ROOT, 'lib/businessTables.js'));
+const STUB_TABLES = ['menu_items', 'faqs'];
+const stubSchema = async () => schemaStub.getSchema();
+
 const schemaStub = {
     SYSTEM_COLUMNS: new Set(['id', 'entity_slug']),
+    RESOURCES: realTables.RESOURCES,
+    ACTIONS: realTables.ACTIONS,
+    permits: realTables.permits,
+    canAny: realTables.canAny,
+    resourceForTable: realTables.resourceForTable,
+    normalizePermissions: realTables.normalizePermissions,
+    scopeForPermissions: realTables.scopeForPermissions,
+    tablesFor: async (caller, action = 'read') => {
+        const { tables, columns } = await stubSchema();
+        return tables.filter((t) => realTables.permits(caller, t, columns[t], action));
+    },
+    allowTableFor: async (caller, name, action) => {
+        const { columns } = await stubSchema();
+        return STUB_TABLES.includes(name) && realTables.permits(caller, name, columns[name], action) ? name : null;
+    },
     getSchema: async () => ({
         tables: ['menu_items', 'faqs'],
         columns: {
@@ -259,6 +282,39 @@ async function run() {
     const denied = await call('delete_row', { section: 'menu_items', id: 1 });
     check('read token calling delete_row → refused', denied.body.error?.code === -32601 || denied.body.result?.isError);
 
+    tokenScope = 'write';
+
+    console.log('\n── permissions (resource:action) ──');
+    tokenScope = 'read';
+    tokenPermissions = ['menu:read'];
+    const plist = await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    check('menu:read token is not shown the writes',
+        !plist.body.result.tools.some((t) => t.name === 'create_row'));
+    const psecs = await call('list_sections', { include_empty: true });
+    const pnames = psecs.body.result.structuredContent.sections.map((x) => x.section);
+    check('menu:read lists menu sections only', pnames.includes('menu_items') && !pnames.includes('faqs'), pnames.join(','));
+    const pread = await call('read_section', { section: 'menu_items' });
+    check('menu:read may read menu_items', !pread.body.result?.isError);
+    const pdenied = await call('read_section', { section: 'faqs' });
+    check('menu:read may not read faqs (business)', pdenied.body.result?.isError === true
+        && /not allowed to read business/.test(pdenied.body.result.content[0].text), JSON.stringify(pdenied.body).slice(0, 200));
+
+    tokenScope = 'write';
+    tokenPermissions = ['menu:write'];
+    calls.length = 0;
+    const pwrite = await call('update_row', { section: 'menu_items', id: 8821, values: { name: 'Y' } });
+    check('menu:write may update menu_items', !pwrite.body.result?.isError);
+    const pwriteFaq = await call('create_row', { section: 'faqs', values: { name: 'Q' } });
+    check('menu:write may not write faqs', pwriteFaq.body.result?.isError === true);
+    const pwriteRead = await call('read_section', { section: 'menu_items' });
+    check('write does not imply read', pwriteRead.body.result?.isError === true);
+    tokenPermissions = [];
+    const none = await call('read_section', { section: 'menu_items' });
+    check('an empty permission list reaches nothing', none.body.result?.isError === true);
+    tokenPermissions = null;
+    tokenScope = 'read';
+    const legacy = await call('read_section', { section: 'faqs' });
+    check('a legacy read token still reads every section', !legacy.body.result?.isError);
     tokenScope = 'write';
 
     console.log('\n── the slug is never taken from the request ──');
