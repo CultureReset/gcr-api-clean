@@ -25,7 +25,7 @@ const express = require('express');
 const router  = express.Router();
 const crypto  = require('crypto');
 const db      = require('../db');
-const { businessAccess, assertSlug } = require('../middleware/businessAccess');
+const { businessOrAdminRequired, assertSlug } = require('../middleware/ownerAuth');
 const { forwardingAddressFor, slugFromAddress } = require('../lib/forwardingAddress');
 
 // ─── WHO MAY WRITE HERE ──────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ async function manualEntryAllowed(req, res, next) {
 
     // Authenticated caller: full trust, normal scoping.
     if (header.startsWith('Bearer ')) {
-        return businessAccess(req, res, () => {
+        return businessOrAdminRequired(req, res, () => {
             req.publicBooking = false;
             next();
         });
@@ -1260,7 +1260,7 @@ router.post('/manual', manualEntryAllowed, async (req, res) => {
  * Accepts JSON array of seating/booking records
  * [{ table_number, party_size, seated_time, left_time, event_date }, ...]
  */
-router.post('/bulk-import', businessAccess, async (req, res) => {
+router.post('/bulk-import', businessOrAdminRequired, async (req, res) => {
   try {
     const { records, booking_type = 'restaurant', event_date } = req.body;
 
@@ -1355,7 +1355,7 @@ router.get('/availability/:slug', async (req, res) => {
 // These rows carry customer names, phone numbers and raw email text, so the
 // filter is not optional for anyone but an admin: an owner reads their own
 // business's log and there is no request they can make that says otherwise.
-router.get('/log', businessAccess, async (req, res) => {
+router.get('/log', businessOrAdminRequired, async (req, res) => {
   try {
     const { date, platform, status, limit = 100, offset = 0 } = req.query;
 
@@ -1432,7 +1432,7 @@ const PLATFORM_DESCRIPTIONS = {
 // The number every availability figure counts down from. Left open, this is
 // the whole platform's soft underbelly: set a competitor's capacity to 1 and
 // GCR shows them booked solid to every tourist who looks.
-router.post('/setup/:slug', businessAccess, async (req, res) => {
+router.post('/setup/:slug', businessOrAdminRequired, async (req, res) => {
   try {
     const slug = assertSlug(req, res, req.params.slug);
     if (!slug) return;
@@ -1613,7 +1613,7 @@ router.get('/ical-import/run', async (req, res) => {
 });
 
 // POST /api/email-parser/ical-import/sync-now/:id — manual "sync now" trigger from the dashboard
-router.post('/ical-import/sync-now/:id', businessAccess, async (req, res) => {
+router.post('/ical-import/sync-now/:id', businessOrAdminRequired, async (req, res) => {
   const { data: row } = await db.from('entity_external_calendars').select('*').eq('id', req.params.id).maybeSingle();
   if (!row) return res.status(404).json({ error: 'Not found' });
   // The feed row names its own business; check that against the caller rather

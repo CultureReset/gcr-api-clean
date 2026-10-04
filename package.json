@@ -15,7 +15,7 @@
     "test:automations": "node scripts/test-automations.js",
     "test:billing": "node scripts/test-billing.js",
     "test:store": "node scripts/test-store.js",
-    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:nodes && npm run test:ghost-mcp && npm run test:ghost-admin && npm run test:automations && npm run test:billing && npm run test:store && npm run test:concierge && npm run test:paperclip-auth && npm run test:telephony && npm run test:nextgent && npm run test:leftovers && npm run test:messages && npm run test:automation-steps && npm run test:intake && npm run test:owner-app && npm run test:receipts && npm run test:google-push && npm run test:phone-agent && npm run test:live && npm run test:litellm-usage && npm run test:email",
+    "verify": "npm run check:sql && npm run check:columns && npm run test:mcp && npm run test:nodes && npm run test:ghost-mcp && npm run test:ghost-admin && npm run test:automations && npm run test:billing && npm run test:store && npm run test:concierge && npm run test:paperclip-auth && npm run test:telephony && npm run test:nextgent && npm run test:leftovers && npm run test:messages && npm run test:automation-steps && npm run test:intake && npm run test:owner-app && npm run test:receipts && npm run test:google-push && npm run test:phone-agent && npm run test:live && npm run test:litellm-usage && npm run test:email && npm run test:dedup",
     "test:concierge": "node scripts/test-concierge.js",
     "vercel-build": "node scripts/stop-image-cron.mjs",
     "test:paperclip-auth": "node scripts/test-paperclip-auth.js",
@@ -31,7 +31,8 @@
     "test:phone-agent": "node scripts/test-phone-agent.js",
     "test:live": "node scripts/test-live.js",
     "test:litellm-usage": "node scripts/test-litellm-usage.js",
-    "test:email": "node scripts/test-email-templates.js"
+    "test:email": "node scripts/test-email-templates.js",
+    "test:dedup": "node scripts/test-dedup.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

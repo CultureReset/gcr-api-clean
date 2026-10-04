@@ -66,10 +66,11 @@ const { T, db } = createMemDb({ tables: {
 inject(path.join(ROOT, 'db.js'), db);
 const emails = [];
 inject(path.join(ROOT, 'utils/email.js'), { sendEmail: async (m) => { emails.push(m); return { success: true }; } });
-inject(path.join(ROOT, 'middleware/businessAccess.js'), { businessAccess: (q, r, n) => n(), assertSlug: () => true });
 let session = { entitySlug: 'shop', authVia: 'paperclip', paperclip: { userId: 'pc-1' } };
 inject(path.join(ROOT, 'middleware/ownerAuth.js'), {
     ownerRequired: (req, res, next) => (session ? (Object.assign(req, session), next()) : res.status(401).json({ error: 'no' })),
+    businessOrAdminRequired: (q, r, n) => n(),
+    assertSlug: () => true,
 });
 inject(path.join(ROOT, 'lib/exportBusiness.js'), { exportBusiness: async (slug) => ({ url: `https://files.example.test/${slug}.json`, expiresAt: 'later' }) });
 

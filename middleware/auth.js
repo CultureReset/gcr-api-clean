@@ -27,6 +27,21 @@ async function paperclipAdminGate(token, req, res, next) {
     return next();
 }
 
+/**
+ * The admin console's own token: an Express JWT signed with JWT_SECRET whose
+ * role is 'admin'. Returns its claims, or null for any other token. One copy,
+ * used by authRequired below and by ownerAuth's businessOrAdminRequired.
+ */
+function consoleAdminClaims(token) {
+    if (!token || !process.env.JWT_SECRET) return null;
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        return decoded && decoded.role === 'admin' ? decoded : null;
+    } catch {
+        return null;
+    }
+}
+
 // Verify JWT and attach site_id to request
 // Accepts both Express JWTs (JWT_SECRET) and Supabase JWTs (old + GCR)
 function authRequired(req, res, next) {
@@ -108,4 +123,4 @@ function adminRequired(req, res, next) {
     });
 }
 
-module.exports = { authRequired, adminRequired, paperclipAdminGate };
+module.exports = { authRequired, adminRequired, paperclipAdminGate, consoleAdminClaims };

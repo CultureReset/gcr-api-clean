@@ -88,6 +88,80 @@ function paperclipFailure(res, err) {
     return res.status(status).json({ error: err?.message || 'That session is not valid.' });
 }
 
+/* ── the one resolver ─────────────────────────────────────────────────── */
+
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+
+/**
+ * Who is behind this bearer token, and which business they own.
+ *
+ * The one copy of the resolution every business guard here uses (and that
+ * other callers import instead of repeating it):
+ *
+ *   Paperclip token  verified against Paperclip's JWKS, its company resolved
+ *                    through company_links; instance_admin honoured only if
+ *                    platform_admins.paperclip_user_id lists the user.
+ *   Supabase token   verified with Supabase, the business looked up in
+ *                    entity_owners; an account owning none is an admin only
+ *                    if platform_admins lists its user id.
+ *
+ * Resolves to { via, userId, user?, claims?, slug, role, isAdmin }. `slug` is
+ * the business the token owns (null when it owns none). Throws an error with
+ * err.status (401 not signed in or not valid, 500 the lookup failed).
+ */
+async function resolveBusinessCaller(token) {
+    if (!token) throw httpError(401, 'Not signed in.');
+
+    if (paperclip.isPaperclipToken(token)) {
+        let resolved;
+        try {
+            resolved = await resolvePaperclip(token);
+        } catch (err) {
+            throw httpError(err?.status || 401, err?.message || 'That session is not valid.');
+        }
+        const { claims, slug, isAdmin } = resolved;
+        return { via: 'paperclip', userId: claims.sub, claims, slug: slug || null, role: claims.role, isAdmin: !!isAdmin };
+    }
+
+    let user;
+    try {
+        const { data, error } = await supabase.auth.getUser(token);
+        if (!error && data?.user) user = data.user;
+    } catch {
+        user = null;
+    }
+    if (!user) throw httpError(401, 'That session is not valid.');
+
+    const { data: owned, error: ownerError } = await supabase
+        .from('entity_owners')
+        .select('entity_slug, role')
+        .eq('user_id', user.id)
+        .limit(1);
+    if (ownerError) throw httpError(500, ownerError.message);
+    if (owned?.length) {
+        return { via: 'supabase', userId: user.id, user, slug: owned[0].entity_slug, role: owned[0].role, isAdmin: false };
+    }
+
+    // No business of their own: an admin, if platform_admins vouches for them.
+    const { data: admin } = await supabase
+        .from('platform_admins')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    return { via: 'supabase', userId: user.id, user, slug: null, role: null, isAdmin: !!admin };
+}
+
+const notLinked = (via) => (via === 'paperclip' ? 'This company is not linked to a business.' : 'This account is not linked to a business.');
+
+function stampCaller(req, caller) {
+    if (caller.via === 'paperclip') {
+        stampPaperclip(req, caller);
+    } else {
+        req.authVia = 'supabase';
+        req.ownerUserId = caller.userId;
+    }
+}
+
 /* ── guards ───────────────────────────────────────────────────────────── */
 
 /**
@@ -131,80 +205,109 @@ async function sessionRequired(req, res, next) {
     }
 }
 
+/**
+ * The business is the one the token owns: req.entitySlug. An admin (Paperclip
+ * instance_admin or a platform_admins account) names the business explicitly
+ * — ?business=, ?slug=, body.slug or the :slug in the path — and only an admin
+ * vouched for server-side gets that far.
+ */
 async function ownerRequired(req, res, next) {
-    const token = bearer(req);
-    if (!token) return res.status(401).json({ error: 'Not signed in.' });
+    let caller;
+    try {
+        caller = await resolveBusinessCaller(bearer(req));
+    } catch (err) {
+        return res.status(err.status || 401).json({ error: err.message || 'That session is not valid.' });
+    }
+    stampCaller(req, caller);
 
-    if (paperclip.isPaperclipToken(token)) {
-        let resolved;
-        try {
-            resolved = await resolvePaperclip(token);
-        } catch (err) {
-            return paperclipFailure(res, err);
-        }
-        stampPaperclip(req, resolved);
-        const requested = resolved.isAdmin ? requestedSlug(req) : '';
-        if (resolved.isAdmin && requested) {
-            req.entitySlug = requested;
-            req.actingAsAdmin = true;
-            return next();
-        }
-        if (!resolved.slug) return res.status(403).json({ error: 'This company is not linked to a business.' });
-        req.entitySlug = resolved.slug;
-        req.ownerRole = resolved.claims.role;
+    // An owner acts on their own business, whatever they typed.
+    if (caller.slug && !(caller.via === 'paperclip' && caller.isAdmin && requestedSlug(req))) {
+        req.entitySlug = caller.slug;
+        req.ownerRole = caller.role;
+        return next();
+    }
+    const requested = caller.isAdmin ? requestedSlug(req) : '';
+    if (caller.isAdmin && requested) {
+        req.entitySlug = requested;
+        req.actingAsAdmin = true;
+        return next();
+    }
+    return res.status(403).json({ error: notLinked(caller.via) });
+}
+
+/**
+ * For routers whose callers are a business owner OR the admin console (the
+ * email parser's manual entry, bulk import, log and setup). Accepts the admin
+ * console's own JWT (middleware/auth.js consoleAdminClaims) as well as
+ * everything resolveBusinessCaller accepts, and normalises the answer:
+ *
+ *   req.scopeSlug   the ONE slug this caller may touch, or null for an admin
+ *                   who may touch any.
+ *   req.isAdmin     true for an admin of any kind.
+ *
+ * Then a handler calls assertSlug(); the slug is never trusted from the
+ * request for a non-admin.
+ */
+async function businessOrAdminRequired(req, res, next) {
+    const token = bearer(req);
+    if (!token) return res.status(401).json({ error: 'Sign in to do that.' });
+
+    // Required lazily: auth.js requires this file lazily too.
+    const { consoleAdminClaims } = require('./auth');
+    const consoleAdmin = consoleAdminClaims(token);
+    if (consoleAdmin) {
+        req.isAdmin = true;
+        req.scopeSlug = null;
+        req.userId = consoleAdmin.userId;
         return next();
     }
 
-    let userId;
+    let caller;
     try {
-        const { data, error } = await supabase.auth.getUser(token);
-        if (error || !data?.user) return res.status(401).json({ error: 'That session is not valid.' });
-        userId = data.user.id;
-    } catch {
-        return res.status(401).json({ error: 'That session is not valid.' });
+        caller = await resolveBusinessCaller(token);
+    } catch (err) {
+        return res.status(err.status || 401).json({ error: err.message || 'That session is not valid.' });
     }
-
-    const { data: owned, error: ownerError } = await supabase
-        .from('entity_owners')
-        .select('entity_slug, role')
-        .eq('user_id', userId)
-        .limit(1);
-    if (ownerError) return res.status(500).json({ error: ownerError.message });
-
-    if (!owned?.length) {
-        // An admin viewing a business is allowed to act on it. Checked against
-        // platform_admins server-side, and the slug still has to be supplied
-        // explicitly rather than assumed.
-        const { data: admin } = await supabase
-            .from('platform_admins')
-            .select('user_id')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        // Four ways an admin can name the business they mean, all of them
-        // explicit: the dashboard's own ?business=<slug>, a plain ?slug=, the
-        // body, or the :slug already in the path on the per-section routers
-        // (/api/faqs/:slug and its siblings).
-        //
-        // All four are only honoured for an account platform_admins vouched
-        // for above. For everybody else this block is never reached, and the
-        // slug comes from entity_owners or the request is refused.
-        const requested = requestedSlug(req);
-        if (admin && requested) {
-            req.authVia = 'supabase';
-            req.ownerUserId = userId;
-            req.entitySlug = requested;
-            req.actingAsAdmin = true;
-            return next();
-        }
-        return res.status(403).json({ error: 'This account is not linked to a business.' });
+    stampCaller(req, caller);
+    if (caller.isAdmin) {
+        req.isAdmin = true;
+        req.scopeSlug = null;
+        return next();
     }
-
-    req.authVia = 'supabase';
-    req.ownerUserId = userId;
-    req.entitySlug = owned[0].entity_slug;
-    req.ownerRole = owned[0].role;
+    if (!caller.slug) return res.status(403).json({ error: notLinked(caller.via) });
+    req.scopeSlug = caller.slug;
+    req.ownerRole = caller.role;
     return next();
+}
+
+/**
+ * The slug this request is allowed to act on, or null if it may not.
+ *
+ * Call AFTER businessOrAdminRequired. An admin gets whatever slug they asked
+ * for; an owner gets their own slug and nothing else, whatever they typed.
+ */
+function scopedSlug(req, requested) {
+    const asked = String(requested || '').trim();
+    if (req.isAdmin) return asked || null;
+    if (!req.scopeSlug) return null;
+    if (asked && asked !== req.scopeSlug) return null;
+    return req.scopeSlug;
+}
+
+/**
+ * Resolve the slug or end the request with 403. Returns null when it has
+ * already responded:
+ *
+ *     const slug = assertSlug(req, res, req.body.entity_slug);
+ *     if (!slug) return;
+ */
+function assertSlug(req, res, requested) {
+    const slug = scopedSlug(req, requested);
+    if (!slug) {
+        res.status(403).json({ error: 'Not your business.' });
+        return null;
+    }
+    return slug;
 }
 
 /**
@@ -238,31 +341,26 @@ async function paperclipRequired(req, res, next) {
  */
 async function resolveSessionSlug(token) {
     if (!token) return { reason: 'No bearer token.' };
-    if (paperclip.isPaperclipToken(token)) {
-        try {
-            const { claims, slug } = await resolvePaperclip(token);
-            if (!slug) return { reason: 'This company is not linked to a business.' };
-            return { slug, userId: claims.sub, via: 'paperclip' };
-        } catch (err) {
-            return { reason: err.message || 'That token is not valid.' };
-        }
-    }
-
-    let userId;
+    let caller;
     try {
-        const { data, error } = await supabase.auth.getUser(token);
-        if (error || !data?.user) return { reason: 'That token is not valid.' };
-        userId = data.user.id;
-    } catch {
-        return { reason: 'That token is not valid.' };
+        caller = await resolveBusinessCaller(token);
+    } catch (err) {
+        if (paperclip.isPaperclipToken(token)) return { reason: err.message || 'That token is not valid.' };
+        return { reason: err.status === 401 ? 'That token is not valid.' : (err.message || 'That token is not valid.') };
     }
-    const { data: owned } = await supabase
-        .from('entity_owners')
-        .select('entity_slug')
-        .eq('user_id', userId)
-        .limit(1);
-    if (!owned?.length) return { reason: 'This account is not linked to a business.' };
-    return { slug: owned[0].entity_slug, userId, via: 'session' };
+    if (!caller.slug) return { reason: notLinked(caller.via) };
+    return { slug: caller.slug, userId: caller.userId, via: caller.via === 'paperclip' ? 'paperclip' : 'session' };
 }
 
-module.exports = { ownerRequired, sessionRequired, paperclipRequired, resolveSessionSlug, isPaperclipAdmin, resolvePaperclipAdmin };
+module.exports = {
+    ownerRequired,
+    sessionRequired,
+    paperclipRequired,
+    businessOrAdminRequired,
+    scopedSlug,
+    assertSlug,
+    resolveBusinessCaller,
+    resolveSessionSlug,
+    isPaperclipAdmin,
+    resolvePaperclipAdmin,
+};
