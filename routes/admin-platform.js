@@ -27,6 +27,7 @@
 const express = require('express');
 const { adminRequired } = require('../middleware/auth');
 const supabase = require('../db');
+const { forwardingAddressFor } = require('../lib/forwardingAddress');
 
 const router = express.Router();
 
@@ -443,7 +444,7 @@ router.get('/integrations', adminRequired, async (req, res) => {
 //
 // The platform does not hold live API connections to Peek Pro, FareHarbor,
 // Thoroughbred and the rest — it receives their confirmation emails at
-// gcr-<slug>@parse.gulfcoastradar.com and parses them. routes/email-parser.js
+// its own forwarding address (lib/forwardingAddress.js) and parses them. routes/email-parser.js
 // recognises 24 platforms and writes every attempt to email_parser_log.
 //
 // That log is therefore the honest answer to "what is this business attached
@@ -544,7 +545,7 @@ router.get('/parser/sources', adminRequired, async (req, res) => {
             ...entry,
             entity_name: nameBySlug[entry.entity_slug]?.name || null,
             entity_type: nameBySlug[entry.entity_slug]?.entity_type || null,
-            bcc_email: `gcr-${entry.entity_slug}@parse.gulfcoastradar.com`,
+            bcc_email: forwardingAddressFor(entry.entity_slug),
             platforms: [...entry.platforms.values()].sort((a, b) => b.count - a.count),
         })).sort((a, b) => b.total - a.total);
 
@@ -556,7 +557,7 @@ router.get('/parser/sources', adminRequired, async (req, res) => {
                 entity_slug: e.slug,
                 entity_name: e.name,
                 entity_type: e.entity_type,
-                bcc_email: `gcr-${e.slug}@parse.gulfcoastradar.com`,
+                bcc_email: forwardingAddressFor(e.slug),
             }));
 
         res.json({
@@ -654,7 +655,7 @@ router.get('/capacity', adminRequired, async (req, res) => {
                 capacity_per_slot: e.capacity_per_slot ?? null,
                 // The parser can only compute "spots left" once this is set.
                 capacity_configured: !!e.daily_capacity,
-                bcc_email: `gcr-${e.slug}@parse.gulfcoastradar.com`,
+                bcc_email: forwardingAddressFor(e.slug),
                 offerings: inv.offerings,
                 active_offerings: inv.active_offerings,
                 offering_seats: inv.seats,
@@ -709,7 +710,7 @@ router.put('/capacity/:slug', adminRequired, async (req, res) => {
         res.json({
             business: {
                 ...data[0],
-                bcc_email: `gcr-${req.params.slug}@parse.gulfcoastradar.com`,
+                bcc_email: forwardingAddressFor(req.params.slug),
                 capacity_configured: !!data[0].daily_capacity,
             },
         });
@@ -1453,7 +1454,7 @@ router.get('/business-calendar/:slug', adminRequired, async (req, res) => {
                 ? unitRows.reduce((n, u) => Math.max(n, u.claimed_days), 0)
                 : summary.claimed_days,
             open_days: days.filter((d) => d.status === 'available' || d.status === 'limited').length,
-            bcc_email: `gcr-${slug}@parse.gulfcoastradar.com`,
+            bcc_email: forwardingAddressFor(slug),
         });
     } catch (err) {
         fail(res, 500, err.message);

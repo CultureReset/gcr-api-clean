@@ -2,7 +2,7 @@
  * GCR EMAIL PARSER SYSTEM
  * ========================
  * Receives booking confirmation emails from any platform via:
- *   A) BCC to gcr-[slug]@parse.yourdomain.com (Sendgrid Inbound Parse / Postmark)
+ *   A) BCC to the business's forwarding address (lib/forwardingAddress.js)
  *   B) Gmail OAuth polling (future)
  *   C) Manual import (CSV/bulk)
  *
@@ -26,6 +26,7 @@ const router  = express.Router();
 const crypto  = require('crypto');
 const db      = require('../db');
 const { businessAccess, assertSlug } = require('../middleware/businessAccess');
+const { forwardingAddressFor, slugFromAddress } = require('../lib/forwardingAddress');
 
 // ─── WHO MAY WRITE HERE ──────────────────────────────────────────────────────
 //
@@ -121,12 +122,9 @@ function parseTime(str) {
   return null;
 }
 
-// Extract entity_slug from the TO address: gcr-[slug]@parse.domain.com
-function slugFromTo(toAddress) {
-  if (!toAddress) return null;
-  const m = (toAddress || '').match(/gcr-([a-z0-9-]+)@/i);
-  return m ? m[1] : null;
-}
+// Extract entity_slug from the TO address (lib/forwardingAddress.js holds the
+// one copy of the address convention, both directions).
+const slugFromTo = (toAddress) => slugFromAddress(toAddress);
 
 // ─── EXTRACTOR REGISTRY ───────────────────────────────────────────────────────
 // Each extractor:
@@ -1392,12 +1390,14 @@ router.post('/setup/:slug', businessAccess, async (req, res) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    const bccEmail = `gcr-${slug}@parse.gulfcoastradar.com`;
+    const bccEmail = forwardingAddressFor(slug);
 
     res.json({
       success: true,
       bcc_email: bccEmail,
-      instructions: `BCC every booking confirmation to: ${bccEmail}. Set this in your FareHarbor / Peek / BoatBooker notification settings.`,
+      instructions: bccEmail
+        ? `BCC every booking confirmation to: ${bccEmail}. Set this in your booking platform's notification settings.`
+        : 'No forwarding address: INTAKE_EMAIL_DOMAIN is not set on this server.',
       daily_capacity: parseInt(daily_capacity),
       capacity_per_slot: capacity_per_slot ? parseInt(capacity_per_slot) : null,
     });
@@ -1426,7 +1426,7 @@ router.get('/setup/:slug', async (req, res) => {
       name: data.name,
       daily_capacity: data.daily_capacity || null,
       capacity_per_slot: data.capacity_per_slot || null,
-      bcc_email: `gcr-${slug}@parse.gulfcoastradar.com`,
+      bcc_email: forwardingAddressFor(slug),
       configured: !!data.daily_capacity,
     });
   } catch (err) {

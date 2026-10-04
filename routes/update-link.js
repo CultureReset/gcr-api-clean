@@ -73,21 +73,19 @@ async function syncToGcr(siteId, type, data) {
     } catch(e) { /* fire-and-forget */ }
 }
 
-function twilio() {
-    const sid = process.env.TWILIO_ACCOUNT_SID;
-    const tok = process.env.TWILIO_AUTH_TOKEN;
-    if (!sid || !tok) return null;
-    return require('twilio')(sid, tok);
-}
-function fromNumber() { return process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM_NUMBER; }
+// Texts go through lib/telephony via utils/sms (platform sender, opt-outs, log).
+const telephony = require('../lib/telephony');
+const { sendSms } = require('../utils/sms');
 function makeToken()  { return crypto.randomBytes(24).toString('hex'); }
 function slugify(s) {
     return String(s || '').toLowerCase().trim()
         .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-')
         .replace(/^-|-$/g, '') || 'business';
 }
+// LINKS_BASE_URL is where the link editor is hosted. Without it the link is a
+// path the caller has to put on its own host.
 function linkUrl(tok, slug) {
-    const base = (process.env.LINKS_BASE_URL || 'https://cybercheck-links.vercel.app').replace(/\/$/, '');
+    const base = (process.env.LINKS_BASE_URL || '').replace(/\/$/, '');
     if (slug) return `${base}/${slug}/edit?token=${tok}`;
     return `${base}/menu-editor.html?token=${tok}`;
 }
@@ -241,14 +239,14 @@ router.post('/send-sms', adminRequired, async (req, res) => {
         slug = slugify(entity?.slug || entity?.name || biz_name);
     }
     const url = linkUrl(link.token, slug);
+    if (!/^https?:\/\//.test(url)) return res.status(503).json({ success: false, error: 'LINKS_BASE_URL is not set, so there is no link to text.', url, token: link.token });
 
-    const tc = twilio();
-    if (!tc) return res.json({ success: false, error: 'Twilio not configured', url, token: link.token });
+    if (!telephony.isConfigured()) return res.json({ success: false, error: 'Texting is not configured', url, token: link.token });
 
-    await tc.messages.create({
-        body: `Hi! Here's your daily update link for ${name}:\n\n${url}\n\nUpdate your menu, specials, photos and more. Expires tonight.`,
-        from: fromNumber(), to: phone,
-    });
+    const sent = await sendSms(phone,
+        `Hi! Here's your daily update link for ${name}:\n\n${url}\n\nUpdate your menu, specials, photos and more. Expires tonight.`,
+        slug || null, 'update_link', link.id || null);
+    if (!sent.success) return res.json({ success: false, error: sent.reason, url, token: link.token });
 
     res.json({ success: true, url, token: link.token, sent_to: phone });
 });

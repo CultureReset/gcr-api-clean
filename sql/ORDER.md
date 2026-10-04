@@ -29,6 +29,13 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 10 | `nextgent_notify.sql` | `owner_notify_settings`, `owner_notifications` |
 | 11 | `nextgent_billing.sql` | item prices, Stripe ids, non-payment clock, `billing_item_charges`, `billing_usage_credits` (needs 1 and 2) |
 
+## NEXT GENT part 2 (plan build steps 7, 9, 12)
+
+| # | File | What it adds |
+| - | ---- | ------------ |
+| 12 | `nextgent_prices.sql` | `billing_item_prices` (prices Paperclip's store sets, CONTRACT §12) |
+| 13 | `nextgent_phone.sql` | phone verification codes; Phone Agent numbers, forwarding codes, live call sessions, AI keys |
+
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.
 

@@ -20,7 +20,6 @@
 
 const express = require('express');
 const multer = require('multer');
-const twilio = require('twilio');
 const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 // The public directory tools — search, details, prices, availability, compare.
@@ -32,13 +31,14 @@ const { runMemoryTool } = require('../lib/touristMemory');
 
 const router = express.Router();
 
-// Same Twilio number/credentials used everywhere else in the app (sms.js,
-// tourist-auth.js) — one provider, one number, no separate config to manage.
-const TWILIO_SID   = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_FROM  = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
-function sendTwilioText(to, body) {
-    return twilio(TWILIO_SID, TWILIO_TOKEN).messages.create({ from: TWILIO_FROM, to, body });
+// Texts go through utils/sms (lib/telephony underneath, the platform sender,
+// opt-outs honoured, every attempt logged). It never throws; this does, so the
+// callers below keep treating a failed send as an error.
+const { sendSms } = require('../utils/sms');
+async function sendText(to, body, slug = null) {
+    const r = await sendSms(to, body, slug, 'tourist');
+    if (!r.success) throw new Error(r.reason || 'Text not sent');
+    return r;
 }
 
 // Tourist media (photo/video) uploads — held in memory, capped at 50MB for short video clips
@@ -1920,7 +1920,7 @@ async function checkGeofence(touristId, lat, lng) {
 
     const msg = `📍 You're near ${biz.name}!\n${special.special_name}${special.discount_text ? ' — ' + special.discount_text : ''}\n\nEnjoy! 🌊`;
 
-    await sendTwilioText(profile.phone, msg).catch(() => {});
+    await sendText(profile.phone, msg, special.entity_slug).catch(() => {});
 
     // Log it
     await mainDb.from('tourist_sms_log').insert({
@@ -1935,7 +1935,7 @@ async function checkGeofence(touristId, lat, lng) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// POST /api/tourist/sms-campaign — admin triggers a targeted Twilio blast
+// POST /api/tourist/sms-campaign — admin triggers a targeted text blast
 // Body: { business_slug, message, tags[], min_score? }
 // Sends ONLY to opted-in tourists whose preference scores match the business tags
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1977,12 +1977,12 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
 
     if (!profiles?.length) return res.json({ sent: 0 });
 
-    // Twilio has no bulk/group-send endpoint — send individually, same pattern
+    // No carrier offers a bulk send here — send individually, same pattern
     // as sms.js's /blast route, with a small delay to stay under rate limits.
     const sentTo = [];
     for (const p of profiles) {
         try {
-            await sendTwilioText(p.phone, message);
+            await sendText(p.phone, message, business_slug || null);
             sentTo.push(p.phone);
             await new Promise(r => setTimeout(r, 100));
         } catch (e) {

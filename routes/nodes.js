@@ -60,12 +60,22 @@ async function nodeRequired(req, res, next) {
 
 // ── owner side ─────────────────────────────────────────────────────────────
 
-// One login, one box, one phone. A box belongs to the user who enrolled it,
-// inside their business: two logins at the same business never see or drive
-// each other's box (and so never each other's Android). Only an admin acting
-// as a business sees all of that business's boxes.
+// Which boxes a caller sees.
+//
+//   Supabase dashboard login   one login, one box, one phone: a box belongs to
+//                              the user who enrolled it, inside their business,
+//                              so two logins at one business never drive each
+//                              other's Android.
+//   Paperclip business token   the company is the business (company_links ->
+//                              entity_slug), and its computers belong to it,
+//                              not to one person: Paperclip user ids are not
+//                              uuids, so created_by cannot hold them, and the
+//                              plan's "a company reaches its computer through
+//                              its business link" is exactly this.
+//   admin acting as a business all of that business's boxes.
 const mine = (query, req) =>
-    req.actingAsAdmin ? query.eq('entity_slug', req.entitySlug)
+    req.actingAsAdmin || req.authVia === 'paperclip'
+        ? query.eq('entity_slug', req.entitySlug)
         : query.eq('entity_slug', req.entitySlug).eq('created_by', req.ownerUserId);
 
 // GET /api/nodes — this user's boxes

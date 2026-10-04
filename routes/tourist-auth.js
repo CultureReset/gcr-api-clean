@@ -397,148 +397,33 @@ router.post('/reset-password', async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TWILIO VERIFY — PHONE OTP
-// POST /api/tourist-auth/phone        { phone }        → sends 6-digit OTP via Twilio Verify
-// POST /api/tourist-auth/phone-verify { phone, code }  → checks OTP via Twilio Verify → upsert tourist_profile → return token
+// PHONE OTP
+// POST /api/tourist-auth/phone        { phone }        → texts a one-time code
+// POST /api/tourist-auth/phone-verify { phone, code }  → checks it → upsert tourist_profile → return token
 //
-// Uses Twilio Verify (not Programmable Messaging) — Verify runs through Twilio's
-// own verified sending infrastructure instead of our long-code number, so it
-// isn't subject to A2P 10DLC campaign registration the way our other SMS
-// (routes/sms.js, live-photo.js, dashboard.js, etc.) is. Requires a Verify
-// Service created in the Twilio Console and its SID set as
-// TWILIO_VERIFY_SERVICE_SID.
+// The codes are our own (lib/phoneVerification.js: stored as an HMAC, short
+// lived, a few tries) and go out through lib/telephony, so sign-in works on
+// whichever carrier is live. This replaced Twilio Verify, which only worked
+// while Twilio was the carrier.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const twilio = require('twilio');
+const { startVerification, checkVerification } = require('../lib/phoneVerification');
+const telephony = require('../lib/telephony');
 
-// Twilio credential resolution that does not depend on the Vercel env vars
-// being right. The env's TWILIO_ACCOUNT_SID has held an API Key SID (SK...)
-// instead of the Account SID (AC...), which the twilio() constructor rejects
-// outright — so the platform_config table in the GCR Supabase (RLS enabled,
-// no policies: service-key access only, never exposed to the anon key) is a
-// second source of truth under the keys twilio_account_sid /
-// twilio_auth_token / twilio_verify_service_sid. Secrets stay out of this
-// public repo — GitHub push protection blocks them and Twilio revokes any
-// token it finds on GitHub.
-//
-// Every plausible (sid, token) pairing from env + DB is built into a client
-// candidate, each is probed with a cheap authenticated account fetch, and the
-// first that authenticates is cached for the life of the lambda.
-let cachedClient = null;
-let dbConfigPromise = null;
+// Kept as a local name: the session helpers below compare normalised phones.
+// A number that cannot be normalised becomes '' and fails the checks below.
+const normalizePhone = (raw) => telephony.normalizePhone(raw) || '';
 
-function dbTwilioConfig() {
-    if (!dbConfigPromise) {
-        dbConfigPromise = Promise.resolve(
-            mainDb.from('platform_config')
-                .select('key, value')
-                .in('key', ['twilio_account_sid', 'twilio_auth_token', 'twilio_verify_service_sid'])
-        ).then(({ data }) => Object.fromEntries((data || []).map(r => [r.key, (r.value || '').trim()])))
-         .catch(() => ({}));
-    }
-    return dbConfigPromise;
-}
-
-async function twilioClient() {
-    if (cachedClient) return cachedClient;
-
-    const envSid = (process.env.TWILIO_ACCOUNT_SID || '').trim();
-    const envTok = (process.env.TWILIO_AUTH_TOKEN || '').trim();
-    const cfg    = await dbTwilioConfig();
-    const dbSid  = (cfg.twilio_account_sid || '');
-    const dbTok  = (cfg.twilio_auth_token || '');
-
-    // Best AC-shaped account SID available (DB wins — it's curated)
-    const acSid = dbSid.startsWith('AC') ? dbSid : (envSid.startsWith('AC') ? envSid : '');
-
-    const candidates = [];
-    const seen = new Set();
-    const push = (sid, tok, opts) => {
-        if (!sid || !tok) return;
-        const k = `${sid}:${tok}:${opts?.accountSid || ''}`;
-        if (seen.has(k)) return;
-        seen.add(k);
-        try { candidates.push(twilio(sid, tok, opts)); } catch (_) { /* malformed pair — skip */ }
-    };
-
-    for (const tok of [envTok, dbTok]) {
-        if (envSid.startsWith('AC')) push(envSid, tok);                          // classic config
-        if (envSid.startsWith('SK') && acSid) push(envSid, tok, { accountSid: acSid }); // API key pair
-        if (acSid) push(acSid, tok);                                             // curated AC + token
-    }
-
-    if (!candidates.length) throw new Error('No usable Twilio credentials found in env or platform_config');
-
-    let lastErr = null;
-    for (const client of candidates) {
-        try {
-            await client.api.v2010.accounts(client.accountSid).fetch();
-            cachedClient = client;
-            return client;
-        } catch (e) {
-            lastErr = e;
-        }
-    }
-    throw new Error('Twilio auth failed for every credential combination (last error: ' + (lastErr?.message || 'unknown') + ')');
-}
-
-// The Verify service SID has the same problem as the account SID: the env var
-// has held an AC... (account SID) instead of a VA... (Verify service SID),
-// which 404s on every send. Resolve it defensively: take the first VA-shaped
-// value from env or platform_config; failing that, ask Twilio for the
-// account's Verify services and use the first one, creating one if the
-// account has none. Discovered SIDs are written back to platform_config so
-// later cold starts skip discovery.
-let cachedVerifyServiceSid = null;
-
-async function resolveVerifyServiceSid(client) {
-    if (cachedVerifyServiceSid) return cachedVerifyServiceSid;
-
-    const cfg = await dbTwilioConfig();
-    for (const sid of [(process.env.TWILIO_VERIFY_SERVICE_SID || '').trim(), cfg.twilio_verify_service_sid || '']) {
-        if (sid.startsWith('VA')) {
-            cachedVerifyServiceSid = sid;
-            return sid;
-        }
-    }
-
-    const services = await client.verify.v2.services.list({ limit: 20 });
-    let svc = services[0];
-    if (!svc) svc = await client.verify.v2.services.create({ friendlyName: 'Gulf Coast Radar' });
-    cachedVerifyServiceSid = svc.sid;
-
-    Promise.resolve(
-        mainDb.from('platform_config').upsert(
-            { key: 'twilio_verify_service_sid', value: svc.sid, updated_at: new Date().toISOString() },
-            { onConflict: 'key' }
-        )
-    ).catch(() => {});
-
-    return svc.sid;
-}
-
-async function verifyService() {
-    const client = await twilioClient();
-    const serviceSid = await resolveVerifyServiceSid(client);
-    return client.verify.v2.services(serviceSid);
-}
-
-function normalizePhone(raw) {
-    const digits = (raw || '').replace(/\D/g, '');
-    if (digits.length === 10) return `+1${digits}`;
-    if (digits.length === 11 && digits[0] === '1') return `+${digits}`;
-    return `+${digits}`;
-}
-
-// POST /phone — send OTP via Twilio Verify
+// POST /phone — text a one-time code
 router.post('/phone', async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
-    if (!phone || phone.length < 10) return res.status(400).json({ error: 'Valid phone number required' });
+    if (!phone) return res.status(400).json({ error: 'Valid phone number required' });
 
     try {
-        await (await verifyService()).verifications.create({ to: phone, channel: 'sms' });
+        await startVerification(phone, { purpose: 'tourist_sign_in' });
     } catch (e) {
-        console.error('Twilio Verify send failed:', e.message);
+        console.error('Phone code send failed:', e.message);
+        if (e.status === 400) return res.status(400).json({ error: e.message });
         return res.status(500).json({ error: 'Could not send code — please try again.' });
     }
 
@@ -566,15 +451,9 @@ router.post('/phone-verify', async (req, res) => {
             return res.status(401).json({ error: 'Invalid Firebase token: ' + err.message });
         }
     } else if (code) {
-        // Twilio Verify path
-        let check;
-        try {
-            check = await (await verifyService()).verificationChecks.create({ to: phone, code });
-        } catch (e) {
-            console.error('Twilio Verify check failed:', e.message);
-            return res.status(400).json({ error: 'Incorrect or expired code' });
-        }
-        if (check.status !== 'approved') return res.status(400).json({ error: 'Incorrect code' });
+        // Our own code (lib/phoneVerification.js)
+        const check = await checkVerification(phone, code, { purpose: 'tourist_sign_in' });
+        if (!check.ok) return res.status(400).json({ error: check.reason || 'Incorrect code' });
     } else {
         return res.status(400).json({ error: 'idToken or code required' });
     }

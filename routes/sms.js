@@ -1,33 +1,27 @@
 const express  = require('express');
 const router   = express.Router();
-const twilio   = require('twilio');
 const crypto   = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const mainDb = require('../db');
 const { adminRequired } = require('../middleware/auth');
 const { handleStaffCommand } = require('../lib/staff-commands');
+const telephony = require('../lib/telephony');
+const { sendSms } = require('../utils/sms');
 
-const ACCOUNT_SID    = process.env.TWILIO_ACCOUNT_SID;
-const AUTH_TOKEN     = process.env.TWILIO_AUTH_TOKEN;
-const FROM_NUMBER    = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
-const GCR_URL        = process.env.GCR_UNIFIED_URL || 'https://gulfcoastradar.com';
-// Must exactly match the "A message comes in" webhook URL configured on the
-// Twilio phone number's console page — Twilio signs against that literal
-// URL, not whatever the server thinks its own host is. VERIFY THIS MATCHES
-// before relying on it; a mismatch makes every real inbound text fail
-// silently with a 403, not just a security check that's merely too loose.
-const TWILIO_INBOUND_URL = process.env.TWILIO_INBOUND_WEBHOOK_URL || 'https://gcr-api-clean.vercel.app/api/sms/inbound';
+// Every text goes through lib/telephony (Telnyx by default; Twilio only when
+// TELEPHONY_PROVIDER=twilio). The number tourists text is the platform sender:
+// PLATFORM_NUMBER, or TWILIO_PHONE_NUMBER on the legacy provider.
+const platformNumber = () => telephony.defaultSender();
 
-// Twilio's inbound webhook has no built-in auth — anyone who finds the URL
-// can POST a forged `From` and, without this check, get back whatever the
-// handler would have texted that number (including a magic sign-in token).
-// This validates the request actually came from Twilio using the shared
-// auth token, per Twilio's request-validation scheme.
-function verifyTwilioSignature(req, res, next) {
-  const signature = req.headers['x-twilio-signature'];
-  const valid = AUTH_TOKEN && signature && twilio.validateRequest(AUTH_TOKEN, signature, TWILIO_INBOUND_URL, req.body || {});
-  if (!valid) {
-    console.error('[sms/inbound] Twilio signature validation failed — rejecting request');
+// An inbound webhook has no auth of its own — anyone who finds the URL can
+// POST a forged `From` and, without a check, get back whatever the handler
+// would have texted that number. The provider's signature is checked every
+// time (lib/telephony verifyWebhook; for Twilio it needs
+// TWILIO_WEBHOOK_BASE_URL to be the public origin Twilio signs against).
+function verifyInboundSignature(req, res, next) {
+  const check = telephony.verifyWebhook(req, { provider: 'twilio' });
+  if (!check.ok) {
+    console.error('[sms/inbound] signature check failed — rejecting request:', check.reason);
     return res.status(403).send('Forbidden');
   }
   next();
@@ -42,21 +36,12 @@ function adminSb() {
   return _adminClient;
 }
 
-function getClient() {
-  return twilio(ACCOUNT_SID, AUTH_TOKEN);
-}
+const normalizePhone = (raw) => telephony.normalizePhone(raw);
 
-function normalizePhone(raw) {
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 10) return '+1' + digits;
-  if (digits.length === 11 && digits[0] === '1') return '+' + digits;
-  return '+' + digits;
-}
-
-async function sendSMS(to, body) {
-  return getClient().messages.create({ from: FROM_NUMBER, to, body });
-}
+// An empty TwiML document: the reply, when there is one, is sent through
+// lib/telephony rather than in the webhook response, so every provider
+// answers the same way.
+const EMPTY_TWIML = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>';
 
 // Parse "June 5-8", "6/5-6/8", "June 5 to June 8" style date replies
 function parseDateRange(text) {
@@ -157,45 +142,51 @@ async function issueMagicToken(phone) {
 // tourist_profiles row / state update exactly as before; only the
 // twiml.message(...) reply calls are skipped. Re-enable by restoring
 // those calls once A2P 10DLC is approved.
-router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSignature, async (req, res) => {
-  const twiml = new twilio.twiml.MessagingResponse();
-  const from  = req.body?.From;
-  const body  = (req.body?.Body || '').trim();
-  const upper = body.toUpperCase();
-
-  if (!from) {
-    return res.type('text/xml').send(twiml.toString());
+router.post('/inbound', express.urlencoded({ extended: false }), verifyInboundSignature, async (req, res) => {
+  const from = req.body?.From;
+  const body = (req.body?.Body || '').trim();
+  try {
+    if (from) {
+      const { reply } = await handlePlatformInbound({ from, body });
+      if (reply) await sendSms(normalizePhone(from), reply, null, 'staff_command_reply', null, platformNumber());
+    }
+  } catch (e) {
+    console.error('SMS inbound error:', e.message);
   }
+  res.type('text/xml').send(EMPTY_TWIML);
+});
 
+/**
+ * A text to the platform number, whichever provider delivered it: staff
+ * quick-toggle commands, QR attribution and tourist sign-up. Returns
+ * { reply } — the text to send back, or null. Also used by the Telnyx
+ * messaging webhook (routes/telephony-live.js) for numbers that are neither
+ * the concierge nor a Phone Agent.
+ */
+async function handlePlatformInbound({ from, body }) {
+  const text  = String(body || '').trim();
+  const upper = text.toUpperCase();
   const phone = normalizePhone(from);
+  if (!phone) return { reply: null };
 
-  // STOP / UNSTOP / HELP handled by Twilio automatically
-  if (['STOP','UNSTOP','HELP'].includes(upper)) {
-    return res.type('text/xml').send(twiml.toString());
-  }
+  // STOP / START / HELP are the carrier's (and lib/telephony's opt-out list's).
+  if (['STOP','UNSTOP','START','HELP'].includes(upper)) return { reply: null };
 
   // Business staff quick-toggle commands (SOLD OUT <item>, ON TAP <item>,
   // etc.) share this same inbound number with tourist signup — checked
   // first since it only ever matches a phone in business_staff, which is
-  // never a tourist's number. Falls through to tourist handling below for
-  // every other phone (the entire current inbound volume, since this table
-  // is brand new).
+  // never a tourist's number.
   try {
-    const staffReply = await handleStaffCommand(phone, body);
-    if (staffReply) {
-      twiml.message(staffReply);
-      return res.type('text/xml').send(twiml.toString());
-    }
+    const staffReply = await handleStaffCommand(phone, text);
+    if (staffReply) return { reply: staffReply };
   } catch (e) {
     console.error('[sms/inbound] staff command check failed:', e.message);
   }
 
-  // QR-code attribution — a QR-driven text reads "BEACH <CODE>" / "BEACHES <CODE>".
-  // The tourist never sees or types the code (the QR pre-fills it); we just log
+  // QR-code attribution — a QR-driven text reads "<KEYWORD> <CODE>". The
+  // tourist never sees or types the code (the QR pre-fills it); we just log
   // which physical QR code drove this text so it shows up in the admin dashboard.
-  // Awaited (not fire-and-forget) since Vercel functions can be frozen the
-  // instant the response is sent, which would silently drop an un-awaited insert.
-  const qrMatch = upper.match(/^(?:BEACH|BEACHES|THE BEACH)\s+([A-Z0-9]{4,8})\b/);
+  const qrMatch = upper.match(/^[A-Z ]{2,20}?\s+([A-Z0-9]{4,8})\b/);
   if (qrMatch) {
     try {
       const { data: qr } = await mainDb.from('sms_qr_codes').select('id').eq('keyword', qrMatch[1]).maybeSingle();
@@ -203,55 +194,45 @@ router.post('/inbound', express.urlencoded({ extended: false }), verifyTwilioSig
     } catch (e) { console.error('QR scan log failed:', e.message); }
   }
 
-  try {
-    const { data: existing } = await mainDb
-      .from('tourist_profiles')
-      .select('user_id, phone, sms_opt_in, sms_state, arrival, departure')
-      .eq('phone', phone)
-      .maybeSingle();
+  // Outbound replies to tourists stay off until the platform number's texting
+  // registration is approved; every inbound text is still received and turned
+  // into a saved tourist_profiles row / state update.
+  const { data: existing } = await mainDb
+    .from('tourist_profiles')
+    .select('user_id, phone, sms_opt_in, sms_state, arrival, departure')
+    .eq('phone', phone)
+    .maybeSingle();
 
-    const phoneEncoded = encodeURIComponent(phone);
-
-    // ── State: waiting for trip dates reply ───────────────────────────────────
-    if (existing?.sms_state === 'awaiting_dates') {
-      const dates = parseDateRange(body);
-
-      if (dates) {
-        await mainDb.from('tourist_profiles').update({
-          arrival:    dates.arrival,
-          departure:  dates.departure,
-          sms_state:  'active',
-          updated_at: new Date().toISOString(),
-        }).eq('user_id', existing.user_id);
-
-        await issueMagicToken(phone); // stored for later use; not texted back right now
-      }
-
-      return res.type('text/xml').send(twiml.toString());
-    }
-
-    // ── Already signed up ──────────────────────────────────────────────────────
-    if (existing?.sms_opt_in) {
+  // ── State: waiting for trip dates reply ─────────────────────────────────
+  if (existing?.sms_state === 'awaiting_dates') {
+    const dates = parseDateRange(text);
+    if (dates) {
+      await mainDb.from('tourist_profiles').update({
+        arrival:    dates.arrival,
+        departure:  dates.departure,
+        sms_state:  'active',
+        updated_at: new Date().toISOString(),
+      }).eq('user_id', existing.user_id);
       await issueMagicToken(phone); // stored for later use; not texted back right now
-      return res.type('text/xml').send(twiml.toString());
     }
-
-    // ── New signup ────────────────────────────────────────────────────────────
-    const { profile } = await getOrCreateTourist(phone);
-
-    await mainDb.from('tourist_profiles').update({
-      sms_state:  'awaiting_dates',
-      updated_at: new Date().toISOString(),
-    }).eq('user_id', profile.user_id);
-
-    await issueMagicToken(phone); // stored for later use; not texted back right now
-
-  } catch (e) {
-    console.error('SMS inbound error:', e.message);
+    return { reply: null };
   }
 
-  res.type('text/xml').send(twiml.toString());
-});
+  // ── Already signed up ───────────────────────────────────────────────────
+  if (existing?.sms_opt_in) {
+    await issueMagicToken(phone);
+    return { reply: null };
+  }
+
+  // ── New signup ──────────────────────────────────────────────────────────
+  const { profile } = await getOrCreateTourist(phone);
+  await mainDb.from('tourist_profiles').update({
+    sms_state:  'awaiting_dates',
+    updated_at: new Date().toISOString(),
+  }).eq('user_id', profile.user_id);
+  await issueMagicToken(phone);
+  return { reply: null };
+}
 
 // POST /api/sms/blast — send promos/deals to all tourists currently in town
 // Body: { message, tags? } — admin only
@@ -275,17 +256,14 @@ router.post('/blast', adminRequired, async (req, res) => {
     if (error) throw error;
     if (!profiles?.length) return res.json({ sent: 0, message: 'No tourists in town today' });
 
-    const client = getClient();
     let sent = 0;
     for (const p of profiles) {
-      try {
-        await client.messages.create({ from: FROM_NUMBER, to: p.phone, body: message });
-        sent++;
-        // Small delay to avoid Twilio rate limits
-        await new Promise(r => setTimeout(r, 100));
-      } catch (e) {
-        console.error('Failed to send to', p.phone, e.message);
-      }
+      // utils/sms honours opt-outs and logs every attempt.
+      const r = await sendSms(p.phone, message, null, 'blast', null, platformNumber());
+      if (r.success) sent++;
+      else console.error('Failed to send to', p.phone, r.reason);
+      // Spaced out to stay under the carrier's per-second limit.
+      await new Promise(r2 => setTimeout(r2, 100));
     }
 
     res.json({ sent, total: profiles.length });
@@ -295,20 +273,17 @@ router.post('/blast', adminRequired, async (req, res) => {
 });
 
 // POST /api/sms/send — send a one-off SMS (admin only — this sends real
-// texts on your Twilio balance to any number, must never be public)
+// texts on the platform's carrier balance to any number, must never be public)
 router.post('/send', adminRequired, async (req, res) => {
   const { to, message } = req.body;
   if (!to || !message) return res.status(400).json({ error: 'to and message required' });
-  try {
-    const result = await sendSMS(normalizePhone(to), message);
-    res.json({ success: true, sid: result.sid });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  const r = await sendSms(normalizePhone(to) || to, message, null, 'admin_send', null, platformNumber());
+  if (!r.success) return res.status(500).json({ error: r.reason || 'Send failed' });
+  res.json({ success: true, sid: r.id });
 });
 
 // ── QR code campaigns ─────────────────────────────────────────────────────────
-// Each QR code encodes an sms: link pre-filled with "BEACHES <CODE>" — scanning
+// Each QR code encodes an sms: link pre-filled with "<SMS_QR_KEYWORD> <CODE>" — scanning
 // it just opens Messages with Send ready to tap. The code itself is invisible
 // to the tourist; the inbound webhook above logs which code drove the text.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -319,9 +294,13 @@ function generateKeyword() {
   for (let i = 0; i < 5; i++) s += QR_CHARSET[crypto.randomInt(QR_CHARSET.length)];
   return s;
 }
+// The word a QR text starts with is configuration (SMS_QR_KEYWORD); the
+// inbound handler accepts any word followed by the code.
 function qrLinks(keyword) {
-  const body = `BEACHES ${keyword}`;
-  return { sms_body: body, sms_link: `sms:${FROM_NUMBER}?body=${encodeURIComponent(body)}` };
+  const word = (process.env.SMS_QR_KEYWORD || '').trim();
+  const body = word ? `${word} ${keyword}` : keyword;
+  const number = platformNumber();
+  return { sms_body: body, sms_link: number ? `sms:${number}?body=${encodeURIComponent(body)}` : null };
 }
 
 // POST /api/sms/qr-codes — admin: create a new trackable QR code
@@ -388,3 +367,4 @@ router.delete('/qr-codes/:id', adminRequired, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.handlePlatformInbound = handlePlatformInbound;
