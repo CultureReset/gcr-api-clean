@@ -37,6 +37,7 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 13 | `nextgent_phone.sql` | phone verification codes; `business_phone_numbers` (Phone Agent numbers and their texting registration), forwarding codes, live conversations, AI keys |
 | 14 | `nextgent_messages.sql` | `message_threads`, `business_messages`, `message_consent` (messages.send, the Messages screen) |
 | 15 | `nextgent_automations.sql` | `automation_waits`, `owner_automation_drafts`; needs `automations.sql` and `booking_ingestion_tables.sql` |
+| 15a | `nextgent_scheduler_state.sql` | `scheduler_state`: the booking completion check's first-run watermark. Until it is applied the check completes nothing |
 | 16 | `nextgent_intake.sql` | forwarding confirmation rules (seeded) and confirmations, `intake_known_senders`, `email_parser_log.intake_state`, `payments_detected` |
 | 17 | `nextgent_nodes.sql` | computer pairing (device flow), remote-view sessions, task id and receipt columns on `ghost_node_requests` (needs `ghost_nodes.sql`) |
 | 18 | `nextgent_google_push.sql` | Google push queue and state, fact sources (seeded), attribute map, source ranks (seeded), `fact_observations` |

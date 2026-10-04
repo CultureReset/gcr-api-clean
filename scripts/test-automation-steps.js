@@ -87,9 +87,21 @@ const { check, done } = checker();
         }
         check('timezones come from the runtime, default from env', cat.timezones.length > 5 && cat.default_timezone === 'America/Chicago');
 
-        console.log('\n── booking.completed from the scheduled check ──');
+        console.log('\n── the completion job starts from when it was first enabled, not from history ──');
         const at = new Date('2026-10-01T18:30:00Z'); // 13:30 in Chicago, after the 12:00 end
         engine._setClock(() => at);
+        T.scheduler_state = [];
+        const first = await engine.tick({ now: at });
+        check('a first run completes nothing that ended before it', T.booking_calendar.find((b) => b.id === 'b-1').status === 'active'
+            && !T.automation_runs.length && first.bookings.completed === 0, JSON.stringify(first.bookings));
+        const mark = T.scheduler_state.find((r) => r.key === 'booking_complete_watermark');
+        check('and keeps its own first-run time as the watermark', mark?.value === at.toISOString(), JSON.stringify(T.scheduler_state));
+        await engine.tick({ now: at });
+        check('the watermark is not moved by a later run', T.scheduler_state.length === 1 && T.scheduler_state[0].value === at.toISOString());
+        // From here on, the job was enabled before these bookings ended.
+        mark.value = '2026-09-30T00:00:00.000Z';
+
+        console.log('\n── booking.completed from the scheduled check ──');
         const summary = await engine.tick({ now: at });
         check('the finished booking is completed', T.booking_calendar.find((b) => b.id === 'b-1').status === 'completed', JSON.stringify(summary.bookings));
         check('cancelled, future and block rows are left alone', T.booking_calendar.find((b) => b.id === 'b-2').status === 'cancelled'
