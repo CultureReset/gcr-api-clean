@@ -40,8 +40,19 @@ function haversine(lat1, lng1, lat2, lng2) {
 
 const SUPABASE_URL = (process.env.GCR_SUPABASE_URL || '').trim();
 
+// Every Google-hosted photo link in the catalogue is dead (checked
+// 2026-10-04): places.googleapis.com links answer 403 without a key and 400
+// "photo resource invalid" with one (the photo tokens expire), and the old
+// maps.googleapis.com place/photo links answer 403 because their key is
+// rejected. About 20k gallery rows and 800 cover images. Treat them as no
+// image so cards fall back to one that loads instead of drawing a blank tile.
+function isDeadImageUrl(url) {
+  return /^https?:\/\/(places|maps)\.googleapis\.com\//.test(url || '');
+}
+
 function normalizeImageUrl(url) {
   if (!url) return null;
+  if (isDeadImageUrl(url)) return null;
   if (url.startsWith('http')) return url;
   if (url.startsWith('/photos/')) {
     const slug = url.split('/')[2];
@@ -391,7 +402,9 @@ async function buildFullEntity(slug) {
       ...sec, items: (itemList || []).filter(i => i.section_id === sec.id),
     }));
 
-  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.url), alt_text: p.caption || null }));
+  const normalizedPhotos = (photos.data || [])
+    .map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.url), alt_text: p.caption || null }))
+    .filter(p => p.url);
 
   return {
     ...entity,
@@ -423,7 +436,7 @@ async function buildFullEntity(slug) {
       artist_name: ev.artist?.name || ev.artist_name || null,
       artist_genre: ev.artist?.genre || null,
       artist_image: ev.artist?.image_url ? normalizeImageUrl(ev.artist.image_url) : null,
-      image_url: normalizeImageUrl(ev.image_url || ev.artist?.image_url),
+      image_url: normalizeImageUrl(ev.image_url) || normalizeImageUrl(ev.artist?.image_url),
     })),
     reviews: reviews.data || [],
     faqs: faqs.data || [],
@@ -502,15 +515,57 @@ async function buildFullEntity(slug) {
   };
 }
 
+// Columns a listing card (GCRCard, the stay/service cards) and the listing
+// page's own filters actually read. view=list returns only these — the full
+// set below is ~2.4 KB a business, mostly AI summaries and Google metadata a
+// card never shows.
+const ENTITY_LIST_COLUMNS = `
+  id, slug, name, subtitle, entity_type, entity_subtype, icon,
+  phone, rating, review_count, city, state, address_line_1,
+  hero_image_url, website_url, directions_url, call_url,
+  booking_url, reservation_url, order_url, price_range,
+  hh_days, hh_start, hh_end, hh_description,
+  live_music, outdoor_seating, featured, is_active, description,
+  duration_text, price_from, price_unit, latitude, longitude,
+  price_level, delivery, dine_in, takeout, curbside_pickup, reservable,
+  serves_breakfast, serves_brunch, serves_lunch, serves_dinner,
+  serves_beer, serves_wine, serves_cocktails, serves_coffee, serves_dessert, serves_vegetarian,
+  good_for_groups, good_for_children, allows_dogs, good_for_watching_sports,
+  wheelchair_accessible_entrance, parent_slug:parent_entity_slug
+`;
+
+// "a,b,c" → ['a','b','c'], keeping only plain subtype-shaped values so nothing
+// from the query string reaches the PostgREST filter syntax unescaped.
+function listParam(v) {
+  return String(v || '').split(',').map(x => x.trim().toLowerCase())
+    .filter(x => /^[a-z0-9_-]{1,60}$/.test(x)).slice(0, 400);
+}
+
+// .in() with a thousand slugs makes a URL PostgREST won't take, and the error
+// was swallowed — so a 1000-row page came back with no photos, tags or hours
+// for any business. Ask in slices and stitch the rows back together.
+async function rowsForSlugs(slugs, build, size = 150) {
+  if (!slugs.length) return { data: [] };
+  const parts = [];
+  for (let i = 0; i < slugs.length; i += size) parts.push(slugs.slice(i, i + size));
+  const results = await Promise.all(parts.map(part => build(part)));
+  return { data: results.flatMap(r => r.data || []) };
+}
+
 // ─── GET /api/gcr/entities ────────────────────────────────────────────────────
+// Extra query params for listing pages:
+//   subtypes, types — comma lists; returns businesses whose entity_subtype or
+//                     entity_type is in either list. The app builds these from
+//                     its own category map and re-checks every row, so this
+//                     only has to never leave one out.
+//   top_level=1     — skip hub children (a marina's individual boats)
+//   view=list       — card columns only, one cover photo per business
 router.get('/entities', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 100, 5000);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-
-    let query = db
-      .from('entity')
-      .select(`
+    const listView = req.query.view === 'list';
+    const columns = listView ? ENTITY_LIST_COLUMNS : `
         id, slug, name, subtitle, entity_type, entity_subtype, icon,
         phone, rating, review_count, city, state, address_line_1,
         hero_image_url, website_url, directions_url, call_url,
@@ -533,46 +588,91 @@ router.get('/entities', async (req, res) => {
         wheelchair_accessible_restroom, wheelchair_accessible_seating,
         google_maps_uri, primary_type_display, also_appears_on,
         national_phone, google_place_id, business_status, parent_slug:parent_entity_slug
-      `)
-      .eq('is_active', true)
-      .range(offset, offset + limit - 1);
+      `;
 
-    if (req.query.type) {
-      if (req.query.type === 'coffee') {
-        query = query.or(`entity_type.in.(coffee,dessert,bakery),also_appears_on.cs.{coffee-sweets}`);
-      } else if (req.query.type === 'staying') {
-        query = query.or(`entity_type.in.(hotel,condo,vacation-rental),also_appears_on.cs.{staying}`);
-      } else {
-        // page name → entity_type mapping for also_appears_on cross-page lookups
-        const PAGE_TO_TYPE = {
-          'restaurants':  'restaurant',
-          'things-to-do': 'activity',
-          'services':     'service',
-          'shopping':     'shopping',
-          'public-spots': 'park',
-        };
-        const page = req.query.type;
-        const primaryType = PAGE_TO_TYPE[page] || page;
-        query = query.or(`entity_type.eq.${primaryType},also_appears_on.cs.{${page}}`);
+    // Built as a function so the list view can run the same filters for a
+    // row count and then for each 1000-row page.
+    const buildQuery = (select, selectOpts) => {
+      let query = db
+        .from('entity')
+        .select(select, selectOpts)
+        .eq('is_active', true);
+
+      if (req.query.type) {
+        if (req.query.type === 'coffee') {
+          query = query.or(`entity_type.in.(coffee,dessert,bakery),also_appears_on.cs.{coffee-sweets}`);
+        } else if (req.query.type === 'staying') {
+          query = query.or(`entity_type.in.(hotel,condo,vacation-rental),also_appears_on.cs.{staying}`);
+        } else {
+          // page name → entity_type mapping for also_appears_on cross-page lookups
+          const PAGE_TO_TYPE = {
+            'restaurants':  'restaurant',
+            'things-to-do': 'activity',
+            'services':     'service',
+            'shopping':     'shopping',
+            'public-spots': 'park',
+          };
+          const page = req.query.type;
+          const primaryType = PAGE_TO_TYPE[page] || page;
+          query = query.or(`entity_type.eq.${primaryType},also_appears_on.cs.{${page}}`);
+        }
       }
-    }
-    if (req.query.subtype) query = query.eq('entity_subtype', req.query.subtype);
-    if (req.query.city)    query = query.ilike('city', `%${req.query.city}%`);
-    if (req.query.search)  query = query.ilike('name', `%${req.query.search}%`);
-    if (req.query.featured === 'true') query = query.eq('featured', true);
+      if (req.query.subtype) query = query.eq('entity_subtype', req.query.subtype);
+      if (req.query.city)    query = query.ilike('city', `%${req.query.city}%`);
+      if (req.query.search)  query = query.ilike('name', `%${req.query.search}%`);
+      if (req.query.featured === 'true') query = query.eq('featured', true);
+      {
+        const subtypes = listParam(req.query.subtypes);
+        const types = listParam(req.query.types);
+        const q = v => `"${v}"`;
+        const ors = [];
+        if (subtypes.length) ors.push(`entity_subtype.in.(${subtypes.map(q).join(',')})`);
+        if (types.length) ors.push(`entity_type.in.(${types.map(q).join(',')})`);
+        if (ors.length) query = query.or(ors.join(','));
+      }
+      if (req.query.top_level === '1') query = query.is('parent_entity_slug', null);
+      return query;
+    };
 
-    const { data: entities, error } = await query;
+    // The database hands back at most 1000 rows a request. The list view asks
+    // for a whole category in one call, so it counts first and fetches the
+    // 1000-row pages side by side (in a stable order, so pages don't overlap).
+    // The full view keeps its single request, so existing callers get exactly
+    // what they got before.
+    let entities, error;
+    if (listView && limit > 1000) {
+      const counted = await buildQuery('id', { count: 'exact', head: true });
+      error = counted.error;
+      if (!error) {
+        const end = Math.min(counted.count || 0, offset + limit);
+        const pages = [];
+        for (let from = offset; from < end; from += 1000) {
+          pages.push(buildQuery(columns).order('id').range(from, Math.min(from + 999, end - 1)));
+        }
+        const results = await Promise.all(pages);
+        error = results.find(r => r.error)?.error;
+        entities = results.flatMap(r => r.data || []);
+      }
+    } else {
+      ({ data: entities, error } = await buildQuery(columns).range(offset, offset + limit - 1));
+    }
     if (error) return res.status(500).json({ error: error.message });
 
     const slugs = (entities || []).map(e => e.slug);
 
-    // Batch fetch tags, photos, hours, today's availability for all entities
+    // Batch fetch tags, photos, hours, today's availability for all entities.
+    // The list view asks in slices so a big category gets all of them; the
+    // full view keeps its old single request so existing callers (swipe's
+    // 2000-row deck) don't suddenly grow by megabytes.
     const today = new Date().toISOString().split('T')[0];
+    const fetchFor = listView
+      ? (build) => rowsForSlugs(slugs, build)
+      : (build) => (slugs.length ? build(slugs) : { data: [] });
     const [tagRows, photoRows, hourRows, availRows] = await Promise.all([
-      slugs.length ? db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', slugs).limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', slugs).order('sort_order').limit(10000) : { data: [] },
-      slugs.length ? db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', slugs).order('day_of_week').limit(10000) : { data: [] },
-      slugs.length ? db.from('business_availability').select('entity_slug, total_capacity, remaining_spots, status, source_platform, last_updated, last_minute_deal, last_minute_price, original_price').in('entity_slug', slugs).eq('availability_date', today).eq('visible_on_profile', true) : { data: [] },
+      fetchFor(part => db.from('entity_tags').select('entity_slug, tag_name, tag_category').in('entity_slug', part).limit(10000)),
+      fetchFor(part => db.from('entity_photos').select('entity_slug, url, is_cover, sort_order, caption, usage_note').in('entity_slug', part).order('sort_order').limit(10000)),
+      fetchFor(part => db.from('entity_hours').select('entity_slug, day_of_week, opens_at, closes_at, is_closed').in('entity_slug', part).order('day_of_week').limit(10000)),
+      fetchFor(part => db.from('business_availability').select('entity_slug, total_capacity, remaining_spots, status, source_platform, last_updated, last_minute_deal, last_minute_price, original_price').in('entity_slug', part).eq('availability_date', today).eq('visible_on_profile', true)),
     ]);
 
     const tagMap = {}, photoMap = {}, hourMap = {}, availMap = {};
@@ -598,10 +698,18 @@ router.get('/entities', async (req, res) => {
     const hasPrefSignal = Object.keys(prefScoreByTag).length > 0;
 
     const results = (entities || []).map(e => {
-      const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
+      let photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) })).filter(p => p.url);
+      // A card draws one cover photo; the list view doesn't ship the gallery.
+      if (listView) {
+        const cover = photos.find(p => p.is_cover) || photos[0];
+        photos = cover ? [{ url: cover.url, is_cover: true }] : [];
+      }
       const avail = availMap[e.slug] || null;
+      const tags = listView
+        ? (tagMap[e.slug] || []).map(t => ({ tag_name: t.tag_name, tag_category: t.tag_category }))
+        : (tagMap[e.slug] || []);
       const row = {
-        ...e, tags: tagMap[e.slug] || [], photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url),
+        ...e, tags, photos, hours: hourMap[e.slug] || [], hero_image_url: normalizeImageUrl(e.hero_image_url),
         // Flat field so GCRCard's existing (previously dead — the column
         // never existed) "🔴 Last spot!" badge logic just works.
         spots_remaining: avail ? avail.remaining_spots : null,
@@ -745,7 +853,7 @@ router.get('/entities/paginated', async (req, res) => {
       const row = {
         ...e,
         tags: tagMap[e.slug] || [],
-        hero_image_url: normalizeImageUrl(photoMap[e.slug]?.url || e.hero_image_url),
+        hero_image_url: normalizeImageUrl(photoMap[e.slug]?.url) || normalizeImageUrl(e.hero_image_url),
       };
       if (userLat !== null && userLng !== null && e.latitude && e.longitude) {
         row.distance_miles = haversine(userLat, userLng, e.latitude, e.longitude);
@@ -1098,7 +1206,7 @@ router.get('/events', async (req, res) => {
       artist_name: ev.artist?.name || ev.artist_name || null,
       artist: ev.artist || null,
       cover_charge: ev.cover_charge,
-      image_url: normalizeImageUrl(ev.image_url || ev.artist?.image_url || ev.entity?.hero_image_url),
+      image_url: normalizeImageUrl(ev.image_url) || normalizeImageUrl(ev.artist?.image_url) || normalizeImageUrl(ev.entity?.hero_image_url),
       entity_slug: ev.entity_slug,
       entity_name: ev.entity?.name || '',
       icon: ev.entity?.icon || '🏪',
@@ -1209,7 +1317,7 @@ router.get('/happy-hours', async (req, res) => {
     (hourRows.data || []).forEach(r => { if (!hourMap[r.entity_slug]) hourMap[r.entity_slug] = []; hourMap[r.entity_slug].push(r); });
 
     const results = (entities || []).map(e => {
-      const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) }));
+      const photos = (photoMap[e.slug] || []).map(p => ({ ...p, url: normalizeImageUrl(p.url) })).filter(p => p.url);
       return {
         ...e,
         hero_image_url: normalizeImageUrl(e.hero_image_url),
@@ -1323,13 +1431,6 @@ function searchCacheSet(key, body) {
   if (searchCache.size >= SEARCH_CACHE_MAX) searchCache.delete(searchCache.keys().next().value);
   searchCache.set(key, { at: Date.now(), body });
 }
-
-// Google Places photo links saved without an API key answer 403, so the image
-// never draws. Some 20k gallery rows and ~700 cover images are like that.
-// Search shows one thumbnail per card, so pick one that will actually load.
-const isKeylessGooglePhoto = (url) => /places\.googleapis\.com/.test(url || '') && !/[?&]key=/.test(url || '');
-// A search card is ~100px wide; asking Google for 1600px wastes the bandwidth.
-const thumbUrl = (url) => (url || '').replace(/maxHeightPx=\d+/, 'maxHeightPx=400').replace(/maxWidthPx=\d+/, 'maxWidthPx=400');
 
 router.post('/search', async (req, res) => {
   try {
@@ -1497,13 +1598,13 @@ router.post('/search', async (req, res) => {
 
       // One working thumbnail per card, not the business's whole gallery —
       // the gallery was three quarters of the response and the card shows one.
-      const photo = (photoMap[e.slug] || []).find(p => p.url && !isKeylessGooglePhoto(p.url));
-      const hero = isKeylessGooglePhoto(e.hero_image_url) ? null : thumbUrl(e.hero_image_url) || null;
+      const photo = (photoMap[e.slug] || []).find(p => normalizeImageUrl(p.url));
+      const hero = normalizeImageUrl(e.hero_image_url);
 
       return {
         ...e,
         hero_image_url: hero,
-        photos: photo ? [{ ...photo, url: thumbUrl(photo.url) }] : [],
+        photos: photo ? [{ ...photo, url: normalizeImageUrl(photo.url) }] : [],
         matched_menu_items: menuItems,
         matched_specials: specials,
         matched_events: events,
