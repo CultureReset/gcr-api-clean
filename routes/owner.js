@@ -26,6 +26,12 @@
 //   POST  /intake/senders/:id/approve|block { sender, processed? }
 //   PATCH /profile                          { field: value } -> { profile, ignored }
 //   POST  /export                           { url, expiresAt }
+//   GET   /apps                             [{ installId, appKey, version, renderMode, publicLabel,
+//                                             position, enabled, publicEnabled, config, manifest }]
+//                                           (the installed apps Paperclip projected, lib/appInstances.js)
+//   PATCH /apps/:installId                  { renderMode?, publicLabel?, position?, publicEnabled? } -> the row
+//                                           (enabled is Paperclip's, not written here)
+//   PUT   /apps/order                       [installId, …] -> the rows in that order
 
 const express = require('express');
 const supabase = require('../db');
@@ -35,6 +41,7 @@ const intake = require('../lib/intake');
 const { forwardingAddressFor } = require('../lib/forwardingAddress');
 const { ownerEditableEntityColumns } = require('../lib/businessTables');
 const { envInt } = require('../lib/env');
+const appInstances = require('../lib/appInstances');
 
 const router = express.Router();
 router.use(ownerRequired);
@@ -279,6 +286,43 @@ router.post('/export', async (req, res) => {
         const out = await require('../lib/exportBusiness').exportBusiness(req.entitySlug);
         res.json({ url: out.url, expiresAt: out.expiresAt });
     } catch (err) { fail(res, err); }
+});
+
+/* ── installed apps ───────────────────────────────────────────────────── */
+
+// The apps Paperclip installed for this business (entity_modules rows with
+// managed_by = 'paperclip'). The owner decides how each is drawn on the public
+// page and in what order; whether it is installed and enabled is Paperclip's.
+const appsFail = (res, err) => (err.code === 'not_configured' ? res.status(503).json({ error: err.message, code: err.code }) : fail(res, err));
+
+router.get('/apps', async (req, res) => {
+    try {
+        res.set('Cache-Control', 'no-store');
+        res.json(await appInstances.listForSlug(req.entitySlug));
+    } catch (err) {
+        appsFail(res, err);
+    }
+});
+
+router.put('/apps/order', async (req, res) => {
+    try {
+        res.json(await appInstances.reorder(req.entitySlug, req.body));
+    } catch (err) {
+        appsFail(res, err);
+    }
+});
+
+router.patch('/apps/:installId', async (req, res) => {
+    const b = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    try {
+        const row = await appInstances.updateOwnerFields(req.entitySlug, req.params.installId, {
+            renderMode: b.renderMode, publicLabel: b.publicLabel, position: b.position, publicEnabled: b.publicEnabled,
+        });
+        if (!row) return res.status(404).json({ error: 'That app is not installed here.' });
+        res.json(row);
+    } catch (err) {
+        appsFail(res, err);
+    }
 });
 
 module.exports = router;

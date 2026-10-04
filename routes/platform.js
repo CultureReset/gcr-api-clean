@@ -30,6 +30,7 @@ const express = require('express');
 const { authRequired } = require('../middleware/auth');
 const supabase = require('../db');
 const { findExistingEntity } = require('../lib/find-existing-entity');
+const { MANAGED_BY: PAPERCLIP_MANAGED } = require('../lib/appInstances');
 
 const router = express.Router();
 
@@ -106,16 +107,24 @@ function bizShape(ent) {
     };
 }
 
+// A row Paperclip projects (lib/appInstances.js): never this dashboard's.
+// The column may not be there until sql/nextgent_entity_modules.sql is
+// applied, so rows are read whole rather than naming it in the select.
+function isPaperclipRow(r) {
+    return r.managed_by === PAPERCLIP_MANAGED;
+}
+
 // installed map — reconstructed from entity_modules rows that carry a
 // platform install snapshot (settings.manifest). Pre-existing GCR module
-// rows (no manifest) are never touched.
+// rows (no manifest) and Paperclip's rows (managed_by) are never touched.
 async function loadInstalled(slug) {
     const { data } = await supabase.from('entity_modules')
-        .select('module_key, enabled, settings, sort_order')
+        .select('*')
         .eq('entity_slug', slug).limit(300);
     const installed = {};
     const ordered = [];
     (data || []).forEach(function (r) {
+        if (isPaperclipRow(r)) return; // Paperclip's install, not this dashboard's
         const s = r.settings || {};
         if (!s.manifest) return; // not a platform install
         installed[r.module_key] = {
@@ -603,16 +612,22 @@ router.post('/state', authRequired, async (req, res) => {
         }
 
         // sync installs into entity_modules — only rows WE manage
-        // (settings.manifest present). Pre-existing GCR module rows are
-        // never modified or deleted.
+        // (settings.manifest present). Pre-existing GCR module rows and
+        // Paperclip's rows (managed_by, lib/appInstances.js) are never
+        // modified, deleted or written over, whatever keys the payload names.
         const want = installed || {};
         const order = page_order || Object.keys(want);
         const { data: existing } = await supabase.from('entity_modules')
-            .select('id, module_key, settings').eq('entity_slug', slug).limit(300);
+            .select('*').eq('entity_slug', slug).limit(300);
         const mine = {};
-        (existing || []).forEach(function (r) { if ((r.settings || {}).manifest) mine[r.module_key] = r.id; });
+        const paperclip = {};
+        (existing || []).forEach(function (r) {
+            if (isPaperclipRow(r)) paperclip[r.module_key] = true;
+            else if ((r.settings || {}).manifest) mine[r.module_key] = r.id;
+        });
 
         for (const key of Object.keys(want)) {
+            if (paperclip[key]) continue; // Paperclip's install under that key
             const inst = want[key] || {};
             const row = {
                 enabled: inst.enabled !== false,

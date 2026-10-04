@@ -8,6 +8,8 @@
 // Boots routes/nextgent.js and routes/app-data.js against the in-memory
 // database. Real signatures, real install tokens (long-lived and session),
 // real manifest guards (lib/businessTables.js). No credentials, no network.
+// The projection is an entity_modules row per install (managed_by =
+// 'paperclip', sql/nextgent_entity_modules.sql).
 
 const path = require('path');
 const crypto = require('crypto');
@@ -30,7 +32,7 @@ const { T, db } = createMemDb({ tables: {
     company_links: [{ company_id: 'co-1', entity_slug: 'shop' }, { company_id: 'co-2', entity_slug: 'other' }],
     business_mcp_tokens: [],
     nextgent_installs: [],
-    business_app_instances: [],
+    entity_modules: [],
     app_records: [],
     billing_item_prices: [],
     billing_plan: [{ key: 'base', is_default: true }],
@@ -140,8 +142,9 @@ async function run() {
         check('a manifest with a bad table is refused', bad.status === 400 && !T.nextgent_installs.some((i) => i.install_id === 'bad-1'), JSON.stringify(bad.body));
         const inst = await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-1', itemKey: 'notes-app', kind: 'app', version: '1.0.0', permissions: ['menu:read'], app: manifest() });
         check('the install answers with its token', inst.status === 201 && /^gcr_mcp_/.test(inst.body.token || ''), JSON.stringify(inst.body));
-        const projected = T.business_app_instances.find((r) => r.install_id === 'app-1');
-        check('the manifest is kept in the runtime projection', projected?.manifest?.id === 'notes-app' && projected.entity_slug === 'shop' && projected.app_key === 'notes-app' && projected.enabled === true && projected.version === '1.0.0');
+        const projected = T.entity_modules.find((r) => r.install_id === 'app-1');
+        check('the manifest is kept in the entity_modules projection', projected?.settings?.manifest?.id === 'notes-app' && projected.entity_slug === 'shop' && projected.module_key === 'notes-app' && projected.enabled === true && projected.version === '1.0.0', JSON.stringify(projected));
+        check('marked as Paperclip\'s, with the install and company', projected?.managed_by === 'paperclip' && projected.company_id === 'co-1' && projected.settings.showOnPublic === true && JSON.stringify(projected.settings.config) === '{}');
         check('and not on the install row', !('manifest' in T.nextgent_installs.find((i) => i.install_id === 'app-1')));
         const own = as(inst.body.token);
 
@@ -155,7 +158,8 @@ async function run() {
         const saved = await own('PUT', '/api/app-install/settings', { settings: { intro: 'Hi there', owner_email: 'me@example.test', api_key: 'sk-1', not_declared: 1 } });
         check('saving keeps declared keys only', saved.status === 200 && saved.body.settings.intro === 'Hi there' && !('not_declared' in saved.body.settings), JSON.stringify(saved.body));
         check('a secret is never returned', !('api_key' in saved.body.settings));
-        check('and is stored sealed', /^v1\./.test(projected.config.api_key) && !JSON.stringify(projected.config).includes('sk-1'));
+        check('and is stored sealed, in settings.config', /^v1\./.test(projected.settings.config.api_key) && !JSON.stringify(projected.settings.config).includes('sk-1'));
+        check('saving settings keeps the manifest and the public flag', projected.settings.manifest?.id === 'notes-app' && projected.settings.showOnPublic === true);
         const company = await signed('POST', '/api/nextgent/link', { companyId: 'co-1', rotateToken: true });
         check('/api/nextgent/link says the business kind', company.body.kind === 'cafe', JSON.stringify(company.body));
         const companyTok = as(company.body.businessToken);
@@ -189,6 +193,7 @@ async function run() {
         console.log('\n── /api/public/apps ──');
         const pub = await call('GET', '/api/public/apps/app-1');
         check('a visitor reads the public block', pub.status === 200 && pub.body.data && pub.body.settings, JSON.stringify(pub.body));
+        check('and the manifest comes with it', pub.body.manifest?.id === 'notes-app' && pub.body.manifest.ui, JSON.stringify(Object.keys(pub.body)));
         check('settings: only those public views use, never a secret or the owner\'s', pub.body.settings.intro === 'Hi there' && pub.body.settings.open === true && !('owner_email' in pub.body.settings) && !('api_key' in pub.body.settings), JSON.stringify(pub.body.settings));
         check('app rows: hidden ones dropped', pub.body.data.notes.length === 1 && pub.body.data.notes[0].title === 'Renamed');
         check('owner-only columns removed', !('flag' in pub.body.data.notes[0]));
@@ -209,24 +214,27 @@ async function run() {
         T.app_records = T.app_records.filter((r) => r.source !== 'visitor');
         await own('PUT', '/api/app-install/settings', { settings: { open: false } });
         check('a form the owner closed takes nothing', (await call('POST', '/api/public/apps/app-1/notes', { title: 'Late' })).status === 403);
-        projected.public_enabled = false;
-        check('public switched off: no public block', (await call('GET', '/api/public/apps/app-1')).status === 404);
-        projected.public_enabled = true;
+        projected.settings.showOnPublic = false;
+        check('public switched off (settings.showOnPublic): no public block', (await call('GET', '/api/public/apps/app-1')).status === 404);
+        projected.settings.showOnPublic = true;
         check('an unknown install is 404', (await call('GET', '/api/public/apps/nope')).status === 404);
 
         console.log('\n── uninstall ──');
         const gone = await signed('DELETE', '/api/nextgent/installs/app-1');
-        check('uninstall switches the projection off', gone.status === 200 && gone.body.app?.disabled === true && projected.enabled === false && projected.public_enabled === false, JSON.stringify(gone.body));
+        check('uninstall switches the projection off', gone.status === 200 && gone.body.app?.disabled === true && projected.enabled === false && projected.settings.showOnPublic === false, JSON.stringify(gone.body));
+        check('the row is kept, not deleted', T.entity_modules.some((r) => r.install_id === 'app-1' && r.settings.manifest?.id === 'notes-app'));
         check('the owner side is gone', (await own('GET', '/api/app-install')).status === 401 && (await as(sess.body.token)('GET', '/api/app-data/notes')).status === 401);
         check('and the public side', (await call('GET', '/api/public/apps/app-1')).status === 404);
-        check('records are kept unless the manifest says delete_on_uninstall', T.app_records.some((r) => r.install_id === 'app-1'));
+        check('records are kept', T.app_records.some((r) => r.install_id === 'app-1'));
         const m2 = manifest();
         m2.data.delete_on_uninstall = true;
         await signed('POST', '/api/nextgent/installs', { companyId: 'co-2', installId: 'app-2', itemKey: 'notes-app', kind: 'app', version: '1.1.0', permissions: [], app: m2 });
-        check('an update replaces the projected manifest and version', T.business_app_instances.find((r) => r.install_id === 'app-2').version === '1.1.0');
+        const p2 = T.entity_modules.find((r) => r.install_id === 'app-2');
+        check('an update replaces the projected manifest and version', p2.version === '1.1.0' && p2.settings.manifest.data.delete_on_uninstall === true, JSON.stringify(p2));
+        check('one row per install, still', T.entity_modules.filter((r) => r.install_id === 'app-2').length === 1);
         await theirs('POST', '/api/app-data/notes', { title: 'Theirs' });
         const gone2 = await signed('DELETE', '/api/nextgent/installs/app-2');
-        check('with delete_on_uninstall the records go too', gone2.body.app?.recordsDeleted === 1 && !T.app_records.some((r) => r.install_id === 'app-2'), JSON.stringify(gone2.body));
+        check('uninstall never deletes app_records, whatever the manifest says (DECISIONS #22)', gone2.body.app?.disabled === true && !('recordsDeleted' in gone2.body.app) && T.app_records.some((r) => r.install_id === 'app-2'), JSON.stringify(gone2.body));
     } catch (e) {
         check('no exception', false, e.stack);
     }

@@ -112,7 +112,9 @@ async function buildFullEntity(slug) {
     db.from('entity_blog_posts').select('id,title,slug,excerpt,body,cover_url,published_at').eq('entity_slug', slug).order('published_at', { ascending: false }).limit(10),
     db.from('entity_secondary_hours').select('*').eq('entity_slug', slug),
     db.from('announcements').select('id,message,type,starts_at,ends_at').eq('entity_slug', slug).eq('active', true),
-    db.from('entity_modules').select('module_key,enabled,sort_order,settings').eq('entity_slug', slug),
+    // Whole rows: the Paperclip columns (sql/nextgent_entity_modules.sql) may
+    // not be there yet, and naming a missing column blanks the whole query.
+    db.from('entity_modules').select('*').eq('entity_slug', slug),
     db.from('entity_sections').select('id,module_key,section_type,section_name,subtitle,icon,image_url,image_path,layout,sort_order,is_active').eq('entity_slug', slug).eq('is_active', true).order('sort_order'),
     db.from('entity_about_bullets').select('id,text,icon,sort_order').eq('entity_slug', slug).order('sort_order'),
     db.from('entity_perfect_for').select('id,label,sort_order').eq('entity_slug', slug).order('sort_order'),
@@ -265,9 +267,15 @@ async function buildFullEntity(slug) {
   }
 
   const modulesData = modulesRes.data || [];
-  // Full module list for the response (control panel: enabled + order + settings)
+  // Full module list for the response (control panel: enabled + order + settings;
+  // Paperclip's installed apps carry managed_by, render_mode, public_label,
+  // install_id and version — lib/appInstances.js — null on the other rows)
   const modulesFull = modulesData
-    .map(m => ({ module_key: m.module_key, enabled: m.enabled !== false, sort_order: m.sort_order ?? 0, settings: m.settings || {} }))
+    .map(m => ({
+      module_key: m.module_key, enabled: m.enabled !== false, sort_order: m.sort_order ?? 0, settings: m.settings || {},
+      managed_by: m.managed_by ?? null, render_mode: m.render_mode ?? null, public_label: m.public_label ?? null,
+      install_id: m.install_id ?? null, version: m.version ?? null,
+    }))
     .sort((a, b) => a.sort_order - b.sort_order);
   // Set of enabled module keys — preserves existing conditional-fetch logic below
   const modules = new Set(modulesData.filter(m => m.enabled !== false).map(m => m.module_key));

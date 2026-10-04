@@ -10,8 +10,12 @@
 //                          business, both from the token
 //   /api/app-install       GET → { installId, itemKey, version, settings, granted }
 //                          PUT /settings { settings } → { settings }
-//   /api/public/apps       GET /:installId → { settings, data }
+//   /api/public/apps       GET /:installId → { settings, data, manifest }
 //                          POST /:installId/:table — a visitor's form
+//   /api/public/business   GET /:slug/apps → [{ installId, appKey, version,
+//                          renderMode, publicLabel, position, enabled,
+//                          publicEnabled, config, manifest }] — the business's
+//                          enabled, public apps in order (what gcr-unified draws)
 //
 // The owner side takes only an install's token (gcr_mcp_…, long-lived or the
 // short-lived session form, lib/businessTokens.js). The business is the
@@ -261,7 +265,7 @@ publicRouter.get('/:installId', async (req, res) => {
             }
         }
         res.set('Cache-Control', `public, max-age=${envInt('APP_PUBLIC_CACHE_SECONDS', 30, { min: 0 })}`);
-        res.json({ settings: appInstances.settingsFor(instance, { only: appInstances.publicSettingKeys(manifest) }), data });
+        res.json({ settings: appInstances.settingsFor(instance, { only: appInstances.publicSettingKeys(manifest) }), data, manifest });
     } catch (err) {
         dbFail(res, err);
     }
@@ -291,4 +295,27 @@ publicRouter.post('/:installId/:table', async (req, res) => {
     }
 });
 
-module.exports = { dataRouter, installRouter, publicRouter, installCaller };
+/* ── /api/public/business ─────────────────────────────────────────────── */
+
+const businessRouter = express.Router();
+
+// The apps a business's public page draws: Paperclip's rows that are enabled
+// and switched on for the public, in the owner's order, each with its
+// manifest. A slug nobody has is 404 with a JSON body, so a page can tell
+// "no such business" from "no such route". This is a public read by slug,
+// like /api/gcr/entity/:slug; nothing here acts as the business.
+businessRouter.get('/:slug/apps', async (req, res) => {
+    const slug = String(req.params.slug || '').trim();
+    try {
+        const { data: entity, error } = await supabase.from('entity').select('slug').eq('slug', slug).maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!entity) return fail(res, 404, 'No such business.');
+        const rows = await appInstances.listForSlug(entity.slug, { publicOnly: true });
+        res.set('Cache-Control', `public, max-age=${envInt('APP_PUBLIC_CACHE_SECONDS', 30, { min: 0 })}`);
+        res.json(rows);
+    } catch (err) {
+        dbFail(res, err);
+    }
+});
+
+module.exports = { dataRouter, installRouter, publicRouter, businessRouter, installCaller };

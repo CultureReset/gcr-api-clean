@@ -12,7 +12,10 @@
 //                                  automation goes onto the business through
 //                                  lib/automationInstalls.js, the path admin
 //                                  rollouts use too)
-//   DELETE /installs/:installId    …and removed
+//   PATCH  /installs/:installId    an app's enabled switch, version or manifest
+//                                  changed (re-projected into entity_modules)
+//   DELETE /installs/:installId    …and removed (the projection is switched off
+//                                  and kept, the app's records stay)
 //   POST   /installs/:installId/session  a short-lived token for that install
 //                                  (≤ 300 s, the install's permissions)
 //   GET    /entitlement            may this company have this item, and at what price
@@ -247,6 +250,20 @@ router.get('/entitlement', async (req, res) => {
     }
 });
 
+/**
+ * The app manifest in a Paperclip body, checked (an object, within
+ * APP_MANIFEST_MAX_BYTES, its tables acceptable to lib/businessTables.js), or
+ * undefined when none was sent. Throws with err.status.
+ */
+function manifestFrom(app) {
+    if (app === undefined || app === null) return undefined;
+    if (typeof app !== 'object' || Array.isArray(app)) throw Object.assign(new Error('app must be the app manifest object.'), { status: 400 });
+    if (Buffer.byteLength(JSON.stringify(app)) > envInt('APP_MANIFEST_MAX_BYTES', 262144)) throw Object.assign(new Error('The app manifest is too large.'), { status: 413 });
+    const problem = checkAppTables(app);
+    if (problem) throw Object.assign(new Error(`app manifest: ${problem}`), { status: 400 });
+    return app;
+}
+
 /* ── POST /installs ───────────────────────────────────────────────────── */
 
 router.post('/installs', async (req, res) => {
@@ -273,15 +290,13 @@ router.post('/installs', async (req, res) => {
     const instructions = typeof b.instructions === 'string' ? b.instructions.slice(0, 20000) : null;
     // An app's manifest (Paperclip's store version payload.app): what the app
     // engine draws, its own tables and its settings. Kept whole in the runtime
-    // projection business_app_instances (CONTRACT §14, lib/appInstances.js),
-    // the one row public pages and /api/app-data read.
+    // projection, an entity_modules row per install (CONTRACT §14,
+    // lib/appInstances.js), the one row public pages and /api/app-data read.
     let appManifest;
-    if (b.app !== undefined && b.app !== null) {
-        if (typeof b.app !== 'object' || Array.isArray(b.app)) return fail(res, 400, 'app must be the app manifest object.');
-        if (Buffer.byteLength(JSON.stringify(b.app)) > envInt('APP_MANIFEST_MAX_BYTES', 262144)) return fail(res, 413, 'The app manifest is too large.');
-        const problem = checkAppTables(b.app);
-        if (problem) return fail(res, 400, `app manifest: ${problem}`);
-        appManifest = b.app;
+    try {
+        appManifest = manifestFrom(b.app);
+    } catch (err) {
+        return fail(res, err.status || 400, err.message);
     }
     const manifestFields = {
         ...(capabilities.length ? { capabilities } : {}),
@@ -511,6 +526,52 @@ router.post('/installs/:installId/session', async (req, res) => {
     }
 });
 
+/* ── PATCH /installs/:installId ───────────────────────────────────────── */
+
+// Paperclip switched an install on or off, or moved it to a version (with the
+// manifest that version carries). The install row keeps the version; an app's
+// projection is refreshed with whatever was sent (lib/appInstances.project).
+router.patch('/installs/:installId', async (req, res) => {
+    const installId = str(req.params.installId);
+    const b = req.body || {};
+    if (b.enabled !== undefined && typeof b.enabled !== 'boolean') return fail(res, 400, 'enabled must be true or false.');
+    if (b.version !== undefined && b.version !== null && !str(b.version)) return fail(res, 400, 'version must be a string.');
+    let appManifest;
+    try {
+        appManifest = manifestFrom(b.app);
+    } catch (err) {
+        return fail(res, err.status || 400, err.message);
+    }
+    const version = b.version !== undefined && b.version !== null ? str(b.version) : undefined;
+    if (b.enabled === undefined && version === undefined && appManifest === undefined) return fail(res, 400, 'Send enabled, version or app.');
+
+    const { data: existing, error: readError } = await supabase
+        .from('nextgent_installs').select('install_id, company_id, entity_slug, item_key, kind, version, status')
+        .eq('install_id', installId).maybeSingle();
+    if (readError) return fail(res, 503, `Installs are not set up on this database yet: ${readError.message}`);
+    if (!existing) return fail(res, 404, 'No such install.');
+    if (existing.status !== 'active') return fail(res, 409, 'That install was removed; install again with a new installId.');
+
+    if (version !== undefined && version !== existing.version) {
+        const { error } = await supabase.from('nextgent_installs')
+            .update({ version, updated_at: new Date().toISOString() }).eq('install_id', installId);
+        if (error) return fail(res, 500, error.message);
+    }
+    let projected = false;
+    if (existing.kind === 'app') {
+        try {
+            await appInstances.project({
+                installId, companyId: existing.company_id, slug: existing.entity_slug, itemKey: existing.item_key,
+                version, manifest: appManifest, enabled: b.enabled,
+            });
+            projected = true;
+        } catch (err) {
+            return fail(res, err.status || 500, err.message, err.code ? { code: err.code } : undefined);
+        }
+    }
+    res.json({ updated: true, projected });
+});
+
 /* ── DELETE /installs/:installId ──────────────────────────────────────── */
 
 router.delete('/installs/:installId', async (req, res) => {
@@ -525,6 +586,7 @@ router.delete('/installs/:installId', async (req, res) => {
         const charges = await billingStripe.removeInstallCharge(installId);
         const numbersReleased = await phoneAgent.releaseForInstall(installId);
         // Both surfaces go: the owner's screen (its token) and the public page.
+        // The projection row and the app's records stay (DECISIONS #22).
         const appRemoved = await appInstances.remove(installId);
         if (!data?.length && !revoked) return fail(res, 404, 'No such install.');
         const row = data?.[0];

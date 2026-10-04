@@ -47,7 +47,8 @@ database named in `CLAUDE.md`, after checking it is the right project.
 
 | # | File | What it adds |
 | - | ---- | ------------ |
-| 18a | `nextgent_apps.sql` | `business_app_instances` (runtime projection of installed apps: manifest, settings, public switches) and `app_records` (an app's own records) — needs 8. Apply **before** Paperclip sends app manifests: an install that carries one answers 503 until it is applied |
+| 18a | `nextgent_apps.sql` | `app_records` (an app's own records) — needs 8. Its `business_app_instances` DDL is superseded by 18b and kept only as a comment |
+| 18b | `nextgent_entity_modules.sql` | `entity_modules.managed_by / install_id / company_id / version / render_mode / public_label / updated_at`: the runtime projection of installed apps is one `entity_modules` row per install (manifest, settings and the public flag in `settings`). Replaces `business_app_instances`. Apply **before** Paperclip sends app installs: an install answers 503 until it is applied |
 
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.

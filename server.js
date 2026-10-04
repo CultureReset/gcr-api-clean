@@ -204,6 +204,10 @@ const appPublicReadLimiter = rateLimit({
     message: { error: 'Too many requests — slow down and try again shortly.' },
 });
 app.use('/api/public/apps', (req, res, next) => (req.method === 'POST' ? appPublicSubmitLimiter : appPublicReadLimiter)(req, res, next));
+// The list of a business's public apps is drawn on the same pages: same
+// origins, same read ceiling.
+app.use('/api/public/business', cors({ origin: '*', credentials: false }));
+app.use('/api/public/business', appPublicReadLimiter);
 
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
@@ -245,6 +249,9 @@ mount('/api/dashboard', () => require('./routes/dashboard'));
 // Installed apps' public blocks — before /api/public, whose site guard would
 // otherwise claim the path. The install names the business, never the request.
 mount('/api/public/apps', () => require('./routes/app-data').publicRouter);
+// A business's public apps, by slug (GET /api/public/business/:slug/apps):
+// Paperclip's enabled, public entity_modules rows in the owner's order.
+mount('/api/public/business', () => require('./routes/app-data').businessRouter);
 
 // Public
 mount('/api/public', () => require('./routes/public'));
