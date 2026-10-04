@@ -275,13 +275,13 @@ router.post('/create-payment', async (req, res) => {
                         console.warn('No customer email on booking:', booking_id);
                     }
 
-                    // Customer SMS — only to a customer who agreed to texts: the
-                    // booking form records the yes (sms_consent) in message_consent,
-                    // and lib/messages.js hasSmsConsent is the one check.
+                    // Customer SMS — a confirmation is transactional: it needs no
+                    // consent row and only a STOP stops it (lib/messages.js
+                    // textCustomer). The form's yes still goes to message_consent.
                     if (customerPhone && msgSettings.notify_customer_on_booking !== false) {
                         const defaultCustTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nReply STOP to opt out. Msg/data rates may apply.';
                         const custMsg = fillTemplate(msgSettings.customer_booking_template || defaultCustTpl, templateData);
-                        require('../lib/messages').textCustomer({ siteId: targetSiteId, to: customerPhone, body: custMsg, type: 'booking_confirmation', relatedId: booking_id })
+                        require('../lib/messages').textCustomer({ siteId: targetSiteId, to: customerPhone, body: custMsg, purpose: 'transactional', type: 'booking_confirmation', relatedId: booking_id })
                             .catch(err => console.error('Customer SMS failed:', err));
                     }
 

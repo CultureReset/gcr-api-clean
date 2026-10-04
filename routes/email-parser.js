@@ -1196,15 +1196,15 @@ async function sendBookingConfirmations(entitySlug, parsed, customerEmail, custo
       });
     }
 
-    // SMS only to a customer who agreed to texts: the opt-in step records the
-    // yes in message_consent and lib/messages.js hasSmsConsent is the one
-    // check. utils/sms still relays to the owner instead when
-    // OWNER_RELAY_MODE is set.
+    // A confirmation is transactional: it needs no consent row and only a STOP
+    // stops it (lib/messages.js textCustomer). utils/sms still relays to the
+    // owner instead when OWNER_RELAY_MODE is set.
     if (customerPhone) {
       await require('../lib/messages').textCustomer({
         slug: entitySlug,
         to: customerPhone,
         body: `${businessName}: We received your reservation request for ${parsed.event_date}${parsed.event_time ? ' at ' + parsed.event_time : ''}. We'll text you when it's confirmed. Reply STOP to opt out.`,
+        purpose: 'transactional',
         type: 'booking_confirmation',
       });
     }

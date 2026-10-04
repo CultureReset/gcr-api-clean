@@ -444,8 +444,8 @@ router.post('/create-payment-intent', async (req, res) => {
                     if (settings.booking_confirmation_enabled !== false && customerPhone) {
                         const defaultTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!\n\n🏖️ Get exclusive deals & rewards while you\'re in town!\ngulfcoastradar.com/trip-pass';
                         const msg = fillTemplate(settings.booking_confirmation_template || defaultTpl, templateData);
-                        // Only to a customer who agreed to texts (lib/messages.js, the one check).
-                        require('../lib/messages').textCustomer({ siteId: targetSiteId, to: customerPhone, body: msg, type: 'booking_confirmation', relatedId: booking_id })
+                        // A confirmation: transactional, so it needs no consent row; a STOP stops it (lib/messages.js).
+                        require('../lib/messages').textCustomer({ siteId: targetSiteId, to: customerPhone, body: msg, purpose: 'transactional', type: 'booking_confirmation', relatedId: booking_id })
                             .catch(err => console.error('Customer SMS failed:', err));
                     }
 

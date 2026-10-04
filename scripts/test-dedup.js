@@ -367,6 +367,25 @@ section('6. hasSmsConsent is the only consent check; message_consent the only re
     const stop = await messages.textCustomer({ slug: 'shop', to: '251-555-0166', body: 'Your code', type: 'test', reply: true });
     check('but an opt-out still stops it', !stop.success && stop.reason === 'opted_out');
 
+    // Transactional texts (confirmations, review requests, waivers, update
+    // links, resends) go without a consent row, as they did before the consent
+    // work; consent gates marketing. A STOP blocks both, for that business.
+    carrier.length = 0;
+    const booked = await messages.textCustomer({ slug: 'shop', to: '251-555-0177', body: 'Your booking is confirmed.', type: 'booking_confirmation', purpose: 'transactional' });
+    check('a transactional text goes without a consent row', booked.success && carrier.some((c) => c.body?.to === '+12515550177'), JSON.stringify(booked));
+    const promo = await messages.textCustomer({ slug: 'shop', to: '251-555-0177', body: 'Promo', type: 'campaign', purpose: 'marketing' });
+    check('a marketing text to the same phone needs the yes', !promo.success && promo.reason === 'no_consent');
+    const stopped = await messages.textCustomer({ slug: 'shop', to: '251-555-0166', body: 'Your booking is confirmed.', type: 'booking_confirmation', purpose: 'transactional' });
+    check('an opt-out blocks a transactional text too', !stopped.success && stopped.reason === 'opted_out');
+    await messages.recordConsent('shop', '251-555-0144', { granted: false, source: 'sms_keyword' });
+    const revoked = await messages.textCustomer({ slug: 'shop', to: '251-555-0144', body: 'Your booking is confirmed.', type: 'booking_confirmation', purpose: 'transactional' });
+    check('and so does a STOP recorded for this business', !revoked.success && revoked.reason === 'consent_revoked');
+    const otherBiz = await messages.textCustomer({ slug: 'other', to: '251-555-0144', body: 'Your booking is confirmed.', type: 'booking_confirmation', purpose: 'transactional' });
+    check('while another business can still confirm a booking to that phone', otherBiz.success, JSON.stringify(otherBiz));
+    let badPurpose = null;
+    try { await messages.textCustomer({ slug: 'shop', to: '251-555-0177', body: 'x', purpose: 'promo' }); } catch (e) { badPurpose = e; }
+    check('an unknown purpose is refused', badPurpose?.status === 400);
+
     await messages.recordConsent('shop', '251-555-0188', { source: 'booking_form' });
     const viaSite = await messages.textCustomer({ siteId: 'site-1', to: '251-555-0188', body: 'Booked', type: 'test' });
     check('an older site flow is checked under its business\'s slug', viaSite.success && (await messages.businessKeyForSite('site-1')) === 'shop');
@@ -394,6 +413,9 @@ section('6. hasSmsConsent is the only consent check; message_consent the only re
     const senders = ['routes/email-parser.js', 'routes/public.js', 'routes/square.js', 'routes/stripe.js', 'routes/dashboard.js', 'routes/platform.js', 'routes/live-photo.js', 'routes/transportation.js'];
     const missing = senders.filter((f) => !/textCustomer/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
     check('every customer-texting route uses textCustomer', !missing.length, missing.join(', '));
+    const noPurpose = senders.filter((f) => fs.readFileSync(path.join(ROOT, f), 'utf8').split(/textCustomer\(\{/).slice(1)
+        .some((call) => !/purpose:\s*'(transactional|marketing)'/.test(call.slice(0, 700))));
+    check('and every call names its purpose, transactional or marketing', !noPurpose.length, noPurpose.join(', '));
     const other = ['routes', 'lib', 'utils'].flatMap((d) => fs.readdirSync(path.join(ROOT, d)).filter((f) => f.endsWith('.js')).map((f) => `${d}/${f}`))
         .filter((f) => f !== 'lib/messages.js' && /booking_opt_ins[^\n]*sms_consent[^\n]*\)\s*$|select\('sms_consent/m.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
     check('no other file reads a consent flag to decide a text', !other.length, other.join(', '));

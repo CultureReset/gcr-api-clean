@@ -1247,8 +1247,8 @@ async function sendBookingConfirmations(booking, siteId) {
         // Customer confirmation SMS
         if (prefs.booking_confirmation_sms && booking.customer_phone) {
             const msg = fillTemplate(prefs.booking_confirmation_template, templateData);
-            // Only to a customer who agreed to texts (lib/messages.js, the one check).
-            textCustomer({ siteId, to: booking.customer_phone, body: msg, type: 'booking_confirmation', relatedId: booking.id })
+            // A confirmation is transactional: no consent row needed, a STOP stops it (lib/messages.js).
+            textCustomer({ siteId, to: booking.customer_phone, body: msg, purpose: 'transactional', type: 'booking_confirmation', relatedId: booking.id })
                 .catch(e => console.warn('Booking confirm SMS failed:', e.message));
         }
 
@@ -1604,11 +1604,12 @@ router.post('/reviews/send-request', async (req, res) => {
     let sms_sent = false;
     if (booking.customer_phone) {
         const name = booking.customer_name ? `, ${booking.customer_name.split(' ')[0]}` : '';
-        // Only to a customer who agreed to texts (lib/messages.js, the one check).
+        // A review request is transactional: no consent row needed, a STOP stops it (lib/messages.js).
         const r = await require('../lib/messages').textCustomer({
             siteId: req.siteId,
             to: booking.customer_phone,
             body: `Hi${name}! Thanks for visiting ${biz?.name || 'us'}. We'd love your feedback: ${reviewLink}`,
+            purpose: 'transactional',
             type: 'review_request',
             relatedId: booking_id,
         }).catch(e => { console.warn('Review SMS failed:', e.message); return null; });
@@ -1920,6 +1921,7 @@ async function generateWaiverLink(siteId, booking_id) {
             siteId,
             to: booking.customer_phone,
             body: `Hi${name}! Please sign your waiver before your rental: ${link}`,
+            purpose: 'transactional',
             type: 'waiver_link',
             relatedId: booking_id,
         }).catch(e => console.warn('Waiver SMS failed:', e.message));
@@ -2727,8 +2729,8 @@ router.post('/sms/campaign', async (req, res) => {
         return res.status(400).json({ error: 'No customers with phone numbers found' });
     }
 
-    // Consent and opt-outs are checked per customer by textCustomer
-    // (lib/messages.js hasSmsConsent, the one check).
+    // A campaign is marketing: textCustomer (lib/messages.js) sends it only
+    // to a customer whose yes is in message_consent and who has not opted out.
 
     // Get business name for template
     const { data: biz } = await supabase
@@ -2762,7 +2764,7 @@ router.post('/sms/campaign', async (req, res) => {
             if (coupon_code) finalMsg += '\n\nUse code ' + coupon_code + ' at checkout!';
             finalMsg += '\n\nReply STOP to unsubscribe.';
 
-            const result = await textCustomer({ siteId: req.siteId, to: customer.phone, body: finalMsg, type: 'campaign', relatedId: campaign.id });
+            const result = await textCustomer({ siteId: req.siteId, to: customer.phone, body: finalMsg, purpose: 'marketing', type: 'campaign', relatedId: campaign.id });
             if (result.success) sentCount++; else failedCount++;
         }
 
@@ -5102,7 +5104,7 @@ router.post('/resend-confirmation', async (req, res) => {
 
         if (bookingData.customer_phone) {
             const tpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!';
-            await textCustomer({ siteId: req.siteId, to: bookingData.customer_phone, body: fillTemplate(tpl, templateData), type: 'booking_confirmation', relatedId: booking_id })
+            await textCustomer({ siteId: req.siteId, to: bookingData.customer_phone, body: fillTemplate(tpl, templateData), purpose: 'transactional', type: 'booking_confirmation', relatedId: booking_id })
                 .catch(err => console.error('Resend SMS failed:', err));
         }
 
@@ -5442,7 +5444,7 @@ router.post('/promotions/claim', async (req, res) => {
         // (lib/messages.js) — they asked for this text, so opt-outs apply but
         // no separate yes is needed.
         const msg = `${promo.title}\n\n${promo.description || ''}\n\nYour code: ${code}${promo.discount_text ? '\n' + promo.discount_text : ''}\n\nYour loyalty #: ${customer?.loyalty_number || ''}`.trim();
-        await require('../lib/messages').textCustomer({ siteId: site_id, to: cleanPhone, body: msg, type: 'coupon_claim', relatedId: promotion_id, reply: true }).catch(() => {});
+        await require('../lib/messages').textCustomer({ siteId: site_id, to: cleanPhone, body: msg, purpose: 'transactional', type: 'coupon_claim', relatedId: promotion_id, reply: true }).catch(() => {});
 
         res.json({
             ok: true,

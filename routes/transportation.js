@@ -19,7 +19,7 @@ const { sendSms, normalizePhone } = require('../utils/sms');
 // check (lib/messages.js). They asked for these updates, so no separate yes is
 // needed, but an opt-out (STOP) is honoured. Drivers are texted with sendSms.
 const textRider = (to, body, slug, type, relatedId) =>
-  require('../lib/messages').textCustomer({ slug, to, body, type, relatedId, reply: true })
+  require('../lib/messages').textCustomer({ slug, to, body, purpose: 'transactional', type, relatedId, reply: true })
 const { ownerRequired } = require('../middleware/ownerAuth');
 
 // Two audiences in one file, and only one of them is signed in.

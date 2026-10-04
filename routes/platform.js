@@ -488,8 +488,8 @@ async function runAutomations(slug, dataKey, record, ctx) {
                 try {
                     const customer = record.phone || record.customer_phone;
                     if (customer) {
-                        // A customer: only with their consent (lib/messages.js, the one check).
-                        await require('../lib/messages').textCustomer({ slug, to: customer, body: run.message, type: 'automation' });
+                        // A customer, about their own record: transactional (lib/messages.js).
+                        await require('../lib/messages').textCustomer({ slug, to: customer, body: run.message, purpose: 'transactional', type: 'automation' });
                     } else if (business.phone) {
                         await require('../utils/sms').sendSms(business.phone, run.message, slug, 'automation', null);
                     }
@@ -1067,7 +1067,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                     const link = rbase + '/r/' + slug + '?t=' + req.params.id;
                     msg = '[' + bizName + '] Thanks for coming out' + (record.customer || record.name ? ', ' + (record.customer || record.name) : '') + '! How was it? Leave a quick review: ' + link + ' — it really helps us.';
                 }
-                if (msg) await textCustomer({ slug, to: phone, body: msg, type: 'status_' + status, relatedId: req.params.id });
+                if (msg) await textCustomer({ slug, to: phone, body: msg, purpose: 'transactional', type: 'status_' + status, relatedId: req.params.id });
             } catch (e) { console.error('status sms failed:', e.message); }
         }
 
@@ -1077,7 +1077,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                 const custPhone = record.phone || record.customer_phone;
                 const bizName = biz.name || 'the business';
                 const { textCustomer } = require('../lib/messages');
-                const textTo = (to, body, s2, type, relatedId) => textCustomer({ slug: s2, to, body, type, relatedId });
+                const textTo = (to, body, s2, type, relatedId) => textCustomer({ slug: s2, to, body, purpose: 'transactional', type, relatedId });
                 if (req.params.dataKey === 'ugc_videos' && status === 'confirmed') {
                     const uploader = await touristByPhone(custPhone);
                     if (uploader) {
@@ -1802,7 +1802,7 @@ router.post('/manage/:id/cancel', async (req, res) => {
             const { sendSms } = require('../utils/sms');
             if (biz.phone) await sendSms(biz.phone, '[' + (biz.name || 'Your page') + '] ' + (rec.customer || rec.name || 'A guest') + ' cancelled ' + (rec.date || '') + (rec.time ? ' ' + rec.time : '') + ' — the spot is open again.', ctx.row.entity_slug, 'guest_cancel', ctx.row.id);
             const gp = rec.phone || rec.customer_phone;
-            if (gp) await require('../lib/messages').textCustomer({ slug: ctx.row.entity_slug, to: gp, body: '[' + (biz.name || '') + '] Your booking' + (rec.date ? ' for ' + rec.date : '') + ' is cancelled. Book again any time: ' + publicBase() + '/p/' + (biz.slug || ''), type: 'guest_cancel_ack', relatedId: ctx.row.id });
+            if (gp) await require('../lib/messages').textCustomer({ slug: ctx.row.entity_slug, to: gp, body: '[' + (biz.name || '') + '] Your booking' + (rec.date ? ' for ' + rec.date : '') + ' is cancelled. Book again any time: ' + publicBase() + '/p/' + (biz.slug || ''), purpose: 'transactional', type: 'guest_cancel_ack', relatedId: ctx.row.id });
         } catch (e) { console.error('cancel sms failed:', e.message); }
         res.json({ success: true, status: 'cancelled' });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1965,7 +1965,7 @@ router.get('/cron/reminders', require('../lib/cronAuth').cronRequired, async (re
                     .replace(/\{time\}/g, rec.time ? ' at ' + rec.time : '')
                     .replace(/\{manage\}/g, publicBase() + '/manage/' + e.booking_id + '?t=' + manageToken(e.booking_id));
                 try {
-                    await textCustomer({ slug, to: phone, body: msg, type: 'reminder_24h', relatedId: e.booking_id });
+                    await textCustomer({ slug, to: phone, body: msg, purpose: 'transactional', type: 'reminder_24h', relatedId: e.booking_id });
                     rec.reminded = new Date().toISOString().slice(0, 10);
                     if (e.booking_id) await supabase.from('bookings').update({ details: rec }).eq('id', e.booking_id);
                     await supabase.from('booking_calendar').update({ details: rec }).eq('id', e.id);
@@ -1987,7 +1987,7 @@ router.get('/cron/reminders', require('../lib/cronAuth').cronRequired, async (re
             const r = row.metadata || {};
             if (r.status !== 'pending' || !r.send_at || r.send_at > nowIso) continue;
             try {
-                if (r.to) await require('../lib/messages').textCustomer({ slug: row.entity_slug, to: r.to, body: r.body, type: 'automation_delayed' });
+                if (r.to) await require('../lib/messages').textCustomer({ slug: row.entity_slug, to: r.to, body: r.body, purpose: 'transactional', type: 'automation_delayed' });
                 r.status = 'sent'; r.sent_at = nowIso;
                 await supabase.from('entity_section_items').update({ metadata: r }).eq('id', row.id);
                 drained++;
@@ -2110,7 +2110,7 @@ async function scheduleAutomationSteps(slug, steps, record, business) {
         if (!to) continue;
         const body = renderTpl(step.template, record, business);
         if (delayMin <= 0) {
-            try { await require('../lib/messages').textCustomer({ slug, to, body, type: 'automation', relatedId: record._mid || null }); }
+            try { await require('../lib/messages').textCustomer({ slug, to, body, purpose: 'transactional', type: 'automation', relatedId: record._mid || null }); }
             catch (e) { console.error('automation sms failed:', e.message); }
         } else {
             const sendAt = new Date(Date.now() + delayMin * 60000).toISOString();

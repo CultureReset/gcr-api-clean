@@ -166,7 +166,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
 
             setTimeout(async () => {
                 try {
-                    await require('../lib/messages').textCustomer({ siteId: site_id, to: cleanPhone, body: smsBody, type: 'review_request', relatedId: photoRecord?.id || null });
+                    await require('../lib/messages').textCustomer({ siteId: site_id, to: cleanPhone, body: smsBody, purpose: 'transactional', type: 'review_request', relatedId: photoRecord?.id || null });
                 } catch (e) { console.error('review SMS error:', e.message); }
             }, delayMs);
         }

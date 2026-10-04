@@ -284,8 +284,8 @@ router.post('/resend-confirmation', async (req, res) => {
 
         if (bookingData.customer_phone) {
             const tpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!';
-            // Only to a customer who agreed to texts (lib/messages.js, the one check).
-            await textCustomer({ siteId, to: bookingData.customer_phone, body: fillTemplate(tpl, templateData), type: 'booking_confirmation', relatedId: booking_id })
+            // A confirmation is transactional: no consent row needed, a STOP stops it (lib/messages.js).
+            await textCustomer({ siteId, to: bookingData.customer_phone, body: fillTemplate(tpl, templateData), purpose: 'transactional', type: 'booking_confirmation', relatedId: booking_id })
                 .catch(err => console.error('Resend SMS failed:', err));
         }
 
@@ -1263,7 +1263,7 @@ router.post('/contact', async (req, res) => {
             const messages = require('../lib/messages');
             const businessName2 = business?.name || 'us';
             const customerSms = `Hi! We received your message and will get back to you shortly. Thanks for contacting ${businessName2}! Reply STOP to opt out.`;
-            messages.textCustomer({ siteId: req.siteId, to: phone, body: customerSms, type: 'contact_form_confirm' })
+            messages.textCustomer({ siteId: req.siteId, to: phone, body: customerSms, purpose: 'transactional', type: 'contact_form_confirm' })
                 .catch(() => {});
         }
         // Collect all emails: primary, secondary (CC), contact_email, business email
@@ -1779,7 +1779,7 @@ Be helpful, enthusiastic, and specific. Recommend real places. Keep responses co
                     if (args.customer_phone) {
                         const tpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!\n\n🏖️ Get exclusive deals & rewards while you\'re in town!\nSign up for Gulf Coast Radar Trip Pass:\ngulfcoastradar.com/trip-pass';
                         const msg = fillTemplate(settings.customerBookingTemplate || tpl, templateData);
-                        require('../lib/messages').textCustomer({ siteId: biz.id, to: args.customer_phone, body: msg, type: 'booking_confirmation', relatedId: result.booking_id }).catch(() => {});
+                        require('../lib/messages').textCustomer({ siteId: biz.id, to: args.customer_phone, body: msg, purpose: 'transactional', type: 'booking_confirmation', relatedId: result.booking_id }).catch(() => {});
                     }
                     if (siteContent?.contact_phone) {
                         const tpl = 'NEW BOOKING (via AI chat)!\n\nCustomer: {{customer_name}}\nPhone: {{customer_phone}}\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}';
@@ -1800,8 +1800,8 @@ Be helpful, enthusiastic, and specific. Recommend real places. Keep responses co
 
             case 'send_sms': {
                 try {
-                    // A customer, so only with their consent (lib/messages.js).
-                    const r = await require('../lib/messages').textCustomer({ siteId: biz.id, to: args.phone, body: args.message_text, type: 'ai_chat_sms' });
+                    // The visitor asked the chat for this text: transactional (lib/messages.js).
+                    const r = await require('../lib/messages').textCustomer({ siteId: biz.id, to: args.phone, body: args.message_text, purpose: 'transactional', type: 'ai_chat_sms' });
                     if (!r.success) return JSON.stringify({ success: false, error: r.reason || 'not sent' });
                     return JSON.stringify({ success: true });
                 } catch (err) {
@@ -2740,7 +2740,7 @@ router.post('/resend-confirmation', async (req, res) => {
         if (bookingData.customer_phone) {
             const defaultTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!';
             const msg = fillTemplate(defaultTpl, templateData);
-            await require('../lib/messages').textCustomer({ siteId: bookingData.site_id, to: bookingData.customer_phone, body: msg, type: 'booking_confirmation', relatedId: booking_id })
+            await require('../lib/messages').textCustomer({ siteId: bookingData.site_id, to: bookingData.customer_phone, body: msg, purpose: 'transactional', type: 'booking_confirmation', relatedId: booking_id })
                 .catch(err => console.error('Resend SMS failed:', err));
         }
 

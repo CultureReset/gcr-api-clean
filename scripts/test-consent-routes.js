@@ -96,7 +96,9 @@ async function run() {
         await settle();
         check('the upload is accepted', r.status === 200, JSON.stringify(r.body));
         check('a ticked box on an anonymous upload records no consent', !consentRows(STRANGER).length, JSON.stringify(consentRows(STRANGER)));
-        check('and no text goes to a phone that never agreed', !textsTo(STRANGER).length, JSON.stringify(textsTo(STRANGER)));
+        // A review request is transactional (DECISIONS.md #6): it goes without a
+        // consent row, and carries nothing the caller typed.
+        check('the review request is texted without a consent row', textsTo(STRANGER).length === 1 && !textsTo(STRANGER)[0].body.text.includes(ATTACK), JSON.stringify(textsTo(STRANGER)));
         r = await photo({ site_id: 'site-1', phone: CONSENTED, send_review: 'true', business_name: ATTACK, review_delay_minutes: '0' });
         await settle();
         const sent = textsTo(CONSENTED);
@@ -110,7 +112,7 @@ async function run() {
         await settle();
         check('the form is accepted', r.status === 200, JSON.stringify(r.body));
         check('a ticked box on the contact form records no consent', !consentRows(STRANGER).length, JSON.stringify(consentRows(STRANGER)));
-        check('and no text goes to a phone that never agreed', !textsTo(STRANGER).length, JSON.stringify(textsTo(STRANGER)));
+        check('the confirmation is texted without a consent row, carrying nothing the caller typed', textsTo(STRANGER).length === 1 && !textsTo(STRANGER)[0].body.text.includes(ATTACK), JSON.stringify(textsTo(STRANGER)));
         r = await post('/api/public/contact?site_id=site-1', { name: ATTACK, message: 'hello', phone: CONSENTED, sms_consent: true });
         await settle();
         const confirm = textsTo(CONSENTED);
