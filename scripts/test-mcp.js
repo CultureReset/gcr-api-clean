@@ -106,6 +106,7 @@ const schemaStub = {
     ACTIONS: realTables.ACTIONS,
     permits: realTables.permits,
     canAny: realTables.canAny,
+    mayUse: realTables.mayUse,
     resourceForTable: realTables.resourceForTable,
     normalizePermissions: realTables.normalizePermissions,
     scopeForPermissions: realTables.scopeForPermissions,

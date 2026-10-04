@@ -35,15 +35,21 @@ const supabase = require('../db');
 const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth');
 const {
     getSchema, allowTable, cleanBody, textColumns,
-    permits, canAny, tablesFor, resourceForTable, normalizePermissions, scopeForPermissions,
+    permits, canAny, mayUse, tablesFor, resourceForTable, normalizePermissions, scopeForPermissions,
 } = require('../lib/businessTables');
+const messages = require('../lib/messages');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { TOKEN_PREFIX, mintToken, lookupToken, missingTable } = require('../lib/businessTokens');
 
-const SERVER_INFO = { name: 'gcr-api-clean', title: 'Gulf Coast Radar — business', version: '1.0.0' };
+// The platform's name is configuration (PLATFORM_NAME), not code.
+const SERVER_INFO = {
+    name: 'gcr-api-clean',
+    title: process.env.PLATFORM_NAME ? `${process.env.PLATFORM_NAME} — business` : 'Business data',
+    version: '1.0.0',
+};
 
 const INSTRUCTIONS = [
-    'You are connected to one business on the Gulf Coast Radar platform. Every tool acts on',
+    'You are connected to one business on this platform. Every tool acts on',
     'that business and no other — there is no way to name a different one.',
     '',
     'A "section" is one table of that business\'s data: menu_items, faqs, events, hours, and so',
@@ -52,6 +58,10 @@ const INSTRUCTIONS = [
     '',
     'Never invent a figure. If a number is asked for, read it with read_section and report what',
     'came back. If a section holds no rows, say so rather than estimating.',
+    '',
+    'send_message (when you have it) reaches a real customer. Texts go only from the business\'s',
+    'registered number and only to customers who agreed to receive them; a refused message comes',
+    'back with status blocked and the reason. Say so rather than retrying.',
 ].join('\n');
 
 /* ── who is calling ───────────────────────────────────────────────────────
@@ -98,7 +108,7 @@ async function authenticate(req) {
     // token, resolved by the same code the dashboard's guards use.
     const session = await resolveSessionSlug(raw);
     if (session.reason) return { reason: session.reason };
-    return { slug: session.slug, scope: 'write', permissions: null, via: session.via, label: 'dashboard session' };
+    return { slug: session.slug, scope: 'write', permissions: null, via: session.via, label: 'dashboard session', session: true };
 }
 
 /* ── the tools ────────────────────────────────────────────────────────────
@@ -216,14 +226,43 @@ const TOOLS = [
     },
 ];
 
+/**
+ * messages.send (CONTRACT §6): one message to one customer, behind the
+ * messages:send permission. The rules live in lib/messages.js.
+ */
+const SEND_TOOL = {
+    name: 'send_message',
+    title: 'messages.send — message a customer',
+    description:
+        'Send one email or text to one customer of this business. Texts go only from the business\'s registered number and only to customers who agreed to texts; otherwise the message is recorded as blocked with the reason. Set require_approval to have the owner OK it first.',
+    inputSchema: {
+        type: 'object',
+        properties: {
+            channel: { type: 'string', enum: messages.CHANNELS, description: 'email or sms.' },
+            to: { type: 'string', description: 'The customer\'s email address or phone number.' },
+            subject: { type: 'string', description: 'Email subject. Ignored for texts.' },
+            body: { type: 'string', description: 'The message itself, plain text.' },
+            require_approval: { type: 'boolean', description: 'Hold it for the owner to approve. Default false.' },
+        },
+        required: ['channel', 'to', 'body'],
+        additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+};
+
 const WRITE_TOOLS = new Set(['create_row', 'update_row', 'delete_row']);
 
 /**
  * Tools this caller may actually see. A token that may not write anything is
- * not shown the writes. Which sections each tool reaches is decided per call by
- * lib/businessTables.js (permits), the same check routes/business-data.js uses.
+ * not shown the writes; send_message only with messages:send. Which sections
+ * each tool reaches is decided per call by lib/businessTables.js (permits),
+ * the same check routes/business-data.js uses.
  */
-const toolsFor = (caller) => (canAny(caller, 'write') ? TOOLS : TOOLS.filter((t) => !WRITE_TOOLS.has(t.name)));
+const toolsFor = (caller) => {
+    const tools = canAny(caller, 'write') ? TOOLS.slice() : TOOLS.filter((t) => !WRITE_TOOLS.has(t.name));
+    if (mayUse(caller, 'messages', 'send')) tools.push(SEND_TOOL);
+    return tools;
+};
 
 /* ── running a tool ───────────────────────────────────────────────────── */
 
@@ -407,6 +446,28 @@ async function runTool(name, args, caller) {
             return content({ section: table, deleted: data[0].id });
         }
 
+        case 'send_message': {
+            if (!mayUse(caller, 'messages', 'send')) {
+                return toolError('This connection is not allowed to send messages. Ask the business owner to approve messages:send.');
+            }
+            const sent = await messages.sendMessage({
+                slug: caller.slug,
+                channel: a.channel,
+                to: a.to,
+                subject: a.subject,
+                body: a.body,
+                requireApproval: a.require_approval === true,
+                author: caller.session ? 'owner' : 'agent',
+                installId: caller.installId || null,
+            });
+            return content({
+                message_id: sent.id,
+                status: sent.status,
+                reason: sent.status_reason || undefined,
+                note: sent.status === 'sent' ? undefined : 'Not delivered yet — the status says why. Do not tell the customer it was sent.',
+            });
+        }
+
         default:
             return null; // unknown tool — the transport turns this into an error
     }
@@ -484,3 +545,7 @@ router.delete('/tokens/:id', ownerRequired, async (req, res) => {
 });
 
 module.exports = router;
+// The live call and text handlers (routes/telephony-live.js) run the same tools.
+module.exports.runTool = runTool;
+module.exports.toolsFor = toolsFor;
+module.exports.INSTRUCTIONS = INSTRUCTIONS;

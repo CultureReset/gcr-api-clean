@@ -243,6 +243,10 @@ mount('/api/business/availability', () => require('./routes/owner-availability')
 // from the session and never from the request.
 mount('/api/business/automations', () => require('./routes/automations').ownerRouter);
 
+// The Messages screen: inbox, send, edit, take over (lib/messages.js rules).
+// Before /api/business for the same reason as the two above.
+mount('/api/business/messages', () => require('./routes/messages'));
+
 mount('/api/business', () => require('./routes/business-data'));
 mount('/api/billing', () => require('./routes/billing'));
 
