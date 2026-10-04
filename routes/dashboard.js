@@ -1914,20 +1914,23 @@ async function generateWaiverLink(siteId, booking_id) {
     const baseUrl = process.env.PUBLIC_SITE_BASE_URL || ('https://' + (biz?.subdomain || 'site') + '.cybercheck.com');
     const link = baseUrl + '/waiver?token=' + token + '&booking=' + booking_id;
 
-    // Send SMS to customer — fire and forget, don't block the response
+    // Text the customer, and report what happened: sms_sent used to say true
+    // for any booking with a phone, sent or not.
+    let sms_sent = false;
     if (booking.customer_phone) {
         const name = booking.customer_name ? `, ${booking.customer_name.split(' ')[0]}` : '';
-        textCustomer({
+        const r = await textCustomer({
             siteId,
             to: booking.customer_phone,
             body: `Hi${name}! Please sign your waiver before your rental: ${link}`,
             purpose: 'transactional',
             type: 'waiver_link',
             relatedId: booking_id,
-        }).catch(e => console.warn('Waiver SMS failed:', e.message));
+        }).catch(e => { console.warn('Waiver SMS failed:', e.message); return null; });
+        sms_sent = !!r?.success;
     }
 
-    return { link, token, booking_id, sms_sent: !!booking.customer_phone };
+    return { link, token, booking_id, sms_sent };
 }
 
 router.get('/waivers/link', async (req, res) => {

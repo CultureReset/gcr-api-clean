@@ -116,6 +116,7 @@ function createMemDb({ tables = {}, unique = {} } = {}) {
             maybeSingle: async () => { const r = run(); return { data: Array.isArray(r.data) ? r.data[0] || null : r.data, error: r.error }; },
             single: async () => { const r = run(); const row = Array.isArray(r.data) ? r.data[0] : r.data; return { data: row || null, error: r.error || (row ? null : { message: 'no rows' }) }; },
             then: (res, rej) => Promise.resolve(run()).then(res, rej),
+            catch: (rej) => Promise.resolve(run()).then(undefined, rej),
         };
         return self;
     }
