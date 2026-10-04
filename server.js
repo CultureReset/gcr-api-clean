@@ -443,6 +443,11 @@ mount('/api/sms', () => require('./routes/sms'));
 // Telnyx's Ed25519 signature on every event.
 mount('/api/telephony/telnyx/say', () => require('./routes/telephony-say'));
 
+// Live calls and texts (CONTRACT §7): inbound Telnyx messaging and voice,
+// answered by the concierge or a business's Phone Agent through LiteLLM with
+// the same MCP tools. Always-on server only — see README.md.
+mount('/api/telephony/telnyx', () => require('./routes/telephony-live'));
+
 // QR & Redirects
 mount('/api/qr', () => require('./routes/qr'));
 mount('/api/ar-hunts', () => require('./routes/ar-hunts'));
@@ -511,5 +516,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
-app.listen(PORT, () => console.log(`GCR API listening on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`GCR API listening on port ${PORT}`);
+  // On the always-on server (ALWAYS_ON=true) the scheduled work runs here
+  // instead of from Vercel's cron: automations and waits, Google pushes,
+  // LiteLLM spend, idle text conversations (lib/scheduler.js).
+  require('./lib/scheduler').start();
+});
 

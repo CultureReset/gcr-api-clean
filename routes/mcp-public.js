@@ -566,3 +566,6 @@ pinned.get('/sections', async (req, res) => {
 });
 
 module.exports.pinned = pinned;
+// The concierge's live calls and texts (lib/liveAgent.js) run the same tools.
+module.exports.runTool = runTool;
+module.exports.publicTools = [...CONCIERGE_TOOLS, ...DISCOVERY_TOOLS];

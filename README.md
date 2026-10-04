@@ -238,6 +238,31 @@ Configuration is environment variables (names only here): `GCR_SUPABASE_URL`,
   `image-liveness` pg_cron job and, if that works, deletes the rows in
   `net._http_response` and `public.image_probe`. It never fails the build.
 
+## The always-on server (live calls and texts)
+
+Most of this API runs on Vercel. **Live calls and texts do not, and must not**:
+`POST /api/telephony/telnyx/voice` and `/messaging` (`routes/telephony-live.js`)
+acknowledge each Telnyx webhook and then keep working — a call is minutes of
+webhooks, LiteLLM turns and MCP tool calls, and a serverless function is frozen
+the moment it has answered. Run the same `server.js` on an always-on host
+(`npm start`) and point the Telnyx messaging profile and Call Control
+connection there:
+
+- `<always-on host>/api/telephony/telnyx/messaging` — inbound texts
+- `<always-on host>/api/telephony/telnyx/voice` — inbound calls (answer, speak,
+  listen with speech transcription, answer through LiteLLM, loop)
+
+Who answers is the number called: `CONCIERGE_NUMBER` is the concierge (public
+MCP tools, NEXT GENT's instructions and LiteLLM key); a Phone Agent number is
+that business (its install's permissions over the business MCP tools, the
+agent's stored instructions, the company's LiteLLM key). Each conversation is
+recorded to Paperclip (`POST /api/nextgent/conversations`, signed).
+
+Set `ALWAYS_ON=true` there: `lib/scheduler.js` then runs the scheduled work
+in-process every minute (automations, waits and completed bookings, Google
+pushes, closing quiet text conversations, LiteLLM spend), which on Vercel runs
+from `vercel.json` crons at coarser intervals.
+
 ## Checks
 
 ```bash
@@ -249,6 +274,16 @@ npm run test:automations
 npm run test:billing
 npm run test:store # 49 checks against an in-memory database
 npm run test:concierge
+npm run test:leftovers         # forwarding address, phone codes, platform texts, computers
+npm run test:messages          # messages.send: MCP tool, owner screen, consent, registered numbers
+npm run test:automation-steps  # wait, agent, message; booking/payment/review events
+npm run test:intake            # forwarding codes, unknown senders, payments, /api/owner
+npm run test:owner-app         # builder palette and drafts, checkout, pairing, remote view
+npm run test:receipts          # Ghost receipts to Paperclip
+npm run test:google-push       # Google push queue, edit limit, read-back
+npm run test:phone-agent       # number bought, billed, released; forwarding codes
+npm run test:live              # Telnyx webhooks, routing, LiteLLM with MCP tools
+npm run test:litellm-usage     # spend pulled per company
 ```
 
 None of them needs credentials or a network.

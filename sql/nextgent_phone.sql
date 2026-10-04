@@ -101,3 +101,51 @@ alter table public.forwarding_codes enable row level security;
 revoke all on public.forwarding_codes from anon, authenticated;
 
 notify pgrst, 'reload schema';
+
+-- live_conversations   one call or text conversation answered live by the
+--                      concierge or a Phone Agent (routes/telephony-live.js):
+--                      who called whom, the transcript, the voice loop's
+--                      state, and whether it was recorded to Paperclip
+--                      (POST /api/nextgent/conversations).
+create table if not exists public.live_conversations (
+    id                uuid primary key default gen_random_uuid(),
+    channel           text not null,
+    mode              text not null,
+    entity_slug       text,
+    company_id        text,
+    from_number       text,
+    to_number         text,
+    provider_ref      text unique,
+    transcript        jsonb not null default '[]'::jsonb,
+    tool_calls        jsonb not null default '[]'::jsonb,
+    status            text not null default 'open',
+    state             text,
+    transcribing      boolean not null default false,
+    outcome           text,
+    started_at        timestamptz not null default now(),
+    last_activity_at  timestamptz not null default now(),
+    ended_at          timestamptz,
+    recorded_at       timestamptz,
+    record_error      text,
+
+    constraint live_conversations_channel_check check (channel in ('voice', 'sms')),
+    constraint live_conversations_status_check  check (status in ('open', 'closed'))
+);
+
+create index if not exists live_conversations_open_sms_idx
+    on public.live_conversations (from_number, to_number, last_activity_at desc) where status = 'open';
+
+-- nextgent_ai_keys   the LiteLLM key a company's live calls run on, made once
+--                    with the master key and kept sealed (lib/litellm.js).
+create table if not exists public.nextgent_ai_keys (
+    company_id  text primary key,
+    key_sealed  text not null,
+    created_at  timestamptz not null default now()
+);
+
+alter table public.live_conversations enable row level security;
+alter table public.nextgent_ai_keys   enable row level security;
+revoke all on public.live_conversations from anon, authenticated;
+revoke all on public.nextgent_ai_keys   from anon, authenticated;
+
+notify pgrst, 'reload schema';

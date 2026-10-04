@@ -661,6 +661,27 @@ publicRouter.get('/cron/tick', async (req, res) => {
     }
 });
 
+/** Hourly, from vercel.json: AI spend per company from LiteLLM (lib/litellmUsage.js). */
+publicRouter.get('/cron/litellm-usage', async (req, res) => {
+    if (!cronAllowed(req)) return fail(res, 401, 'Unauthorized');
+    try {
+        res.json(await require('../lib/litellmUsage').pullUsage());
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
+/** Close idle text conversations and record them to Paperclip. */
+publicRouter.get('/cron/conversations', async (req, res) => {
+    if (!cronAllowed(req)) return fail(res, 401, 'Unauthorized');
+    try {
+        const live = require('../lib/liveAgent');
+        res.json({ ...(await live.closeIdleConversations()), ...(await live.retryUnrecorded()) });
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
 /** One URL per install. The token is the credential; nothing else is trusted. */
 publicRouter.post('/hook/:token', async (req, res) => {
     const token = String(req.params.token || '');

@@ -186,7 +186,9 @@ async function handlePlatformInbound({ from, body }) {
   // QR-code attribution — a QR-driven text reads "<KEYWORD> <CODE>". The
   // tourist never sees or types the code (the QR pre-fills it); we just log
   // which physical QR code drove this text so it shows up in the admin dashboard.
-  const qrMatch = upper.match(/^[A-Z ]{2,20}?\s+([A-Z0-9]{4,8})\b/);
+  // The keyword in front is optional (SMS_QR_KEYWORD may be unset); a match
+  // only counts when the code is a real sms_qr_codes keyword.
+  const qrMatch = upper.match(/^(?:[A-Z]+(?:\s+[A-Z]+)?\s+)?([A-Z0-9]{4,8})\b/);
   if (qrMatch) {
     try {
       const { data: qr } = await mainDb.from('sms_qr_codes').select('id').eq('keyword', qrMatch[1]).maybeSingle();
