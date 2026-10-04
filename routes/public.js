@@ -1255,15 +1255,15 @@ router.post('/contact', async (req, res) => {
             sendSms(adminPhone, adminSmsBody, req.siteId, 'contact_form_notify').catch(() => {});
         }
 
-        // Customer confirmation SMS — the consent checkbox is recorded, then the
-        // one consent check (lib/messages.js) decides.
+        // Customer confirmation SMS — only to a customer who already agreed:
+        // the one consent check (lib/messages.js) decides. This form takes no
+        // credential, so a ticked box here cannot create consent for a phone
+        // number, and the text carries nothing the caller typed.
         if (phone && req.body.sms_consent === true) {
             const messages = require('../lib/messages');
             const businessName2 = business?.name || 'us';
-            const customerSms = `Hi ${name}! We received your message and will get back to you shortly. Thanks for contacting ${businessName2}! Reply STOP to opt out.`;
-            messages.businessKeyForSite(req.siteId)
-                .then((key) => messages.recordConsent(key, phone, { source: 'contact_form', text: req.body.sms_consent_text || null }))
-                .then(() => messages.textCustomer({ siteId: req.siteId, to: phone, body: customerSms, type: 'contact_form_confirm' }))
+            const customerSms = `Hi! We received your message and will get back to you shortly. Thanks for contacting ${businessName2}! Reply STOP to opt out.`;
+            messages.textCustomer({ siteId: req.siteId, to: phone, body: customerSms, type: 'contact_form_confirm' })
                 .catch(() => {});
         }
         // Collect all emails: primary, secondary (CC), contact_email, business email

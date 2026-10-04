@@ -43,7 +43,7 @@ router.get('/', async (req, res) => {
 
 // POST /api/live-photo — upload a verified live photo
 router.post('/', upload.single('photo'), async (req, res) => {
-    const { site_id, table_qr_id, phone, dish_name, points_reward, timestamp, send_review, business_name, review_delay_minutes } = req.body;
+    const { site_id, table_qr_id, phone, dish_name, points_reward, timestamp, send_review, review_delay_minutes } = req.body;
 
     if (!req.file)  return res.status(400).json({ error: 'Photo required' });
     if (!site_id)   return res.status(400).json({ error: 'site_id required' });
@@ -148,21 +148,19 @@ router.post('/', upload.single('photo'), async (req, res) => {
         // Fire-and-forget after delay. The photo proves they were there —
         // so this review is 100% verified before it's even written.
         // Through utils/sms -> lib/telephony (whichever carrier is live), and
-        // only to a customer who agreed to texts: a ticked sms_consent box on
-        // the upload is recorded first, then the one consent check
-        // (lib/messages.js) decides. The review page is LINKS_BASE_URL's.
+        // only to a customer who already agreed to texts: the one consent
+        // check (lib/messages.js) decides. This route takes no credential, so
+        // nothing it is sent can create consent for a phone number, and the
+        // text names the business from its own record, never from the request.
+        // The review page is LINKS_BASE_URL's.
         const truthy = (v) => v === true || v === 'true';
-        if (truthy(req.body.sms_consent)) {
-            const messages = require('../lib/messages');
-            await messages.businessKeyForSite(site_id)
-                .then((key) => messages.recordConsent(key, cleanPhone, { source: 'live_photo', text: req.body.sms_consent_text || null }))
-                .catch((e) => console.warn('live-photo consent not recorded:', e.message));
-        }
         const linksBase = require('../lib/env').envUrl('LINKS_BASE_URL');
         if (truthy(send_review) && !linksBase) console.warn('live-photo: LINKS_BASE_URL is not set, so no review link can be texted.');
         if (truthy(send_review) && linksBase) {
             const delayMs = Math.max(0, parseInt(review_delay_minutes) || 0) * 60 * 1000;
-            const bizName = business_name || 'us';
+            const key = await require('../lib/messages').businessKeyForSite(site_id);
+            const { data: biz } = key ? await supabase.from('entity').select('name').eq('slug', key).maybeSingle() : { data: null };
+            const bizName = biz?.name || 'us';
             const reviewUrl = `${linksBase}/review.html?site=${encodeURIComponent(site_id)}&phone=${cleanPhone}${photoRecord?.id ? '&photo=' + photoRecord.id : ''}`;
             const smsBody = `Thanks for dining with ${bizName}! 🙏\n\nYour photo is live on our menu. Mind leaving a quick review? It only takes 30 seconds and helps other visitors:\n\n${reviewUrl}`;
 

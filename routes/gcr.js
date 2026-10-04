@@ -2862,11 +2862,9 @@ router.post('/opt-in', async (req, res) => {
     }).select('id').single()
 
     if (error) return res.status(500).json({ error: error.message })
-    // The yes is recorded where every texting check reads it (lib/messages.js).
-    if (sms_consent) {
-      await require('../lib/messages').recordConsent(entity_slug, phone, { source: 'booking_opt_in', text: consent_text || null })
-        .catch((e) => console.warn('[opt-in] consent not recorded:', e.message))
-    }
+    // The box and its wording are kept on the opt-in row. This route takes no
+    // credential, so it does not write message_consent (the one place texting
+    // consent is read, lib/messages.js): anyone could post any phone number.
     res.json({ opt_in_id: data.id })
   } catch (err) {
     res.status(500).json({ error: err.message })
