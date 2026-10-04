@@ -236,6 +236,14 @@ async function run() {
         const appInstances = require(path.join(ROOT, 'lib/appInstances.js'));
         check('the old install id no longer resolves; the new one does', (await appInstances.liveInstance('app-b')) === null && (await appInstances.liveInstance('app-b2'))?.instance.install_id === 'app-b2');
         check('the new install is in the public list, once', (await call('GET', '/api/public/business/shop/apps')).body.filter((r) => r.appKey === 'board-app').map((r) => r.installId).join(',') === 'app-b2');
+
+        console.log('\n── a legacy row under the same key is taken over, its config kept (DECISIONS #30) ──');
+        const legacyApp = { id: 'legacy-2', entity_slug: 'shop', module_key: 'tips-app', enabled: true, settings: { manifest: { block: 'tips' }, config: { a: 1 }, showOnPublic: false }, sort_order: 4 };
+        T.entity_modules.push(legacyApp);
+        const over = await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-t', itemKey: 'tips-app', kind: 'app', version: '1.0.0', permissions: [], app: manifest('tips-app', '1.0.0') });
+        const tips = T.entity_modules.filter((r) => r.entity_slug === 'shop' && r.module_key === 'tips-app');
+        check('one row for (shop, tips-app): the legacy one, now Paperclip\'s', over.status === 201 && tips.length === 1 && tips[0] === legacyApp && legacyApp.managed_by === 'paperclip' && legacyApp.install_id === 'app-t' && legacyApp.version === '1.0.0', JSON.stringify(tips));
+        check('the owner\'s config is carried over, the manifest is the new one, public on', JSON.stringify(legacyApp.settings.config) === '{"a":1}' && legacyApp.settings.manifest.id === 'tips-app' && legacyApp.settings.manifest.ui && legacyApp.settings.showOnPublic === true && legacyApp.enabled === true, JSON.stringify(legacyApp.settings));
     } catch (e) {
         check('no exception', false, e.stack);
     }
