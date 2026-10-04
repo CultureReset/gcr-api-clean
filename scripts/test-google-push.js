@@ -15,6 +15,7 @@ const { createMemDb, inject, checker } = require('./lib/memdb');
 const ROOT = path.resolve(__dirname, '..');
 Object.assign(process.env, {
     OAUTH_TOKEN_ENCRYPTION_KEY: crypto.randomBytes(32).toString('hex'),
+    NEXTGENT_SERVICE_SECRET: 'svc-secret',
     GOOGLE_EDITS_PER_MINUTE: '2',
     GOOGLE_PUSH_MAX_ATTEMPTS: '2',
     DEFAULT_CURRENCY: 'usd',

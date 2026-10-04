@@ -14,6 +14,7 @@ const express = require('express');
 const supabase = require('../db');
 const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 const billing = require('../lib/billing');
+const { defaultPlanKey } = require('../lib/entitlements');
 
 const router = express.Router();
 const fail = (res, code, message) => res.status(code).json({ error: message });
@@ -75,8 +76,12 @@ async function stateFor(slug) {
         plan = data;
     }
     if (!plan) {
-        const { data } = await supabase.from('billing_plan').select('*').eq('is_default', true).maybeSingle();
-        plan = data;
+        // The default plan's key from lib/entitlements.js, the one copy of that lookup.
+        const key = await defaultPlanKey().catch(() => null);
+        if (key) {
+            const { data } = await supabase.from('billing_plan').select('*').eq('key', key).maybeSingle();
+            plan = data;
+        }
     }
     if (!plan) return { error: 'no default billing plan is configured' };
 

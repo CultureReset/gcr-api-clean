@@ -27,6 +27,7 @@ const { paperclipRequired } = require('../middleware/ownerAuth');
 const { companyForSlug, linkCompany } = require('../lib/companyLinks');
 const telephony = require('../lib/telephony');
 const { notifyPlatform } = require('../lib/notify');
+const { envInt } = require('../lib/env');
 
 const router = express.Router();
 
@@ -35,10 +36,6 @@ const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
 // Tunables, from env (documented in .env.example). The fallbacks keep a
 // missing variable from disabling claims, not from being configured.
-const envInt = (name, fallback) => {
-    const n = Number(process.env[name]);
-    return Number.isInteger(n) && n > 0 ? n : fallback;
-};
 const codeDigits = () => Math.min(envInt('CLAIM_CODE_DIGITS', 6), 9);
 const codeTtlMinutes = () => envInt('CLAIM_CODE_TTL_MINUTES', 10);
 const maxAttempts = () => envInt('CLAIM_MAX_ATTEMPTS', 5);

@@ -157,6 +157,68 @@ section('1. businessOrAdminRequired answers as businessAccess did', async () => 
     check('middleware/businessAccess.js is gone', !require('fs').existsSync(path.join(ROOT, 'middleware/businessAccess.js')));
 });
 
+
+/* ── 10. helpers: one copy each ─────────────────────────────────────────── */
+
+section('10. routine signing, envInt, defaultPlanKey, Google token encryption', async () => {
+    const engine = require(path.join(ROOT, 'lib/automationEngine.js'));
+    const now = 1_790_000_000_000;
+    const raw = JSON.stringify({ hello: 'routine' });
+    // The formula the engine used to carry itself.
+    const ts = String(Math.floor(now / 1000));
+    const old = crypto.createHmac('sha256', 'whsec').update(`${ts}.`).update(raw).digest('hex');
+    const h = engine.paperclipRoutineHeaders('whsec', raw, now);
+    check('routine headers: same timestamp and signature as before', h['X-Paperclip-Timestamp'] === ts && h['X-Paperclip-Signature'] === `sha256=${old}`);
+
+    const { envInt } = require(path.join(ROOT, 'lib/env.js'));
+    process.env.DEDUP_N = '0';
+    check('envInt: 0 is below the default minimum', envInt('DEDUP_N', 7) === 7);
+    check('envInt: 0 is kept when the minimum is 0', envInt('DEDUP_N', 7, { min: 0 }) === 0);
+    process.env.DEDUP_N = ' ';
+    check('envInt: blank is unset', envInt('DEDUP_N', 7, { min: 0 }) === 7);
+    process.env.DEDUP_N = '12';
+    check('envInt: a number is read', envInt('DEDUP_N', 7) === 12);
+    delete process.env.DEDUP_N;
+    const fs = require('fs');
+    for (const f of ['routes/claims.js', 'lib/paperclipAuth.js']) {
+        check(`${f} has no envInt copy of its own`, !/const (envInt|num) = \(/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    }
+
+    T.billing_plan = [{ key: 'starter', is_default: true }, { key: 'pro' }];
+    T.billing_subscription = [];
+    const ent = require(path.join(ROOT, 'lib/entitlements.js'));
+    check('defaultPlanKey is exported once, from lib/entitlements.js', (await ent.defaultPlanKey()) === 'starter');
+    for (const f of ['lib/billingStripe.js', 'routes/billing.js']) {
+        check(`${f} has no defaultPlanKey copy`, !/async function defaultPlanKey|eq\('is_default', true\)/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    }
+    check('planKeysFor falls back to the default plan', (await ent.planKeysFor(['shop'])).get('shop') === 'starter');
+
+    // Google tokens: the old format still opens; new ones are sealed.
+    const legacyKey = crypto.randomBytes(32).toString('hex');
+    process.env.OAUTH_TOKEN_ENCRYPTION_KEY = legacyKey;
+    const legacyEncrypt = (plaintext) => {
+        const iv = crypto.randomBytes(16);
+        const c = crypto.createCipheriv('aes-256-gcm', Buffer.from(legacyKey, 'hex'), iv);
+        const enc = Buffer.concat([c.update(plaintext, 'utf8'), c.final()]);
+        return `${iv.toString('hex')}:${c.getAuthTag().toString('hex')}:${enc.toString('hex')}`;
+    };
+    const gbp = require(path.join(ROOT, 'lib/googleBusinessApi.js'));
+    check('a token stored in the old format still decrypts', gbp.decryptToken(legacyEncrypt('ya29.old-token')) === 'ya29.old-token');
+    check('an empty old-format refresh token still decrypts', gbp.decryptToken(legacyEncrypt('')) === '');
+    const sealed = gbp.encryptToken('ya29.new-token');
+    check('new tokens are sealed by secretBox', /^v1\./.test(sealed) && gbp.decryptToken(sealed) === 'ya29.new-token');
+    check('an empty token round-trips sealed', gbp.decryptToken(gbp.encryptToken('')) === '');
+    check('googleBusinessApi does no crypto of its own', !/require\('crypto'\)|createCipheriv|createDecipheriv/.test(fs.readFileSync(path.join(ROOT, 'lib/googleBusinessApi.js'), 'utf8')));
+
+    // A refresh moves both stored tokens to the sealed format.
+    T.oauth_tokens = [{ entity_slug: 'shop', provider: 'google_business', access_token: legacyEncrypt('at-old'), refresh_token: legacyEncrypt('rt-old'), expires_at: new Date(Date.now() - 1000).toISOString(), extra: {} }];
+    gbp._setFetch(async () => ({ ok: true, status: 200, json: async () => ({ access_token: 'at-new', expires_in: 3600 }) }));
+    const tok = await gbp.getValidAccessToken('shop');
+    const row = T.oauth_tokens[0];
+    check('refresh used the old-format refresh token', tok === 'at-new');
+    check('and re-stored both tokens sealed', /^v1\./.test(row.access_token) && /^v1\./.test(row.refresh_token) && gbp.decryptToken(row.refresh_token) === 'rt-old');
+});
+
 /* ── run ─────────────────────────────────────────────────────────────── */
 
 (async () => {
