@@ -227,6 +227,11 @@ mount('/api/mcp/public', () => require('./routes/mcp-public'));
 // /api/mcp and its tokens are for.
 mount('/api/mcp/business/:slug', () => require('./routes/mcp-public').pinned);
 
+// Paperclip/agent access to one enrolled Ghost. Token scope is pinned to the
+// node at credential creation; execution still happens locally through the
+// node's outbound poll and NEXT GENT's own policy/approval gate.
+mount('/api/mcp/ghost', () => require('./routes/mcp-ghost'));
+
 // The same data, spoken to instead of clicked on. An MCP server so an outside
 // AI assistant — Grok, or any other MCP client — can read and edit one
 // business's sections in words.
