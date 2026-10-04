@@ -6,9 +6,9 @@
  * Required env vars:
  *   GOOGLE_CLIENT_ID          — from Google Cloud Console
  *   GOOGLE_CLIENT_SECRET      — from Google Cloud Console
- *   GOOGLE_REDIRECT_URI       — e.g. https://cybercheck-api-database.vercel.app/api/google-business/callback
+ *   GOOGLE_REDIRECT_URI       — <API_BASE_URL>/api/google-business/callback
  *   OAUTH_TOKEN_ENCRYPTION_KEY — 32-byte hex key: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
- *   DASHBOARD_BASE_URL        — e.g. https://cybercheck-login.vercel.app
+ *   DASHBOARD_BASE_URL        — where Google sends the owner back (else OWNER_APP_URL)
  *
  * Routes:
  *   GET  /api/google-business/auth               — start OAuth (redirect to Google)
@@ -33,12 +33,12 @@ const { isInServiceArea } = require('../lib/serviceArea');
 const router = express.Router();
 
 // ─── Google API endpoints ──────────────────────────────────────────────────
-const GOOGLE_AUTH_URL    = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL   = 'https://oauth2.googleapis.com/token';
-const GOOGLE_USERINFO    = 'https://www.googleapis.com/oauth2/v3/userinfo';
-const GBP_ACCOUNTS       = 'https://mybusinessaccountmanagement.googleapis.com/v1/accounts';
-const GBP_LOCATIONS_BASE = 'https://mybusinessbusinessinformation.googleapis.com/v1';
-const GBP_REVIEWS_BASE   = 'https://mybusiness.googleapis.com/v4';
+const GOOGLE_AUTH_URL    = API.auth();
+const GOOGLE_TOKEN_URL   = API.token();
+const GOOGLE_USERINFO    = API.userinfo();
+const GBP_ACCOUNTS       = API.accounts();
+const GBP_LOCATIONS_BASE = API.info();
+const GBP_REVIEWS_BASE   = API.v4();
 
 // What we ask Google for. The original asked for five fields and no
 // coordinates, which left out the one thing that matters most: latlng decides
@@ -57,94 +57,9 @@ const SCOPES = [
     'https://www.googleapis.com/auth/userinfo.profile'
 ].join(' ');
 
-// ─── Token encryption (AES-256-GCM) ──────────────────────────────────────
-function encryptToken(plaintext) {
-    const hexKey = process.env.OAUTH_TOKEN_ENCRYPTION_KEY || process.env.STRIPE_KEY_ENCRYPTION_KEY;
-    if (!hexKey) throw new Error('OAUTH_TOKEN_ENCRYPTION_KEY not set');
-    const key    = Buffer.from(hexKey, 'hex');
-    const iv     = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    const enc    = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-    const tag    = cipher.getAuthTag();
-    return iv.toString('hex') + ':' + tag.toString('hex') + ':' + enc.toString('hex');
-}
-
-function decryptToken(stored) {
-    const hexKey = process.env.OAUTH_TOKEN_ENCRYPTION_KEY || process.env.STRIPE_KEY_ENCRYPTION_KEY;
-    if (!hexKey) throw new Error('OAUTH_TOKEN_ENCRYPTION_KEY not set');
-    const [ivHex, tagHex, encHex] = stored.split(':');
-    const key      = Buffer.from(hexKey, 'hex');
-    const iv       = Buffer.from(ivHex, 'hex');
-    const tag      = Buffer.from(tagHex, 'hex');
-    const encBuf   = Buffer.from(encHex, 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(encBuf), decipher.final()]).toString('utf8');
-}
-
-// ─── Refresh access token when expired ────────────────────────────────────
-async function getValidAccessToken(slug) {
-    const { data: row, error } = await supabase
-        .from('oauth_tokens')
-        .select('access_token, refresh_token, expires_at')
-        .eq('entity_slug', slug)
-        .eq('provider', 'google_business')
-        .single();
-
-    if (error || !row) throw new Error('Google Business not connected');
-
-    const accessToken   = decryptToken(row.access_token);
-    const refreshToken  = decryptToken(row.refresh_token);
-    const expiresAt     = new Date(row.expires_at);
-
-    // Refresh if token expires within 5 minutes
-    if (expiresAt > new Date(Date.now() + 5 * 60 * 1000)) {
-        return accessToken;
-    }
-
-    // Token expired — use refresh token to get a new one
-    const params = new URLSearchParams({
-        client_id:     process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        refresh_token: refreshToken,
-        grant_type:    'refresh_token'
-    });
-
-    const resp = await fetch(GOOGLE_TOKEN_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body:    params.toString()
-    });
-    const tokens = await resp.json();
-    if (!resp.ok || !tokens.access_token) {
-        throw new Error('Failed to refresh Google token: ' + (tokens.error_description || tokens.error));
-    }
-
-    const newExpiry = new Date(Date.now() + (tokens.expires_in || 3600) * 1000);
-    await supabase.from('oauth_tokens').update({
-        access_token: encryptToken(tokens.access_token),
-        expires_at:   newExpiry.toISOString(),
-        updated_at:   new Date().toISOString()
-    }).eq('entity_slug', slug).eq('provider', 'google_business');
-
-    return tokens.access_token;
-}
-
-// ─── Helper: call Google API with auto-refresh ─────────────────────────────
-async function gbpFetch(slug, url, options = {}) {
-    const token = await getValidAccessToken(slug);
-    const res = await fetch(url, {
-        ...options,
-        headers: {
-            'Authorization': 'Bearer ' + token,
-            'Content-Type':  'application/json',
-            ...(options.headers || {})
-        }
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw Object.assign(new Error(body.error?.message || 'Google API error'), { status: res.status, body });
-    return body;
-}
+// Token storage, refresh and the authorised fetch live in one place,
+// lib/googleBusinessApi.js, shared with the push queue (lib/googlePush.js).
+const { API, encryptToken, gbpFetch } = require('../lib/googleBusinessApi');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GET /api/google-business/auth
@@ -198,7 +113,7 @@ router.post('/start', ownerRequired, (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 router.get('/callback', async (req, res) => {
     const { code, state, error } = req.query;
-    const dashboardUrl = process.env.DASHBOARD_BASE_URL || 'https://cybercheck-login.vercel.app';
+    const dashboardUrl = (process.env.DASHBOARD_BASE_URL || process.env.OWNER_APP_URL || '').replace(/\/+$/, '');
 
     if (error) {
         return res.redirect(`${dashboardUrl}/#connections?google_error=${encodeURIComponent(error)}`);
@@ -601,6 +516,37 @@ router.post('/sync-profile', ownerRequired, async (req, res) => {
         });
     } catch (err) {
         res.status(err.status || 502).json({ error: err.message });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// The push queue (lib/googlePush.js): what is waiting to reach Google, whether
+// the profile is verified, the last push, and where Google's copy differs.
+// ═══════════════════════════════════════════════════════════════════════════
+router.get('/push-status', ownerRequired, async (req, res) => {
+    try {
+        res.json(await require('../lib/googlePush').status(req.entitySlug));
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Push every fact now (queued, then drained by the scheduled check).
+router.post('/push-all', ownerRequired, async (req, res) => {
+    const push = require('../lib/googlePush');
+    const queued = [];
+    for (const kind of push.KINDS) if (kind !== 'posts' && (await push.enqueue(req.entitySlug, kind))) queued.push(kind);
+    res.status(202).json({ queued });
+});
+
+// The scheduled drain: from cron (CRON_SECRET) or the always-on scheduler.
+router.get('/cron/drain', async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (secret && (req.headers.authorization || '') !== `Bearer ${secret}`) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+        res.json(await require('../lib/googlePush').drain());
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

@@ -32,6 +32,10 @@
     {
       "path": "/api/automations/cron/tick",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/google-business/cron/drain",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

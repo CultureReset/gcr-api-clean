@@ -38,6 +38,7 @@ const {
     permits, canAny, mayUse, tablesFor, resourceForTable, normalizePermissions, scopeForPermissions,
 } = require('../lib/businessTables');
 const messages = require('../lib/messages');
+const googlePush = require('../lib/googlePush');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { TOKEN_PREFIX, mintToken, lookupToken, missingTable } = require('../lib/businessTokens');
 
@@ -411,6 +412,7 @@ async function runTool(name, args, caller) {
                 .select()
                 .single();
             if (error) return toolError(`Could not add to ${table}: ${error.message}`);
+            await googlePush.noteTableWrite(caller.slug, table, data);
             return content({ section: table, created: data });
         }
 
@@ -429,6 +431,7 @@ async function runTool(name, args, caller) {
                 .select();
             if (error) return toolError(`Could not update ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
+            await googlePush.noteTableWrite(caller.slug, table, data[0]);
             return content({ section: table, updated: data[0] });
         }
 
@@ -443,6 +446,7 @@ async function runTool(name, args, caller) {
                 .select('id');
             if (error) return toolError(`Could not delete from ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
+            await googlePush.noteTableWrite(caller.slug, table, null);
             return content({ section: table, deleted: data[0].id });
         }
 

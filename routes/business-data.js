@@ -40,6 +40,7 @@
 
 const express = require('express');
 const supabase = require('../db');
+const googlePush = require('../lib/googlePush');
 const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 
 // The schema discovery, the table allow-list and the column filter live in
@@ -317,6 +318,8 @@ router.post('/:table', businessCaller, async (req, res) => {
         .single();
     if (error) return fail(res, 400, error.message);
 
+    // A fact Google shows (hours, menus…) is queued for the profile (lib/googlePush.js).
+    await googlePush.noteTableWrite(req.entitySlug, table, data);
     res.status(201).json({ table, row: data });
 });
 
@@ -337,6 +340,7 @@ router.patch('/:table/:id', businessCaller, async (req, res) => {
     if (error) return fail(res, 400, error.message);
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
+    await googlePush.noteTableWrite(req.entitySlug, table, data[0]);
     res.json({ table, row: data[0] });
 });
 
@@ -354,6 +358,7 @@ router.delete('/:table/:id', businessCaller, async (req, res) => {
     if (error) return fail(res, 400, error.message);
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
+    await googlePush.noteTableWrite(req.entitySlug, table, null);
     res.json({ table, deleted: data[0].id });
 });
 

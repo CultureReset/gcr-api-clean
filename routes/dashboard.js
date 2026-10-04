@@ -346,6 +346,7 @@ router.put('/hours', async (req, res) => {
     }));
     const { data, error } = await gcr().from('entity_hours').upsert(rows, { onConflict: 'entity_slug,day_of_week' }).select();
     if (error) return res.status(500).json({ error: error.message });
+    await require('../lib/googlePush').noteTableWrite(entity.slug, 'entity_hours');
     res.json(data);
 });
 
