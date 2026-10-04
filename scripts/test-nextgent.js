@@ -58,6 +58,7 @@ const T = {
     billing_usage: [],
     billing_item_charges: [],
     billing_usage_credits: [],
+    billing_item_prices: [],
     store_plan_items: [],
     store_grants: [],
     claim_codes: [],
@@ -196,6 +197,8 @@ const fakeStripe = {
         del: async (id) => { stripeCalls.push(['subscriptionItems.del', id]); return {}; },
     },
     invoiceItems: { create: async (a) => { stripeCalls.push(['invoiceItems.create', a]); return { id: 'ii_1' }; } },
+    products: { create: async (a) => { stripeCalls.push(['products.create', a]); return { id: 'prod_1' }; } },
+    prices: { create: async (a) => { stripeCalls.push(['prices.create', a]); return { id: `price_new_${stripeCalls.length}` }; } },
     billing: { meterEvents: { create: async (a) => { stripeCalls.push(['meterEvents.create', a]); return {}; } } },
 };
 const billingStripe = require(path.join(ROOT, 'lib/billingStripe.js'));
@@ -301,6 +304,30 @@ async function run() {
         check('a plan item not in this plan is refused', planOnly.body.allowed === false && planOnly.body.reason === 'not_entitled');
         const notLinked = await signed('GET', '/api/nextgent/entitlement?companyId=co-none&itemKey=qr-menu');
         check('an unlinked company is refused', notLinked.body.allowed === false && notLinked.body.reason === 'not_linked');
+
+        console.log('\n── item prices from Paperclip (CONTRACT §12) ──');
+        const unsignedPrice = await signed('PUT', '/api/nextgent/items/brand-new-agent/price', { amountCents: 2500, currency: 'usd', interval: 'month' }, { sign: false });
+        check('setting a price must be signed', unsignedPrice.status === 401);
+        const badPrice = await signed('PUT', '/api/nextgent/items/brand-new-agent/price', { amountCents: -1, currency: 'usd', interval: 'month' });
+        check('a negative price is refused', badPrice.status === 400);
+        const badIv = await signed('PUT', '/api/nextgent/items/brand-new-agent/price', { amountCents: 100, currency: 'usd', interval: 'fortnight' });
+        check('an unknown interval is refused', badIv.status === 400);
+        stripeCalls.length = 0;
+        const setP = await signed('PUT', '/api/nextgent/items/brand-new-agent/price', { amountCents: 2500, currency: 'USD', interval: 'month', model: 'flat' });
+        check('a price is stored', setP.status === 200 && setP.body.amountCents === 2500 && setP.body.currency === 'usd' && setP.body.model === 'flat', JSON.stringify(setP.body));
+        check('a Stripe product and recurring price are made for it', stripeCalls.some((c) => c[0] === 'products.create') && stripeCalls.some((c) => c[0] === 'prices.create' && c[1].unit_amount === 2500 && c[1].recurring?.interval === 'month'));
+        const priced = await q('brand-new-agent');
+        check('entitlement now reports that price', priced.body.allowed === true && priced.body.priceCents === 2500 && priced.body.interval === 'month', JSON.stringify(priced.body));
+        stripeCalls.length = 0;
+        await signed('PUT', '/api/nextgent/items/brand-new-agent/price', { amountCents: 2500, currency: 'usd', interval: 'month', model: 'flat' });
+        check('the same price again makes no new Stripe price', !stripeCalls.some((c) => c[0] === 'prices.create'));
+        await signed('PUT', '/api/nextgent/items/review-agent/price', { amountCents: 1900, currency: 'usd', interval: 'month' });
+        const repriced = await q('review-agent');
+        check('a store item takes the price Paperclip set', repriced.body.priceCents === 1900, JSON.stringify(repriced.body));
+        check('and keeps its own row otherwise', T.store_items.find((i) => i.key === 'review-agent').price_cents === 1500);
+        // Put review-agent back to the price the rest of this test expects.
+        await signed('PUT', '/api/nextgent/items/review-agent/price', { amountCents: 1500, currency: 'usd', interval: 'month' });
+        T.billing_item_prices.find((p) => p.item_key === 'review-agent').stripe_price_id = 'price_rev';
 
         console.log('\n── installs ──');
         const badPerm = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-0', itemKey: 'qr-menu', kind: 'app', permissions: ['menu:delete'] });

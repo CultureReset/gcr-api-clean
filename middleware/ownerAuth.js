@@ -64,6 +64,18 @@ async function resolvePaperclip(token) {
     return { claims, slug, isAdmin };
 }
 
+/**
+ * A Paperclip token that is a platform admin's (CONTRACT §12): verified, role
+ * instance_admin, and its sub listed in platform_admins.paperclip_user_id.
+ * Resolves to the claims, or null when the token is valid but not an admin's.
+ * Throws (err.status) when the token itself is not valid.
+ */
+async function resolvePaperclipAdmin(token) {
+    const claims = await paperclip.verifyToken(token);
+    if (claims.role !== 'instance_admin') return null;
+    return (await isPaperclipAdmin(claims.sub)) ? claims : null;
+}
+
 function stampPaperclip(req, { claims, isAdmin }) {
     req.authVia = 'paperclip';
     req.paperclip = { userId: claims.sub, companyId: claims.company_id, role: claims.role, isAdmin };
@@ -253,4 +265,4 @@ async function resolveSessionSlug(token) {
     return { slug: owned[0].entity_slug, userId, via: 'session' };
 }
 
-module.exports = { ownerRequired, sessionRequired, paperclipRequired, resolveSessionSlug, isPaperclipAdmin };
+module.exports = { ownerRequired, sessionRequired, paperclipRequired, resolveSessionSlug, isPaperclipAdmin, resolvePaperclipAdmin };

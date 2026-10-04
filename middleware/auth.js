@@ -1,5 +1,31 @@
 const jwt = require('jsonwebtoken');
 const supabase = require('../db');
+const paperclip = require('../lib/paperclipAuth');
+
+/**
+ * A Paperclip instance-admin token (CONTRACT §12). Honoured only when its sub
+ * is in platform_admins.paperclip_user_id (middleware/ownerAuth.js, one copy
+ * of that check). Any other Paperclip token is refused here: these gates are
+ * site_id- and admin-based, and a company token carries neither.
+ *
+ * Calls next() with req.role = 'admin', or answers 401/403/503 itself.
+ */
+async function paperclipAdminGate(token, req, res, next) {
+    // Required lazily: ownerAuth requires db, and so does this file.
+    const { resolvePaperclipAdmin } = require('./ownerAuth');
+    let claims;
+    try {
+        claims = await resolvePaperclipAdmin(token);
+    } catch (err) {
+        return res.status(err.status || 401).json({ error: err.message || 'Invalid token' });
+    }
+    if (!claims) return res.status(403).json({ error: 'Admin access required' });
+    req.authVia = 'paperclip';
+    req.userId = claims.sub;
+    req.role = 'admin';
+    req.paperclip = { userId: claims.sub, companyId: claims.company_id || null, role: claims.role, isAdmin: true };
+    return next();
+}
 
 // Verify JWT and attach site_id to request
 // Accepts both Express JWTs (JWT_SECRET) and Supabase JWTs (old + GCR)
@@ -10,6 +36,9 @@ function authRequired(req, res, next) {
     }
 
     const token = header.split(' ')[1];
+
+    // A Paperclip token: only an instance admin's is accepted on these gates.
+    if (paperclip.isPaperclipToken(token)) return paperclipAdminGate(token, req, res, next);
 
     // Try Express JWT first
     try {
@@ -79,4 +108,4 @@ function adminRequired(req, res, next) {
     });
 }
 
-module.exports = { authRequired, adminRequired };
+module.exports = { authRequired, adminRequired, paperclipAdminGate };

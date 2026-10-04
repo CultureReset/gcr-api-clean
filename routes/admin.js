@@ -38,6 +38,15 @@ function authRequired(req, res, next) {
 
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
+  // A Paperclip instance-admin token (CONTRACT §12), checked by the one gate
+  // in middleware/auth.js.
+  if (require('../lib/paperclipAuth').isPaperclipToken(token)) {
+    return require('../middleware/auth').paperclipAdminGate(token, req, res, () => {
+      req.admin = { role: 'admin', paperclip_user_id: req.paperclip.userId };
+      next();
+    });
+  }
+
   // Check if it's an API key
   const validKeys = [
     process.env.GCR_SUPABASE_SERVICE_KEY,

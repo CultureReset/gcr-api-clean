@@ -179,6 +179,43 @@ function run(mw, { token, query = {}, body = {}, params = {} } = {}) {
     const notPc = await run(paperclipRequired, { token: 'some-supabase-token' });
     check('a non-Paperclip token may not', !notPc.next && notPc.status === 401);
 
+    console.log('\n── instance-admin token on the admin gates (CONTRACT §12) ──');
+    const { adminRequired, authRequired } = require(path.join(ROOT, 'middleware/auth.js'));
+    const adminTok = (claims = {}) => {
+        const t = sign({ claims: { sub: 'pc-admin', role: 'instance_admin', ...claims } });
+        return t;
+    };
+    const noCompany = (() => {
+        const now = Math.floor(Date.now() / 1000);
+        const head = b64({ alg: 'EdDSA', kid: 'ed-1', typ: 'JWT' });
+        const body = b64({ iss: ISSUER, aud: 'gcr-api-clean', sub: 'pc-admin', role: 'instance_admin', iat: now, exp: now + 300 });
+        return `${head}.${body}.${crypto.sign(null, Buffer.from(`${head}.${body}`), ed.privateKey).toString('base64url')}`;
+    })();
+    const verifiedNoCo = await paperclip.verifyToken(noCompany).catch((e) => e);
+    check('an instance_admin token may name no company', verifiedNoCo.role === 'instance_admin' && !verifiedNoCo.company_id);
+    await rejects('an owner token with no company is still refused', paperclip.verifyToken((() => {
+        const now = Math.floor(Date.now() / 1000);
+        const head = b64({ alg: 'EdDSA', kid: 'ed-1', typ: 'JWT' });
+        const body = b64({ iss: ISSUER, aud: 'gcr-api-clean', sub: 'pc-user', role: 'owner', iat: now, exp: now + 300 });
+        return `${head}.${body}.${crypto.sign(null, Buffer.from(`${head}.${body}`), ed.privateKey).toString('base64url')}`;
+    })()), /company/);
+    const gate = await run(adminRequired, { token: noCompany });
+    check('adminRequired accepts a listed instance admin with no company', gate.next && gate.req.role === 'admin' && gate.req.authVia === 'paperclip');
+    const gate2 = await run(adminRequired, { token: adminTok() });
+    check('and with a company', gate2.next && gate2.req.role === 'admin');
+    const notListed = await run(adminRequired, { token: sign({ claims: { sub: 'pc-nobody', role: 'instance_admin' } }) });
+    check('an instance_admin not in platform_admins is 403', !notListed.next && notListed.status === 403);
+    const ownerTok = await run(adminRequired, { token: sign() });
+    check('a company owner token is 403 on an admin gate', !ownerTok.next && ownerTok.status === 403);
+    const badSig = await run(adminRequired, { token: noCompany.slice(0, -4) + 'AAAA' });
+    check('a forged admin token is 401', !badSig.next && badSig.status === 401);
+    const plain = await run(authRequired, { token: noCompany });
+    check('authRequired gives a listed admin role admin', plain.next && plain.req.role === 'admin');
+    const adminOwner = await run(ownerRequired, { token: noCompany, query: { slug: 'any-biz' } });
+    check('ownerRequired: a company-less admin acts on the slug it names', adminOwner.next && adminOwner.req.entitySlug === 'any-biz' && adminOwner.req.actingAsAdmin);
+    const adminNoSlug = await run(ownerRequired, { token: noCompany });
+    check('and without a slug it is refused, not given a business', !adminNoSlug.next && adminNoSlug.status === 403);
+
     console.log(`\n${pass} passed, ${fail} failed\n`);
     process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

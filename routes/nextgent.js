@@ -13,6 +13,7 @@
 //   GET    /entitlement            may this company have this item, and at what price
 //   POST   /unlink                 the business leaves (export first if asked)
 //   POST   /usage                  AI spend from LiteLLM, per company and period
+//   PUT    /items/:itemKey/price   the price Paperclip's store set for an item
 //
 // Tokens are returned once, in the response that created them. Only their
 // hashes are stored (lib/businessTokens.js).
@@ -445,6 +446,32 @@ router.post('/usage', async (req, res) => {
             periodStart: start.toISOString(), periodEnd: end.toISOString(), spendUsd: spend,
         });
         res.json({ recorded: true, ...out });
+    } catch (err) {
+        fail(res, err.status || 500, err.message);
+    }
+});
+
+/* ── PUT /items/:itemKey/price ────────────────────────────────────────── */
+
+// Paperclip's store sets an item's price here (CONTRACT §12); entitlement and
+// install charges read it through billingStripe.itemByKey.
+router.put('/items/:itemKey/price', async (req, res) => {
+    const itemKey = str(req.params.itemKey);
+    if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(itemKey)) return fail(res, 400, 'Not an item key.');
+    const b = req.body || {};
+    try {
+        const saved = await billingStripe.setItemPrice({
+            itemKey, amountCents: b.amountCents, currency: b.currency, interval: b.interval, model: b.model,
+        });
+        res.json({
+            itemKey,
+            amountCents: saved.amount_cents,
+            currency: saved.currency,
+            interval: saved.interval,
+            model: saved.model,
+            stripePriceId: saved.stripe_price_id,
+            ...(saved.amount_cents > 0 && !saved.stripeConfigured ? { warning: 'Stripe is not configured; installs of this item are refused until it is.' } : {}),
+        });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
