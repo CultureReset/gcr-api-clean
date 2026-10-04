@@ -224,6 +224,18 @@ async function run() {
         check('out of the public list', !(await call('GET', '/api/public/business/shop/apps')).body.some((r) => r.installId === 'app-b'));
         check('still in the owner\'s list, enabled false', (await call('GET', '/api/owner/apps')).body.find((r) => r.installId === 'app-b')?.enabled === false);
         check('the owner cannot switch an uninstalled app back on by making it public', (await call('PATCH', '/api/owner/apps/app-b', { publicEnabled: true })).status === 200 && rb.enabled === false && !(await call('GET', '/api/public/business/shop/apps')).body.some((r) => r.installId === 'app-b'));
+
+        console.log('\n── reinstall reuses the row (DECISIONS #28) ──');
+        rb.settings.config = { intro: 'Old words' };
+        rb.settings.showOnPublic = false;
+        const again = await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-b2', itemKey: 'board-app', kind: 'app', version: '2.1.0', permissions: [], app: manifest('board-app', '2.1.0') });
+        const boards = T.entity_modules.filter((r) => r.entity_slug === 'shop' && r.module_key === 'board-app');
+        check('one row for (shop, board-app), not two', again.status === 201 && boards.length === 1 && boards[0] === rb, JSON.stringify(boards));
+        check('re-enabled with the new install id, version and manifest', rb.enabled === true && rb.install_id === 'app-b2' && rb.company_id === 'co-1' && rb.version === '2.1.0' && rb.settings.manifest.version === '2.1.0' && rb.managed_by === 'paperclip', JSON.stringify(rb));
+        check('config reset and public again', JSON.stringify(rb.settings.config) === '{}' && rb.settings.showOnPublic === true);
+        const appInstances = require(path.join(ROOT, 'lib/appInstances.js'));
+        check('the old install id no longer resolves; the new one does', (await appInstances.liveInstance('app-b')) === null && (await appInstances.liveInstance('app-b2'))?.instance.install_id === 'app-b2');
+        check('the new install is in the public list, once', (await call('GET', '/api/public/business/shop/apps')).body.filter((r) => r.appKey === 'board-app').map((r) => r.installId).join(',') === 'app-b2');
     } catch (e) {
         check('no exception', false, e.stack);
     }
