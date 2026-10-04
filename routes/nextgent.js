@@ -13,9 +13,13 @@
 //                                  lib/automationInstalls.js, the path admin
 //                                  rollouts use too)
 //   DELETE /installs/:installId    …and removed
+//   POST   /installs/:installId/session  a short-lived token for that install
+//                                  (≤ 300 s, the install's permissions)
 //   GET    /entitlement            may this company have this item, and at what price
 //   POST   /unlink                 the business leaves (export first if asked)
 //   POST   /usage                  AI spend from LiteLLM, per company and period
+//                                  (refused while LITELLM_USAGE_PULL is on, the
+//                                  default: the pull already bills it)
 //   PUT    /items/:itemKey/price   the price Paperclip's store set for an item
 //   PUT    /numbers/:phone/registration  where a number's texting registration stands
 //   POST   /email                  a platform email from templates/email (e.g. team-invite)
@@ -27,8 +31,11 @@ const express = require('express');
 const supabase = require('../db');
 const { serviceSigned } = require('../lib/serviceSigning');
 const { slugForCompany, linkCompany, unlinkCompany } = require('../lib/companyLinks');
-const { mintToken, revokeWhere } = require('../lib/businessTokens');
-const { RESOURCES, normalizePermissions, scopeForPermissions } = require('../lib/businessTables');
+const { mintToken, revokeWhere, mintInstallSession } = require('../lib/businessTokens');
+const { RESOURCES, normalizePermissions, scopeForPermissions, checkAppTables } = require('../lib/businessTables');
+const { envInt } = require('../lib/env');
+const { usagePullOn } = require('../lib/litellmUsage');
+const appInstances = require('../lib/appInstances');
 const { forwardingAddressFor } = require('../lib/forwardingAddress');
 const { findExistingEntity } = require('../lib/find-existing-entity');
 const { normalizePhone } = require('../lib/telephony');
@@ -182,8 +189,12 @@ router.post('/link', async (req, res) => {
         return fail(res, err.status || 500, err.message, { entitySlug: slug });
     }
 
+    // The business's kind (its entity type): Paperclip targets store audiences by it.
+    const { data: entityRow } = await supabase.from('entity').select('entity_type').eq('slug', slug).maybeSingle();
+
     res.status(created ? 201 : 200).json({
         entitySlug: slug,
+        kind: entityRow?.entity_type || null,
         forwardingAddress: forwardingAddressFor(slug),
         businessToken,
         ...(businessToken ? {} : { businessTokenIssued: true }),
@@ -260,10 +271,23 @@ router.post('/installs', async (req, res) => {
     const capabilities = Array.isArray(b.capabilities) ? b.capabilities.map((c) => str(c)).filter(Boolean).slice(0, 50) : [];
     if (b.telephony && typeof b.telephony === 'object' && !capabilities.includes('telephony')) capabilities.push('telephony');
     const instructions = typeof b.instructions === 'string' ? b.instructions.slice(0, 20000) : null;
+    // An app's manifest (Paperclip's store version payload.app): what the app
+    // engine draws, its own tables and its settings. Kept whole in the runtime
+    // projection business_app_instances (CONTRACT §14, lib/appInstances.js),
+    // the one row public pages and /api/app-data read.
+    let appManifest;
+    if (b.app !== undefined && b.app !== null) {
+        if (typeof b.app !== 'object' || Array.isArray(b.app)) return fail(res, 400, 'app must be the app manifest object.');
+        if (Buffer.byteLength(JSON.stringify(b.app)) > envInt('APP_MANIFEST_MAX_BYTES', 262144)) return fail(res, 413, 'The app manifest is too large.');
+        const problem = checkAppTables(b.app);
+        if (problem) return fail(res, 400, `app manifest: ${problem}`);
+        appManifest = b.app;
+    }
     const manifestFields = {
         ...(capabilities.length ? { capabilities } : {}),
         ...(instructions ? { instructions } : {}),
     };
+    if (b.enabled !== undefined && typeof b.enabled !== 'boolean') return fail(res, 400, 'enabled must be true or false.');
 
     const routine = b.routine;
     if (kind === 'automation' && routine) {
@@ -304,6 +328,14 @@ router.post('/installs', async (req, res) => {
         }
         const { error } = await supabase.from('nextgent_installs').update(patch).eq('install_id', installId);
         if (error) return fail(res, 500, error.message);
+        if (kind === 'app') {
+            try {
+                await appInstances.project({ installId, companyId, slug, itemKey, version: patch.version, manifest: appManifest, enabled: b.enabled });
+            } catch (err) {
+                if (!(err.code === 'not_configured' && !appManifest)) return fail(res, err.status || 500, err.message);
+                console.warn(`[nextgent] ${err.message}`);
+            }
+        }
         await supabase.from('business_mcp_tokens')
             .update({ permissions, scope: scopeForPermissions(permissions) })
             .eq('install_id', installId).is('revoked_at', null);
@@ -410,6 +442,23 @@ router.post('/installs', async (req, res) => {
         }
     }
 
+    // An app's runtime projection: manifest, settings, public switches.
+    if (kind === 'app') {
+        try {
+            await appInstances.project({ installId, companyId, slug, itemKey, version: b.version != null ? String(b.version) : null, manifest: appManifest, enabled: b.enabled });
+        } catch (err) {
+            // No manifest to keep and the table not there yet: the install
+            // still stands, as it did before this projection existed.
+            if (err.code === 'not_configured' && !appManifest) {
+                console.warn(`[nextgent] ${err.message}`);
+            } else {
+                if (charge.charged) await billingStripe.removeInstallCharge(installId);
+                await supabase.from('nextgent_installs').update({ status: 'removed', removed_at: new Date().toISOString() }).eq('install_id', installId);
+                return fail(res, err.status || 500, err.message);
+            }
+        }
+    }
+
     // Agents and apps get a token holding only what the owner approved.
     let token;
     if (kind !== 'automation') {
@@ -437,6 +486,31 @@ router.post('/installs', async (req, res) => {
     });
 });
 
+/* ── POST /installs/:installId/session ────────────────────────────────── */
+
+// A short-lived token for one install, for the screen that draws it: at most
+// 300 s (INSTALL_SESSION_TTL_SECONDS), the install's permissions as they are
+// when it is used, dead once the install is removed (lib/businessTokens.js).
+// The long-lived install token stays with Paperclip.
+router.post('/installs/:installId/session', async (req, res) => {
+    const installId = str(req.params.installId);
+    const { data, error } = await supabase
+        .from('nextgent_installs').select('install_id, company_id, kind, status')
+        .eq('install_id', installId).maybeSingle();
+    if (error) return fail(res, 503, `Installs are not set up on this database yet: ${error.message}`);
+    if (!data) return fail(res, 404, 'No such install.');
+    const companyId = str(req.body?.companyId);
+    if (companyId && companyId !== data.company_id) return fail(res, 404, 'No such install.');
+    if (data.status !== 'active') return fail(res, 409, 'That install was removed.');
+    if (data.kind === 'automation') return fail(res, 409, 'Automation installs have no token.');
+    try {
+        res.set('Cache-Control', 'no-store');
+        res.status(201).json(mintInstallSession({ installId: data.install_id, companyId: data.company_id }));
+    } catch (err) {
+        fail(res, err.status || 500, err.message);
+    }
+});
+
 /* ── DELETE /installs/:installId ──────────────────────────────────────── */
 
 router.delete('/installs/:installId', async (req, res) => {
@@ -450,12 +524,14 @@ router.delete('/installs/:installId', async (req, res) => {
             .select('install_id, kind, item_key, entity_slug');
         const charges = await billingStripe.removeInstallCharge(installId);
         const numbersReleased = await phoneAgent.releaseForInstall(installId);
+        // Both surfaces go: the owner's screen (its token) and the public page.
+        const appRemoved = await appInstances.remove(installId);
         if (!data?.length && !revoked) return fail(res, 404, 'No such install.');
         const row = data?.[0];
         const automationsDisabled = row?.kind === 'automation'
             ? await automationInstalls.uninstallFromStore({ itemKey: row.item_key, slug: row.entity_slug })
             : 0;
-        res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed, numbersReleased, automationsDisabled });
+        res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed, numbersReleased, automationsDisabled, ...(appRemoved ? { app: appRemoved } : {}) });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
@@ -494,6 +570,7 @@ router.post('/unlink', async (req, res) => {
         for (const row of installs || []) {
             await billingStripe.removeInstallCharge(row.install_id);
             await phoneAgent.releaseForInstall(row.install_id);
+            await appInstances.remove(row.install_id);
         }
         await supabase.from('nextgent_installs')
             .update({ status: 'removed', removed_at: new Date().toISOString() })
@@ -516,10 +593,14 @@ router.post('/unlink', async (req, res) => {
 
 /* ── POST /usage ──────────────────────────────────────────────────────── */
 
-// AI spend for one company over one period, as LiteLLM reports it. Paperclip
-// holds the LiteLLM master key and sends this; the same period sent again
-// replaces the earlier figure and bills only the difference.
+// AI spend for one company over one period, as LiteLLM reports it; the same
+// period sent again replaces the earlier figure and bills only the difference.
+// The pull (lib/litellmUsage.js) is the path in use, and on by default; while
+// it is on this push is refused, so the same spend is never billed twice.
 router.post('/usage', async (req, res) => {
+    if (usagePullOn()) {
+        return fail(res, 409, 'Usage is pulled from LiteLLM here (LITELLM_USAGE_PULL is on); pushed usage is refused so it is not billed twice.', { code: 'usage_pull_on' });
+    }
     const b = req.body || {};
     const companyId = str(b.companyId);
     const start = new Date(b.periodStart);

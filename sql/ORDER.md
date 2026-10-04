@@ -41,6 +41,12 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 17 | `nextgent_nodes.sql` | computer pairing (device flow), remote-view sessions, task id and receipt columns on `ghost_node_requests` (needs `ghost_nodes.sql`) |
 | 18 | `nextgent_google_push.sql` | Google push queue and state, fact sources (seeded), attribute map, source ranks (seeded), `fact_observations` |
 
+## NEXT GENT apps (app engine, CONTRACT §14)
+
+| # | File | What it adds |
+| - | ---- | ------------ |
+| 18a | `nextgent_apps.sql` | `business_app_instances` (runtime projection of installed apps: manifest, settings, public switches) and `app_records` (an app's own records) — needs 8. Apply **before** Paperclip sends app manifests: an install that carries one answers 503 until it is applied |
+
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.
 

@@ -12,7 +12,6 @@ const ROOT = path.resolve(__dirname, '..');
 Object.assign(process.env, {
     LITELLM_URL: 'https://litellm.test',
     LITELLM_MASTER_KEY: 'sk-master',
-    LITELLM_USAGE_PULL: 'true',
     USAGE_CREDITS_PER_USD: '100',
     SUPABASE_URL: 'https://db.example.test',
     SUPABASE_KEY: 'service',
@@ -61,8 +60,10 @@ const { check, done } = checker();
         check('the period is the UTC day', shop.period_start === '2026-10-04T00:00:00.000Z' && shop.period_end === '2026-10-05T00:00:00.000Z' && out.days[0].companies === 2);
         await pullUsage({ now, days: 1 });
         check('pulling the same day again replaces it, not adds', T.billing_usage_credits.length === 2);
+        delete process.env.LITELLM_USAGE_PULL;
+        check('on by default (the pull is the billing path)', !(await pullUsage({ now, days: 1 })).skipped);
         process.env.LITELLM_USAGE_PULL = 'false';
-        check('off unless switched on', (await pullUsage({ now })).skipped);
+        check('off only when switched off', (await pullUsage({ now })).skipped);
     } catch (e) {
         check('no exception', false, e.stack);
     }

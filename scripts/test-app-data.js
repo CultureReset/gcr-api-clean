@@ -1,0 +1,235 @@
+#!/usr/bin/env node
+// ============================================================
+// App-engine apps: install manifest, own records, settings, public block
+// ============================================================
+//
+//     npm run test:app-data
+//
+// Boots routes/nextgent.js and routes/app-data.js against the in-memory
+// database. Real signatures, real install tokens (long-lived and session),
+// real manifest guards (lib/businessTables.js). No credentials, no network.
+
+const path = require('path');
+const crypto = require('crypto');
+const express = require('express');
+const { createMemDb, inject, checker } = require('./lib/memdb');
+
+const ROOT = path.resolve(__dirname, '..');
+const SECRET = 'svc-secret';
+Object.assign(process.env, {
+    NEXTGENT_SERVICE_SECRET: SECRET,
+    SUPABASE_URL: 'https://db.example.test',
+    SUPABASE_KEY: 'service',
+    INTAKE_EMAIL_DOMAIN: 'parse.example.test',
+    APP_DATA_MAX_ROWS_PER_TABLE: '3',
+});
+
+const { T, db } = createMemDb({ tables: {
+    entity: [{ slug: 'shop', name: 'Shop', entity_type: 'cafe' }, { slug: 'other', name: 'Other', entity_type: 'bar' }],
+    company_links: [{ company_id: 'co-1', entity_slug: 'shop' }, { company_id: 'co-2', entity_slug: 'other' }],
+    business_mcp_tokens: [],
+    nextgent_installs: [],
+    business_app_instances: [],
+    app_records: [],
+    billing_item_prices: [],
+    billing_plan: [{ key: 'base', is_default: true }],
+    billing_subscription: [],
+    store_plan_items: [],
+    store_grants: [],
+    menu_items: [
+        { id: 1, entity_slug: 'shop', name: 'Toast', shown: true, cost_note: 'x' },
+        { id: 2, entity_slug: 'shop', name: 'Off menu', shown: false },
+        { id: 3, entity_slug: 'other', name: 'Not ours', shown: true },
+    ],
+    bookings: [{ id: 1, entity_slug: 'shop', customer_name: 'A Person' }],
+} });
+inject(path.join(ROOT, 'db.js'), db);
+
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith('https://db.example.test/rest/v1/')) {
+        const def = (cols) => ({ properties: Object.fromEntries(cols.map((c) => [c, { type: 'string' }])) });
+        return { ok: true, status: 200, json: async () => ({ definitions: {
+            menu_items: def(['id', 'entity_slug', 'name', 'shown', 'cost_note']),
+            bookings: def(['id', 'entity_slug', 'customer_name']),
+            app_records: def(['id', 'entity_slug', 'data']),
+        } }) };
+    }
+    return realFetch(url, init);
+};
+
+function manifest(over = {}) {
+    return {
+        schema_version: 1, id: 'notes-app', name: 'Notes', version: '1.0.0', publisher: 'test',
+        runtime: { type: 'engine', engine: '1' },
+        surfaces: [{ id: 'owner', kind: 'dashboard', path: '/owner' }, { id: 'public', kind: 'public', path: '/public' }],
+        permissions: [{ id: 'menu:read', reason: 'Shows the menu.' }],
+        data: {
+            namespace: 'notes',
+            tables: {
+                notes: { public: 'read-append', columns: {
+                    title: { type: 'text', required: true, max_length: 20 },
+                    count: { type: 'integer' },
+                    shown: { type: 'boolean', default: true },
+                    flag: { type: 'text', default: 'new' },
+                } },
+                internal: { columns: { memo: { type: 'text' } } },
+            },
+        },
+        config: [
+            { key: 'intro', type: 'text', default: 'Hello' },
+            { key: 'open', type: 'boolean', default: true },
+            { key: 'owner_email', type: 'text' },
+            { key: 'api_key', type: 'secret' },
+        ],
+        ui: {
+            sources: {
+                notes: { from: 'app', table: 'notes', fields: [
+                    { key: 'title', type: 'text' }, { key: 'count', type: 'number' }, { key: 'shown', type: 'boolean' },
+                    { key: 'flag', type: 'text', ownerOnly: true },
+                ], title: 'title', visibleWhen: 'shown' },
+                menu: { from: 'business', section: 'menu_items', resource: 'menu', fields: [{ key: 'name', type: 'text' }, { key: 'cost_note', type: 'text', ownerOnly: true }], title: 'name', visibleWhen: 'shown' },
+                people: { from: 'business', section: 'bookings', resource: 'bookings', fields: [{ key: 'customer_name', type: 'text' }], title: 'customer_name' },
+                memos: { from: 'app', table: 'internal', fields: [{ key: 'memo', type: 'text' }], title: 'memo' },
+            },
+            views: {
+                owner: [{ type: 'collection', source: 'notes' }, { type: 'collection', source: 'memos' }],
+                public: [
+                    { type: 'list', source: 'notes', fields: { title: 'title' } },
+                    { type: 'list', source: 'menu', fields: { title: 'name' } },
+                    { type: 'list', source: 'people', fields: { title: 'customer_name' } },
+                    { type: 'list', source: 'memos', fields: { title: 'memo' } },
+                    { type: 'form', source: 'notes', intro: { setting: 'intro' }, openWhen: { setting: 'open' } },
+                ],
+            },
+        },
+        ...over,
+    };
+}
+
+const { dataRouter, installRouter, publicRouter } = require(path.join(ROOT, 'routes/app-data.js'));
+const app = express();
+app.use(express.json({ verify: (req, _r, buf) => { req.rawBody = buf; } }));
+app.use('/api/nextgent', require(path.join(ROOT, 'routes/nextgent.js')));
+app.use('/api/app-data', dataRouter);
+app.use('/api/app-install', installRouter);
+app.use('/api/public/apps', publicRouter);
+const server = app.listen(0, run);
+const base = () => `http://127.0.0.1:${server.address().port}`;
+
+async function call(method, url, body, headers = {}) {
+    const res = await realFetch(`${base()}${url}`, {
+        method, headers: { 'Content-Type': 'application/json', ...headers }, body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+function signed(method, url, body) {
+    const raw = body === undefined ? '' : JSON.stringify(body);
+    const ts = String(Math.floor(Date.now() / 1000));
+    return call(method, url, body, { 'x-nextgent-timestamp': ts, 'x-nextgent-signature': crypto.createHmac('sha256', SECRET).update(`${ts}.${raw}`).digest('hex') });
+}
+const as = (token) => (method, url, body) => call(method, url, body, { Authorization: `Bearer ${token}` });
+
+const { check, done } = checker();
+
+async function run() {
+    try {
+        console.log('\n── install with the app manifest ──');
+        const bad = await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'bad-1', itemKey: 'notes-app', kind: 'app', permissions: [], app: manifest({ data: { tables: { 'Bad Name': { columns: {} } } } }) });
+        check('a manifest with a bad table is refused', bad.status === 400 && !T.nextgent_installs.some((i) => i.install_id === 'bad-1'), JSON.stringify(bad.body));
+        const inst = await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-1', itemKey: 'notes-app', kind: 'app', version: '1.0.0', permissions: ['menu:read'], app: manifest() });
+        check('the install answers with its token', inst.status === 201 && /^gcr_mcp_/.test(inst.body.token || ''), JSON.stringify(inst.body));
+        const projected = T.business_app_instances.find((r) => r.install_id === 'app-1');
+        check('the manifest is kept in the runtime projection', projected?.manifest?.id === 'notes-app' && projected.entity_slug === 'shop' && projected.app_key === 'notes-app' && projected.enabled === true && projected.version === '1.0.0');
+        check('and not on the install row', !('manifest' in T.nextgent_installs.find((i) => i.install_id === 'app-1')));
+        const own = as(inst.body.token);
+
+        const other = await signed('POST', '/api/nextgent/installs', { companyId: 'co-2', installId: 'app-2', itemKey: 'notes-app', kind: 'app', version: '1.0.0', permissions: [], app: manifest() });
+        const theirs = as(other.body.token);
+
+        console.log('\n── /api/app-install ──');
+        const me = await own('GET', '/api/app-install');
+        check('{ installId, itemKey, version, settings, granted }', me.status === 200 && me.body.installId === 'app-1' && me.body.itemKey === 'notes-app' && me.body.version === '1.0.0' && JSON.stringify(me.body.granted) === '["menu:read"]', JSON.stringify(me.body));
+        check('settings carry the declared defaults', me.body.settings.intro === 'Hello' && me.body.settings.open === true);
+        const saved = await own('PUT', '/api/app-install/settings', { settings: { intro: 'Hi there', owner_email: 'me@example.test', api_key: 'sk-1', not_declared: 1 } });
+        check('saving keeps declared keys only', saved.status === 200 && saved.body.settings.intro === 'Hi there' && !('not_declared' in saved.body.settings), JSON.stringify(saved.body));
+        check('a secret is never returned', !('api_key' in saved.body.settings));
+        check('and is stored sealed', /^v1\./.test(projected.config.api_key) && !JSON.stringify(projected.config).includes('sk-1'));
+        const company = await signed('POST', '/api/nextgent/link', { companyId: 'co-1', rotateToken: true });
+        check('/api/nextgent/link says the business kind', company.body.kind === 'cafe', JSON.stringify(company.body));
+        const companyTok = as(company.body.businessToken);
+        check('a company token (no install) is refused', (await companyTok('GET', '/api/app-install')).status === 403);
+        check('no token is refused', (await call('GET', '/api/app-install')).status === 401);
+
+        console.log('\n── /api/app-data ──');
+        const made = await own('POST', '/api/app-data/notes', { title: 'First', count: '3', sneaky: 'x', entity_slug: 'other' });
+        check('a record is created with declared columns only', made.status === 201 && made.body.row.title === 'First' && made.body.row.count === 3 && !('sneaky' in made.body.row) && made.body.row.shown === true, JSON.stringify(made.body));
+        const rec = T.app_records.find((r) => r.id === made.body.row.id);
+        check('scoped to the install and the business from the token', rec.install_id === 'app-1' && rec.entity_slug === 'shop' && rec.app_table === 'notes');
+        check('a missing required column is refused', (await own('POST', '/api/app-data/notes', { count: 1 })).status === 422);
+        const wrong = await own('POST', '/api/app-data/notes', { title: 'x', count: 'many' });
+        check('a value of the wrong type is refused, naming the column', wrong.status === 422 && wrong.body.errors.count, JSON.stringify(wrong.body));
+        check('too long for max_length is refused', (await own('POST', '/api/app-data/notes', { title: 'x'.repeat(21) })).status === 422);
+        check('an undeclared table is refused', (await own('GET', '/api/app-data/menu_items')).status === 404);
+        await own('POST', '/api/app-data/notes', { title: 'Hidden', shown: false, flag: 'secret' });
+        await own('POST', '/api/app-data/internal', { memo: 'owner only' });
+        const list = await own('GET', '/api/app-data/notes');
+        check('the list returns this install\'s rows', list.status === 200 && list.body.rows.length === 2 && list.body.total === 2, JSON.stringify(list.body));
+        const patched = await own('PATCH', `/api/app-data/notes/${made.body.row.id}`, { title: 'Renamed' });
+        check('PATCH changes only what was sent', patched.status === 200 && patched.body.row.title === 'Renamed' && patched.body.row.count === 3, JSON.stringify(patched.body));
+        check('PATCH cannot blank a required column', (await own('PATCH', `/api/app-data/notes/${made.body.row.id}`, { title: '' })).status === 422);
+        check('another business\'s install cannot read it', (await theirs('GET', '/api/app-data/notes')).body.rows.length === 0);
+        check('nor change it', (await theirs('PATCH', `/api/app-data/notes/${made.body.row.id}`, { title: 'Hack' })).status === 404);
+        check('nor delete it', (await theirs('DELETE', `/api/app-data/notes/${made.body.row.id}`)).status === 404);
+
+        const sess = await signed('POST', '/api/nextgent/installs/app-1/session', { companyId: 'co-1' });
+        check('a short-lived session token works on the app routes too', (await as(sess.body.token)('GET', '/api/app-data/notes')).body.rows?.length === 2);
+
+        console.log('\n── /api/public/apps ──');
+        const pub = await call('GET', '/api/public/apps/app-1');
+        check('a visitor reads the public block', pub.status === 200 && pub.body.data && pub.body.settings, JSON.stringify(pub.body));
+        check('settings: only those public views use, never a secret or the owner\'s', pub.body.settings.intro === 'Hi there' && pub.body.settings.open === true && !('owner_email' in pub.body.settings) && !('api_key' in pub.body.settings), JSON.stringify(pub.body.settings));
+        check('app rows: hidden ones dropped', pub.body.data.notes.length === 1 && pub.body.data.notes[0].title === 'Renamed');
+        check('owner-only columns removed', !('flag' in pub.body.data.notes[0]));
+        check('business rows the install may read, this business only, visible ones', pub.body.data.menu.length === 1 && pub.body.data.menu[0].name === 'Toast' && !('cost_note' in pub.body.data.menu[0]), JSON.stringify(pub.body.data.menu));
+        check('a table of people is never public', !('people' in pub.body.data));
+        check('an app table not declared public is not read', !('memos' in pub.body.data));
+        const theirPub = await call('GET', '/api/public/apps/app-2');
+        check('without menu:read the business source is left out', theirPub.status === 200 && !('menu' in theirPub.body.data));
+
+        const sub = await call('POST', '/api/public/apps/app-1/notes', { title: 'From a visitor', flag: 'set-by-visitor' });
+        check('a visitor can append to a public append table', sub.status === 201 && sub.body.row.id && !('title' in sub.body.row), JSON.stringify(sub.body));
+        const vrec = T.app_records.find((r) => r.id === sub.body.row.id);
+        check('owner-only columns take their default, not the visitor\'s value', vrec.data.flag === 'new' && vrec.source === 'visitor' && vrec.entity_slug === 'shop');
+        check('a table not open to visitors is refused', (await call('POST', '/api/public/apps/app-1/internal', { memo: 'x' })).status === 404);
+        check('bad visitor input is refused', (await call('POST', '/api/public/apps/app-1/notes', {})).status === 422);
+        const full = await call('POST', '/api/public/apps/app-1/notes', { title: 'Too many' });
+        check('a table at APP_DATA_MAX_ROWS_PER_TABLE takes no more', full.status === 409, JSON.stringify(full.body));
+        T.app_records = T.app_records.filter((r) => r.source !== 'visitor');
+        await own('PUT', '/api/app-install/settings', { settings: { open: false } });
+        check('a form the owner closed takes nothing', (await call('POST', '/api/public/apps/app-1/notes', { title: 'Late' })).status === 403);
+        projected.public_enabled = false;
+        check('public switched off: no public block', (await call('GET', '/api/public/apps/app-1')).status === 404);
+        projected.public_enabled = true;
+        check('an unknown install is 404', (await call('GET', '/api/public/apps/nope')).status === 404);
+
+        console.log('\n── uninstall ──');
+        const gone = await signed('DELETE', '/api/nextgent/installs/app-1');
+        check('uninstall switches the projection off', gone.status === 200 && gone.body.app?.disabled === true && projected.enabled === false && projected.public_enabled === false, JSON.stringify(gone.body));
+        check('the owner side is gone', (await own('GET', '/api/app-install')).status === 401 && (await as(sess.body.token)('GET', '/api/app-data/notes')).status === 401);
+        check('and the public side', (await call('GET', '/api/public/apps/app-1')).status === 404);
+        check('records are kept unless the manifest says delete_on_uninstall', T.app_records.some((r) => r.install_id === 'app-1'));
+        const m2 = manifest();
+        m2.data.delete_on_uninstall = true;
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-2', installId: 'app-2', itemKey: 'notes-app', kind: 'app', version: '1.1.0', permissions: [], app: m2 });
+        check('an update replaces the projected manifest and version', T.business_app_instances.find((r) => r.install_id === 'app-2').version === '1.1.0');
+        await theirs('POST', '/api/app-data/notes', { title: 'Theirs' });
+        const gone2 = await signed('DELETE', '/api/nextgent/installs/app-2');
+        check('with delete_on_uninstall the records go too', gone2.body.app?.recordsDeleted === 1 && !T.app_records.some((r) => r.install_id === 'app-2'), JSON.stringify(gone2.body));
+    } catch (e) {
+        check('no exception', false, e.stack);
+    }
+    server.close();
+    done('app-data');
+}

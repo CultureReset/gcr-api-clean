@@ -284,6 +284,7 @@ async function run() {
         check('with a forwarding address from the intake mechanism', made.body.forwardingAddress === 'gcr-new-taco-shop@parse.example.test');
         check('and a business token, once', /^gcr_mcp_/.test(made.body.businessToken || ''));
         const ent = T.entity.find((e) => e.slug === 'new-taco-shop');
+        check('the business kind comes back (Paperclip store audiences)', made.body.kind === 'restaurant', JSON.stringify(made.body));
         check('the new business is hidden until reviewed', ent && ent.is_active === false && ent.entity_type === 'restaurant');
         check('the link is recorded', T.company_links.some((l) => l.company_id === 'co-new' && l.entity_slug === 'new-taco-shop'));
         const tokRow = T.business_mcp_tokens.find((t) => t.token_hash === sha(made.body.businessToken));
@@ -360,6 +361,32 @@ async function run() {
         check('the schema lists only readable sections', JSON.stringify(schema.body.tables) === '["menu_items"]', JSON.stringify(schema.body.tables));
         check('credential tables are never sections', !schema.body.tables.includes('business_mcp_tokens'));
 
+        console.log('\n── short-lived install tokens ──');
+        const unsignedSess = await signed('POST', '/api/nextgent/installs/in-1/session', {}, { sign: false });
+        check('a session token must be asked for with a signature', unsignedSess.status === 401);
+        const sess = await signed('POST', '/api/nextgent/installs/in-1/session', { companyId: 'co-new' });
+        const ttl = (Date.parse(sess.body.expiresAt) - Date.now()) / 1000;
+        check('it returns { token, expiresAt } within 300 s', sess.status === 201 && /^gcr_mcp_ist\./.test(sess.body.token || '') && ttl > 0 && ttl <= 300, JSON.stringify(sess.body));
+        check('nothing about it is stored', !T.business_mcp_tokens.some((t) => t.token_hash === sha(sess.body.token)));
+        const sessMenu = await asUser('GET', '/api/business/menu_items', undefined, sess.body.token);
+        check('it reads what the install may read', sessMenu.status === 200 && sessMenu.body.rows.every((r) => r.entity_slug === 'new-taco-shop'), JSON.stringify(sessMenu.body));
+        const sessFaq = await asUser('GET', '/api/business/faqs', undefined, sess.body.token);
+        check('and nothing else', sessFaq.status === 403);
+        const forged = sess.body.token.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A'));
+        check('a tampered one is refused', (await asUser('GET', '/api/business/menu_items', undefined, forged)).status === 401);
+        const otherCo = await signed('POST', '/api/nextgent/installs/in-1/session', { companyId: 'co-other' });
+        check('another company cannot get one for this install', otherCo.status === 404);
+        process.env.INSTALL_SESSION_TTL_SECONDS = '9999';
+        const capped = await signed('POST', '/api/nextgent/installs/in-1/session', {});
+        check('a TTL set above 300 s is held to 300', (Date.parse(capped.body.expiresAt) - Date.now()) / 1000 <= 300);
+        process.env.INSTALL_SESSION_TTL_SECONDS = '1';
+        const shortSess = await signed('POST', '/api/nextgent/installs/in-1/session', {});
+        delete process.env.INSTALL_SESSION_TTL_SECONDS;
+        await new Promise((r) => setTimeout(r, 1100));
+        const expired = await asUser('GET', '/api/business/menu_items', undefined, shortSess.body.token);
+        check('an expired one is refused', expired.status === 401 && /expired/.test(expired.body.error), JSON.stringify(expired.body));
+        const keptSession = sess.body.token;
+
         const upd = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-1', itemKey: 'qr-menu', kind: 'app', version: '1.1.0', permissions: ['menu:read', 'menu:write'] });
         check('a repeat install updates permissions', upd.body.updated === true && appRow.permissions.includes('menu:write') && appRow.scope === 'write');
 
@@ -396,10 +423,16 @@ async function run() {
         check('and stops its charge', stripeCalls.some(([n, id]) => n === 'subscriptionItems.del' && id === 'si_1')
             && T.billing_item_charges.find((c) => c.install_id === 'in-2').status === 'removed');
 
+        const autoSess = await signed('POST', '/api/nextgent/installs/in-4/session', {});
+        check('an automation install has no session token', autoSess.status === 409);
         const delAuto = await signed('DELETE', '/api/nextgent/installs/in-4');
         check('removing an automation install switches it off', delAuto.body.automationsDisabled === 1 && ea.enabled === false && T.entity_automations.length === 1);
 
         console.log('\n── usage from LiteLLM ──');
+        delete process.env.LITELLM_USAGE_PULL;
+        const pushedWhilePull = await signed('POST', '/api/nextgent/usage', { companyId: 'co-new', periodStart: new Date(Date.now() - 3600e3).toISOString(), periodEnd: new Date().toISOString(), spendUsd: 1.25 });
+        check('the pull is on by default, so pushed usage is refused (no double billing)', pushedWhilePull.status === 409 && pushedWhilePull.body.code === 'usage_pull_on' && !T.billing_usage_credits.length, JSON.stringify(pushedWhilePull.body));
+        process.env.LITELLM_USAGE_PULL = 'false';
         const usage = await signed('POST', '/api/nextgent/usage', { companyId: 'co-new', periodStart: new Date(Date.now() - 3600e3).toISOString(), periodEnd: new Date().toISOString(), spendUsd: 1.25 });
         check('spend becomes credits', usage.body.recorded && usage.body.credits === 125, JSON.stringify(usage.body));
         check('and the month total feeds billing_usage', T.billing_usage.some((u) => u.entity_slug === 'new-taco-shop' && u.dimension === 'ai_credits' && u.value === 125));
@@ -474,6 +507,8 @@ async function run() {
         check('the link is gone, the business is not', !T.company_links.some((l) => l.company_id === 'co-new') && T.entity.some((e) => e.slug === 'new-taco-shop'));
         const stale = await asUser('GET', '/api/business/menu_items', undefined, appTok);
         check('an unlinked install token stops working', stale.status === 401);
+        const staleSess = await asUser('GET', '/api/business/menu_items', undefined, keptSession);
+        check('and so does a live session token of that install', staleSess.status === 401, JSON.stringify(staleSess.body));
         const again2 = await signed('POST', '/api/nextgent/unlink', { companyId: 'co-new' });
         check('unlinking twice is harmless', again2.body.alreadyUnlinked === true);
     } catch (e) {

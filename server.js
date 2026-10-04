@@ -178,6 +178,31 @@ const embedLeadLimiter = rateLimit({
 });
 app.use('/api/embed/lead', embedLeadLimiter);
 
+/* ── installed apps' public pages (routes/app-data.js) ────────────────────
+ *
+ * Like the widget above, an app's public block is drawn on the business's own
+ * site, so any origin may read it, without credentials. It returns only what
+ * the app's manifest declares public. Visitor submissions are write-only and
+ * limited per IP; reads get the wider public ceiling.
+ */
+app.use('/api/public/apps', cors({ origin: '*', credentials: false }));
+const appPublicWindowMs = Number(process.env.APP_PUBLIC_RATE_WINDOW_SECONDS || 60) * 1000;
+const appPublicSubmitLimiter = rateLimit({
+    windowMs: appPublicWindowMs,
+    max: Number(process.env.APP_PUBLIC_SUBMIT_RATE_LIMIT || 10),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many submissions — try again in a moment.' },
+});
+const appPublicReadLimiter = rateLimit({
+    windowMs: appPublicWindowMs,
+    max: Number(process.env.APP_PUBLIC_READ_RATE_LIMIT || 120),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests — slow down and try again shortly.' },
+});
+app.use('/api/public/apps', (req, res, next) => (req.method === 'POST' ? appPublicSubmitLimiter : appPublicReadLimiter)(req, res, next));
+
 // Fail-safe route mount: a broken/WIP route file is skipped with a warning
 // instead of crashing the entire API on boot. The loader thunk MUST contain a
 // literal require('./...') string so Vercel's bundler statically traces and
@@ -215,6 +240,10 @@ mount('/api/admin', () => require('./routes/admin'));
 // Dashboard (business owner) — TODO: has missing module dependencies
 mount('/api/dashboard', () => require('./routes/dashboard'));
 
+// Installed apps' public blocks — before /api/public, whose site guard would
+// otherwise claim the path. The install names the business, never the request.
+mount('/api/public/apps', () => require('./routes/app-data').publicRouter);
+
 // Public
 mount('/api/public', () => require('./routes/public'));
 
@@ -251,6 +280,11 @@ mount('/api/business/automations', () => require('./routes/automations').ownerRo
 mount('/api/owner', () => require('./routes/owner'));
 
 mount('/api/business', () => require('./routes/business-data'));
+
+// An app-engine app's own records and its install's settings, with that
+// install's token only (routes/app-data.js; the engine's adapter calls these).
+mount('/api/app-data', () => require('./routes/app-data').dataRouter);
+mount('/api/app-install', () => require('./routes/app-data').installRouter);
 mount('/api/billing', () => require('./routes/billing'));
 
 // NEXT GENT (CONTRACT §4): the calls Paperclip makes, each one HMAC-signed
