@@ -65,7 +65,8 @@ const INSTALL = {
 
 function result(rec) {
     if (rec.table === 'entity' && rec.range) return { data: [{ slug: 'flora-bama', entity_type: 'restaurant' }], error: null };
-    if (rec.table === 'entity') return { data: { slug: 'flora-bama', name: 'Flora-Bama', phone: '555-0100', email: 'fb@example.com' }, error: null };
+    // The business's own phone: a text step may go to it (sms.send is for the business, not customers).
+    if (rec.table === 'entity') return { data: { slug: 'flora-bama', name: 'Flora-Bama', phone: '(251) 555-0100', email: 'fb@example.com' }, error: null };
     if (rec.table === 'menu_items') return { data: [{ id: 1, item_name: 'Bushwacker', is_active: true }], error: null };
     if (rec.table === 'entity_specials') return { data: { id: 77, ...rec.insert }, error: null };
     if (rec.table === 'automation_runs') return { data: rec.insert ? { id: 'run-1' } : [], error: null };
@@ -208,6 +209,14 @@ function check(label, ok, detail) {
     check('a run row was written first, then finished with the step log', rec && rec.insert.status === 'running' && fin && fin.update.status === 'ok' && fin.update.steps_log.length === 4);
     const touched = calls.find((c) => c.table === 'entity_automations' && c.update);
     check('the install\'s last_run was updated', touched && touched.update.last_run_status === 'ok' && touched.eq.id === 'inst-1');
+
+    calls.length = 0; smsCalls.length = 0;
+    const toCustomer = await engine.runDefinition({
+        definition: DEFINITION, slug: 'flora-bama', trigger: { type: 'manual' },
+        config: { reminder_phone: '251-555-0999' },
+    });
+    check('a text step to a number that is not the business\'s is refused', toCustomer.status === 'failed' && smsCalls.length === 0
+        && /only goes to the business's own numbers/.test(toCustomer.error || JSON.stringify(toCustomer.steps_log)), JSON.stringify(toCustomer.error));
 
     console.log('\nRunner — a dry run reads but never writes or sends');
     calls.length = 0; smsCalls.length = 0;
