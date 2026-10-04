@@ -447,6 +447,18 @@ section('8. /api/owner/messages covers everything /api/business/messages did', a
     check('and /api/business/messages is not mounted', !/\/api\/business\/messages/.test(fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8')));
 });
 
+/* ── 9. the old app catalogue is marked, not removed ────────────────────── */
+
+section('9. /api/admin/apps and /site-apps are deprecated, still there', async () => {
+    const fs = require('fs');
+    const src = fs.readFileSync(path.join(ROOT, 'routes/admin.js'), 'utf8');
+    const routes = ["get('/apps'", "post('/apps'", "put('/apps/:appId'", "delete('/apps/:appId'", "post('/site-apps'", "delete('/site-apps'"];
+    const unmarked = routes.filter((r) => !new RegExp(`router\\.${r.replace(/[()/:]/g, (c) => `\\${c}`)}, authRequired, deprecatedAppCatalog,`).test(src));
+    check('all six legacy catalogue routes still exist and are marked deprecated', !unmarked.length, unmarked.join(', '));
+    check('the marker sets the Deprecation header', /res\.set\('Deprecation', 'true'\)/.test(src));
+    check('the README lists them under Deprecated', /## Deprecated, kept until their data moves[\s\S]*\/api\/admin\/site-apps/.test(fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8')));
+});
+
 /* ── 10. helpers: one copy each ─────────────────────────────────────────── */
 
 section('10. routine signing, envInt, defaultPlanKey, Google token encryption', async () => {

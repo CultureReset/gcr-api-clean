@@ -284,6 +284,8 @@ npm run test:google-push       # Google push queue, edit limit, read-back
 npm run test:phone-agent       # number bought, billed, released; forwarding codes
 npm run test:live              # Telnyx webhooks, routing, LiteLLM with MCP tools
 npm run test:litellm-usage     # spend pulled per company
+npm run test:email             # platform emails from template files
+npm run test:dedup             # one copy each: access, installs, prices, codes, consent, sends, messages
 ```
 
 None of them needs credentials or a network.
@@ -299,6 +301,7 @@ nothing anywhere until the next publish and push.
 |---|---|
 | Engine: step catalogue, templating, runner, schedule check, events | `lib/automationEngine.js` |
 | Routes: admin builder, owner installs, cron tick, inbound hooks | `routes/automations.js` |
+| Installing on a business (store installs and admin rollouts, one path) | `lib/automationInstalls.js` |
 | Tables (applied to the live project) | `sql/automations.sql` |
 | Tests, no credentials needed | `npm run test:automations` |
 
@@ -307,9 +310,16 @@ Mounts: `/api/admin/automations` (adminRequired), `/api/business/automations`
 (hourly, from `vercel.json`, guarded by `CRON_SECRET` when that is set) and
 `/api/automations/hook/:token` (one random token per install).
 
+How an automation reaches a business: the owner installs it from the
+Paperclip store (`POST /api/nextgent/installs`, kind `automation`, item key =
+the automation's `key`), which is the release path; the builder's
+`/api/admin/automations/:id/deploy` stays for authoring and staged rollouts of
+a version. Both run `installAutomation` in `lib/automationInstalls.js`.
+
 Step types are the modular part: `data.query`, `data.insert`, `data.update`,
-`condition`, `transform`, `script`, `ai.prompt`, `http.request`, `sms.send`,
-`email.send`, `notify`, `log`. Adding one is one entry in the engine; the admin
+`condition`, `transform`, `script`, `ai.prompt`, `http.request`, `sms.send`
+(the business's own numbers only), `message` (a customer, with consent),
+`email.send`, `wait`, `agent`, `notify`, `log`. Adding one is one entry in the engine; the admin
 console's builder reads the catalogue from `GET /api/admin/automations/meta`.
 
 The data steps use the same three guards as the dashboard and the MCP server
@@ -319,6 +329,16 @@ never reach them through the generic writer.
 
 To fire an automation from another route: `require('../lib/automationEngine').emitEvent(name, slug, payload)`.
 `routes/intake.js` does this for `intake.created`.
+
+## Deprecated, kept until their data moves
+
+| Route | Replaced by | Retire when |
+|---|---|---|
+| `GET/POST /api/admin/apps`, `PUT/DELETE /api/admin/apps/:appId` (the `apps` catalog, Plat-admin's App Manager) | the Paperclip store catalog | the `apps` rows are published as store items |
+| `POST/DELETE /api/admin/site-apps` (`site_apps`, installing an app for a business) | `POST /api/nextgent/installs` / `DELETE /api/nextgent/installs/:installId` | the `site_apps` rows are installs in the store |
+
+Both answer with `Deprecation: true` and a `Warning` header. Plan section 7
+("Eight stores in code today, one kept") has the full table.
 
 ## Other documents in this repo
 

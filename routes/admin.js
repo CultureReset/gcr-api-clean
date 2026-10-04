@@ -3733,9 +3733,23 @@ router.delete('/social-posts/:id', authRequired, async (req, res) => {
   }
 });
 
-// ─── APP CATALOG (App Manager tab) ─────────────────────────────────────────
+// ─── APP CATALOG (App Manager tab) — DEPRECATED ─────────────────────────────
+//
+// The `apps` / `site_apps` catalog is the older app store (plan section 7,
+// "Eight stores in code today, one kept": its rows move into the kept store —
+// Paperclip's catalog, installed through POST /api/nextgent/installs — then it
+// retires). Kept working until those rows are moved, so Plat-admin's two
+// legacy entries (App Manager, and installing an app for a business) keep
+// working meanwhile. Every response here carries `Deprecation: true` and a
+// Warning header saying so. Do not build on these routes.
+function deprecatedAppCatalog(req, res, next) {
+  res.set('Deprecation', 'true');
+  res.set('Warning', '299 - "Deprecated: the apps/site_apps catalog is retiring; publish and install through the Paperclip store (POST /api/nextgent/installs)."');
+  next();
+}
+
 // GET /api/admin/apps — full catalog for editing (all statuses, not just active)
-router.get('/apps', authRequired, async (req, res) => {
+router.get('/apps', authRequired, deprecatedAppCatalog, async (req, res) => {
   try {
     const { data, error } = await getDb().from('apps').select('*').order('category', { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
@@ -3746,7 +3760,7 @@ router.get('/apps', authRequired, async (req, res) => {
 });
 
 // POST /api/admin/apps — create a new app
-router.post('/apps', authRequired, async (req, res) => {
+router.post('/apps', authRequired, deprecatedAppCatalog, async (req, res) => {
   try {
     const { app_id, name, description, category, type, monthly_price, icon, script_url, business_types, active } = req.body;
     if (!app_id || !name) return res.status(400).json({ error: 'app_id and name required' });
@@ -3769,7 +3783,7 @@ router.post('/apps', authRequired, async (req, res) => {
 });
 
 // PUT /api/admin/apps/:appId — update an app
-router.put('/apps/:appId', authRequired, async (req, res) => {
+router.put('/apps/:appId', authRequired, deprecatedAppCatalog, async (req, res) => {
   try {
     const { name, description, category, type, monthly_price, icon, script_url, business_types, active } = req.body;
     const { data, error } = await getDb().from('apps').update({
@@ -3791,7 +3805,7 @@ router.put('/apps/:appId', authRequired, async (req, res) => {
 });
 
 // DELETE /api/admin/apps/:appId — delete an app and uninstall it from every business
-router.delete('/apps/:appId', authRequired, async (req, res) => {
+router.delete('/apps/:appId', authRequired, deprecatedAppCatalog, async (req, res) => {
   try {
     const db = getDb();
     await db.from('site_apps').delete().eq('app_id', req.params.appId);
@@ -3833,8 +3847,8 @@ router.get('/businesses', authRequired, async (req, res) => {
   }
 });
 
-// POST /api/admin/site-apps — install an app for a business
-router.post('/site-apps', authRequired, async (req, res) => {
+// POST /api/admin/site-apps — install an app for a business (DEPRECATED, see above)
+router.post('/site-apps', authRequired, deprecatedAppCatalog, async (req, res) => {
   try {
     const { site_id, app_id } = req.body;
     if (!site_id || !app_id) return res.status(400).json({ error: 'site_id and app_id required' });
@@ -3847,8 +3861,8 @@ router.post('/site-apps', authRequired, async (req, res) => {
   }
 });
 
-// DELETE /api/admin/site-apps — uninstall an app for a business
-router.delete('/site-apps', authRequired, async (req, res) => {
+// DELETE /api/admin/site-apps — uninstall an app for a business (DEPRECATED, see above)
+router.delete('/site-apps', authRequired, deprecatedAppCatalog, async (req, res) => {
   try {
     const { site_id, app_id } = req.body;
     if (!site_id || !app_id) return res.status(400).json({ error: 'site_id and app_id required' });
