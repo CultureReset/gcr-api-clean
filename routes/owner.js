@@ -242,8 +242,11 @@ for (const action of ['approve', 'block']) {
     router.post(`/intake/senders/:id/${action}`, async (req, res) => {
         try {
             const sender = await intake.decideSender(req.entitySlug, req.params.id, action === 'approve', who(req));
+            // Held bookings (routes/email-parser.js) and held payments
+            // (routes/email-webhook.js) are both read now.
             const processed = action === 'approve'
-                ? await require('./email-parser').processHeld(req.entitySlug, sender.sender)
+                ? (await require('./email-parser').processHeld(req.entitySlug, sender.sender))
+                    + (await require('./email-webhook').processHeld(req.entitySlug, sender.sender))
                 : 0;
             res.json({ sender, processed });
         } catch (err) { fail(res, err); }

@@ -33,6 +33,68 @@ function computeEmailHash(from, subject, text) {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+/** Insert a log row; without sql/nextgent_intake.sql the raw_html column is left out. */
+async function insertWebhookLog(row) {
+  let { data, error } = await db.from('email_webhook_log').insert(row).select('id').single();
+  if (error && /raw_html/.test(error.message || '')) {
+    const { raw_html, ...rest } = row;
+    ({ data, error } = await db.from('email_webhook_log').insert(rest).select('id').single());
+  }
+  if (error) console.error('[email-webhook] log insert failed:', error.message);
+  return data || null;
+}
+
+/** The payment read out of an email, the way the live route reads it, or null. */
+function extractPayment(sourceType, text, html, from) {
+  if (sourceType !== 'venmo' && sourceType !== 'cashapp') return null;
+  const extractor = sourceType === 'venmo' ? venmoExtractor : cashappExtractor;
+  return extractor.extract(text, html, from);
+}
+
+/**
+ * The owner approved a sender: read the payment emails held from it, from the
+ * body the held row kept. A payment is recorded for the business exactly as
+ * the live route records it (lib/payments.js); the row then stands as the
+ * live route leaves a payment email with no request to match ('unmatched').
+ * Returns how many emails were processed.
+ */
+async function processHeld(businessSlug, sender) {
+  const heldRows = (cols) => db.from('email_webhook_log')
+    .select(cols)
+    .eq('matched_site_id', businessSlug).eq('status', 'needs_review').is('parsed_data', null)
+    .ilike('from_email', `%${String(sender).replace(/[%_]/g, '')}%`)
+    .limit(200);
+  let { data: rows, error } = await heldRows('id, from_email, subject, raw_text, raw_html, email_hash, source_type');
+  // A database without the raw_html column yet.
+  if (error && /raw_html/.test(error.message || '')) ({ data: rows } = await heldRows('id, from_email, subject, raw_text, email_hash, source_type'));
+  let processed = 0;
+  for (const row of rows || []) {
+    const sourceType = row.source_type || detectSource(row.from_email);
+    const parsed = extractPayment(sourceType, row.raw_text || '', row.raw_html || '', row.from_email);
+    const patch = { status: 'unmatched', ...('raw_html' in row ? { raw_html: null } : {}) };
+    if (parsed) {
+      patch.parsed_data = parsed;
+      patch.confidence = parsed.confidence;
+      if (parsed.confidence >= 0.6) {
+        await recordPayment(businessSlug, {
+          amount: parsed.amount,
+          currency: parsed.currency || process.env.DEFAULT_CURRENCY || null,
+          payer: parsed.senderName || null,
+          source: sourceType,
+          status: 'claimed',
+          reference: parsed.transactionId || parsed.reqCode || row.email_hash,
+          details: { req_code: parsed.reqCode || null, confidence: parsed.confidence },
+        });
+      } else {
+        patch.status = 'needs_review';
+      }
+    }
+    await db.from('email_webhook_log').update(patch).eq('id', row.id);
+    processed += 1;
+  }
+  return processed;
+}
+
 router.post('/email', express.urlencoded({ extended: false }), async (req, res) => {
   const secret = process.env.EMAIL_WEBHOOK_SECRET;
   const headerSecret = req.headers['x-webhook-secret'];
@@ -65,10 +127,13 @@ router.post('/email', express.urlencoded({ extended: false }), async (req, res) 
       }
       const senderState = await intake.checkSender(businessSlug, from, { subject });
       if (senderState !== 'known') {
-        await db.from('email_webhook_log').insert({
+        // Held mail keeps its body (text and html), so approving the sender
+        // can read it (processHeld below) the way this route would have.
+        await insertWebhookLog({
           from_email: from, to_email: to, subject, source_type: sourceType,
           status: senderState === 'blocked' ? 'blocked_sender' : 'needs_review',
           email_hash: emailHash, matched_site_id: businessSlug,
+          raw_text: text, raw_html: html || null,
         });
         return res.status(200).json({ status: senderState === 'blocked' ? 'blocked_sender' : 'held_for_review' });
       }
@@ -326,3 +391,4 @@ router.post('/email', express.urlencoded({ extended: false }), async (req, res) 
 });
 
 module.exports = router;
+module.exports.processHeld = processHeld;

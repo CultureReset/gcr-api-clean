@@ -1024,11 +1024,16 @@ function parserLogFields(parsed) {
   };
 }
 
-/** Insert a log row; without sql/nextgent_intake.sql the intake_state column is left out. */
+/** The columns sql/nextgent_intake.sql adds; a database without it has neither. */
+const INTAKE_COLUMNS = ['intake_state', 'raw_html'];
+
+/** Insert a log row; without sql/nextgent_intake.sql its columns are left out. */
 async function insertParserLog(row) {
   let { data, error } = await db.from('email_parser_log').insert(row).select('id').single();
-  if (error && /intake_state/.test(error.message || '')) {
-    const { intake_state, ...rest } = row;
+  const absent = error ? INTAKE_COLUMNS.filter((c) => new RegExp(c).test(error.message || '')) : [];
+  if (absent.length) {
+    const rest = { ...row };
+    for (const c of INTAKE_COLUMNS) delete rest[c];
     ({ data, error } = await db.from('email_parser_log').insert(rest).select('id').single());
   }
   if (error) console.error('[email-parser] log insert failed:', error.message);
@@ -1036,20 +1041,30 @@ async function insertParserLog(row) {
 }
 
 /**
- * The owner approved a sender: read what was held from it. Returns how many
- * emails were processed.
+ * The owner approved a sender: read what was held from it, from the body the
+ * held row kept (text and html, the same two the live path reads). Returns
+ * how many emails were processed.
  */
 async function processHeld(entitySlug, sender) {
-  const { data: rows } = await db.from('email_parser_log')
-    .select('id, from_email, subject, raw_text')
+  const heldRows = (cols) => db.from('email_parser_log')
+    .select(cols)
     .eq('entity_slug', entitySlug).eq('intake_state', 'held')
     .ilike('from_email', `%${String(sender).replace(/[%_]/g, '')}%`)
     .limit(200);
+  let { data: rows, error } = await heldRows('id, from_email, subject, raw_text, raw_html');
+  // A database with intake_state but not yet raw_html.
+  if (error && /raw_html/.test(error.message || '')) ({ data: rows } = await heldRows('id, from_email, subject, raw_text'));
   let processed = 0;
   for (const row of rows || []) {
-    const parsed = detectAndExtract(row.from_email, row.subject, row.raw_text || '', '');
+    const parsed = detectAndExtract(row.from_email, row.subject, row.raw_text || '', row.raw_html || '');
+    // Once read, the row keeps what a processed row keeps: the truncated text.
     await db.from('email_parser_log')
-      .update({ ...parserLogFields(parsed), intake_state: parsed?.event_date ? 'processed' : 'review' })
+      .update({
+        ...parserLogFields(parsed),
+        raw_text: String(row.raw_text || '').slice(0, 5000),
+        ...('raw_html' in row ? { raw_html: null } : {}),
+        intake_state: parsed?.event_date ? 'processed' : 'review',
+      })
       .eq('id', row.id);
     if (parsed?.event_date) await upsertAvailability(entitySlug, parsed, row.id);
     processed += 1;
@@ -1111,17 +1126,21 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     // Parse
     const parsed = senderState === 'known' ? detectAndExtract(from, subject, text, html) : null;
 
-    // Log it
+    // Log it. A held email keeps its whole body (text and html) so that, once
+    // the owner approves the sender, processHeld reads exactly what the live
+    // path would have read.
+    const held = senderState !== 'known';
     const logRow = await insertParserLog({
         ...parserLogFields(parsed),
         entity_slug: entitySlug,
         from_email: from,
         to_email: to,
         subject,
-        raw_text: text.slice(0, 5000),
+        raw_text: held ? text : text.slice(0, 5000),
+        raw_html: held ? (html || null) : null,
         email_hash: hash,
         created_at: new Date().toISOString(),
-        intake_state: senderState === 'known' ? (parsed?.event_date ? 'processed' : 'review') : 'held',
+        intake_state: held ? 'held' : (parsed?.event_date ? 'processed' : 'review'),
     });
 
     if (senderState !== 'known') return;

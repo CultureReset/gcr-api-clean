@@ -17,7 +17,9 @@
 --                                 and the owner is told; approving it
 --                                 processes what was held.
 -- email_parser_log.intake_state   processed | held (unknown sender) | review
--- payments_detected               payments read from forwarded email
+-- email_parser_log.raw_html       the html part of a held email, so html-only
+-- email_webhook_log.raw_html      mail can be read after approval
+-- payments_detected              payments read from forwarded email
 --                                 ('claimed' until matched) or from a signed
 --                                 provider webhook ('verified').
 --
@@ -85,6 +87,40 @@ create table if not exists public.intake_known_senders (
 );
 
 alter table public.email_parser_log add column if not exists intake_state text;
+
+-- A held email must be readable later exactly as it would have been read on
+-- arrival, so held rows keep the whole body: raw_text (the text part) and
+-- raw_html (the html part, for html-only mail). Processed rows keep the
+-- truncated text they always did.
+alter table public.email_parser_log add column if not exists raw_html text;
+alter table if exists public.email_webhook_log add column if not exists raw_html text;
+
+-- Seed known senders from what has already worked: every sender whose
+-- forwarded email a business has read into a booking before this table
+-- existed is approved for that business, so applying this file does not
+-- stop the forwards that were working. Derived from the parser's own log;
+-- no sender is named here. Which senders are held is the owner's rule and
+-- is not changed by this.
+insert into public.intake_known_senders (entity_slug, sender, status, example_subject, first_seen_at, decided_at, decided_by)
+select l.entity_slug,
+       s.sender,
+       'approved',
+       min(l.subject),
+       coalesce(min(l.created_at), now()),
+       now(),
+       'seed:email_parser_log'
+from public.email_parser_log l
+cross join lateral (
+    select lower(trim(coalesce(substring(l.from_email from '<([^>]+)>'), l.from_email))) as sender
+) s
+where l.entity_slug is not null
+  and l.parsed is true
+  and l.event_date is not null
+  and coalesce(l.manual, false) is false
+  and coalesce(l.bulk, false) is false
+  and s.sender like '%@%'
+group by l.entity_slug, s.sender
+on conflict (entity_slug, sender) do nothing;
 
 create table if not exists public.payments_detected (
     id              uuid primary key default gen_random_uuid(),

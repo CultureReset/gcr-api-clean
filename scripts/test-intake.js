@@ -152,6 +152,35 @@ async function run() {
         check('payments list claimed and verified, each once', pays.body.payments.length === 2 && pays.body.payments.some((p) => p.status === 'verified' && p.amount_cents === 9900)
             && pays.body.payments.some((p) => p.status === 'claimed' && p.amount_cents === 2500), JSON.stringify(pays.body));
 
+        console.log('\n── held mail keeps its body: html-only and payments ──');
+        await inbound({
+            from: 'Peek Pro <bookings@peek.com>', to: ADDR, subject: 'New Booking: Kayak Tour',
+            html: '<p>Date: 2026-10-22</p><p>Time: 2:00 PM</p><p>Guests: 2</p><p>Order #PK12345</p>',
+        });
+        const heldHtml = T.email_parser_log.find((l) => l.from_email === 'Peek Pro <bookings@peek.com>' && l.intake_state === 'held');
+        check('an html-only email is held with its html kept', !!heldHtml?.raw_html && /2026-10-22/.test(heldHtml.raw_html), JSON.stringify(heldHtml));
+        await call('POST', '/api/webhooks/email', {
+            from: 'Venmo <notifications@venmo.com>', to: ADDR, subject: 'Bob Smith paid you $25.00',
+            text: 'Payment from Bob Smith $25.00\nfor: Deposit', html: '',
+        });
+        const heldPay = T.email_webhook_log.find((l) => l.from_email === 'Venmo <notifications@venmo.com>' && l.status === 'needs_review');
+        check('a payment email from an unknown sender is held with its body kept', !!heldPay?.raw_text && /25\.00/.test(heldPay.raw_text), JSON.stringify(heldPay));
+        check('nothing is recorded as a payment until the sender is approved', !T.payments_detected.some((p) => p.source === 'venmo' && p.payer === 'Bob Smith'));
+        const list = await call('GET', '/api/owner/intake/senders');
+        const peek = list.body.senders.find((s) => s.sender === 'bookings@peek.com');
+        const venmo = list.body.senders.find((s) => s.sender === 'notifications@venmo.com');
+        const ap1 = await call('POST', `/api/owner/intake/senders/${peek.id}/approve`);
+        check('the html-only email is read after approval, as the live path reads it', ap1.body.processed === 1
+            && T.booking_calendar.some((b) => b.entity_slug === 'shop' && b.date === '2026-10-22'), JSON.stringify(ap1.body));
+        const ap2 = await call('POST', `/api/owner/intake/senders/${venmo.id}/approve`);
+        check('the held payment is recorded after approval', ap2.body.processed === 1
+            && T.payments_detected.some((p) => p.source === 'venmo' && p.amount_cents === 2500 && p.payer === 'Bob Smith'), JSON.stringify(ap2.body));
+        check('and its row is no longer waiting', heldPay && !T.email_webhook_log.some((l) => l.id === heldPay.id && l.status === 'needs_review'));
+        const intakeSql = fs.readFileSync(path.join(ROOT, 'sql/nextgent_intake.sql'), 'utf8');
+        check('known senders are seeded from parsed email history, not from a list',
+            /insert into public\.intake_known_senders[\s\S]*?from public\.email_parser_log[\s\S]*?on conflict \(entity_slug, sender\) do nothing/i.test(intakeSql));
+        check('held mail has a column for its html', /alter table public\.email_parser_log add column if not exists raw_html text/.test(intakeSql));
+
         console.log('\n── bookings and messages screens ──');
         const bk = await call('GET', '/api/owner/bookings?from=2026-10-01&to=2026-10-31');
         const b1 = bk.body.bookings.find((b) => b.id === 'b-1');
