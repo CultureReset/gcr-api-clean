@@ -199,14 +199,14 @@ const stripeCalls = [];
 const fakeStripe = {
     customers: { create: async (a) => { stripeCalls.push(['customers.create', a]); return { id: 'cus_1' }; } },
     subscriptions: {
-        create: async (a) => { stripeCalls.push(['subscriptions.create', a]); return { id: 'sub_1', items: { data: [{ id: 'si_1' }] } }; },
+        create: async (a, o) => { stripeCalls.push(['subscriptions.create', a, o]); return { id: 'sub_1', items: { data: [{ id: 'si_1' }] } }; },
         update: async (id, a) => { stripeCalls.push(['subscriptions.update', id, a]); return {}; },
     },
     subscriptionItems: {
-        create: async (a) => { stripeCalls.push(['subscriptionItems.create', a]); return { id: 'si_2' }; },
+        create: async (a, o) => { stripeCalls.push(['subscriptionItems.create', a, o]); return { id: 'si_2' }; },
         del: async (id) => { stripeCalls.push(['subscriptionItems.del', id]); return {}; },
     },
-    invoiceItems: { create: async (a) => { stripeCalls.push(['invoiceItems.create', a]); return { id: 'ii_1' }; } },
+    invoiceItems: { create: async (a, o) => { stripeCalls.push(['invoiceItems.create', a, o]); return { id: 'ii_1' }; } },
     products: { create: async (a) => { stripeCalls.push(['products.create', a]); return { id: 'prod_1' }; } },
     prices: { create: async (a) => { stripeCalls.push(['prices.create', a]); return { id: `price_new_${stripeCalls.length}` }; } },
     billing: { meterEvents: { create: async (a) => { stripeCalls.push(['meterEvents.create', a]); return {}; } } },
@@ -399,6 +399,9 @@ async function run() {
         stripeCalls.length = 0;
         const paidInst = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-2', itemKey: 'review-agent', kind: 'agent', permissions: ['reviews:read'] });
         check('a priced agent install is charged', paidInst.status === 201 && paidInst.body.charged === true && paidInst.body.priceCents === 1500);
+        const charge = stripeCalls.find(([n]) => n === 'subscriptions.create' || n === 'subscriptionItems.create');
+        check('the Stripe call carries an idempotency key for this install, so a retry cannot bill twice',
+            !!charge && typeof charge[2]?.idempotencyKey === 'string' && /in-2/.test(charge[2].idempotencyKey) && /review-agent/.test(charge[2].idempotencyKey), JSON.stringify(charge));
         check('a Stripe customer is made for the business', stripeCalls.some(([n, a]) => n === 'customers.create' && a.metadata.entity_slug === 'new-taco-shop'));
         check('and a subscription with the item\'s price', stripeCalls.some(([n, a]) => n === 'subscriptions.create' && a.items[0].price === 'price_rev'));
         check('the charge is recorded', T.billing_item_charges.some((c) => c.install_id === 'in-2' && c.price_cents === 1500 && c.status === 'active'));

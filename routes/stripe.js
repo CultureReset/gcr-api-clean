@@ -831,9 +831,40 @@ router.post("/refund", authRequired, async (req, res) => {
 });
 // ============================================
 // POST /api/stripe/webhook — Stripe event handler
-// Alias that mirrors /api/webhooks/stripe for compatibility
+// The one handler: /api/webhooks/stripe (routes/webhooks.js) runs this same
+// function, so an event Stripe posts to both addresses is processed once.
 // ============================================
-router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+
+const eventsTableMissing = (error) => /stripe_webhook_events/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
+
+/**
+ * Claim an event id before acting on it (stripe_webhook_events,
+ * sql/nextgent_stripe_events.sql). Resolves true when this delivery is the
+ * first, false when the event was already claimed. Without the table every
+ * delivery is treated as the first, and that is said once in the log.
+ */
+let warnedNoEventsTable = false;
+async function claimStripeEvent(event) {
+    if (!event?.id) return true;
+    const { error } = await supabase.from('stripe_webhook_events').insert({ event_id: String(event.id), type: event.type || null, received_at: new Date().toISOString() });
+    if (!error) return true;
+    if (error.code === '23505' || /duplicate/i.test(error.message || '')) return false;
+    if (eventsTableMissing(error)) {
+        if (!warnedNoEventsTable) console.warn('[stripe webhook] stripe_webhook_events is missing (sql/nextgent_stripe_events.sql): events are not deduplicated.');
+        warnedNoEventsTable = true;
+        return true;
+    }
+    console.error('[stripe webhook] could not record event id:', error.message);
+    return true;
+}
+
+/** The handler failed: let Stripe's retry run it. */
+async function releaseStripeEvent(event) {
+    if (!event?.id) return;
+    await supabase.from('stripe_webhook_events').delete().eq('event_id', String(event.id)).then(() => {}, () => {});
+}
+
+async function handleStripeWebhook(req, res) {
     let event;
     let verified = false;
 
@@ -859,7 +890,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
     const type = event.type;
     const data = event.data?.object;
-    console.log(`Stripe webhook (stripe route): ${type}`);
+    console.log(`Stripe webhook: ${type}`);
+
+    // Once per event id, whichever address it arrived at.
+    if (!(await claimStripeEvent(event))) return res.json({ received: true, duplicate: true });
 
     // Platform billing (subscription and invoice events, lib/billingStripe.js).
     // Only from a verified signature: an unsigned invoice.paid must not be able
@@ -870,6 +904,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             if (applied) return res.json({ received: true, billing: applied });
         } catch (err) {
             console.error('[billing webhook]', type, err.message);
+            await releaseStripeEvent(event);
             return res.status(500).json({ error: 'billing update failed' });
         }
     }
@@ -916,6 +951,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     }
 
     res.json({ received: true });
-});
+}
+
+router.post('/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 module.exports = router;
+module.exports.handleStripeWebhook = handleStripeWebhook;

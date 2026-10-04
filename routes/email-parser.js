@@ -1616,10 +1616,7 @@ async function syncExternalCalendar(row) {
 }
 
 // GET /api/email-parser/ical-import/run — Vercel cron hits this hourly
-router.get('/ical-import/run', async (req, res) => {
-  if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+router.get('/ical-import/run', require('../lib/cronAuth').cronRequired, async (req, res) => {
   const { data: rows } = await db.from('entity_external_calendars').select('*');
   for (const row of (rows || [])) {
     await syncExternalCalendar(row);

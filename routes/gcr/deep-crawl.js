@@ -337,12 +337,7 @@ router.get('/jobs', async (req, res) => {
  *  4. Mark as 'writing', upsert to entity + related tables
  *  5. Mark as 'done'
  */
-router.post('/run', async (req, res) => {
-  const secret = req.headers['x-cron-secret'] || req.body?.secret
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
+router.post('/run', require('../../lib/cronAuth').cronRequired, async (req, res) => {
   const limit = Math.min(parseInt(req.body?.limit || 5), 20) // max 20 per run
   const priority = req.body?.priority || 'High'
 
@@ -483,12 +478,7 @@ router.post('/run', async (req, res) => {
  * POST /api/gcr/deep-crawl/retry-failed
  * Reset failed jobs back to pending for retry
  */
-router.post('/retry-failed', async (req, res) => {
-  const secret = req.headers['x-cron-secret'] || req.body?.secret
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
+router.post('/retry-failed', require('../../lib/cronAuth').cronRequired, async (req, res) => {
   const { data, error } = await db
     .from('deep_crawl_jobs')
     .update({ status: 'pending', updated_at: new Date().toISOString() })

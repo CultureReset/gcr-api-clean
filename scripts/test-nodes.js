@@ -130,6 +130,19 @@ async function call(server, method, url, { token, body } = {}) {
         r = await call(server, 'POST', '/api/nodes/node-1/requests', { token: 'owner-token', body: { method: 'POST', path: '/sms/out' } });
         check('a path off the allow-list is refused', r.status === 400);
 
+        // Remote view: the viewer gets the token; the queue and the session row hold only its hash.
+        process.env.NODE_REMOTE_URL_TEMPLATE = 'https://view.example.test/{node}?t={token}';
+        calls.length = 0;
+        r = await call(server, 'GET', '/api/nodes/node-1/remote', { token: 'owner-token' });
+        const viewerToken = r.status === 200 ? decodeURIComponent(new URL(r.json.url).searchParams.get('t')) : null;
+        check('remote view returns a link carrying the token', r.status === 200 && !!viewerToken && viewerToken.length >= 24, JSON.stringify(r.json));
+        const sessionRow = calls.find((c) => c.table === 'node_remote_sessions' && c.insert);
+        check('the session row stores only the hash', sessionRow?.insert.token_hash === sha(viewerToken) && !('token' in sessionRow.insert));
+        const remoteReq = calls.find((c) => c.table === 'ghost_node_requests' && c.insert);
+        check('the queued request for the computer holds the hash, never the token',
+            remoteReq?.insert.body?.token_hash === sha(viewerToken) && !JSON.stringify(remoteReq.insert).includes(viewerToken), JSON.stringify(remoteReq?.insert));
+        delete process.env.NODE_REMOTE_URL_TEMPLATE;
+
         calls.length = 0;
         r = await call(server, 'POST', '/api/nodes/node-1/requests', { token: 'owner-token', body: { method: 'POST', path: '/intent', body: { text: 'open display settings' } } });
         check('an allowed request is queued', r.status === 202 && r.json.request.status === 'queued');

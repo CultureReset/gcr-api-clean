@@ -1,6 +1,9 @@
 const express = require('express');
 const db = require('../db');
-const { authRequired } = require('../middleware/auth');
+// Owner data: the caller must own the business the resource belongs to
+// (bookable_resources.entity_slug), resolved server-side by ownerAuth. A valid
+// token alone (any Supabase user, a tourist included) is not ownership.
+const { businessOrAdminRequired, assertSlug } = require('../middleware/ownerAuth');
 
 const router = express.Router();
 
@@ -168,21 +171,22 @@ router.post('/:slug/bookings', async (req, res) => {
 // and phone, and nothing but an unguessed booking id was in front of it. No
 // frontend calls this route.
 //
-// A token is not yet proof that the caller owns THIS slug — see the note on
-// the list route below.
-router.get('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
+// The caller must own the resource's business (bookable_resources.entity_slug,
+// checked by assertSlug), as on the rentals routes.
+router.get('/:slug/bookings/:booking_id', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug, booking_id } = req.params;
 
     const { data: resource } = await db
       .from('bookable_resources')
-      .select('id')
+      .select('id, entity_slug')
       .eq('slug', slug)
       .maybeSingle();
 
     if (!resource) {
       return res.status(404).json({ error: 'Service not found' });
     }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
 
     const { data: booking, error } = await db
       .from('booking_events')
@@ -203,19 +207,20 @@ router.get('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
 });
 
 // GET /api/services/:slug/bookings — get service bookings (for owner)
-router.get('/:slug/bookings', authRequired, async (req, res) => {
+router.get('/:slug/bookings', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug } = req.params;
 
     const { data: resource } = await db
       .from('bookable_resources')
-      .select('id')
+      .select('id, entity_slug')
       .eq('slug', slug)
       .maybeSingle();
 
     if (!resource) {
       return res.status(404).json({ error: 'Service not found' });
     }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
 
     const { data: bookings, error } = await db
       .from('booking_events')
@@ -235,9 +240,20 @@ router.get('/:slug/bookings', authRequired, async (req, res) => {
 });
 
 // PATCH /api/services/:slug/bookings/:booking_id — update service booking
-router.patch('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
+router.patch('/:slug/bookings/:booking_id', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug, booking_id } = req.params;
+
+    const { data: resource } = await db
+      .from('bookable_resources')
+      .select('id, entity_slug')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (!resource) {
+      return res.status(404).json({ error: 'Service not found' });
+    }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
     const { booking_status } = req.body;
 
     const updateData = { booking_status };
@@ -252,6 +268,7 @@ router.patch('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
       .from('booking_events')
       .update(updateData)
       .eq('id', booking_id)
+      .eq('resource_id', resource.id)
       .select()
       .single();
 

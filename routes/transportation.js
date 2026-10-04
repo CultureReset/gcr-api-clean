@@ -267,11 +267,7 @@ router.post('/inbound-sms', express.urlencoded({ extended: false }), async (req,
 // ─────────────────────────────────────────────────────────────
 // GET /api/transportation/expire — cron: expire stale dispatches, re-dispatch
 // ─────────────────────────────────────────────────────────────
-router.get('/expire', async (req, res) => {
-  if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
+router.get('/expire', require('../lib/cronAuth').cronRequired, async (req, res) => {
   const { data: expired } = await db
     .from('transportation_dispatches')
     .select('id, request_id, driver_phone, provider_entity_slug')

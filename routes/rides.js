@@ -454,12 +454,7 @@ router.post('/inbound-sms', async (req, res) => {
 // GET /api/rides/expire — cron: expire stale dispatches and re-dispatch
 // Schedule: every minute  "* * * * *"
 // ─────────────────────────────────────────────────────────────
-router.get('/expire', async (req, res) => {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers['x-cron-secret'] !== secret) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+router.get('/expire', require('../lib/cronAuth').cronRequired, async (req, res) => {
   // Find pending dispatches that have passed their timeout
   const { data: expired } = await supabase
     .from('ride_dispatches')

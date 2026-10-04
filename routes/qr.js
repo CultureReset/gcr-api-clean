@@ -656,7 +656,6 @@ router.post('/alert-settings/global', authRequired, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function buildAndSendDigest(period) {
-    const secret = process.env.CRON_SECRET;
     const { sendSms } = require('../utils/sms');
 
     // Get global alert phone
@@ -724,16 +723,14 @@ async function buildAndSendDigest(period) {
     return { sent: 1, scans: total };
 }
 
-router.get('/digest/daily', async (req, res) => {
-    const secret = process.env.CRON_SECRET;
-    if (secret && req.headers['authorization'] !== 'Bearer ' + secret) return res.status(401).json({ error: 'Unauthorized' });
+const { cronRequired } = require('../lib/cronAuth');
+
+router.get('/digest/daily', cronRequired, async (req, res) => {
     const result = await buildAndSendDigest('daily').catch(e => ({ error: e.message }));
     res.json(result);
 });
 
-router.get('/digest/weekly', async (req, res) => {
-    const secret = process.env.CRON_SECRET;
-    if (secret && req.headers['authorization'] !== 'Bearer ' + secret) return res.status(401).json({ error: 'Unauthorized' });
+router.get('/digest/weekly', cronRequired, async (req, res) => {
     const result = await buildAndSendDigest('weekly').catch(e => ({ error: e.message }));
     res.json(result);
 });

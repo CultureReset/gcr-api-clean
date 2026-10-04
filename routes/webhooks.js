@@ -5,142 +5,14 @@ const router = express.Router();
 
 // ============================================
 // POST /api/webhooks/stripe — Stripe payment events
+// The older address. It runs the one handler in routes/stripe.js
+// (/api/stripe/webhook), which claims each event id first, so an event Stripe
+// posts to both addresses is processed once. (The branches this route used to
+// carry on its own — an `orders` table that does not exist and a
+// businesses.plan update keyed on subscription metadata nothing here sets —
+// were dead; the booking and platform-billing branches are the shared ones.)
 // ============================================
-router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
-    let event;
-    let verified = false;
-
-    // Verify Stripe webhook signature when secret is configured
-    if (process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_SECRET_KEY) {
-        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-        const sig = req.headers['stripe-signature'];
-        try {
-            // express.json() runs first (server.js), so req.body is already an
-            // object here; the signature is over the raw bytes it kept.
-            event = stripe.webhooks.constructEvent(req.rawBody || req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-            verified = true;
-        } catch (err) {
-            console.error('Stripe webhook signature failed:', err.message);
-            return res.status(400).json({ error: 'Invalid signature' });
-        }
-    } else {
-        // Fallback: parse without verification (dev only)
-        try {
-            event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-        } catch (err) {
-            return res.status(400).json({ error: 'Invalid JSON' });
-        }
-    }
-
-    const type = event.type;
-    const data = event.data?.object;
-
-    console.log(`Stripe webhook: ${type}`);
-
-    // Platform billing (subscription and invoice events, lib/billingStripe.js).
-    // Only from a verified signature: an unsigned invoice.paid must not be able
-    // to lift a pause.
-    if (verified) {
-        try {
-            const applied = await require('../lib/billingStripe').applyStripeEvent(event);
-            if (applied) return res.json({ received: true, billing: applied });
-        } catch (err) {
-            console.error('[billing webhook]', type, err.message);
-            return res.status(500).json({ error: 'billing update failed' });
-        }
-    }
-
-    switch (type) {
-        case 'payment_intent.succeeded': {
-            // Update booking/order payment status
-            const bookingId = data.metadata?.booking_id;
-            const orderId = data.metadata?.order_id;
-
-            if (bookingId) {
-                const { error } = await supabase
-                    .from('bookings')
-                    .update({
-                        payment_status: 'paid',
-                        payment_id: data.id,
-                        payment_provider: 'stripe',
-                        status: 'confirmed'
-                    })
-                    .eq('id', bookingId);
-                if (error) console.error('[webhooks/stripe] failed to mark booking paid:', bookingId, error.message);
-            }
-
-            // Note: 'orders' table referenced here doesn't exist in the live DB (same
-            // gap as public.js/dashboard.js/site.js's own 'orders' reads) -- and nothing
-            // in this codebase ever sets metadata.order_id on a real payment intent, so
-            // this branch cannot currently fire. Left as-is pending a real orders feature.
-            if (orderId) {
-                const { error } = await supabase
-                    .from('orders')
-                    .update({
-                        payment_id: data.id,
-                        payment_provider: 'stripe',
-                        status: 'received'
-                    })
-                    .eq('id', orderId);
-                if (error) console.error('[webhooks/stripe] failed to mark order received:', orderId, error.message);
-            }
-            break;
-        }
-
-        case 'payment_intent.payment_failed': {
-            const bookingId = data.metadata?.booking_id;
-            if (bookingId) {
-                const { error } = await supabase
-                    .from('bookings')
-                    .update({ payment_status: 'failed' })
-                    .eq('id', bookingId);
-                if (error) console.error('[webhooks/stripe] failed to mark booking failed:', bookingId, error.message);
-            }
-            // TODO: Emit event: payment.failed → notify owner
-            break;
-        }
-
-        case 'charge.refunded': {
-            const bookingId = data.metadata?.booking_id;
-            if (bookingId) {
-                const { error } = await supabase
-                    .from('bookings')
-                    .update({ payment_status: 'refunded', status: 'cancelled' })
-                    .eq('id', bookingId);
-                if (error) console.error('[webhooks/stripe] failed to mark booking refunded:', bookingId, error.message);
-            }
-            break;
-        }
-
-        case 'customer.subscription.created':
-        case 'customer.subscription.updated': {
-            // Platform subscription changes
-            const siteId = data.metadata?.site_id;
-            const plan = data.metadata?.plan;
-            if (siteId && plan) {
-                await supabase
-                    .from('businesses')
-                    .update({ plan })
-                    .eq('site_id', siteId);
-            }
-            break;
-        }
-
-        case 'customer.subscription.deleted': {
-            // Downgrade to free
-            const siteId = data.metadata?.site_id;
-            if (siteId) {
-                await supabase
-                    .from('businesses')
-                    .update({ plan: 'free' })
-                    .eq('site_id', siteId);
-            }
-            break;
-        }
-    }
-
-    res.json({ received: true });
-});
+router.post('/stripe', express.raw({ type: 'application/json' }), (req, res) => require('./stripe').handleStripeWebhook(req, res));
 
 // ============================================
 // POST /api/webhooks/twilio — Twilio SMS events

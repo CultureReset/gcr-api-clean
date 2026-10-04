@@ -298,23 +298,29 @@ router.post('/block', ownerRequired, async (req, res) => {
  */
 router.delete('/block/:id', ownerRequired, async (req, res) => {
     try {
-        // Ownership is checked against the row, not taken from the URL.
+        // Scoped to the session's business on both the read and the write;
+        // another business's row simply does not exist here.
         const { data: row } = await db
             .from('booking_calendar')
-            .select('id, entity_slug')
+            .select('*')
             .eq('id', req.params.id)
+            .eq('entity_slug', req.entitySlug)
             .maybeSingle();
         if (!row) return res.status(404).json({ error: 'Not found' });
-        if (row.entity_slug !== req.entitySlug) {
-            return res.status(403).json({ error: 'Not your business.' });
-        }
+        const before = { ...row };
 
-        const { error } = await db
+        const { data: saved, error } = await db
             .from('booking_calendar')
             .update({ status: 'cancelled' })
-            .eq('id', row.id);
+            .eq('id', row.id)
+            .eq('entity_slug', req.entitySlug)
+            .select('*')
+            .maybeSingle();
 
         if (error) return res.status(500).json({ error: error.message });
+        // A booking row cancelled here fires booking.cancelled exactly as the
+        // other cancel paths do (lib/businessEvents.js); a block fires nothing.
+        await require('../lib/businessEvents').bookingSaved(req.entitySlug, before, saved || { ...before, status: 'cancelled' });
         res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ error: err.message });

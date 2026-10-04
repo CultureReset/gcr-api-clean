@@ -611,15 +611,11 @@ ownerRouter.post('/:id/hook/rotate', ownerRequired, async (req, res) => {
  *  PUBLIC — the cron tick and the inbound hooks
  * ════════════════════════════════════════════════════════════════════════ */
 
-function cronAllowed(req) {
-    const secret = process.env.CRON_SECRET;
-    if (!secret) return true;
-    return (req.headers.authorization || '') === `Bearer ${secret}` || req.query.secret === secret;
-}
+// CRON_SECRET in a header, required (lib/cronAuth.js, one copy for every cron route).
+const { cronRequired } = require('../lib/cronAuth');
 
 /** Hourly, from vercel.json. Runs every scheduled install that is due. */
-publicRouter.get('/cron/tick', async (req, res) => {
-    if (!cronAllowed(req)) return fail(res, 401, 'Unauthorized');
+publicRouter.get('/cron/tick', cronRequired, async (req, res) => {
     try {
         res.json(await engine.tick());
     } catch (err) {
@@ -628,8 +624,7 @@ publicRouter.get('/cron/tick', async (req, res) => {
 });
 
 /** Hourly, from vercel.json: AI spend per company from LiteLLM (lib/litellmUsage.js). */
-publicRouter.get('/cron/litellm-usage', async (req, res) => {
-    if (!cronAllowed(req)) return fail(res, 401, 'Unauthorized');
+publicRouter.get('/cron/litellm-usage', cronRequired, async (req, res) => {
     try {
         res.json(await require('../lib/litellmUsage').pullUsage());
     } catch (err) {
@@ -638,8 +633,7 @@ publicRouter.get('/cron/litellm-usage', async (req, res) => {
 });
 
 /** Close idle text conversations and record them to Paperclip. */
-publicRouter.get('/cron/conversations', async (req, res) => {
-    if (!cronAllowed(req)) return fail(res, 401, 'Unauthorized');
+publicRouter.get('/cron/conversations', cronRequired, async (req, res) => {
     try {
         const live = require('../lib/liveAgent');
         res.json({ ...(await live.closeIdleConversations()), ...(await live.retryUnrecorded()) });

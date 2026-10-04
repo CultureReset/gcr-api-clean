@@ -311,9 +311,12 @@ router.get('/:id/remote', ownerRequired, async (req, res) => {
         created_by: req.paperclip?.userId ? `paperclip:${req.paperclip.userId}` : req.ownerUserId || null,
     });
     if (error) return tableError(res, error);
+    // The computer is told the token's hash, never the token: it compares
+    // sha256 of what a viewer presents (or asks POST /remote/verify), so the
+    // queued request holds nothing that opens the session by itself.
     const { error: queueError } = await supabase.from('ghost_node_requests').insert({
         node_id: node.id, entity_slug: req.entitySlug, method: 'POST', path: '/remote/session',
-        body: { token, expires_at: expiresAt }, created_by: req.ownerUserId || null,
+        body: { token_hash: hashToken(token), expires_at: expiresAt }, created_by: req.ownerUserId || null,
     });
     if (queueError) return tableError(res, queueError);
     const url = template.replace(/\{node\}/g, encodeURIComponent(node.id)).replace(/\{token\}/g, encodeURIComponent(token));

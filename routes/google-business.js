@@ -541,9 +541,7 @@ router.post('/push-all', ownerRequired, async (req, res) => {
 });
 
 // The scheduled drain: from cron (CRON_SECRET) or the always-on scheduler.
-router.get('/cron/drain', async (req, res) => {
-    const secret = process.env.CRON_SECRET;
-    if (secret && (req.headers.authorization || '') !== `Bearer ${secret}`) return res.status(401).json({ error: 'Unauthorized' });
+router.get('/cron/drain', require('../lib/cronAuth').cronRequired, async (req, res) => {
     try {
         res.json(await require('../lib/googlePush').drain());
     } catch (err) {

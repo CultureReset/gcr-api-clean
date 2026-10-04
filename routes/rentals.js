@@ -1,6 +1,9 @@
 const express = require('express');
 const db = require('../db');
-const { authRequired } = require('../middleware/auth');
+// Owner data: the caller must own the business the resource belongs to
+// (bookable_resources.entity_slug), resolved server-side by ownerAuth. A valid
+// token alone (any Supabase user, a tourist included) is not ownership.
+const { businessOrAdminRequired, assertSlug } = require('../middleware/ownerAuth');
 
 const router = express.Router();
 
@@ -184,21 +187,22 @@ router.post('/:slug/bookings', async (req, res) => {
 // this route, so requiring a token costs nothing and closes a public read of
 // somebody else's customer.
 //
-// A token is not yet proof that the caller owns THIS slug — see the note on
-// the list route below.
-router.get('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
+// The caller must own the resource's business — see the note on the list
+// route below.
+router.get('/:slug/bookings/:booking_id', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug, booking_id } = req.params;
 
     const { data: resource } = await db
       .from('bookable_resources')
-      .select('id')
+      .select('id, entity_slug')
       .eq('slug', slug)
       .maybeSingle();
 
     if (!resource) {
       return res.status(404).json({ error: 'Rental not found' });
     }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
 
     const { data: booking, error } = await db
       .from('booking_events')
@@ -220,30 +224,24 @@ router.get('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
 
 // GET /api/rentals/:slug/bookings — get bookings (for owner dashboard)
 //
-// OPEN: "for owner dashboard" is the intent, not what is enforced.
-// authRequired proves a token is valid; it does not prove the token owns this
-// slug. It is also broader than it looks — middleware/auth.js falls through to
-// "any valid Supabase user in this project" and assigns role 'owner', and
-// tourist accounts are Supabase users in that same project. So a tourist
-// signup can read every guest name, email and phone on this route.
-//
-// Closing it needs one decision first: bookable_resources.slug is a resource
-// slug, and entity_owners is keyed by entity_slug, so the ownership path has
-// to be settled before a guard can be written. Same applies to the PATCH
-// below and to the matching routes in services.js and bookings.js.
-router.get('/:slug/bookings', authRequired, async (req, res) => {
+// "For owner dashboard" is enforced: the resource row names its business
+// (bookable_resources.entity_slug) and assertSlug checks the caller owns that
+// business. A tourist is a Supabase user with no entity_owners row, so it is
+// refused here, as is an owner naming another business's resource.
+router.get('/:slug/bookings', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug } = req.params;
 
     const { data: resource } = await db
       .from('bookable_resources')
-      .select('id')
+      .select('id, entity_slug')
       .eq('slug', slug)
       .maybeSingle();
 
     if (!resource) {
       return res.status(404).json({ error: 'Rental not found' });
     }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
 
     const { data: bookings, error } = await db
       .from('booking_events')
@@ -263,9 +261,20 @@ router.get('/:slug/bookings', authRequired, async (req, res) => {
 });
 
 // PATCH /api/rentals/:slug/bookings/:booking_id — update booking
-router.patch('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
+router.patch('/:slug/bookings/:booking_id', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug, booking_id } = req.params;
+
+    const { data: resource } = await db
+      .from('bookable_resources')
+      .select('id, entity_slug')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (!resource) {
+      return res.status(404).json({ error: 'Rental not found' });
+    }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
     const { booking_status, check_in_sent, check_out_sent } = req.body;
 
     const updateData = {};
@@ -280,6 +289,7 @@ router.patch('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
       .from('booking_events')
       .update(updateData)
       .eq('id', booking_id)
+      .eq('resource_id', resource.id)
       .select()
       .single();
 
@@ -295,20 +305,21 @@ router.patch('/:slug/bookings/:booking_id', authRequired, async (req, res) => {
 });
 
 // POST /api/rentals/:slug/availability-blocks — create availability block
-router.post('/:slug/availability-blocks', authRequired, async (req, res) => {
+router.post('/:slug/availability-blocks', businessOrAdminRequired, async (req, res) => {
   try {
     const { slug } = req.params;
     const { block_date_start, block_date_end, block_type, reason } = req.body;
 
     const { data: resource } = await db
       .from('bookable_resources')
-      .select('id')
+      .select('id, entity_slug')
       .eq('slug', slug)
       .maybeSingle();
 
     if (!resource) {
       return res.status(404).json({ error: 'Rental not found' });
     }
+    if (!assertSlug(req, res, resource.entity_slug)) return;
 
     const { data: block, error } = await db
       .from('availability_blocks')

@@ -314,12 +314,7 @@ router.post('/sync', authRequired, async (req, res) => {
 // GET /api/integrations/fareharbor/sync-all (cron — daily 3am)
 // Sync every connected FareHarbor account
 // ─────────────────────────────────────────────────────────────
-router.get('/sync-all', async (req, res) => {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers['x-cron-secret'] !== secret) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+router.get('/sync-all', require('../lib/cronAuth').cronRequired, async (req, res) => {
   const { data: integrations } = await supabase
     .from('integrations')
     .select('*')

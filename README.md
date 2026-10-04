@@ -307,7 +307,8 @@ nothing anywhere until the next publish and push.
 
 Mounts: `/api/admin/automations` (adminRequired), `/api/business/automations`
 (ownerRequired — the slug comes from the session), `/api/automations/cron/tick`
-(hourly, from `vercel.json`, guarded by `CRON_SECRET` when that is set) and
+(hourly, from `vercel.json`; `CRON_SECRET` in a header is required, as on every
+scheduled endpoint — lib/cronAuth.js) and
 `/api/automations/hook/:token` (one random token per install).
 
 How an automation reaches a business: the owner installs it from the

@@ -3136,12 +3136,7 @@ router.post('/waivers/send-link', async (req, res) => {
 // GET /api/public/waivers/send-reminders — Vercel Cron: email waiver link 2 days before booking
 // Runs once daily. Secured by CRON_SECRET env var.
 // ═══════════════════════════════════════════════════════════════════════════════
-router.get('/waivers/send-reminders', async (req, res) => {
-    const secret = process.env.CRON_SECRET;
-    if (secret && req.headers['authorization'] !== 'Bearer ' + secret) {
-        return res.status(401).json({ error: 'Unauthorized' });
-    }
-
+router.get('/waivers/send-reminders', require('../lib/cronAuth').cronRequired, async (req, res) => {
     try {
         const { sendEmail } = require('../utils/email');
 

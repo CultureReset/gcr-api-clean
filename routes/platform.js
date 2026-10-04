@@ -1919,11 +1919,8 @@ router.post('/waiver-sign/:slug', async (req, res) => {
 // ============================================================
 // TIMED REMINDERS — Vercel cron hits this hourly.
 // ============================================================
-router.get('/cron/reminders', async (req, res) => {
+router.get('/cron/reminders', require('../lib/cronAuth').cronRequired, async (req, res) => {
     try {
-        if (process.env.CRON_SECRET && (req.headers.authorization || '') !== 'Bearer ' + process.env.CRON_SECRET) {
-            return res.status(401).json({ error: 'unauthorized' });
-        }
         const tomorrow = new Date(Date.now() + 86400e3).toISOString().slice(0, 10);
         const { data: entries } = await supabase.from('booking_calendar')
             .select('id, entity_slug, date, start_time, title, booking_id, details')
