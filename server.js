@@ -421,6 +421,11 @@ mount('/api/google-business', () => require('./routes/google-business'));
 // SMS
 mount('/api/sms', () => require('./routes/sms'));
 
+// Telephony (lib/telephony, Telnyx by default). The say webhook drives calls
+// that read one message and hang up — claim codes to a landline. It checks
+// Telnyx's Ed25519 signature on every event.
+mount('/api/telephony/telnyx/say', () => require('./routes/telephony-say'));
+
 // QR & Redirects
 mount('/api/qr', () => require('./routes/qr'));
 mount('/api/ar-hunts', () => require('./routes/ar-hunts'));

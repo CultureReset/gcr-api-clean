@@ -1,23 +1,18 @@
 const supabase = require('../db');
-
-let twilioClient = null;
-
-function getClient() {
-    if (!twilioClient && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-        const twilio = require('twilio');
-        twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-    }
-    return twilioClient;
-}
+const telephony = require('../lib/telephony');
 
 /**
- * Send SMS via Twilio and log to sms_log
+ * Send a text and log it to sms_log.
+ *
+ * Every text goes through lib/telephony (Telnyx by default, Twilio when
+ * TELEPHONY_PROVIDER=twilio); nothing here knows which carrier is live.
+ *
  * @param {string} to - Phone number
  * @param {string} body - Message text
- * @param {string} siteId - Business site_id for logging
+ * @param {string} siteId - Business site_id (or entity_slug) for logging
  * @param {string} type - 'booking_confirmation', 'booking_owner_notify', 'campaign', 'cancellation'
  * @param {string} relatedId - Optional booking_id or campaign_id
- * @param {string} from - Optional custom from number (overrides default)
+ * @param {string} from - Optional custom from number (overrides the provider's default sender)
  */
 async function sendSms(to, body, siteId, type = 'outgoing', relatedId = null, from = null) {
     const ownerPhone = process.env.OWNER_PHONE;
@@ -25,19 +20,17 @@ async function sendSms(to, body, siteId, type = 'outgoing', relatedId = null, fr
 
     // Owner relay mode: redirect all customer SMS to owner's number for manual forwarding
     if (relayMode) {
-        const client = getClient();
-        if (!client) {
-            console.warn('Relay mode: Twilio not configured');
+        if (!telephony.isConfigured()) {
+            console.warn('Relay mode: telephony not configured');
             await logSms(siteId, to, body, type, 'relay_not_configured', relatedId);
-            return { success: false, reason: 'twilio_not_configured' };
+            return { success: false, reason: 'telephony_not_configured' };
         }
-        const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
         const preview = body.length > 280 ? body.substring(0, 280) + '...' : body;
         const relayBody = `📬 RELAY [${type}]\nSEND TO: ${to}\n──────────\n${preview}\n──────────\nCopy # above → text customer`;
         try {
-            const msg = await client.messages.create({ body: relayBody, from: fromNumber, to: ownerPhone });
-            await logSms(siteId, to, body, type, 'relayed_to_owner', relatedId, msg.sid);
-            return { success: true, relayed: true, sid: msg.sid };
+            const msg = await telephony.sendSms({ to: ownerPhone, from: from || undefined, text: relayBody });
+            await logSms(siteId, to, body, type, 'relayed_to_owner', relatedId, msg.id, msg.provider);
+            return { success: true, relayed: true, sid: msg.id };
         } catch (err) {
             console.error('Owner relay SMS failed:', err.message);
             await logSms(siteId, to, body, type, 'relay_failed', relatedId);
@@ -45,12 +38,10 @@ async function sendSms(to, body, siteId, type = 'outgoing', relatedId = null, fr
         }
     }
 
-    const client = getClient();
-
-    if (!client) {
-        console.warn('Twilio not configured, SMS not sent:', { to, body: body.substring(0, 50) });
+    if (!telephony.isConfigured()) {
+        console.warn('Telephony not configured, SMS not sent:', { to, body: body.substring(0, 50) });
         await logSms(siteId, to, body, type, 'not_configured', relatedId);
-        return { success: false, reason: 'twilio_not_configured' };
+        return { success: false, reason: 'telephony_not_configured' };
     }
 
     const normalizedTo = normalizePhone(to);
@@ -72,46 +63,13 @@ async function sendSms(to, body, siteId, type = 'outgoing', relatedId = null, fr
         return { success: false, reason: 'opted_out' };
     }
 
-    // Route SMS via Twilio (Brevo handles email only, not SMS).
-    // To re-enable Brevo SMS, set BREVO_SMS_ENABLED=true in env.
-    if (process.env.BREVO_API_KEY && process.env.BREVO_SMS_ENABLED === 'true') {
-        try {
-            const res = await fetch('https://api.brevo.com/v3/transactionalSMS/sms', {
-                method: 'POST',
-                headers: {
-                    'api-key': process.env.BREVO_API_KEY,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    sender: process.env.BREVO_SMS_SENDER || 'CyberCheck',
-                    recipient: normalizedTo.replace('+', ''),
-                    content: body
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Brevo SMS failed');
-            await logSms(siteId, normalizedTo, body, type, 'sent', relatedId, String(data.messageId || ''));
-            return { success: true, messageId: data.messageId };
-        } catch (err) {
-            console.error('Brevo SMS error:', err.message);
-            await logSms(siteId, normalizedTo, body, type, 'failed', relatedId);
-            return { success: false, reason: err.message };
-        }
-    }
-
-    const fromNumber = from || process.env.TWILIO_PHONE_NUMBER;
-
     try {
-        const message = await client.messages.create({
-            body: body,
-            from: fromNumber,
-            to: normalizedTo
-        });
-
-        await logSms(siteId, normalizedTo, body, type, 'sent', relatedId, message.sid);
-        return { success: true, sid: message.sid };
+        const message = await telephony.sendSms({ to: normalizedTo, from: from || undefined, text: body });
+        await logSms(siteId, normalizedTo, body, type, 'sent', relatedId, message.id, message.provider);
+        // `sid` kept for callers written against the Twilio-only version.
+        return { success: true, sid: message.id, id: message.id, provider: message.provider };
     } catch (err) {
-        console.error('Twilio send error:', err.message);
+        console.error('SMS send error:', err.message);
         await logSms(siteId, normalizedTo, body, type, 'failed', relatedId);
         return { success: false, reason: err.message };
     }
@@ -261,19 +219,10 @@ async function buildTemplateData(booking, siteId) {
     };
 }
 
-/**
- * Normalize phone number to E.164 format
- */
-function normalizePhone(phone) {
-    if (!phone) return null;
-    const digits = phone.replace(/\D/g, '');
-    if (digits.length === 10) return '+1' + digits;
-    if (digits.length === 11 && digits[0] === '1') return '+' + digits;
-    if (digits.length > 10 && phone.startsWith('+')) return phone;
-    return null;
-}
+/** Normalize phone number to E.164 format (one copy, in lib/telephony). */
+const normalizePhone = (phone) => telephony.normalizePhone(phone);
 
-async function logSms(siteId, to, message, type, status, relatedId, sid) {
+async function logSms(siteId, to, message, type, status, relatedId, sid, provider) {
     try {
         await supabase.from('sms_log').insert({
             site_id: siteId,
@@ -282,7 +231,8 @@ async function logSms(siteId, to, message, type, status, relatedId, sid) {
             type: type,
             status: status,
             related_id: relatedId || null,
-            metadata: sid ? { twilio_sid: sid } : {}
+            // twilio_sid kept as the key older readers look for; provider says whose id it is.
+            metadata: sid ? { twilio_sid: sid, message_id: sid, provider: provider || null } : {}
         });
     } catch (err) {
         console.error('SMS log error:', err.message);
