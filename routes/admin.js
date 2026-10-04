@@ -2039,9 +2039,11 @@ router.post('/sms-blast', authRequired, async (req, res) => {
 
   if (!message) return res.status(400).json({ error: 'message required' });
 
-  const twilio = require('twilio');
-  const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  const from   = process.env.TWILIO_PHONE_NUMBER || '+12513135464';
+  // Platform texts to tourists who opted in to them (tourist_profiles.sms_opt_in),
+  // through utils/sms -> lib/telephony from the platform sender: whichever
+  // carrier is live, opt-outs honoured, every attempt logged.
+  const { sendSms } = require('../utils/sms');
+  const from   = require('../lib/telephony').defaultSender();
   const today  = new Date().toISOString().slice(0, 10);
   const db     = getDb();
 
@@ -2130,17 +2132,14 @@ router.post('/sms-blast', authRequired, async (req, res) => {
     // Step 6 — get phones for eligible tourist IDs
     const eligibleTourists = allTourists.filter(t => eligible.has(t.user_id));
 
-    // Step 7 — send via Twilio with small delay between messages
+    // Step 7 — send, with a small delay between messages
     let sent = 0;
     const errors = [];
     for (const t of eligibleTourists) {
-      try {
-        await client.messages.create({ from, to: t.phone, body: message });
-        sent++;
-        await new Promise(r => setTimeout(r, 80));
-      } catch (e) {
-        errors.push({ phone: t.phone, error: e.message });
-      }
+      const r = await sendSms(t.phone, message, null, 'blast', null, from);
+      if (r.success) sent++;
+      else errors.push({ phone: t.phone, error: r.reason || 'not sent' });
+      await new Promise(r2 => setTimeout(r2, 80));
     }
 
     // Log the blast

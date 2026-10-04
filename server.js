@@ -82,7 +82,7 @@ app.use(express.json({
 
 /* ── rate limits on the two doors that cost money ─────────────────────────
  *
- * Every phone-verification request spends a Twilio message. Both sign-up
+ * Every phone-verification request spends a text (lib/telephony). Both sign-up
  * systems are public by necessity, so without a limit a script can run up a
  * real bill and burn the numbers it targets.
  *

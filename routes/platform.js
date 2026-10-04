@@ -486,9 +486,13 @@ async function runAutomations(slug, dataKey, record, ctx) {
         for (const run of runs) {
             if (run.action === 'sms') {
                 try {
-                    const { sendSms } = require('../utils/sms');
-                    const to = record.phone || record.customer_phone || business.phone;
-                    if (to) await sendSms(to, run.message, slug, 'automation', null);
+                    const customer = record.phone || record.customer_phone;
+                    if (customer) {
+                        // A customer: only with their consent (lib/messages.js, the one check).
+                        await require('../lib/messages').textCustomer({ slug, to: customer, body: run.message, type: 'automation' });
+                    } else if (business.phone) {
+                        await require('../utils/sms').sendSms(business.phone, run.message, slug, 'automation', null);
+                    }
                 } catch (e) { console.error('automation sms failed:', e.message); }
             } else if (run.action === 'email') {
                 try {
@@ -1043,7 +1047,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
         if (phone) {
             try {
                 const bizName = biz.name || 'the business';
-                const { sendSms } = require('../utils/sms');
+                const { textCustomer } = require('../lib/messages');
                 let msg = null;
                 if (req.params.dataKey === 'ugc_videos') msg = null;
                 else if (status === 'confirmed') {
@@ -1063,7 +1067,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                     const link = rbase + '/r/' + slug + '?t=' + req.params.id;
                     msg = '[' + bizName + '] Thanks for coming out' + (record.customer || record.name ? ', ' + (record.customer || record.name) : '') + '! How was it? Leave a quick review: ' + link + ' — it really helps us.';
                 }
-                if (msg) await sendSms(phone, msg, slug, 'status_' + status, req.params.id);
+                if (msg) await textCustomer({ slug, to: phone, body: msg, type: 'status_' + status, relatedId: req.params.id });
             } catch (e) { console.error('status sms failed:', e.message); }
         }
 
@@ -1072,18 +1076,19 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
             try {
                 const custPhone = record.phone || record.customer_phone;
                 const bizName = biz.name || 'the business';
-                const { sendSms } = require('../utils/sms');
+                const { textCustomer } = require('../lib/messages');
+                const textTo = (to, body, s2, type, relatedId) => textCustomer({ slug: s2, to, body, type, relatedId });
                 if (req.params.dataKey === 'ugc_videos' && status === 'confirmed') {
                     const uploader = await touristByPhone(custPhone);
                     if (uploader) {
                         const pts = await platformAward(uploader.user_id, 'video', slug);
-                        if (pts && custPhone) await sendSms(custPhone, '[' + bizName + '] Your video was approved — +' + pts + ' points! 🎥', slug, 'points_video', req.params.id);
+                        if (pts && custPhone) await textTo(custPhone, '[' + bizName + '] Your video was approved — +' + pts + ' points! 🎥', slug, 'points_video', req.params.id);
                     }
                 } else if (status === 'completed') {
                     const customer = await touristByPhone(custPhone);
                     if (customer) {
                         const pts = await platformAward(customer.user_id, 'booking_completed', slug);
-                        if (pts && custPhone) await sendSms(custPhone, '[' + bizName + '] +' + pts + ' points added to your Gulf Perks wallet! 🎁', slug, 'points_booking', req.params.id);
+                        if (pts && custPhone) await textTo(custPhone, '[' + bizName + '] +' + pts + ' points added to your Gulf Perks wallet! 🎁', slug, 'points_booking', req.params.id);
                     }
                     if (record.ref) {
                         const { data: refT } = await supabase.from('tourist_profiles')
@@ -1091,7 +1096,7 @@ router.post('/records/:dataKey/:id/status', authRequired, async (req, res) => {
                         const same = refT && last10(refT.phone) === last10(custPhone);
                         if (refT && !same) {
                             const pts = await platformAward(refT.user_id, 'referral', slug);
-                            if (pts && refT.phone) await sendSms(refT.phone, 'Someone booked through your link at ' + bizName + ' — +' + pts + ' points! 🤝', slug, 'points_referral', req.params.id);
+                            if (pts && refT.phone) await textTo(refT.phone, 'Someone booked through your link at ' + bizName + ' — +' + pts + ' points! 🤝', slug, 'points_referral', req.params.id);
                         }
                     }
                 }
@@ -1797,7 +1802,7 @@ router.post('/manage/:id/cancel', async (req, res) => {
             const { sendSms } = require('../utils/sms');
             if (biz.phone) await sendSms(biz.phone, '[' + (biz.name || 'Your page') + '] ' + (rec.customer || rec.name || 'A guest') + ' cancelled ' + (rec.date || '') + (rec.time ? ' ' + rec.time : '') + ' — the spot is open again.', ctx.row.entity_slug, 'guest_cancel', ctx.row.id);
             const gp = rec.phone || rec.customer_phone;
-            if (gp) await sendSms(gp, '[' + (biz.name || '') + '] Your booking' + (rec.date ? ' for ' + rec.date : '') + ' is cancelled. Book again any time: ' + publicBase() + '/p/' + (biz.slug || ''), ctx.row.entity_slug, 'guest_cancel_ack', ctx.row.id);
+            if (gp) await require('../lib/messages').textCustomer({ slug: ctx.row.entity_slug, to: gp, body: '[' + (biz.name || '') + '] Your booking' + (rec.date ? ' for ' + rec.date : '') + ' is cancelled. Book again any time: ' + publicBase() + '/p/' + (biz.slug || ''), type: 'guest_cancel_ack', relatedId: ctx.row.id });
         } catch (e) { console.error('cancel sms failed:', e.message); }
         res.json({ success: true, status: 'cancelled' });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1939,7 +1944,7 @@ router.get('/cron/reminders', async (req, res) => {
                         '[{business}] Reminder: {title} tomorrow{time}. See you then!';
                 }
             });
-            const { sendSms } = require('../utils/sms');
+            const { textCustomer } = require('../lib/messages');
             // text-built 'before_24h' automations also fire
             for (const e of bySlug[slug]) {
                 const rec = e.details || {};
@@ -1963,7 +1968,7 @@ router.get('/cron/reminders', async (req, res) => {
                     .replace(/\{time\}/g, rec.time ? ' at ' + rec.time : '')
                     .replace(/\{manage\}/g, publicBase() + '/manage/' + e.booking_id + '?t=' + manageToken(e.booking_id));
                 try {
-                    await sendSms(phone, msg, slug, 'reminder_24h', e.booking_id);
+                    await textCustomer({ slug, to: phone, body: msg, type: 'reminder_24h', relatedId: e.booking_id });
                     rec.reminded = new Date().toISOString().slice(0, 10);
                     if (e.booking_id) await supabase.from('bookings').update({ details: rec }).eq('id', e.booking_id);
                     await supabase.from('booking_calendar').update({ details: rec }).eq('id', e.id);
@@ -1985,8 +1990,7 @@ router.get('/cron/reminders', async (req, res) => {
             const r = row.metadata || {};
             if (r.status !== 'pending' || !r.send_at || r.send_at > nowIso) continue;
             try {
-                const { sendSms } = require('../utils/sms');
-                if (r.to) await sendSms(r.to, r.body, row.entity_slug, 'automation_delayed', null);
+                if (r.to) await require('../lib/messages').textCustomer({ slug: row.entity_slug, to: r.to, body: r.body, type: 'automation_delayed' });
                 r.status = 'sent'; r.sent_at = nowIso;
                 await supabase.from('entity_section_items').update({ metadata: r }).eq('id', row.id);
                 drained++;
@@ -2109,7 +2113,7 @@ async function scheduleAutomationSteps(slug, steps, record, business) {
         if (!to) continue;
         const body = renderTpl(step.template, record, business);
         if (delayMin <= 0) {
-            try { const { sendSms } = require('../utils/sms'); await sendSms(to, body, slug, 'automation', record._mid || null); }
+            try { await require('../lib/messages').textCustomer({ slug, to, body, type: 'automation', relatedId: record._mid || null }); }
             catch (e) { console.error('automation sms failed:', e.message); }
         } else {
             const sendAt = new Date(Date.now() + delayMin * 60000).toISOString();

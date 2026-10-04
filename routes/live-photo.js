@@ -147,23 +147,30 @@ router.post('/', upload.single('photo'), async (req, res) => {
         // ── Send review request via SMS ────────────────────────────
         // Fire-and-forget after delay. The photo proves they were there —
         // so this review is 100% verified before it's even written.
-        if (send_review === 'true' || send_review === true) {
-            const sid  = process.env.TWILIO_ACCOUNT_SID;
-            const tok  = process.env.TWILIO_AUTH_TOKEN;
-            const from = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM_NUMBER;
-            if (sid && tok && from) {
-                const delayMs = Math.max(0, parseInt(review_delay_minutes) || 0) * 60 * 1000;
-                const bizName = business_name || 'us';
-                const reviewUrl = `https://cybercheck-links.vercel.app/review.html?site=${site_id}&phone=${cleanPhone}${photoRecord?.id ? '&photo=' + photoRecord.id : ''}`;
-                const smsBody = `Thanks for dining with ${bizName}! 🙏\n\nYour photo is live on our menu. Mind leaving a quick review? It only takes 30 seconds and helps other visitors:\n\n${reviewUrl}`;
+        // Through utils/sms -> lib/telephony (whichever carrier is live), and
+        // only to a customer who agreed to texts: a ticked sms_consent box on
+        // the upload is recorded first, then the one consent check
+        // (lib/messages.js) decides. The review page is LINKS_BASE_URL's.
+        const truthy = (v) => v === true || v === 'true';
+        if (truthy(req.body.sms_consent)) {
+            const messages = require('../lib/messages');
+            await messages.businessKeyForSite(site_id)
+                .then((key) => messages.recordConsent(key, cleanPhone, { source: 'live_photo', text: req.body.sms_consent_text || null }))
+                .catch((e) => console.warn('live-photo consent not recorded:', e.message));
+        }
+        const linksBase = require('../lib/env').envUrl('LINKS_BASE_URL');
+        if (truthy(send_review) && !linksBase) console.warn('live-photo: LINKS_BASE_URL is not set, so no review link can be texted.');
+        if (truthy(send_review) && linksBase) {
+            const delayMs = Math.max(0, parseInt(review_delay_minutes) || 0) * 60 * 1000;
+            const bizName = business_name || 'us';
+            const reviewUrl = `${linksBase}/review.html?site=${encodeURIComponent(site_id)}&phone=${cleanPhone}${photoRecord?.id ? '&photo=' + photoRecord.id : ''}`;
+            const smsBody = `Thanks for dining with ${bizName}! 🙏\n\nYour photo is live on our menu. Mind leaving a quick review? It only takes 30 seconds and helps other visitors:\n\n${reviewUrl}`;
 
-                setTimeout(async () => {
-                    try {
-                        const twilio = require('twilio')(sid, tok);
-                        await twilio.messages.create({ body: smsBody, from, to: '+1' + cleanPhone });
-                    } catch(e) { console.error('review SMS error:', e.message); }
-                }, delayMs);
-            }
+            setTimeout(async () => {
+                try {
+                    await require('../lib/messages').textCustomer({ siteId: site_id, to: cleanPhone, body: smsBody, type: 'review_request', relatedId: photoRecord?.id || null });
+                } catch (e) { console.error('review SMS error:', e.message); }
+            }, delayMs);
         }
 
         res.json({

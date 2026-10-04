@@ -275,15 +275,13 @@ router.post('/create-payment', async (req, res) => {
                         console.warn('No customer email on booking:', booking_id);
                     }
 
-                    // Customer SMS — this is a transactional receipt for a booking the
-                    // customer just made with their own number, not marketing; there is
-                    // no sms_consent column/capture step in this flow (that's tracked
-                    // separately as a compliance task), so gate on phone presence only,
-                    // matching stripe.js's existing behavior for the same notification.
+                    // Customer SMS — only to a customer who agreed to texts: the
+                    // booking form records the yes (sms_consent) in message_consent,
+                    // and lib/messages.js hasSmsConsent is the one check.
                     if (customerPhone && msgSettings.notify_customer_on_booking !== false) {
                         const defaultCustTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nReply STOP to opt out. Msg/data rates may apply.';
                         const custMsg = fillTemplate(msgSettings.customer_booking_template || defaultCustTpl, templateData);
-                        sendSms(customerPhone, custMsg, targetSiteId, 'booking_confirmation', booking_id)
+                        require('../lib/messages').textCustomer({ siteId: targetSiteId, to: customerPhone, body: custMsg, type: 'booking_confirmation', relatedId: booking_id })
                             .catch(err => console.error('Customer SMS failed:', err));
                     }
 

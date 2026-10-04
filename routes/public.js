@@ -267,7 +267,8 @@ router.post('/resend-confirmation', async (req, res) => {
     if (!booking_id) return res.status(400).json({ error: 'booking_id required' });
 
     try {
-        const { sendSms, fillTemplate, buildTemplateData } = require('../utils/sms');
+        const { fillTemplate, buildTemplateData } = require('../utils/sms');
+        const { textCustomer } = require('../lib/messages');
         const { sendEmail, customerConfirmationHtml, generateIcsContent } = require('../utils/email');
 
         const { data: bookingData } = await supabase
@@ -283,7 +284,8 @@ router.post('/resend-confirmation', async (req, res) => {
 
         if (bookingData.customer_phone) {
             const tpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!';
-            await sendSms(bookingData.customer_phone, fillTemplate(tpl, templateData), siteId, 'booking_confirmation', booking_id)
+            // Only to a customer who agreed to texts (lib/messages.js, the one check).
+            await textCustomer({ siteId, to: bookingData.customer_phone, body: fillTemplate(tpl, templateData), type: 'booking_confirmation', relatedId: booking_id })
                 .catch(err => console.error('Resend SMS failed:', err));
         }
 
@@ -1026,6 +1028,15 @@ router.post('/bookings', async (req, res) => {
             .catch(err => console.error('Waiver link failed:', err));
     }
 
+    // The customer's yes to texts goes where every texting check reads it
+    // (lib/messages.js hasSmsConsent), under this site's business key.
+    if (booking.sms_consent && booking.customer_phone) {
+        const messages = require('../lib/messages');
+        await messages.businessKeyForSite(req.siteId)
+            .then((key) => messages.recordConsent(key, booking.customer_phone, { source: 'booking_form', text: booking.sms_consent_text }))
+            .catch((e) => console.warn('Booking consent not recorded:', e.message));
+    }
+
     // Respond immediately — don't block on SMS (prevents 504 timeout)
     res.status(201).json(data);
 
@@ -1244,11 +1255,16 @@ router.post('/contact', async (req, res) => {
             sendSms(adminPhone, adminSmsBody, req.siteId, 'contact_form_notify').catch(() => {});
         }
 
-        // Customer confirmation SMS — gated on customer's explicit consent checkbox
+        // Customer confirmation SMS — the consent checkbox is recorded, then the
+        // one consent check (lib/messages.js) decides.
         if (phone && req.body.sms_consent === true) {
+            const messages = require('../lib/messages');
             const businessName2 = business?.name || 'us';
             const customerSms = `Hi ${name}! We received your message and will get back to you shortly. Thanks for contacting ${businessName2}! Reply STOP to opt out.`;
-            sendSms(phone, customerSms, req.siteId, 'contact_form_confirm').catch(() => {});
+            messages.businessKeyForSite(req.siteId)
+                .then((key) => messages.recordConsent(key, phone, { source: 'contact_form', text: req.body.sms_consent_text || null }))
+                .then(() => messages.textCustomer({ siteId: req.siteId, to: phone, body: customerSms, type: 'contact_form_confirm' }))
+                .catch(() => {});
         }
         // Collect all emails: primary, secondary (CC), contact_email, business email
         const emailList = [];
@@ -1763,7 +1779,7 @@ Be helpful, enthusiastic, and specific. Recommend real places. Keep responses co
                     if (args.customer_phone) {
                         const tpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!\n\n🏖️ Get exclusive deals & rewards while you\'re in town!\nSign up for Gulf Coast Radar Trip Pass:\ngulfcoastradar.com/trip-pass';
                         const msg = fillTemplate(settings.customerBookingTemplate || tpl, templateData);
-                        sendSms(args.customer_phone, msg, biz.id, 'booking_confirmation', result.booking_id).catch(() => {});
+                        require('../lib/messages').textCustomer({ siteId: biz.id, to: args.customer_phone, body: msg, type: 'booking_confirmation', relatedId: result.booking_id }).catch(() => {});
                     }
                     if (siteContent?.contact_phone) {
                         const tpl = 'NEW BOOKING (via AI chat)!\n\nCustomer: {{customer_name}}\nPhone: {{customer_phone}}\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}';
@@ -1784,8 +1800,9 @@ Be helpful, enthusiastic, and specific. Recommend real places. Keep responses co
 
             case 'send_sms': {
                 try {
-                    const { sendSms } = require('../utils/sms');
-                    await sendSms(args.phone, args.message_text, biz.id, 'ai_chat_sms');
+                    // A customer, so only with their consent (lib/messages.js).
+                    const r = await require('../lib/messages').textCustomer({ siteId: biz.id, to: args.phone, body: args.message_text, type: 'ai_chat_sms' });
+                    if (!r.success) return JSON.stringify({ success: false, error: r.reason || 'not sent' });
                     return JSON.stringify({ success: true });
                 } catch (err) {
                     return JSON.stringify({ success: false, error: err.message });
@@ -2337,12 +2354,11 @@ router.post('/review', async (req, res) => {
     }
 
     // Send SMS to owner if they have a phone number (non-blocking)
-    if (ownerPhone && process.env.TWILIO_ACCOUNT_SID) {
+    if (ownerPhone) {
         try {
             const smsBody = `New review from ${customerName}! ⭐${rating} ${uploadedPhotos.length > 0 ? '+ photos' : ''} — Check dashboard to approve.`;
-            // TODO: Use internal SMS service or queue to avoid blocking response
-            // For now, fire-and-forget to Twilio (production should use async job queue)
-            sendSmsAsync(ownerPhone, smsBody).catch(e => console.warn('SMS send failed:', e.message));
+            // To the owner, through utils/sms -> lib/telephony (whichever carrier is live).
+            require('../utils/sms').sendSms(ownerPhone, smsBody, siteId, 'review_owner_notify').catch(e => console.warn('SMS send failed:', e.message));
         } catch (e) {
             console.warn('Could not send owner SMS:', e.message);
         }
@@ -2703,7 +2719,7 @@ router.post('/resend-confirmation', async (req, res) => {
     }
 
     try {
-        const { sendSms, fillTemplate, buildTemplateData } = require('../utils/sms');
+        const { fillTemplate, buildTemplateData } = require('../utils/sms');
         const { sendEmail, customerConfirmationHtml, generateIcsContent } = require('../utils/email');
 
         // Fetch booking
@@ -2724,7 +2740,7 @@ router.post('/resend-confirmation', async (req, res) => {
         if (bookingData.customer_phone) {
             const defaultTpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!';
             const msg = fillTemplate(defaultTpl, templateData);
-            await sendSms(bookingData.customer_phone, msg, bookingData.site_id, 'booking_confirmation', booking_id)
+            await require('../lib/messages').textCustomer({ siteId: bookingData.site_id, to: bookingData.customer_phone, body: msg, type: 'booking_confirmation', relatedId: booking_id })
                 .catch(err => console.error('Resend SMS failed:', err));
         }
 

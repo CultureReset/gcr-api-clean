@@ -239,4 +239,4 @@ async function logSms(siteId, to, message, type, status, relatedId, sid, provide
     }
 }
 
-module.exports = { sendSms, fillTemplate, buildTemplateData, normalizePhone };
+module.exports = { sendSms, fillTemplate, buildTemplateData, normalizePhone, logSms };

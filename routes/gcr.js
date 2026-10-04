@@ -2862,6 +2862,11 @@ router.post('/opt-in', async (req, res) => {
     }).select('id').single()
 
     if (error) return res.status(500).json({ error: error.message })
+    // The yes is recorded where every texting check reads it (lib/messages.js).
+    if (sms_consent) {
+      await require('../lib/messages').recordConsent(entity_slug, phone, { source: 'booking_opt_in', text: consent_text || null })
+        .catch((e) => console.warn('[opt-in] consent not recorded:', e.message))
+    }
     res.json({ opt_in_id: data.id })
   } catch (err) {
     res.status(500).json({ error: err.message })

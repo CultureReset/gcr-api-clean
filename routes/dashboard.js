@@ -1233,6 +1233,7 @@ router.get('/bookings/:id', async (req, res) => {
 async function sendBookingConfirmations(booking, siteId) {
     try {
         const { sendSms, fillTemplate, buildTemplateData } = require('../utils/sms');
+        const { textCustomer } = require('../lib/messages');
 
         const { data: settings } = await supabase
             .from('messaging_settings')
@@ -1246,7 +1247,8 @@ async function sendBookingConfirmations(booking, siteId) {
         // Customer confirmation SMS
         if (prefs.booking_confirmation_sms && booking.customer_phone) {
             const msg = fillTemplate(prefs.booking_confirmation_template, templateData);
-            sendSms(booking.customer_phone, msg, siteId, 'booking_confirmation', booking.id)
+            // Only to a customer who agreed to texts (lib/messages.js, the one check).
+            textCustomer({ siteId, to: booking.customer_phone, body: msg, type: 'booking_confirmation', relatedId: booking.id })
                 .catch(e => console.warn('Booking confirm SMS failed:', e.message));
         }
 
@@ -1556,7 +1558,6 @@ router.post('/reviews/send-request', async (req, res) => {
     const { booking_id } = req.body;
     if (!booking_id) return res.status(400).json({ error: 'booking_id required' });
 
-    const { sendSms } = require('../utils/sms');
     const crypto = require('crypto');
 
     const { data: booking, error: bookingErr } = await supabase
@@ -1603,14 +1604,15 @@ router.post('/reviews/send-request', async (req, res) => {
     let sms_sent = false;
     if (booking.customer_phone) {
         const name = booking.customer_name ? `, ${booking.customer_name.split(' ')[0]}` : '';
-        await sendSms(
-            booking.customer_phone,
-            `Hi${name}! Thanks for visiting ${biz?.name || 'us'}. We'd love your feedback: ${reviewLink}`,
-            req.siteId,
-            'review_request',
-            booking_id
-        ).catch(e => console.warn('Review SMS failed:', e.message));
-        sms_sent = true;
+        // Only to a customer who agreed to texts (lib/messages.js, the one check).
+        const r = await require('../lib/messages').textCustomer({
+            siteId: req.siteId,
+            to: booking.customer_phone,
+            body: `Hi${name}! Thanks for visiting ${biz?.name || 'us'}. We'd love your feedback: ${reviewLink}`,
+            type: 'review_request',
+            relatedId: booking_id,
+        }).catch(e => { console.warn('Review SMS failed:', e.message); return null; });
+        sms_sent = !!r?.success;
     }
 
     res.json({ success: true, review_link: reviewLink, sms_sent });
@@ -1882,7 +1884,7 @@ router.get('/waivers/booking/:booking_id', async (req, res) => {
 // GET /api/dashboard/waivers/link — get waiver link for a booking (query: ?booking_id=)
 async function generateWaiverLink(siteId, booking_id) {
     const crypto = require('crypto');
-    const { sendSms } = require('../utils/sms');
+    const { textCustomer } = require('../lib/messages');
     const token = crypto.randomBytes(24).toString('hex');
 
     const { data: booking } = await supabase
@@ -1914,13 +1916,13 @@ async function generateWaiverLink(siteId, booking_id) {
     // Send SMS to customer — fire and forget, don't block the response
     if (booking.customer_phone) {
         const name = booking.customer_name ? `, ${booking.customer_name.split(' ')[0]}` : '';
-        sendSms(
-            booking.customer_phone,
-            `Hi${name}! Please sign your waiver before your rental: ${link}`,
+        textCustomer({
             siteId,
-            'waiver_link',
-            booking_id
-        ).catch(e => console.warn('Waiver SMS failed:', e.message));
+            to: booking.customer_phone,
+            body: `Hi${name}! Please sign your waiver before your rental: ${link}`,
+            type: 'waiver_link',
+            relatedId: booking_id,
+        }).catch(e => console.warn('Waiver SMS failed:', e.message));
     }
 
     return { link, token, booking_id, sms_sent: !!booking.customer_phone };
@@ -2704,7 +2706,8 @@ router.post('/sms/campaign', async (req, res) => {
 
     if (!message) return res.status(400).json({ error: 'Message required' });
 
-    const { sendSms, fillTemplate } = require('../utils/sms');
+    const { fillTemplate } = require('../utils/sms');
+    const { textCustomer } = require('../lib/messages');
 
     // Get customers with phone numbers, filtered by audience
     let query = supabase
@@ -2724,14 +2727,8 @@ router.post('/sms/campaign', async (req, res) => {
         return res.status(400).json({ error: 'No customers with phone numbers found' });
     }
 
-    // Check opt-outs
-    const phones = customers.map(c => c.phone);
-    const { data: optOuts } = await supabase
-        .from('sms_opt_outs')
-        .select('phone')
-        .in('phone', phones);
-
-    const optOutSet = new Set((optOuts || []).map(o => o.phone));
+    // Consent and opt-outs are checked per customer by textCustomer
+    // (lib/messages.js hasSmsConsent, the one check).
 
     // Get business name for template
     const { data: biz } = await supabase
@@ -2761,13 +2758,11 @@ router.post('/sms/campaign', async (req, res) => {
 
     const sendAll = async () => {
         for (const customer of customers) {
-            if (optOutSet.has(customer.phone)) { failedCount++; continue; }
-
             let finalMsg = '[' + businessName + '] ' + fillTemplate(message, { customer_name: customer.name || 'there' });
             if (coupon_code) finalMsg += '\n\nUse code ' + coupon_code + ' at checkout!';
             finalMsg += '\n\nReply STOP to unsubscribe.';
 
-            const result = await sendSms(customer.phone, finalMsg, req.siteId, 'campaign', campaign.id);
+            const result = await textCustomer({ siteId: req.siteId, to: customer.phone, body: finalMsg, type: 'campaign', relatedId: campaign.id });
             if (result.success) sentCount++; else failedCount++;
         }
 
@@ -5090,7 +5085,8 @@ router.post('/resend-confirmation', async (req, res) => {
     if (!booking_id) return res.status(400).json({ error: 'booking_id required' });
 
     try {
-        const { sendSms, fillTemplate, buildTemplateData } = require('../utils/sms');
+        const { fillTemplate, buildTemplateData } = require('../utils/sms');
+        const { textCustomer } = require('../lib/messages');
         const { sendEmail, customerConfirmationHtml, generateIcsContent } = require('../utils/email');
 
         const { data: bookingData } = await supabase
@@ -5106,7 +5102,7 @@ router.post('/resend-confirmation', async (req, res) => {
 
         if (bookingData.customer_phone) {
             const tpl = '[{{business_name}}] Hi {{customer_name}}! Your booking is confirmed.\n\nDate: {{date}}\nTime: {{time_slot}}\nTotal: ${{total}}\n\nQuestions? Reply to this number!';
-            await sendSms(bookingData.customer_phone, fillTemplate(tpl, templateData), req.siteId, 'booking_confirmation', booking_id)
+            await textCustomer({ siteId: req.siteId, to: bookingData.customer_phone, body: fillTemplate(tpl, templateData), type: 'booking_confirmation', relatedId: booking_id })
                 .catch(err => console.error('Resend SMS failed:', err));
         }
 
@@ -5441,15 +5437,12 @@ router.post('/promotions/claim', async (req, res) => {
         // Increment shown count
         await supabase.from('promotions').update({ total_claimed: (promo.total_claimed || 0) + 1 }).eq('id', promotion_id);
 
-        // Send SMS with coupon
-        const sid  = process.env.TWILIO_ACCOUNT_SID;
-        const tok  = process.env.TWILIO_AUTH_TOKEN;
-        const from = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_FROM_NUMBER;
-        if (sid && tok && from) {
-            const twilio = require('twilio')(sid, tok);
-            const msg = `${promo.title}\n\n${promo.description || ''}\n\nYour code: ${code}${promo.discount_text ? '\n' + promo.discount_text : ''}\n\nYour loyalty #: ${customer?.loyalty_number || ''}`.trim();
-            await twilio.messages.create({ body: msg, from, to: '+1' + cleanPhone }).catch(() => {});
-        }
+        // Text the coupon the customer just asked for: through utils/sms ->
+        // lib/telephony (whichever carrier is live), with the one consent check
+        // (lib/messages.js) — they asked for this text, so opt-outs apply but
+        // no separate yes is needed.
+        const msg = `${promo.title}\n\n${promo.description || ''}\n\nYour code: ${code}${promo.discount_text ? '\n' + promo.discount_text : ''}\n\nYour loyalty #: ${customer?.loyalty_number || ''}`.trim();
+        await require('../lib/messages').textCustomer({ siteId: site_id, to: cleanPhone, body: msg, type: 'coupon_claim', relatedId: promotion_id, reply: true }).catch(() => {});
 
         res.json({
             ok: true,

@@ -313,6 +313,117 @@ section('4. claims and business sign-up use lib/phoneVerification.js', async () 
     }
 });
 
+/* ── 5. the automation text step is for the business, not customers ─────── */
+
+section('5. sms.send goes only to the business\'s own numbers', async () => {
+    const engine = require(path.join(ROOT, 'lib/automationEngine.js'));
+    T.owner_notify_settings = [{ entity_slug: 'shop', phone: '251-555-0142' }];
+    T.business_phone_numbers = [{ entity_slug: 'shop', phone_number: '+15550200000', status: 'active' }, { entity_slug: 'shop', phone_number: '+15550299999', status: 'released' }];
+    const step = engine.STEP_TYPES['sms.send'];
+    const run = (to) => step.run({ config: { to, body: 'Nightly report ready' }, slug: 'shop', dryRun: true, ctx: {} }).then((r) => r, (e) => ({ error: e.message }));
+    check('to the listing\'s phone', !(await run('+15550100000')).error);
+    check('to the owner\'s notification phone', !(await run('(251) 555-0142')).error);
+    check('to a number the business owns', !(await run('+15550200000')).error);
+    check('not to a released number', /own numbers/.test((await run('+15550299999')).error || ''));
+    check('not to a customer', /Message a customer/.test((await run('+12515550177')).error || ''));
+    check('not to another business\'s phone', /own numbers/.test((await run('+15550300000')).error || ''));
+    const fs = require('fs');
+    const seeds = fs.readdirSync(path.join(ROOT, 'sql')).filter((f) => /sms\.send/.test(fs.readFileSync(path.join(ROOT, 'sql', f), 'utf8')));
+    check('no seed in sql/ uses sms.send (nothing to migrate there)', !seeds.length, seeds.join(', '));
+});
+
+/* ── 6. consent: one check, one record ──────────────────────────────────── */
+
+section('6. hasSmsConsent is the only consent check; message_consent the only record', async () => {
+    const fs = require('fs');
+    const carrier = [];
+    require(path.join(ROOT, 'lib/telephony/telnyx.js'))._setFetch(async (url, init) => {
+        carrier.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
+        return { ok: true, status: 200, json: async () => ({ data: { id: `tx-${carrier.length}` } }), text: async () => '{}' };
+    });
+    T.message_consent = [];
+    T.sms_opt_outs = [{ phone: '+12515550166' }];
+    T.booking_opt_ins = [{ id: 'opt-old', entity_slug: 'shop', phone: '251-555-0155', sms_consent: true }];
+    T.sms_log = [];
+    T.businesses = [{ id: 'site-1', entity_slug: 'shop' }, { id: 'site-2', entity_slug: null }];
+    const messages = require(path.join(ROOT, 'lib/messages.js'));
+
+    check('an opt-in row alone is not read any more (the fold moves it)', (await messages.hasSmsConsent('shop', '251-555-0155')).reason === 'no_consent');
+    await messages.recordConsent('shop', '251-555-0155', { source: 'booking_opt_in' });
+    check('once in message_consent it counts', (await messages.hasSmsConsent('shop', '+12515550155')).ok);
+    check('an opt-out wins', (await messages.hasSmsConsent('shop', '251-555-0166')).reason === 'opted_out');
+    await messages.recordConsent('shop', '251-555-0155', { granted: false, source: 'sms_keyword' });
+    check('a revoked yes is a no', (await messages.hasSmsConsent('shop', '251-555-0155')).reason === 'consent_revoked');
+    await messages.recordConsent('shop', '251-555-0155', { source: 'booking_opt_in' });
+
+    carrier.length = 0;
+    const ok = await messages.textCustomer({ slug: 'shop', to: '251-555-0155', body: 'Your table is ready', type: 'test' });
+    check('textCustomer sends to a customer who said yes', ok.success && carrier.some((c) => c.body?.to === '+12515550155'));
+    const no = await messages.textCustomer({ slug: 'shop', to: '251-555-0177', body: 'Promo', type: 'test' });
+    check('and not to one who did not, logged with the reason', !no.success && no.reason === 'no_consent' && T.sms_log.some((l) => l.to_phone === '+12515550177' && l.status === 'no_consent'));
+    const asked = await messages.textCustomer({ slug: 'shop', to: '251-555-0177', body: 'Your code', type: 'test', reply: true });
+    check('a text the customer asked for needs no separate yes', asked.success);
+    const stop = await messages.textCustomer({ slug: 'shop', to: '251-555-0166', body: 'Your code', type: 'test', reply: true });
+    check('but an opt-out still stops it', !stop.success && stop.reason === 'opted_out');
+
+    await messages.recordConsent('shop', '251-555-0188', { source: 'booking_form' });
+    const viaSite = await messages.textCustomer({ siteId: 'site-1', to: '251-555-0188', body: 'Booked', type: 'test' });
+    check('an older site flow is checked under its business\'s slug', viaSite.success && (await messages.businessKeyForSite('site-1')) === 'shop');
+    check('a site with no linked business keys on its own id', (await messages.businessKeyForSite('site-2')) === 'site-2');
+
+    // The opt-in step records the yes where it is read.
+    const app = express();
+    app.use(express.json());
+    app.use('/api/embed', require(path.join(ROOT, 'routes/embed.js')));
+    T.entity.find((e) => e.slug === 'shop').is_active = true;
+    T.tourist_click_events = [];
+    const server = await listen(app);
+    try {
+        const lead = await hit(server, { method: 'POST', p: '/api/embed/lead/shop', body: { name: 'Ana', phone: '251-555-0199', sms_consent: true, consent_text: 'Text me' } });
+        check('the embed opt-in records the yes in message_consent', lead.status === 200 && (await messages.hasSmsConsent('shop', '2515550199')).ok, JSON.stringify(lead.body));
+        await hit(server, { method: 'POST', p: '/api/embed/lead/shop', body: { name: 'Bo', phone: '251-555-0198', sms_consent: false } });
+        check('a box left empty records nothing', !(await messages.hasSmsConsent('shop', '2515550198')).ok);
+    } finally { server.close(); }
+
+    const sql = fs.readFileSync(path.join(ROOT, 'sql/nextgent_consent_fold.sql'), 'utf8');
+    check('the fold reads booking_opt_ins.sms_consent and bookings.sms_consent', /from public\.booking_opt_ins/.test(sql) && /from public\.bookings/.test(sql) && /sms_consent is true/.test(sql));
+    check('into message_consent, never over a newer row', /insert into public\.message_consent/.test(sql) && /on conflict \(entity_slug, channel, phone\) do nothing/.test(sql));
+
+    // Every customer-texting sender goes through the one check.
+    const senders = ['routes/email-parser.js', 'routes/public.js', 'routes/square.js', 'routes/stripe.js', 'routes/dashboard.js', 'routes/platform.js', 'routes/live-photo.js', 'routes/transportation.js'];
+    const missing = senders.filter((f) => !/textCustomer/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    check('every customer-texting route uses textCustomer', !missing.length, missing.join(', '));
+    const other = ['routes', 'lib', 'utils'].flatMap((d) => fs.readdirSync(path.join(ROOT, d)).filter((f) => f.endsWith('.js')).map((f) => `${d}/${f}`))
+        .filter((f) => f !== 'lib/messages.js' && /booking_opt_ins[^\n]*sms_consent[^\n]*\)\s*$|select\('sms_consent/m.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    check('no other file reads a consent flag to decide a text', !other.length, other.join(', '));
+});
+
+/* ── 7. every text through utils/sms -> lib/telephony ───────────────────── */
+
+section('7. no provider SDK or provider credentials outside lib/telephony', async () => {
+    const fs = require('fs');
+    const files = [];
+    const walk = (d) => {
+        for (const f of fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })) {
+            const rel = `${d}/${f.name}`;
+            if (f.isDirectory()) { if (!['node_modules', 'scripts', 'lib/telephony', '.git'].includes(rel) && !rel.startsWith('node_modules')) walk(rel); continue; }
+            if (f.name.endsWith('.js')) files.push(rel);
+        }
+    };
+    for (const d of ['routes', 'lib', 'utils', 'middleware']) walk(d);
+    files.push('server.js');
+    const sdk = files.filter((f) => /require\(['"]twilio['"]\)|require\(['"]telnyx['"]\)|api\.twilio\.com|api\.telnyx\.com|transactionalSMS/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    check('no Twilio/Telnyx SDK or SMS API call outside lib/telephony', !sdk.length, sdk.join(', '));
+    const creds = files.filter((f) => /process\.env\.(TWILIO_|TELNYX_API_KEY)|'TWILIO_[A-Z_]+'/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    check('no carrier credentials read outside lib/telephony', !creds.length, creds.join(', '));
+    const literal = ['routes/admin.js', 'routes/dashboard.js', 'routes/live-photo.js'].filter((f) => /'\+1' \+ cleanPhone|\+12513135464/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    check('no hard-coded number or country code in the sends that moved', !literal.length, literal.join(', '));
+
+    // The admin console's provider list asks lib/telephony.
+    const tel = require(path.join(ROOT, 'lib/telephony')).status();
+    check('telephony.status names the live carrier without the key', tel.provider === 'telnyx' && tel.configured && tel.keyEnv === 'TELNYX_API_KEY' && tel.fingerprint === '…test');
+});
+
 /* ── 10. helpers: one copy each ─────────────────────────────────────────── */
 
 section('10. routine signing, envInt, defaultPlanKey, Google token encryption', async () => {

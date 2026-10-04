@@ -245,6 +245,12 @@ router.post('/lead/:slug', async (req, res) => {
 
         if (error) return res.status(500).json({ error: error.message });
 
+        // The yes is recorded where every texting check reads it (lib/messages.js).
+        if (sms_consent) {
+            await require('../lib/messages').recordConsent(slug, phone, { source: 'booking_opt_in', text: consent_text || null })
+                .catch((e) => console.warn('[embed] consent not recorded:', e.message));
+        }
+
         res.json({
             opt_in_id:   optIn.id,
             click_id:    clickId,

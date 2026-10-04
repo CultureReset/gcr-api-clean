@@ -1156,7 +1156,7 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
 // Fire-and-forget confirmation email + (consent-gated) SMS for a GCR-direct
 // booking — never throws into the caller, a send failure must not fail the
 // booking itself.
-async function sendBookingConfirmations(entitySlug, parsed, customerEmail, customerPhone, optInId) {
+async function sendBookingConfirmations(entitySlug, parsed, customerEmail, customerPhone) {
   try {
     const { data: entity } = await db.from('entity').select('name').eq('slug', entitySlug).maybeSingle();
     const businessName = entity?.name || 'Gulf Coast Radar';
@@ -1177,21 +1177,17 @@ async function sendBookingConfirmations(entitySlug, parsed, customerEmail, custo
       });
     }
 
-    // SMS only goes out if this phone number has an explicit sms_consent=true
-    // opt-in on file — required until A2P 10DLC approval lands. sendSms()
-    // itself also relays to the owner instead of the customer when
-    // OWNER_RELAY_MODE is set, as an extra pre-approval safety net.
-    if (customerPhone && optInId) {
-      const { data: optIn } = await db.from('booking_opt_ins').select('sms_consent').eq('id', optInId).maybeSingle();
-      if (optIn?.sms_consent) {
-        const { sendSms } = require('../utils/sms');
-        await sendSms(
-          customerPhone,
-          `${businessName}: We received your reservation request for ${parsed.event_date}${parsed.event_time ? ' at ' + parsed.event_time : ''}. We'll text you when it's confirmed. Reply STOP to opt out.`,
-          entitySlug,
-          'booking_confirmation'
-        );
-      }
+    // SMS only to a customer who agreed to texts: the opt-in step records the
+    // yes in message_consent and lib/messages.js hasSmsConsent is the one
+    // check. utils/sms still relays to the owner instead when
+    // OWNER_RELAY_MODE is set.
+    if (customerPhone) {
+      await require('../lib/messages').textCustomer({
+        slug: entitySlug,
+        to: customerPhone,
+        body: `${businessName}: We received your reservation request for ${parsed.event_date}${parsed.event_time ? ' at ' + parsed.event_time : ''}. We'll text you when it's confirmed. Reply STOP to opt out.`,
+        type: 'booking_confirmation',
+      });
     }
   } catch (err) {
     console.error('sendBookingConfirmations failed:', err.message);
@@ -1245,7 +1241,7 @@ router.post('/manual', manualEntryAllowed, async (req, res) => {
     await upsertAvailability(slug, parsed, logRow?.id);
 
     if (customer_email || opt_in_id) {
-      sendBookingConfirmations(slug, parsed, customer_email, customer_phone, opt_in_id).catch(() => {});
+      sendBookingConfirmations(slug, parsed, customer_email, customer_phone).catch(() => {});
     }
 
     res.json({ success: true, parsed, log_id: logRow?.id });

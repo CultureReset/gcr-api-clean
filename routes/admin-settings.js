@@ -97,7 +97,6 @@ const PROVIDER_ENV = {
     stripe: 'STRIPE_SECRET_KEY',
     square: 'SQUARE_ACCESS_TOKEN',
     brevo: 'BREVO_API_KEY',
-    twilio: 'TWILIO_AUTH_TOKEN',
     resend: 'RESEND_API_KEY',
     sendgrid: 'SENDGRID_API_KEY',
     composio: 'COMPOSIO_API_KEY',
@@ -115,6 +114,9 @@ router.get('/provider-status', adminRequired, (_req, res) => {
             fingerprint: raw ? `…${String(raw).trim().slice(-4)}` : null,
         };
     });
+    // Texting and calls: whichever carrier lib/telephony has live, asked of it.
+    const tel = require('../lib/telephony').status();
+    providers.push({ id: `telephony:${tel.provider}`, env_var: tel.keyEnv, configured: tel.configured, fingerprint: tel.fingerprint });
     res.json({
         providers,
         configured_count: providers.filter((p) => p.configured).length,

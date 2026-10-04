@@ -4,9 +4,9 @@
 //
 // SEPARATE FROM routes/sms.js. That file is the customer-facing pipeline —
 // tourist signup, staff commands, blasts, QR attribution — and nothing here
-// touches it, imports from it, or changes how it behaves. This file talks to
-// Brevo directly rather than going through utils/sms.js so the two systems
-// cannot affect each other. There is no Twilio anywhere in this file.
+// touches it, imports from it, or changes how it behaves. Its replies go out
+// like every other text: utils/sms.js -> lib/telephony, from the platform
+// sender, whichever carrier is live.
 //
 // ── What it does ────────────────────────────────────────────────────────
 //
@@ -29,9 +29,9 @@
 // leak whose only password is knowing the number. Rejections are logged rather
 // than silently dropped.
 //
-// Provider: Brevo. Its inbound webhook posts JSON, so this reads JSON and
-// replies by making its own outbound call — not by returning a body, which is
-// the Twilio idiom and is why the existing /api/sms/inbound cannot serve this.
+// Inbound: Brevo's webhook posts JSON, so this reads JSON and replies by
+// making its own outbound text — not by returning a body, which is why the
+// existing /api/sms/inbound cannot serve this.
 
 const express = require('express');
 const db = require('../db');
@@ -42,27 +42,11 @@ const router = express.Router();
 /** One SMS segment is 160 chars; keep replies to about two. */
 const MAX_REPLY = 300;
 
-/* ── Brevo, spoken to directly ───────────────────────────────────────────── */
+/* ── the reply: utils/sms -> lib/telephony, like every other text ────────── */
 
 async function sendSms(to, text) {
-    const key = process.env.BREVO_API_KEY;
-    if (!key) return { ok: false, error: 'BREVO_API_KEY not set' };
-    try {
-        const res = await fetch('https://api.brevo.com/v3/transactionalSMS/sms', {
-            method: 'POST',
-            headers: { 'api-key': key, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sender: process.env.DASHBOARD_SMS_SENDER || process.env.BREVO_SMS_SENDER || 'CyberCheck',
-                recipient: String(to).replace(/[^\d]/g, ''),
-                content: text.slice(0, MAX_REPLY),
-            }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) return { ok: false, error: data.message || `HTTP ${res.status}` };
-        return { ok: true, id: data.messageId };
-    } catch (e) {
-        return { ok: false, error: e.message };
-    }
+    const r = await require('../utils/sms').sendSms(to, String(text).slice(0, MAX_REPLY), null, 'dashboard_sms_reply');
+    return r.success ? { ok: true, id: r.id } : { ok: false, error: r.reason || 'not sent' };
 }
 
 const normalise = (p) => {

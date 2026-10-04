@@ -39,7 +39,10 @@ const { T, db } = createMemDb({ tables: {
     business_phone_numbers: [{ entity_slug: 'shop', phone_number: '+15550200000', status: 'active', registration_status: 'pending', provider: 'telnyx' }],
     message_threads: [],
     business_messages: [],
-    message_consent: [],
+    // A booking opt-in's yes, as the opt-in route records it (and as
+    // sql/nextgent_consent_fold.sql copied the older ones): message_consent is
+    // the only place consent is read from.
+    message_consent: [{ entity_slug: 'shop', channel: 'sms', phone: '+12515550177', status: 'granted', source: 'booking_opt_in' }],
     booking_opt_ins: [{ entity_slug: 'shop', phone: '251-555-0177', sms_consent: true }],
     sms_opt_outs: [{ phone: '+12515550166' }],
     sms_log: [],

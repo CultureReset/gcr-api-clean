@@ -14,6 +14,12 @@ const express = require('express');
 const db = require('../db');
 const router = express.Router();
 const { sendSms, normalizePhone } = require('../utils/sms');
+
+// Texts to the rider about the request they made: through the one consent
+// check (lib/messages.js). They asked for these updates, so no separate yes is
+// needed, but an opt-out (STOP) is honoured. Drivers are texted with sendSms.
+const textRider = (to, body, slug, type, relatedId) =>
+  require('../lib/messages').textCustomer({ slug, to, body, type, relatedId, reply: true })
 const { ownerRequired } = require('../middleware/ownerAuth');
 
 // Two audiences in one file, and only one of them is signed in.
@@ -58,7 +64,7 @@ async function dispatchToNext(requestId) {
 
   if (!entities || !entities.length) {
     await db.from('transportation_requests').update({ status: 'no_coverage' }).eq('id', requestId);
-    await sendSms(request.customer_phone, "Sorry, we couldn't find an available driver for your request right now. Please try again or call the business directly.", request.linked_entity_slug || 'gcr', 'transport_no_coverage', requestId).catch(() => {});
+    await textRider(request.customer_phone, "Sorry, we couldn't find an available driver for your request right now. Please try again or call the business directly.", request.linked_entity_slug || 'gcr', 'transport_no_coverage', requestId).catch(() => {});
     return;
   }
 
@@ -80,7 +86,7 @@ async function dispatchToNext(requestId) {
 
   if (!chosen) {
     await db.from('transportation_requests').update({ status: 'no_coverage' }).eq('id', requestId);
-    await sendSms(request.customer_phone, "Sorry, we couldn't find an available driver for your request right now. Please try again or call the business directly.", request.linked_entity_slug || 'gcr', 'transport_no_coverage', requestId).catch(() => {});
+    await textRider(request.customer_phone, "Sorry, we couldn't find an available driver for your request right now. Please try again or call the business directly.", request.linked_entity_slug || 'gcr', 'transport_no_coverage', requestId).catch(() => {});
     return;
   }
 
@@ -195,7 +201,7 @@ router.post('/inbound-sms', express.urlencoded({ extended: false }), async (req,
       const plate = provider?.vehicle_plate ? ` (${provider.vehicle_plate})` : ''
 
       const customerMsg = `🚗 Bid from ${driverName}\n${vehicle}${plate}\nPrice: $${price.toFixed(2)}\n\n${request.pickup_location} → ${request.dropoff_location}\n${fmtDate(request.pickup_date, request.pickup_window)}\n\nReply YES to confirm or NO to pass.`
-      await sendSms(request.customer_phone, customerMsg, pendingDispatch.provider_entity_slug, 'transport_customer_bid', request.id)
+      await textRider(request.customer_phone, customerMsg, pendingDispatch.provider_entity_slug, 'transport_customer_bid', request.id)
       await sendSms(from, `✓ Bid of $${price.toFixed(2)} sent to customer. Waiting for their reply.`, pendingDispatch.provider_entity_slug, 'transport_driver_bid_ack', request.id)
       return
     }
@@ -224,7 +230,7 @@ router.post('/inbound-sms', express.urlencoded({ extended: false }), async (req,
       .maybeSingle()
 
     if (!bidDispatch) {
-      await sendSms(from, "We're still finding you a driver. Hang tight!", customerRequest.linked_entity_slug || 'gcr', 'transport_customer_wait', customerRequest.id)
+      await textRider(from, "We're still finding you a driver. Hang tight!", customerRequest.linked_entity_slug || 'gcr', 'transport_customer_wait', customerRequest.id)
       return
     }
 
@@ -240,7 +246,7 @@ router.post('/inbound-sms', express.urlencoded({ extended: false }), async (req,
       const vehicle = [provider?.vehicle_color, provider?.vehicle_make, provider?.vehicle_model].filter(Boolean).join(' ')
       const plate = provider?.vehicle_plate ? ` (${provider.vehicle_plate})` : ''
 
-      await sendSms(from, `✓ Confirmed!\n${driverName} · ${vehicle}${plate}\nPickup: ${fmtDate(customerRequest.pickup_date, customerRequest.pickup_window)}\nPrice: $${price.toFixed(2)}\n\nYour driver will send you a payment link shortly.`, bidDispatch.provider_entity_slug, 'transport_customer_confirmed', customerRequest.id)
+      await textRider(from, `✓ Confirmed!\n${driverName} · ${vehicle}${plate}\nPickup: ${fmtDate(customerRequest.pickup_date, customerRequest.pickup_window)}\nPrice: $${price.toFixed(2)}\n\nYour driver will send you a payment link shortly.`, bidDispatch.provider_entity_slug, 'transport_customer_confirmed', customerRequest.id)
       await sendSms(bidDispatch.driver_phone, `✓ Customer confirmed your $${price.toFixed(2)} bid!\nYou earn: $${driverEarns} (after 10% platform fee)\n\nCustomer: ${customerRequest.customer_name || 'Guest'} · ${customerRequest.customer_phone}\nPickup: ${customerRequest.pickup_location}\nDrop: ${customerRequest.dropoff_location}\n${fmtDate(customerRequest.pickup_date, customerRequest.pickup_window)}`, bidDispatch.provider_entity_slug, 'transport_driver_confirmed', customerRequest.id)
       return
     }
@@ -248,12 +254,12 @@ router.post('/inbound-sms', express.urlencoded({ extended: false }), async (req,
     if (body === 'no' || body === 'n') {
       await db.from('transportation_dispatches').update({ status: 'customer_declined' }).eq('id', bidDispatch.id)
       await db.from('transportation_requests').update({ status: 'pending' }).eq('id', customerRequest.id)
-      await sendSms(from, "No problem — we'll find another driver. This may take a few minutes.", customerRequest.linked_entity_slug || 'gcr', 'transport_customer_declined', customerRequest.id)
+      await textRider(from, "No problem — we'll find another driver. This may take a few minutes.", customerRequest.linked_entity_slug || 'gcr', 'transport_customer_declined', customerRequest.id)
       dispatchToNext(customerRequest.id).catch(() => {})
       return
     }
 
-    await sendSms(from, 'Reply YES to confirm or NO to find another driver.', customerRequest.linked_entity_slug || 'gcr', 'transport_customer_invalid', customerRequest.id)
+    await textRider(from, 'Reply YES to confirm or NO to find another driver.', customerRequest.linked_entity_slug || 'gcr', 'transport_customer_invalid', customerRequest.id)
     return
   }
 })
