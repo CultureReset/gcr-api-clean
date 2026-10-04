@@ -20,6 +20,8 @@ const express = require('express');
 const crypto = require('crypto');
 const supabase = require('../db');
 const { ownerRequired } = require('../middleware/ownerAuth');
+const secretBox = require('../lib/secretBox');
+const { envInt, envStr } = require('../lib/env');
 
 const router = express.Router();
 
@@ -28,7 +30,7 @@ const hashToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex')
 const nowIso = () => new Date().toISOString();
 
 // Paths the dashboard may ask a box to serve. The box enforces the same list.
-const FORWARDABLE = ['/health', '/capabilities', '/intent', '/approvals', '/actions/'];
+const FORWARDABLE = ['/health', '/capabilities', '/intent', '/approvals', '/actions/', '/remote/'];
 const forwardable = (path) =>
     typeof path === 'string' && !path.includes('..') && FORWARDABLE.some((p) => path.startsWith(p));
 
@@ -77,6 +79,125 @@ const mine = (query, req) =>
     req.actingAsAdmin || req.authVia === 'paperclip'
         ? query.eq('entity_slug', req.entitySlug)
         : query.eq('entity_slug', req.entitySlug).eq('created_by', req.ownerUserId);
+
+
+// ── pairing: the TV sign-in (OAuth device flow), plan §11 ──────────────────
+//
+//   1. The computer asks for a code: POST /pair/start → a short user_code to
+//      show (and put in a QR) and a long device_code it keeps to itself.
+//   2. The owner, signed in to the app, sends the user_code:
+//      POST /pair { code } → the node is enrolled for the session's business.
+//      The computer never chooses its business.
+//   3. The computer polls POST /pair/poll { device_code } and, once, receives
+//      its own node token. Codes expire (NODE_PAIR_TTL_MINUTES).
+//
+// Only hashes of both codes are stored; the node token waits sealed
+// (lib/secretBox.js) until the computer collects it, then is erased.
+
+const PAIR_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const pairTtlMinutes = () => envInt('NODE_PAIR_TTL_MINUTES', 10);
+const pairPollSeconds = () => envInt('NODE_PAIR_POLL_SECONDS', 5);
+const PAIR_PURPOSE = 'node-pair-token';
+
+function newUserCode() {
+    const len = Math.min(Math.max(envInt('NODE_PAIR_CODE_LENGTH', 8), 6), 12);
+    let out = '';
+    for (let i = 0; i < len; i += 1) out += PAIR_CHARSET[crypto.randomInt(PAIR_CHARSET.length)];
+    return out;
+}
+const normalizeUserCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+router.post('/pair/start', async (req, res) => {
+    const deviceCode = crypto.randomBytes(32).toString('base64url');
+    const userCode = newUserCode();
+    const expiresAt = new Date(Date.now() + pairTtlMinutes() * 60 * 1000).toISOString();
+    const { error } = await supabase.from('node_pairings').insert({
+        device_code_hash: hashToken(deviceCode),
+        user_code_hash: hashToken(userCode),
+        name: String(req.body?.name || '').trim().slice(0, 80) || null,
+        status: 'pending',
+        expires_at: expiresAt,
+    });
+    if (error) return res.status(501).json({ error: `Pairing is not set up on this database yet: ${error.message}` });
+    const verify = envStr('NODE_PAIR_URL');
+    res.status(201).json({
+        device_code: deviceCode,
+        user_code: userCode,
+        expires_in: pairTtlMinutes() * 60,
+        interval: pairPollSeconds(),
+        ...(verify ? { verification_uri: verify, verification_uri_complete: `${verify}${verify.includes('?') ? '&' : '?'}code=${userCode}` } : {}),
+    });
+});
+
+router.post('/pair/poll', async (req, res) => {
+    const deviceCode = String(req.body?.device_code || '');
+    if (!deviceCode) return res.status(400).json({ error: 'device_code is required.' });
+    const { data: row, error } = await supabase.from('node_pairings').select('*')
+        .eq('device_code_hash', hashToken(deviceCode)).maybeSingle();
+    if (error) return tableError(res, error);
+    if (!row) return res.status(404).json({ error: 'Unknown pairing.' });
+    if (row.status === 'collected') return res.status(410).json({ status: 'collected', error: 'This pairing was already collected.' });
+    if (new Date(row.expires_at) < new Date() && row.status !== 'approved') return res.status(410).json({ status: 'expired' });
+    if (row.status !== 'approved') return res.status(202).json({ status: 'pending', interval: pairPollSeconds() });
+
+    // Hand the token over once, then forget it.
+    const sealed = row.token_sealed;
+    const nodeId = row.node_id;
+    const { data: claimed } = await supabase.from('node_pairings')
+        .update({ status: 'collected', token_sealed: null, collected_at: nowIso() })
+        .eq('id', row.id).eq('status', 'approved').select('id');
+    if (!claimed?.length) return res.status(410).json({ status: 'collected' });
+    const { data: node } = await supabase.from('ghost_nodes').select('id, name, entity_slug').eq('id', nodeId).maybeSingle();
+    res.json({ status: 'approved', token: secretBox.open(sealed, PAIR_PURPOSE), node: node ? { id: node.id, name: node.name } : null });
+});
+
+router.post('/pair', ownerRequired, async (req, res) => {
+    const code = normalizeUserCode(req.body?.code);
+    if (code.length < 6) return res.status(400).json({ error: 'Enter the code the computer shows.' });
+    const { data: row, error } = await supabase.from('node_pairings').select('*')
+        .eq('user_code_hash', hashToken(code)).eq('status', 'pending').maybeSingle();
+    if (error) return tableError(res, error);
+    if (!row || new Date(row.expires_at) < new Date()) return res.status(404).json({ error: 'That code is not valid or has expired. Ask the computer for a new one.' });
+
+    const token = TOKEN_PREFIX + crypto.randomBytes(24).toString('hex');
+    const { data: node, error: nodeError } = await supabase.from('ghost_nodes').insert({
+        entity_slug: req.entitySlug,
+        name: row.name || String(req.body?.name || '').trim().slice(0, 80) || envStr('NODE_DEFAULT_NAME', 'Computer'),
+        token_hash: hashToken(token),
+        token_hint: token.slice(-6),
+        created_by: req.ownerUserId || null,
+    }).select('id, name, token_hint, created_at').single();
+    if (nodeError) return tableError(res, nodeError);
+
+    const { data: approved } = await supabase.from('node_pairings').update({
+        status: 'approved', node_id: node.id, entity_slug: req.entitySlug,
+        token_sealed: secretBox.seal(token, PAIR_PURPOSE), approved_at: nowIso(),
+        approved_by: req.paperclip?.userId ? `paperclip:${req.paperclip.userId}` : req.ownerUserId || null,
+    }).eq('id', row.id).eq('status', 'pending').select('id');
+    if (!approved?.length) {
+        await supabase.from('ghost_nodes').update({ revoked_at: nowIso() }).eq('id', node.id);
+        return res.status(409).json({ error: 'That code was just used.' });
+    }
+    res.status(201).json({ node });
+});
+
+// ── remote view of a computer's screen ─────────────────────────────────────
+//
+// GET /:id/remote mints a short-lived session token, asks the computer to open
+// a remote session for it (a relay request to /remote/session), and returns
+// the viewer link: NODE_REMOTE_URL_TEMPLATE with {node} and {token} filled in.
+// The viewer checks a token with POST /remote/verify. Only the token's hash is
+// kept.
+
+router.post('/remote/verify', async (req, res) => {
+    const token = String(req.body?.token || '');
+    if (!token) return res.status(400).json({ error: 'token is required.' });
+    const { data, error } = await supabase.from('node_remote_sessions').select('node_id, expires_at, revoked_at')
+        .eq('token_hash', hashToken(token)).maybeSingle();
+    if (error) return tableError(res, error);
+    const valid = !!data && !data.revoked_at && new Date(data.expires_at) > new Date();
+    res.status(valid ? 200 : 401).json({ valid, ...(valid ? { node_id: data.node_id, expires_at: data.expires_at } : {}) });
+});
 
 // GET /api/nodes — this user's boxes
 router.get('/', ownerRequired, async (req, res) => {
@@ -173,6 +294,30 @@ router.delete('/:id/mcp-token/:tokenId', ownerRequired, async (req, res) => {
     if (error) return tableError(res, error);
     if (!data?.length) return res.status(404).json({ error: 'No such MCP credential.' });
     res.json({ revoked: true });
+});
+
+// GET /api/nodes/:id/remote — a link to view this computer's screen
+router.get('/:id/remote', ownerRequired, async (req, res) => {
+    const template = envStr('NODE_REMOTE_URL_TEMPLATE');
+    if (!template) return res.status(503).json({ error: 'Remote view is not configured (NODE_REMOTE_URL_TEMPLATE).' });
+    const { data: node, error: nodeError } = await mine(supabase.from('ghost_nodes').select('id, revoked_at').eq('id', req.params.id), req).maybeSingle();
+    if (nodeError) return tableError(res, nodeError);
+    if (!node || node.revoked_at) return res.status(404).json({ error: 'No such computer.' });
+
+    const token = crypto.randomBytes(24).toString('base64url');
+    const expiresAt = new Date(Date.now() + envInt('NODE_REMOTE_TTL_MINUTES', 15) * 60 * 1000).toISOString();
+    const { error } = await supabase.from('node_remote_sessions').insert({
+        node_id: node.id, entity_slug: req.entitySlug, token_hash: hashToken(token), expires_at: expiresAt,
+        created_by: req.paperclip?.userId ? `paperclip:${req.paperclip.userId}` : req.ownerUserId || null,
+    });
+    if (error) return tableError(res, error);
+    const { error: queueError } = await supabase.from('ghost_node_requests').insert({
+        node_id: node.id, entity_slug: req.entitySlug, method: 'POST', path: '/remote/session',
+        body: { token, expires_at: expiresAt }, created_by: req.ownerUserId || null,
+    });
+    if (queueError) return tableError(res, queueError);
+    const url = template.replace(/\{node\}/g, encodeURIComponent(node.id)).replace(/\{token\}/g, encodeURIComponent(token));
+    res.json({ url, expiresAt });
 });
 
 // DELETE /api/nodes/:id — revoke a box's token

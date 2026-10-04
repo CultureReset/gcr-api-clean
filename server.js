@@ -101,6 +101,8 @@ const authLimiter = rateLimit({
 
 app.use('/api/business-auth', authLimiter);
 app.use('/api/tourist-auth', authLimiter);
+// A computer asks for a pairing code with no credential (routes/nodes.js).
+app.use('/api/nodes/pair/start', authLimiter);
 
 /* ── and on the one door that is open to everybody ────────────────────────
  *

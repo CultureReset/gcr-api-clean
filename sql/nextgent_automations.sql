@@ -43,3 +43,28 @@ alter table public.automation_waits enable row level security;
 revoke all on public.automation_waits from anon, authenticated;
 
 notify pgrst, 'reload schema';
+
+-- owner_automation_drafts   an owner's own automation, built in the owner
+--                           app from the engine's palette (GET
+--                           /api/business/automations/meta). Saved with the
+--                           problems the engine's checks found; a draft never
+--                           runs on its own.
+create table if not exists public.owner_automation_drafts (
+    id             uuid primary key default gen_random_uuid(),
+    entity_slug    text not null,
+    name           text not null,
+    trigger        jsonb not null default '{"type":"manual"}'::jsonb,
+    steps          jsonb not null default '[]'::jsonb,
+    config_schema  jsonb not null default '[]'::jsonb,
+    problems       jsonb not null default '[]'::jsonb,
+    status         text not null default 'draft',
+    updated_by     text,
+    created_at     timestamptz not null default now(),
+    updated_at     timestamptz not null default now()
+);
+
+create index if not exists owner_automation_drafts_slug_idx on public.owner_automation_drafts (entity_slug, updated_at desc);
+alter table public.owner_automation_drafts enable row level security;
+revoke all on public.owner_automation_drafts from anon, authenticated;
+
+notify pgrst, 'reload schema';

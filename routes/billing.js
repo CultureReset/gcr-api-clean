@@ -42,6 +42,22 @@ router.get('/plans', async (req, res) => {
     res.json({ plans: (plans || []).map((p) => ({ ...p, limits: byPlan[p.key] || {} })) });
 });
 
+// POST /api/billing/checkout { plan } -> { url, mode }: Stripe Checkout for
+// the plan, or the billing portal when the business already subscribes.
+// The business is the session's (ownerRequired); the plan is a row.
+router.post('/checkout', ownerRequired, async (req, res) => {
+    try {
+        const out = await require('../lib/billingStripe').checkoutForPlan({
+            slug: req.entitySlug,
+            companyId: req.paperclip?.companyId || null,
+            planKey: req.body?.plan,
+        });
+        res.json(out);
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
+});
+
 // Read a business's plan, its limits, its usage, and whether it is restricted.
 //
 // The default plan applies when there is no subscription row, so a business

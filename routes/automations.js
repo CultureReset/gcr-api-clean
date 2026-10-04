@@ -479,6 +479,46 @@ function hookUrl(req, token) {
     return `${proto}://${host}/api/automations/hook/${token}`;
 }
 
+/** The builder's palette for an owner: the engine's own registry, less platform-only steps. */
+ownerRouter.get('/meta', ownerRequired, (_req, res) => {
+    res.json(engine.catalogue({ forOwner: true }));
+});
+
+/** The owner's own automation drafts. */
+ownerRouter.get('/drafts', ownerRequired, async (req, res) => {
+    const { data, error } = await supabase.from('owner_automation_drafts').select('*')
+        .eq('entity_slug', req.entitySlug).order('updated_at', { ascending: false });
+    if (error) return fail(res, 503, `Drafts are not set up on this database yet: ${error.message}`);
+    res.json({ drafts: data || [] });
+});
+
+/**
+ * Save a draft (new, or an existing one by id). Checked against the engine's
+ * rules with the platform-only steps refused; problems come back with the
+ * saved draft so the builder can show them. A draft never runs by itself.
+ */
+ownerRouter.post('/drafts', ownerRequired, async (req, res) => {
+    const b = req.body || {};
+    const def = {
+        name: String(b.name || '').trim().slice(0, 120),
+        trigger: b.trigger && typeof b.trigger === 'object' ? b.trigger : { type: 'manual' },
+        steps: Array.isArray(b.steps) ? b.steps : [],
+        config_schema: Array.isArray(b.config_schema) ? b.config_schema : [],
+    };
+    const problems = engine.validateDefinition(def, { forOwner: true });
+    if (!def.name) return fail(res, 400, 'A name is required.', { problems });
+    const row = { ...def, entity_slug: req.entitySlug, problems, updated_at: new Date().toISOString(), updated_by: req.paperclip?.userId || req.ownerUserId || null };
+    let result;
+    if (b.id) {
+        result = await supabase.from('owner_automation_drafts').update(row).eq('id', b.id).eq('entity_slug', req.entitySlug).select('*');
+        if (!result.error && !result.data?.length) return fail(res, 404, 'No such draft.');
+    } else {
+        result = await supabase.from('owner_automation_drafts').insert({ ...row, status: 'draft' }).select('*');
+    }
+    if (result.error) return fail(res, 503, `Drafts are not set up on this database yet: ${result.error.message}`);
+    res.status(b.id ? 200 : 201).json({ draft: result.data[0], problems });
+});
+
 /** Everything pushed to this business, at the version it has. */
 ownerRouter.get('/', ownerRequired, async (req, res) => {
     try {
