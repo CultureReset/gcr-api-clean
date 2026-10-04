@@ -44,6 +44,23 @@ database named in `CLAUDE.md`, after checking it is the right project.
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.
 
+## One copy of each thing (the duplication audit)
+
+Apply after everything above. Each moves data that two places held into the
+one kept place; the old place is left untouched until the "Later" step.
+
+| # | File | What it does |
+| - | ---- | ------------ |
+| 19 | `nextgent_prices_fold.sql` | copies `store_items.price_cents / price_interval / stripe_price_id` into `billing_item_prices` (needs 11 and 12). Apply **before** deploying the code that stops reading the `store_items` prices, or priced items read as free until it runs |
+
+### Later (not a file here yet)
+
+`npm run check:sql` refuses any file that drops a column, so these wait for a
+deliberate, reviewed one-off once the step above is applied and checked:
+
+- drop `store_items.price_cents`, `store_items.price_interval`,
+  `store_items.stripe_price_id` (nothing reads them after step 19).
+
 ## Everything else
 
 The other files (`capability_*`, `automations.sql`, `composio_connections.sql`,

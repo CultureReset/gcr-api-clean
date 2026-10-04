@@ -58,7 +58,12 @@ const T = {
     billing_usage: [],
     billing_item_charges: [],
     billing_usage_credits: [],
-    billing_item_prices: [],
+    // What sql/nextgent_prices_fold.sql leaves: the store_items prices above,
+    // copied here. itemByKey reads only this table.
+    billing_item_prices: [
+        { item_key: 'review-agent', amount_cents: 1500, currency: 'usd', interval: 'month', stripe_price_id: 'price_rev' },
+        { item_key: 'setup-pack', amount_cents: 5000, currency: 'usd', interval: 'one_time', stripe_price_id: 'price_setup' },
+    ],
     store_plan_items: [],
     store_grants: [],
     claim_codes: [],

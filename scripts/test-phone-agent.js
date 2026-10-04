@@ -44,7 +44,7 @@ const { T, db } = createMemDb({ tables: {
     billing_plan: [{ key: 'base', is_default: true }],
     billing_subscription: [],
     billing_item_charges: [],
-    billing_item_prices: [],
+    billing_item_prices: [{ item_key: 'phone-number', amount_cents: 900, currency: 'usd', interval: 'month', stripe_price_id: 'price_num' }],
     store_plan_items: [],
     store_grants: [],
 } });

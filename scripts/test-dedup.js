@@ -158,6 +158,36 @@ section('1. businessOrAdminRequired answers as businessAccess did', async () => 
 });
 
 
+/* ── 3. item prices: billing_item_prices only ───────────────────────────── */
+
+section('3. item prices live in billing_item_prices', async () => {
+    const fs = require('fs');
+    T.store_items = [
+        { id: 'i-a', key: 'priced-both', access: 'free', status: 'published', price_cents: 999, price_interval: 'year', stripe_price_id: 'price_old' },
+        { id: 'i-b', key: 'old-price-only', access: 'plan', status: 'published', price_cents: 700, price_interval: 'month', stripe_price_id: 'price_stale' },
+    ];
+    T.billing_item_prices = [
+        { item_key: 'priced-both', amount_cents: 1500, currency: 'usd', interval: 'month', model: 'flat', stripe_price_id: 'price_new' },
+        { item_key: 'paperclip-only', amount_cents: 300, currency: 'usd', interval: 'one_time', stripe_price_id: 'price_p' },
+    ];
+    const stripe = require(path.join(ROOT, 'lib/billingStripe.js'));
+    const both = await stripe.itemByKey('priced-both');
+    check('the price row wins, and the store row keeps its access and id', both.price_cents === 1500 && both.price_interval === 'month' && both.stripe_price_id === 'price_new' && both.id === 'i-a' && both.access === 'free');
+    const stale = await stripe.itemByKey('old-price-only');
+    check('a price left only on store_items is no longer read', stale.price_cents === 0 && stale.stripe_price_id === null && stale.access === 'plan');
+    check('so priceOf calls it free', stripe.priceOf(stale).priceCents === 0 && stripe.priceOf(stale).interval === null);
+    const pOnly = await stripe.itemByKey('paperclip-only');
+    check('an item priced only by Paperclip is still billable', pOnly.id === null && pOnly.price_cents === 300 && pOnly.access === 'free');
+    check('an item in neither is unknown', (await stripe.itemByKey('nothing')) === null);
+
+    const sql = fs.readFileSync(path.join(ROOT, 'sql/nextgent_prices_fold.sql'), 'utf8');
+    check('the fold copies all three store_items price columns', /si\.price_cents/.test(sql) && /si\.price_interval/.test(sql) && /si\.stripe_price_id/.test(sql));
+    check('into billing_item_prices without overwriting a price Paperclip set', /insert into public\.billing_item_prices/.test(sql) && /on conflict \(item_key\) do nothing/.test(sql));
+    check('with the currency taken from the default plan row, not a literal', /bp\.currency from public\.billing_plan bp where bp\.is_default/.test(sql) && !/'usd'/i.test(sql));
+    const order = fs.readFileSync(path.join(ROOT, 'sql/ORDER.md'), 'utf8');
+    check('ORDER.md lists the fold and the later column drop', /nextgent_prices_fold\.sql/.test(order) && /price_cents/.test(order));
+});
+
 /* ── 10. helpers: one copy each ─────────────────────────────────────────── */
 
 section('10. routine signing, envInt, defaultPlanKey, Google token encryption', async () => {
