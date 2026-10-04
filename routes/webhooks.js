@@ -8,13 +8,17 @@ const router = express.Router();
 // ============================================
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
     let event;
+    let verified = false;
 
     // Verify Stripe webhook signature when secret is configured
     if (process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_SECRET_KEY) {
         const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
         const sig = req.headers['stripe-signature'];
         try {
-            event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+            // express.json() runs first (server.js), so req.body is already an
+            // object here; the signature is over the raw bytes it kept.
+            event = stripe.webhooks.constructEvent(req.rawBody || req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+            verified = true;
         } catch (err) {
             console.error('Stripe webhook signature failed:', err.message);
             return res.status(400).json({ error: 'Invalid signature' });
@@ -32,6 +36,19 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
     const data = event.data?.object;
 
     console.log(`Stripe webhook: ${type}`);
+
+    // Platform billing (subscription and invoice events, lib/billingStripe.js).
+    // Only from a verified signature: an unsigned invoice.paid must not be able
+    // to lift a pause.
+    if (verified) {
+        try {
+            const applied = await require('../lib/billingStripe').applyStripeEvent(event);
+            if (applied) return res.json({ received: true, billing: applied });
+        } catch (err) {
+            console.error('[billing webhook]', type, err.message);
+            return res.status(500).json({ error: 'billing update failed' });
+        }
+    }
 
     switch (type) {
         case 'payment_intent.succeeded': {

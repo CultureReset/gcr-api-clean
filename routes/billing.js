@@ -98,7 +98,10 @@ router.get('/me', ownerRequired, async (req, res) => {
     }
 
     const { persist, ...evaluation } = state.evaluation;
-    res.json({ ...evaluation, subscription: state.subscription });
+    // Non-payment runs the same grace clock (lib/billing.paymentState): warned
+    // first, paused when it runs out, never deleted.
+    const payment = billing.paymentState(state.subscription?.payment_failed_since ?? null);
+    res.json({ ...evaluation, subscription: state.subscription, payment, paused: payment.paused });
 });
 
 // Ask before doing something metered: "may I add another listing?"

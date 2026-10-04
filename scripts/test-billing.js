@@ -88,6 +88,21 @@ check('dimensions are not hardcoded anywhere', () => {
     }
 });
 
+check('a failed payment warns before it pauses', () => {
+    assert.equal(b.paymentState(T0, at(3)).paused, false);
+    assert.equal(b.paymentState(T0, at(3)).mode, 'warning');
+    assert.equal(b.paymentState(T0, at(8)).paused, true, 'past the grace period the business is paused');
+    assert.equal(b.paymentState(null, at(8)).paused, false, 'no failed payment, no pause');
+});
+
+check('AI spend becomes whole credits at the configured rate', () => {
+    assert.equal(b.creditsFor(1.25, '100'), 125);
+    assert.equal(b.creditsFor(0.001, '100'), 1, 'any spend costs at least one credit');
+    assert.equal(b.creditsFor(2, '10'), 20);
+    assert.equal(b.creditsFor(0, '100'), 0);
+    assert.equal(b.creditsFor('nonsense', '100'), 0);
+});
+
 if (failures.length) {
     console.error(`\n${failures.length} failed:\n`);
     for (const f of failures) console.error(`  x ${f}`);
