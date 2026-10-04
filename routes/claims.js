@@ -137,6 +137,10 @@ router.post('/start', paperclipRequired, async (req, res) => {
     const { data: recent } = await supabase.from('claim_codes').select('id')
         .eq('company_id', req.paperclip.companyId).gte('created_at', since);
     if ((recent || []).length >= maxStartsPerHour()) return fail(res, 429, 'Too many codes this hour. Try again later or ask for review.');
+    // …and a business's phone cannot be rung without limit by many companies.
+    const { data: rung } = await supabase.from('claim_codes').select('id')
+        .eq('entity_slug', slug).gte('created_at', since);
+    if ((rung || []).length >= maxStartsPerHour()) return fail(res, 429, 'This business has been sent too many codes this hour. Try again later or ask for review.');
 
     let channel = 'voice';
     try {
