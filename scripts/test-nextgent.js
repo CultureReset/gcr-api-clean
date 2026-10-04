@@ -72,6 +72,10 @@ const T = {
     owner_notifications: [],
     menu_items: [{ id: 1, entity_slug: 'listed-cafe', name: 'Toast' }, { id: 3, entity_slug: 'new-taco-shop', name: 'Taco' }],
     faqs: [{ id: 2, entity_slug: 'listed-cafe', q: 'Open?' }],
+    // An automation built in the admin builder; its key is the store item key.
+    automations: [{ id: 'auto-1', key: 'review-request', name: 'Review request', version: 2, status: 'published', trigger: { type: 'manual' }, steps: [] }],
+    automation_versions: [{ automation_id: 'auto-1', version: 1 }, { automation_id: 'auto-1', version: 2 }],
+    entity_automations: [],
 };
 let seq = 0;
 const like = (v, pat) => new RegExp(`^${String(pat).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*')}$`).test(String(v));
@@ -369,11 +373,17 @@ async function run() {
         await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-3', itemKey: 'setup-pack', kind: 'app', permissions: [] });
         check('a one-time price becomes an invoice item', stripeCalls.some(([n, a]) => n === 'invoiceItems.create' && a.price === 'price_setup'));
 
+        const noSuch = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-x', itemKey: 'no-such-automation', kind: 'automation', permissions: [] });
+        check('an automation install with no automation behind it is refused, nothing recorded', noSuch.status === 409 && !T.nextgent_installs.some((i) => i.install_id === 'in-x'));
         const auto = await signed('POST', '/api/nextgent/installs', {
-            companyId: 'co-new', installId: 'in-4', itemKey: 'qr-menu', kind: 'automation', permissions: [],
+            companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '1', permissions: [],
             routine: { webhookUrl: 'https://paperclip.test/routines/r1', webhookSecret: 'whsec-plain' },
         });
-        check('an automation install has no token', auto.status === 201 && !auto.body.token);
+        check('an automation install has no token', auto.status === 201 && !auto.body.token, JSON.stringify(auto.body));
+        const ea = T.entity_automations.find((r) => r.automation_id === 'auto-1' && r.entity_slug === 'new-taco-shop');
+        check('it puts that automation version on the business, switched on', ea && ea.version === 1 && ea.enabled === true && /^[a-f0-9]{48}$/.test(ea.hook_token), JSON.stringify(ea));
+        const autoUpd = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '2', permissions: [] });
+        check('an update moves it to the new version, keeping its settings', autoUpd.status === 200 && ea.version === 2 && T.entity_automations.length === 1);
         const autoRow = T.nextgent_installs.find((i) => i.install_id === 'in-4');
         check('its routine secret is not stored in the clear', autoRow.routine_webhook_secret && !autoRow.routine_webhook_secret.includes('whsec-plain'));
         const routine = await require(path.join(ROOT, 'routes/nextgent.js')).routineFor('in-4');
@@ -385,6 +395,9 @@ async function run() {
         check('marks it removed', T.nextgent_installs.find((i) => i.install_id === 'in-2').status === 'removed');
         check('and stops its charge', stripeCalls.some(([n, id]) => n === 'subscriptionItems.del' && id === 'si_1')
             && T.billing_item_charges.find((c) => c.install_id === 'in-2').status === 'removed');
+
+        const delAuto = await signed('DELETE', '/api/nextgent/installs/in-4');
+        check('removing an automation install switches it off', delAuto.body.automationsDisabled === 1 && ea.enabled === false && T.entity_automations.length === 1);
 
         console.log('\n── usage from LiteLLM ──');
         const usage = await signed('POST', '/api/nextgent/usage', { companyId: 'co-new', periodStart: new Date(Date.now() - 3600e3).toISOString(), periodEnd: new Date().toISOString(), spendUsd: 1.25 });

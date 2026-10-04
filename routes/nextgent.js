@@ -8,7 +8,10 @@
 // through company_links, the only place that says which.
 //
 //   POST   /link                   link a company to a business (new or claimed)
-//   POST   /installs               an agent, app or automation was installed
+//   POST   /installs               an agent, app or automation was installed (an
+//                                  automation goes onto the business through
+//                                  lib/automationInstalls.js, the path admin
+//                                  rollouts use too)
 //   DELETE /installs/:installId    …and removed
 //   GET    /entitlement            may this company have this item, and at what price
 //   POST   /unlink                 the business leaves (export first if asked)
@@ -34,6 +37,7 @@ const billingStripe = require('../lib/billingStripe');
 const secretBox = require('../lib/secretBox');
 const { exportBusiness } = require('../lib/exportBusiness');
 const phoneAgent = require('../lib/phoneAgent');
+const automationInstalls = require('../lib/automationInstalls');
 
 const router = express.Router();
 router.use(serviceSigned);
@@ -290,12 +294,32 @@ router.post('/installs', async (req, res) => {
             patch.routine_webhook_url = str(routine.webhookUrl);
             patch.routine_webhook_secret = secretBox.seal(str(routine.webhookSecret), ROUTINE_SECRET_PURPOSE);
         }
+        // An automation moves to the version the store now has (same install path as a new one).
+        if (kind === 'automation') {
+            try {
+                await automationInstalls.installFromStore({ itemKey, slug, version: b.version ?? existing.version });
+            } catch (err) {
+                return fail(res, err.status || 500, err.message);
+            }
+        }
         const { error } = await supabase.from('nextgent_installs').update(patch).eq('install_id', installId);
         if (error) return fail(res, 500, error.message);
         await supabase.from('business_mcp_tokens')
             .update({ permissions, scope: scopeForPermissions(permissions) })
             .eq('install_id', installId).is('revoked_at', null);
         return res.json({ updated: true });
+    }
+
+    // An automation install puts that automation on the business: the item key
+    // is the automation's key. Checked before anything is charged.
+    if (kind === 'automation') {
+        try {
+            const found = await automationInstalls.automationByKey(itemKey);
+            if (!found) return fail(res, 409, `No automation has the key ${itemKey}.`);
+            await automationInstalls.versionFor(found, b.version);
+        } catch (err) {
+            return fail(res, err.status || 500, err.message);
+        }
     }
 
     // New install: entitled, then billed, then recorded, then its token.
@@ -372,8 +396,21 @@ router.post('/installs', async (req, res) => {
         };
     }
 
+    // Automations run inside this API and need no token: the install is the
+    // entity_automations row, through the same path an admin rollout uses.
+    let automation;
+    if (kind === 'automation') {
+        try {
+            const done = await automationInstalls.installFromStore({ itemKey, slug, version: b.version });
+            automation = { key: done.automation.key, version: done.version };
+        } catch (err) {
+            if (charge.charged) await billingStripe.removeInstallCharge(installId);
+            await supabase.from('nextgent_installs').update({ status: 'removed', removed_at: new Date().toISOString() }).eq('install_id', installId);
+            return fail(res, err.status || 500, err.message);
+        }
+    }
+
     // Agents and apps get a token holding only what the owner approved.
-    // Automations run inside this API and need none.
     let token;
     if (kind !== 'automation') {
         try {
@@ -394,6 +431,7 @@ router.post('/installs', async (req, res) => {
     res.status(201).json({
         ...(token ? { token } : {}),
         ...(phone ? { phone } : {}),
+        ...(automation ? { automation } : {}),
         charged: !!charge.charged,
         ...(charge.charged ? { priceCents: charge.priceCents, interval: charge.interval } : {}),
     });
@@ -409,11 +447,15 @@ router.delete('/installs/:installId', async (req, res) => {
             .from('nextgent_installs')
             .update({ status: 'removed', removed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq('install_id', installId)
-            .select('install_id');
+            .select('install_id, kind, item_key, entity_slug');
         const charges = await billingStripe.removeInstallCharge(installId);
         const numbersReleased = await phoneAgent.releaseForInstall(installId);
         if (!data?.length && !revoked) return fail(res, 404, 'No such install.');
-        res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed, numbersReleased });
+        const row = data?.[0];
+        const automationsDisabled = row?.kind === 'automation'
+            ? await automationInstalls.uninstallFromStore({ itemKey: row.item_key, slug: row.entity_slug })
+            : 0;
+        res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed, numbersReleased, automationsDisabled });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }

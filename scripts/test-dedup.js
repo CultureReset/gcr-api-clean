@@ -158,6 +158,43 @@ section('1. businessOrAdminRequired answers as businessAccess did', async () => 
 });
 
 
+/* ── 2. automations: one install path ───────────────────────────────────── */
+
+section('2. an admin rollout and a store install use one install path', async () => {
+    const fs = require('fs');
+    T.automations = [{ id: 'auto-r', key: 'nightly-report', name: 'Nightly', version: 3, status: 'published', trigger: { type: 'manual' }, steps: [] }];
+    T.automation_versions = [1, 2, 3].map((v) => ({ automation_id: 'auto-r', version: v, definition: {} }));
+    T.automation_deployments = [];
+    // A business that already has it, switched off and configured by its owner.
+    T.entity_automations = [{ id: 'ea-1', entity_slug: 'shop', automation_id: 'auto-r', version: 1, enabled: false, config: { hour: 9 }, hook_token: 'a'.repeat(48) }];
+
+    const app = express();
+    app.use(express.json());
+    app.use('/api/admin/automations', require(path.join(ROOT, 'routes/automations.js')));
+    const server = await listen(app);
+    try {
+        const admin = jwt.sign({ userId: 'op-1', role: 'admin' }, process.env.JWT_SECRET);
+        const r = await hit(server, { token: admin, method: 'POST', p: '/api/admin/automations/auto-r/deploy', body: { version: 2, audience: { mode: 'slugs', slugs: ['shop', 'other'] } } });
+        const dep = r.body?.deployment;
+        check('the rollout reports the same counts', r.status === 200 && dep.installed === 1 && dep.updated === 1 && dep.failed === 0 && dep.status === 'done', JSON.stringify(r.body));
+        const kept = T.entity_automations.find((e) => e.entity_slug === 'shop');
+        check('an existing install keeps its settings and stays off; only the version moves', kept.version === 2 && kept.enabled === false && kept.config.hour === 9 && kept.hook_token === 'a'.repeat(48) && kept.deployment_id === dep.id);
+        const added = T.entity_automations.find((e) => e.entity_slug === 'other');
+        check('a new install is on, at that version, with a fresh hook token and the deployment', added.version === 2 && added.enabled === true && /^[a-f0-9]{48}$/.test(added.hook_token) && added.deployment_id === dep.id);
+    } finally { server.close(); }
+
+    const installs = require(path.join(ROOT, 'lib/automationInstalls.js'));
+    const store = await installs.installFromStore({ itemKey: 'nightly-report', slug: 'shop', version: null });
+    const kept = T.entity_automations.find((e) => e.entity_slug === 'shop');
+    check('a store install of the same automation moves it to the latest and switches it on, keeping settings', store.version === 3 && kept.version === 3 && kept.enabled === true && kept.config.hour === 9);
+    check('uninstalling from the store switches it off and keeps the row', (await installs.uninstallFromStore({ itemKey: 'nightly-report', slug: 'shop' })) === 1 && kept.enabled === false && T.entity_automations.length === 2);
+
+    for (const f of ['routes/automations.js', 'routes/nextgent.js']) {
+        const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+        check(`${f} does not insert installs itself`, !/from\('entity_automations'\)\.insert/.test(src));
+    }
+});
+
 /* ── 3. item prices: billing_item_prices only ───────────────────────────── */
 
 section('3. item prices live in billing_item_prices', async () => {

@@ -32,6 +32,7 @@ const supabase = require('../db');
 const { adminRequired } = require('../middleware/auth');
 const { ownerRequired } = require('../middleware/ownerAuth');
 const engine = require('../lib/automationEngine');
+const { installAutomation } = require('../lib/automationInstalls');
 
 const router = express.Router();
 const ownerRouter = express.Router();
@@ -65,9 +66,12 @@ const { pageAll, resolveAudience, industries } = require('../lib/audience');
 
 /* ── deploy ──────────────────────────────────────────────────────────────
  *
- * Existing installs keep their settings and their on/off state; only the
- * version moves. New installs get a fresh hook token and the enabled flag the
- * operator chose.
+ * A rollout of a published version to an audience. The installing itself is
+ * lib/automationInstalls.js, the same code a store install (POST
+ * /api/nextgent/installs, kind automation) runs: existing installs keep their
+ * settings and their on/off state, only the version moves; new installs get a
+ * fresh hook token and the enabled flag the operator chose. This route records
+ * the deployment around it.
  */
 async function deploy({ automation, version, audience, enabled, createdBy, notes }) {
     const slugs = await resolveAudience(audience);
@@ -82,48 +86,10 @@ async function deploy({ automation, version, audience, enabled, createdBy, notes
     }).select().single();
     if (depError) throw new Error(depError.message);
 
-    let installed = 0;
-    let updated = 0;
-    let failed = 0;
-    const now = new Date().toISOString();
-
-    for (let i = 0; i < slugs.length; i += 500) {
-        const chunk = slugs.slice(i, i + 500);
-        const { data: existing } = await supabase
-            .from('entity_automations')
-            .select('entity_slug')
-            .eq('automation_id', automation.id)
-            .in('entity_slug', chunk);
-        const have = new Set((existing || []).map((r) => r.entity_slug));
-
-        const fresh = chunk.filter((s) => !have.has(s));
-        const known = chunk.filter((s) => have.has(s));
-
-        if (fresh.length) {
-            const { error } = await supabase.from('entity_automations').insert(fresh.map((slug) => ({
-                entity_slug: slug,
-                automation_id: automation.id,
-                version,
-                enabled: enabled !== false,
-                config: {},
-                hook_token: engine.newHookToken(),
-                deployment_id: dep.id,
-                installed_at: now,
-                updated_at: now,
-            })));
-            if (error) failed += fresh.length;
-            else installed += fresh.length;
-        }
-        if (known.length) {
-            const { error } = await supabase
-                .from('entity_automations')
-                .update({ version, deployment_id: dep.id, updated_at: now })
-                .eq('automation_id', automation.id)
-                .in('entity_slug', known);
-            if (error) failed += known.length;
-            else updated += known.length;
-        }
-    }
+    // The one install path (lib/automationInstalls.js), shared with store installs.
+    const { installed, updated, failed } = await installAutomation({
+        automation, version, slugs, enabled, deploymentId: dep.id,
+    });
 
     const { data: done } = await supabase.from('automation_deployments').update({
         installed, updated, failed,
