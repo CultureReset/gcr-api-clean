@@ -1068,6 +1068,16 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req, res
     // Update availability
     if (entitySlug && parsed && parsed.event_date) {
       await upsertAvailability(entitySlug, parsed, logRow?.id);
+    } else if (entitySlug) {
+      // Nothing could be read out of it, so it waits in the review queue —
+      // and the owner hears about it (lib/notify.js; never throws).
+      require('../lib/notify').notifyOwner(entitySlug, {
+        kind: 'review',
+        title: 'A forwarded email needs a look',
+        body: `From ${from}\n${subject}`.slice(0, 500),
+        ref: logRow?.id || hash,
+        link: process.env.OWNER_REVIEW_PATH || null,
+      });
     }
 
   } catch (err) {
