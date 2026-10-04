@@ -121,7 +121,9 @@ async function run() {
         const remote = await call('GET', `/api/nodes/${T.ghost_nodes[0].id}/remote`);
         check('a viewer link from the configured template', remote.status === 200 && remote.body.url.startsWith(`https://view.example.test/${T.ghost_nodes[0].id}#`));
         const token = decodeURIComponent(remote.body.url.split('#')[1]);
-        check('the computer is asked to open the session', T.ghost_node_requests.some((r) => r.path === '/remote/session' && r.body.token === token));
+        const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
+        check('the computer is asked to open the session, told only the token\'s hash',
+            T.ghost_node_requests.some((r) => r.path === '/remote/session' && r.body.token_hash === sha(token) && !('token' in r.body)));
         const ok = await call('POST', '/api/nodes/remote/verify', { token });
         check('the viewer can check the token', ok.status === 200 && ok.body.valid && ok.body.node_id === T.ghost_nodes[0].id);
         check('a made-up token is not valid', (await call('POST', '/api/nodes/remote/verify', { token: 'nope' })).status === 401);
