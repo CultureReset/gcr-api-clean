@@ -13,7 +13,7 @@ const { createMemDb, inject, checker } = require('./lib/memdb');
 
 const ROOT = path.resolve(__dirname, '..');
 const SECRET = 'svc-secret';
-Object.assign(process.env, { NEXTGENT_SERVICE_SECRET: SECRET, PAPERCLIP_API_URL: 'https://paperclip.test' });
+Object.assign(process.env, { NEXTGENT_SERVICE_SECRET: SECRET, NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key', PAPERCLIP_API_URL: 'https://paperclip.test' });
 const sha = (t) => crypto.createHash('sha256').update(t).digest('hex');
 const NODE_TOKEN = 'gcr_node_' + 'c'.repeat(48);
 const MCP_TOKEN = 'gcr_ghostmcp_' + 'd'.repeat(64);
@@ -69,7 +69,10 @@ async function run() {
         const body = JSON.parse(p?.body || '{}');
         check('posted to Paperclip /api/nextgent/receipts', p?.url === 'https://paperclip.test/api/nextgent/receipts');
         const ts = p.headers['x-nextgent-timestamp'];
-        check('signed per CONTRACT §3', p.headers['x-nextgent-signature'] === crypto.createHmac('sha256', SECRET).update(`${ts}.${p.body}`).digest('hex'));
+        const nonce = p.headers['x-nextgent-nonce'];
+        const bodyHash = crypto.createHash('sha256').update(p.body).digest('hex');
+        check('signed per CONTRACT §3: ts, nonce, METHOD, path, query, sha256(body)', /^[0-9a-f]{32,}$/.test(nonce || '')
+            && p.headers['x-nextgent-signature'] === crypto.createHmac('sha256', SECRET).update(`${ts}\n${nonce}\nPOST\n/api/nextgent/receipts\n\n${bodyHash}`).digest('hex'));
         check('against the instruction\'s task, with the receipt fields', body.companyId === 'co-1' && body.taskId === 'task-42' && body.action === 'sms.send'
             && body.target === '+15550001111' && body.newValue === 'table ready' && body.verified === true && body.device === 'Front desk' && body.evidence.screenshot === 'sha256:abc', JSON.stringify(body));
         check('marked posted, never twice', !!T.ghost_node_requests[1].receipt_posted_at);

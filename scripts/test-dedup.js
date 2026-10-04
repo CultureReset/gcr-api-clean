@@ -19,6 +19,7 @@ const ROOT = path.resolve(__dirname, '..');
 Object.assign(process.env, {
     JWT_SECRET: 'console-secret',
     NEXTGENT_SERVICE_SECRET: 'svc-secret',
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     TELNYX_API_KEY: 'KEY_test',
     PLATFORM_NUMBER: '+15550000001',
     SUPABASE_URL: 'https://db.example.test',

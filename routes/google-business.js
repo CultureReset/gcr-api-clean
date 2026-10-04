@@ -7,7 +7,7 @@
  *   GOOGLE_CLIENT_ID          — from Google Cloud Console
  *   GOOGLE_CLIENT_SECRET      — from Google Cloud Console
  *   GOOGLE_REDIRECT_URI       — <API_BASE_URL>/api/google-business/callback
- *   NEXTGENT_SECRETS_KEY or NEXTGENT_SERVICE_SECRET — tokens are sealed by lib/secretBox.js
+ *   NEXTGENT_SECRETS_KEY      — tokens are sealed by lib/secretBox.js
  *   OAUTH_TOKEN_ENCRYPTION_KEY — only to read tokens stored before that (old format)
  *   DASHBOARD_BASE_URL        — where Google sends the owner back (else OWNER_APP_URL)
  *

@@ -8,7 +8,7 @@ const { createMemDb, inject, checker } = require('./lib/memdb');
 
 const ROOT = path.resolve(__dirname, '..');
 const SECRET = 'svc';
-Object.assign(process.env, { NEXTGENT_SERVICE_SECRET: SECRET, PLATFORM_NAME: 'BrandX', SUPABASE_URL: 'https://db.example.test', SUPABASE_KEY: 'k' });
+Object.assign(process.env, { NEXTGENT_SERVICE_SECRET: SECRET, NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key', PLATFORM_NAME: 'BrandX', SUPABASE_URL: 'https://db.example.test', SUPABASE_KEY: 'k' });
 const { db } = createMemDb({ tables: { company_links: [{ company_id: 'co-1', entity_slug: 'shop' }] } });
 inject(path.join(ROOT, 'db.js'), db);
 const emails = [];
@@ -23,7 +23,7 @@ async function post(body, sign = true) {
     const raw = JSON.stringify(body);
     const ts = String(Math.floor(Date.now() / 1000));
     const headers = { 'Content-Type': 'application/json' };
-    if (sign) { headers['x-nextgent-timestamp'] = ts; headers['x-nextgent-signature'] = crypto.createHmac('sha256', SECRET).update(`${ts}.${raw}`).digest('hex'); }
+    if (sign) Object.assign(headers, require(path.join(ROOT, 'lib/serviceSigning.js')).signHeaders({ method: 'POST', url: '/api/nextgent/email', rawBody: raw }, { key: SECRET, now: Number(ts) * 1000 }));
     const res = await fetch(`http://127.0.0.1:${server.address().port}/api/nextgent/email`, { method: 'POST', headers, body: raw });
     return { status: res.status, body: await res.json() };
 }

@@ -1,5 +1,7 @@
 // Cache buster: 2026-06-01T02
 require('dotenv').config();
+// One secret per purpose; a production deploy does not start with one missing.
+require('./lib/requiredSecrets').assertSecrets();
 const express = require('express');
 const cors = require('cors');
 

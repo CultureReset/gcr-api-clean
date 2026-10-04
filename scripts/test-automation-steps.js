@@ -16,6 +16,7 @@ const { createMemDb, inject, checker } = require('./lib/memdb');
 const ROOT = path.resolve(__dirname, '..');
 Object.assign(process.env, {
     NEXTGENT_SERVICE_SECRET: 'svc',
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     SUPABASE_URL: 'https://db.example.test',
     SUPABASE_KEY: 'service',
     DEFAULT_TIMEZONE: 'America/Chicago',

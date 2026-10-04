@@ -15,6 +15,7 @@ const { createMemDb, inject, checker } = require('./lib/memdb');
 const ROOT = path.resolve(__dirname, '..');
 Object.assign(process.env, {
     NEXTGENT_SERVICE_SECRET: 'svc',
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     TELNYX_API_KEY: 'KEY_test',
     PLATFORM_NUMBER: '+15550000001',
     INTAKE_EMAIL_DOMAIN: 'intake.example.test',

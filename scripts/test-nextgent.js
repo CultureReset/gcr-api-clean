@@ -20,6 +20,7 @@ const SECRET = 'svc-secret';
 const ISSUER = 'https://paperclip.test';
 Object.assign(process.env, {
     NEXTGENT_SERVICE_SECRET: SECRET,
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     PAPERCLIP_ISSUER: ISSUER,
     PAPERCLIP_JWKS_URL: 'https://paperclip.test/.well-known/jwks.json',
     INTAKE_EMAIL_DOMAIN: 'parse.example.test',
@@ -239,8 +240,14 @@ async function signed(method, url, body, { sign = true } = {}) {
     const ts = String(Math.floor(Date.now() / 1000));
     const headers = { 'Content-Type': 'application/json' };
     if (sign) {
+        // CONTRACT §3: ts, nonce, METHOD, path, query and the body's sha256, newline-joined.
+        const nonce = crypto.randomBytes(16).toString('hex');
+        const u = new URL(url, 'http://localhost');
+        const bodyHash = crypto.createHash('sha256').update(raw).digest('hex');
         headers['x-nextgent-timestamp'] = ts;
-        headers['x-nextgent-signature'] = crypto.createHmac('sha256', SECRET).update(`${ts}.${raw}`).digest('hex');
+        headers['x-nextgent-nonce'] = nonce;
+        headers['x-nextgent-signature'] = crypto.createHmac('sha256', SECRET)
+            .update(`${ts}\n${nonce}\n${method.toUpperCase()}\n${u.pathname}\n${u.search.replace(/^\?/, '')}\n${bodyHash}`).digest('hex');
     }
     const res = await realFetch(`${base()}${url}`, { method, headers, body: body === undefined ? undefined : raw });
     return { status: res.status, body: await res.json() };
@@ -267,11 +274,10 @@ async function run() {
         const unsigned = await signed('POST', '/api/nextgent/link', { companyId: 'co-1' }, { sign: false });
         check('an unsigned call is refused', unsigned.status === 401);
         const tampered = await (async () => {
-            const ts = String(Math.floor(Date.now() / 1000));
-            const sig = crypto.createHmac('sha256', SECRET).update(`${ts}.{"companyId":"co-1"}`).digest('hex');
+            const headers = require(path.join(ROOT, 'lib/serviceSigning.js')).signHeaders({ method: 'POST', url: '/api/nextgent/link', rawBody: '{"companyId":"co-1"}' }, { key: SECRET });
             const res = await realFetch(`${base()}/api/nextgent/link`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-nextgent-timestamp': ts, 'x-nextgent-signature': sig },
+                headers: { 'Content-Type': 'application/json', ...headers },
                 body: '{"companyId":"co-2"}',
             });
             return res.status;

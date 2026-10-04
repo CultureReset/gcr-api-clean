@@ -109,17 +109,66 @@ function run(mw, { token, query = {}, body = {}, params = {} } = {}) {
 (async () => {
     console.log('\n── service signing ──');
     const raw = JSON.stringify({ companyId: 'co-1' });
-    const headers = signing.signHeaders(raw);
-    check('a correctly signed request passes', signing.verifyRequest({ headers, rawBody: Buffer.from(raw) }) === null);
-    check('a changed body fails', /Bad signature/.test(signing.verifyRequest({ headers, rawBody: Buffer.from(raw + ' ') })));
-    const old = signing.signHeaders(raw, { now: Date.now() - 301 * 1000 });
-    check('older than 300 s fails', /too old/.test(signing.verifyRequest({ headers: old, rawBody: Buffer.from(raw) })));
-    const future = signing.signHeaders(raw, { now: Date.now() + 301 * 1000 });
-    check('more than 300 s in the future fails', /too old/.test(signing.verifyRequest({ headers: future, rawBody: Buffer.from(raw) })));
-    check('no headers fails', /Missing/.test(signing.verifyRequest({ headers: {}, rawBody: Buffer.from(raw) })));
-    check('an empty body signs as `${ts}.`', signing.verifyRequest({ headers: signing.signHeaders(''), rawBody: undefined }) === null);
-    check('signature is hex HMAC-SHA256 of `${ts}.${body}`',
+    const URL_ = 'https://gcr.test/api/nextgent/link';
+    const sig = (opts = {}) => signing.signHeaders({ method: 'POST', url: URL_, rawBody: raw }, opts);
+    const reqOf = (headers, { body = raw, method = 'POST', url = '/api/nextgent/link' } = {}) =>
+        ({ headers, rawBody: body === undefined ? undefined : Buffer.from(body), method, originalUrl: url });
+    const headers = sig();
+    check('a correctly signed request passes', signing.verifyRequest(reqOf(headers)) === null);
+    check('headers: unix-second timestamp, a nonce of at least 16 random bytes as hex, a hex HMAC-SHA256',
+        /^\d+$/.test(headers['x-nextgent-timestamp']) && /^[0-9a-f]{32,}$/.test(headers['x-nextgent-nonce']) && /^[0-9a-f]{64}$/.test(headers['x-nextgent-signature']),
+        JSON.stringify(headers));
+    check('the same request a second time is a replay', /replay/i.test(signing.verifyRequest(reqOf(headers)) || ''), String(signing.verifyRequest(reqOf(headers))));
+    check('two signatures of one request never share a nonce', sig()['x-nextgent-nonce'] !== sig()['x-nextgent-nonce']);
+    check('a changed body fails', /Bad signature/.test(signing.verifyRequest(reqOf(sig(), { body: raw + ' ' }))));
+    check('the signature binds the method', /Bad signature/.test(signing.verifyRequest(reqOf(sig(), { method: 'DELETE' }))));
+    check('and the path', /Bad signature/.test(signing.verifyRequest(reqOf(sig(), { url: '/api/nextgent/installs/x' }))));
+    const q = signing.signHeaders({ method: 'GET', url: 'https://gcr.test/api/nextgent/entitlement?companyId=co-1&itemKey=a', rawBody: '' });
+    check('a GET with a query passes with that query', signing.verifyRequest(reqOf(q, { body: '', method: 'GET', url: '/api/nextgent/entitlement?companyId=co-1&itemKey=a' })) === null);
+    const q2 = signing.signHeaders({ method: 'GET', url: 'https://gcr.test/api/nextgent/entitlement?companyId=co-1&itemKey=a', rawBody: '' });
+    check('and the query is bound', /Bad signature/.test(signing.verifyRequest(reqOf(q2, { body: '', method: 'GET', url: '/api/nextgent/entitlement?companyId=co-2&itemKey=a' }))));
+    const old = sig({ now: Date.now() - 301 * 1000 });
+    check('older than 300 s fails', /too old/.test(signing.verifyRequest(reqOf(old))));
+    const future = sig({ now: Date.now() + 301 * 1000 });
+    check('more than 300 s in the future fails', /too old/.test(signing.verifyRequest(reqOf(future))));
+    check('no headers fails', /Missing/.test(signing.verifyRequest(reqOf({}))));
+    check('a signature without a nonce fails', /Missing/.test(signing.verifyRequest(reqOf((() => { const h = sig(); delete h['x-nextgent-nonce']; return h; })()))));
+    const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+    check('signed string is `${ts}\\n${nonce}\\n${METHOD}\\n${path}\\n${query}\\n${sha256hex(body)}`',
+        signing.requestSignature({ timestamp: '100', nonce: 'ab', method: 'get', pathname: '/p', query: 'a=1', rawBody: 'x' }, 'k')
+            === crypto.createHmac('sha256', 'k').update(`100\nab\nGET\n/p\na=1\n${sha('x')}`).digest('hex'));
+    check('an empty body hashes as the empty string', signing.requestSignature({ timestamp: '1', nonce: 'n', method: 'GET', pathname: '/p', query: '', rawBody: '' }, 'k')
+        === crypto.createHmac('sha256', 'k').update(`1\nn\nGET\n/p\n\n${sha('')}`).digest('hex'));
+    check('the Paperclip routine webhook format (`${ts}.${body}`) is still available for the agent step',
         signing.signature('100', 'x', 'k') === crypto.createHmac('sha256', 'k').update('100.x').digest('hex'));
+
+    console.log('\n── one secret per purpose ──');
+    const fs = require('fs');
+    const secrets = require(path.join(ROOT, 'lib/requiredSecrets.js'));
+    const throwsFor = (env) => { try { secrets.assertSecrets(env); return null; } catch (e) { return e.message; } };
+    const all = { NEXTGENT_SERVICE_SECRET: 'a', NEXTGENT_SECRETS_KEY: 'b', NEXTGENT_SESSION_SECRET: 'c', VERIFY_CODE_SECRET: 'd' };
+    check('production refuses to start when a secret is missing, naming it', /NEXTGENT_SECRETS_KEY/.test(throwsFor({ NODE_ENV: 'production', NEXTGENT_SERVICE_SECRET: 'a' }) || ''));
+    check('a Vercel production deploy too', /NEXTGENT_SESSION_SECRET/.test(throwsFor({ VERCEL_ENV: 'production', ...all, NEXTGENT_SESSION_SECRET: '' }) || ''));
+    check('with every secret set it starts', throwsFor({ NODE_ENV: 'production', ...all }) === null);
+    check('development starts without them', throwsFor({ NODE_ENV: 'development' }) === null);
+    for (const f of ['lib/secretBox.js', 'lib/businessTokens.js', 'lib/phoneVerification.js']) {
+        check(`${f} never derives from NEXTGENT_SERVICE_SECRET`, !/NEXTGENT_SERVICE_SECRET/.test(fs.readFileSync(path.join(ROOT, f), 'utf8')));
+    }
+    const box = require(path.join(ROOT, 'lib/secretBox.js'));
+    delete process.env.NEXTGENT_SECRETS_KEY;
+    check('secretBox refuses to seal without its own key', (() => { try { box.seal('x'); return false; } catch (e) { return /NEXTGENT_SECRETS_KEY/.test(e.message); } })());
+    process.env.NEXTGENT_SECRETS_KEY = 'box-key';
+    check('and seals with it', box.open(box.seal('hello')) === 'hello');
+    const tokens = require(path.join(ROOT, 'lib/businessTokens.js'));
+    delete process.env.NEXTGENT_SESSION_SECRET;
+    check('an install session token needs its own secret', (() => { try { tokens.mintInstallSession({ installId: 'in-1' }); return false; } catch (e) { return /NEXTGENT_SESSION_SECRET/.test(e.message); } })());
+    process.env.NEXTGENT_SESSION_SECRET = 'session-one';
+    const minted = tokens.mintInstallSession({ installId: 'in-1' }).token;
+    process.env.NEXTGENT_SESSION_SECRET = 'session-two';
+    tables.nextgent_installs = [{ install_id: 'in-1', company_id: null, entity_slug: 'biz-one', item_key: 'x', permissions: [], status: 'active' }];
+    check('a token minted under another session secret is refused', /not valid/.test((await tokens.lookupToken(minted)).reason || ''));
+    process.env.NEXTGENT_SESSION_SECRET = 'session-one';
+    check('and accepted under its own', (await tokens.lookupToken(minted)).slug === 'biz-one');
 
     console.log('\n── token verification ──');
     const good = await paperclip.verifyToken(sign());

@@ -19,6 +19,7 @@ const ed = crypto.generateKeyPairSync('ed25519');
 const rawPub = ed.publicKey.export({ format: 'der', type: 'spki' }).subarray(-32);
 Object.assign(process.env, {
     NEXTGENT_SERVICE_SECRET: 'svc',
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     PAPERCLIP_API_URL: 'https://paperclip.test',
     TELNYX_API_KEY: 'KEY_test',
     TELNYX_PUBLIC_KEY: rawPub.toString('base64'),

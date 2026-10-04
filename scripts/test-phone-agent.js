@@ -15,6 +15,7 @@ const ROOT = path.resolve(__dirname, '..');
 const SECRET = 'svc';
 Object.assign(process.env, {
     NEXTGENT_SERVICE_SECRET: SECRET,
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     TELNYX_API_KEY: 'KEY_test',
     TELNYX_CONNECTION_ID: 'conn-1',
     TELNYX_MESSAGING_PROFILE_ID: 'mp-1',
@@ -77,10 +78,9 @@ app.use('/api/nextgent', require(path.join(ROOT, 'routes/nextgent.js')));
 const server = app.listen(0, run);
 async function signed(method, url, body) {
     const raw = body === undefined ? '' : JSON.stringify(body);
-    const ts = String(Math.floor(Date.now() / 1000));
     const res = await fetch(`http://127.0.0.1:${server.address().port}${url}`, {
         method, body: body === undefined ? undefined : raw,
-        headers: { 'Content-Type': 'application/json', 'x-nextgent-timestamp': ts, 'x-nextgent-signature': crypto.createHmac('sha256', SECRET).update(`${ts}.${raw}`).digest('hex') },
+        headers: { 'Content-Type': 'application/json', ...require(path.join(ROOT, 'lib/serviceSigning.js')).signHeaders({ method, url, rawBody: raw }, { key: SECRET }) },
     });
     return { status: res.status, body: await res.json() };
 }

@@ -18,6 +18,7 @@ const ROOT = path.resolve(__dirname, '..');
 const SECRET = 'svc-secret';
 Object.assign(process.env, {
     NEXTGENT_SERVICE_SECRET: SECRET,
+    NEXTGENT_SECRETS_KEY: 'box-key', NEXTGENT_SESSION_SECRET: 'session-key', VERIFY_CODE_SECRET: 'code-key',
     SUPABASE_URL: 'https://db.example.test',
     SUPABASE_KEY: 'service',
     INTAKE_EMAIL_DOMAIN: 'parse.example.test',
@@ -126,8 +127,7 @@ async function call(method, url, body, headers = {}) {
 }
 function signed(method, url, body) {
     const raw = body === undefined ? '' : JSON.stringify(body);
-    const ts = String(Math.floor(Date.now() / 1000));
-    return call(method, url, body, { 'x-nextgent-timestamp': ts, 'x-nextgent-signature': crypto.createHmac('sha256', SECRET).update(`${ts}.${raw}`).digest('hex') });
+    return call(method, url, body, require(path.join(ROOT, 'lib/serviceSigning.js')).signHeaders({ method, url, rawBody: raw }, { key: SECRET }));
 }
 const as = (token) => (method, url, body) => call(method, url, body, { Authorization: `Bearer ${token}` });
 
