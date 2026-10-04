@@ -439,7 +439,13 @@ router.get('/deployments/recent', adminRequired, async (req, res) => {
  *  OWNER — one business, its own installs
  * ════════════════════════════════════════════════════════════════════════ */
 
+// The address an outside system posts to is this API's own (API_BASE_URL):
+// a dashboard reaches here through its surface's proxy, whose forwarded
+// host is the surface, not this API. The headers are the fallback only when
+// API_BASE_URL is unset.
 function hookUrl(req, token) {
+    const base = require('../lib/env').envUrl('API_BASE_URL');
+    if (base) return `${base}/api/automations/hook/${token}`;
     const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
     const host = req.headers['x-forwarded-host'] || req.headers.host;
     return `${proto}://${host}/api/automations/hook/${token}`;
