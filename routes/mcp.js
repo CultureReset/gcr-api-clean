@@ -276,7 +276,7 @@ const TOOLS = [
         name: 'whoami',
         title: 'Which business am I connected to',
         description:
-            'The business this connection acts as, and whether it may write. Call this first if you are unsure who you are working for.',
+            'The business this connection acts as, whether it may write, its timezone and its own phone numbers. Call this first if you are unsure who you are working for.',
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -534,16 +534,21 @@ async function runTool(name, args, caller) {
 
     switch (name) {
         case 'whoami': {
-            const { data: entity } = await supabase
-                .from('entity')
-                .select('name, entity_type')
-                .eq('slug', caller.slug)
-                .maybeSingle();
-            const tables = await tablesFor(caller, 'read');
+            // timezone and own_numbers are what Paperclip's scheduler and its
+            // sms.send step read live (DECISIONS #105). The numbers are the
+            // engine's own businessOwnNumbers — one copy of "the business's own".
+            const { businessOwnNumbers } = require('../lib/automationEngine');
+            const [{ data: entity }, ownNumbers, tables] = await Promise.all([
+                supabase.from('entity').select('name, entity_type, timezone').eq('slug', caller.slug).maybeSingle(),
+                businessOwnNumbers(caller.slug),
+                tablesFor(caller, 'read'),
+            ]);
             return content({
                 slug: caller.slug,
                 name: entity?.name || null,
                 industry: entity?.entity_type || null,
+                timezone: entity?.timezone || null,
+                own_numbers: [...ownNumbers],
                 can_write: canAny(caller, 'write'),
                 permissions: caller.permissions ?? undefined,
                 connection: caller.label || caller.via,

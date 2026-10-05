@@ -52,6 +52,7 @@ const TOKEN_ROW = {
 let tokenScope = 'write';
 let tokenPermissions = null; // null = a legacy token
 let entityExists = true;
+let entityTimezone = 'America/Chicago'; // null = a business that never set one
 let appsInstalled = false; // the agent face: installed apps' declared actions (DECISIONS #46)
 
 // Two installed apps (lib/appInstances.js projection rows) with declared actions.
@@ -104,9 +105,14 @@ function result(rec) {
         // entityExists false stands in for a slug nobody has, or a delisted one.
         if (!entityExists) return { data: null, error: null };
         return {
-            data: { slug: 'flora-bama', name: 'Flora-Bama', entity_type: 'restaurant', city: 'Perdido Key', phone: '555-0100', is_active: true },
+            data: { slug: 'flora-bama', name: 'Flora-Bama', entity_type: 'restaurant', city: 'Perdido Key', phone: '555-0100', is_active: true, timezone: entityTimezone },
             error: null,
         };
+    }
+    // The business's own numbers (lib/automationEngine.js businessOwnNumbers), keyed by the slug asked for.
+    if (rec.table === 'owner_notify_settings') return { data: rec.eq.entity_slug === 'flora-bama' ? { phone: '(251) 555-0199' } : null, error: null };
+    if (rec.table === 'business_phone_numbers') {
+        return { data: rec.eq.entity_slug === 'flora-bama' ? [{ phone_number: '+12515550123', status: 'active' }, { phone_number: '+12515550999', status: 'released' }] : [], error: null };
     }
     if (rec.table === 'tourist_memories') {
         if (rec.upsert) return { data: null, error: null };
@@ -514,6 +520,19 @@ async function run() {
     const who = await call('whoami');
     check('whoami reports the business', who.body.result.structuredContent.slug === 'flora-bama');
     check('whoami reports write access', who.body.result.structuredContent.can_write === true);
+    // DECISIONS #105: Paperclip's scheduler and sms.send step read these live.
+    check('whoami reports the business timezone', who.body.result.structuredContent.timezone === 'America/Chicago', JSON.stringify(who.body.result.structuredContent));
+    const own = who.body.result.structuredContent.own_numbers;
+    check('whoami reports the business\'s own numbers as businessOwnNumbers computes them (active registered numbers + owner notification phone, E.164)',
+        Array.isArray(own) && own.includes('+12515550123') && own.includes('+12515550199') && !own.includes('+12515550999'), JSON.stringify(own));
+    calls.length = 0;
+    await call('whoami');
+    const ownQueries = calls.filter((c) => ['owner_notify_settings', 'business_phone_numbers'].includes(c.table));
+    check('the own numbers are read for the token\'s slug only', ownQueries.length === 2 && ownQueries.every((c) => c.eq.entity_slug === 'flora-bama'), JSON.stringify(ownQueries.map((c) => c.eq)));
+    entityTimezone = null;
+    const noTz = await call('whoami');
+    check('whoami reports timezone null when the business has not set one', noTz.body.result.structuredContent.timezone === null && 'timezone' in noTz.body.result.structuredContent);
+    entityTimezone = 'America/Chicago';
     const desc = await call('describe_section', { section: 'menu_items' });
     check('describe_section lists columns', desc.body.result.structuredContent.columns.length === 5);
     const secs = await call('list_sections');
