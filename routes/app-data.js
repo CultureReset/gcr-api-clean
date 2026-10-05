@@ -32,6 +32,7 @@ const {
     sectionSelect, applySection, sectionRow,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
+const businessEvents = require('../lib/businessEvents');
 const { envInt } = require('../lib/env');
 
 const fail = (res, status, error, extra) => res.status(status).json({ error, ...(extra || {}) });
@@ -83,7 +84,7 @@ async function countRows(installId, table) {
     return count || 0;
 }
 
-async function insertRecord({ install, table, data, source }) {
+async function insertRecord({ install, instance, table, data, source }) {
     if (Buffer.byteLength(JSON.stringify(data)) > maxRecordBytes()) throw Object.assign(new Error('That record is too large.'), { status: 413 });
     if (await countRows(install.install_id, table) >= maxRows()) throw Object.assign(new Error('This table is full.'), { status: 409 });
     const { data: made, error } = await supabase.from('app_records').insert({
@@ -94,6 +95,17 @@ async function insertRecord({ install, table, data, source }) {
         source,
     }).select().single();
     if (error) throw (appInstances.missing(error) ? appInstances.notSetUp() : new Error(error.message));
+    // <appKey>.<event> for each event the manifest declares for this table
+    // (events.emits, DECISIONS #47). The record as the engine reads it, with a
+    // visitor's owner-only columns left out. Never fails the insert.
+    await businessEvents.appRecordCreated(install.entity_slug, {
+        appKey: instance.app_key,
+        manifest: instance.manifest,
+        table,
+        record: appRecordRow(made, { strip: source === 'visitor' ? ownerOnlyColumns(instance.manifest, table) : null }),
+        source,
+        installId: install.install_id,
+    });
     return made;
 }
 
@@ -127,7 +139,7 @@ dataRouter.post('/:table', async (req, res) => {
     const checked = cleanAppRecord(instance.manifest, table, req.body);
     if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
     try {
-        const made = await insertRecord({ install, table, data: checked.data, source: 'owner' });
+        const made = await insertRecord({ install, instance, table, data: checked.data, source: 'owner' });
         res.status(201).json({ table, row: appRecordRow(made) });
     } catch (err) {
         dbFail(res, err);
@@ -291,7 +303,7 @@ publicRouter.post('/:installId/:table', async (req, res) => {
         }
         const checked = cleanAppRecord(manifest, table, req.body, { visitor: true });
         if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
-        const made = await insertRecord({ install, table, data: checked.data, source: 'visitor' });
+        const made = await insertRecord({ install, instance, table, data: checked.data, source: 'visitor' });
         // Write-only: a visitor gets the receipt, not the row back.
         res.status(201).json({ table, row: { id: made.id, created_at: made.created_at } });
     } catch (err) {

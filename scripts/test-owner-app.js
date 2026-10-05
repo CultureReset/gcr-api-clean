@@ -27,6 +27,12 @@ Object.assign(process.env, {
 const { T, db } = createMemDb({ tables: {
     entity: [{ slug: 'shop', name: 'The Shop', email: 'o@shop.test' }],
     owner_automation_drafts: [],
+    // An installed app (lib/appInstances.js projection) declaring the events it emits.
+    entity_modules: [
+        { id: 1, entity_slug: 'shop', module_key: 'song-requests', managed_by: 'paperclip', install_id: 'in-1', enabled: true, settings: { manifest: { name: 'Song Requests', events: { emits: ['requests.submitted'] } } } },
+        { id: 2, entity_slug: 'shop', module_key: 'gone-app', managed_by: 'paperclip', install_id: 'in-2', enabled: false, settings: { manifest: { name: 'Gone', events: { emits: ['things.happened'] } } } },
+        { id: 3, entity_slug: 'other', module_key: 'theirs', managed_by: 'paperclip', install_id: 'in-3', enabled: true, settings: { manifest: { name: 'Theirs', events: { emits: ['stuff.done'] } } } },
+    ],
     billing_plan: [{ key: 'base', is_default: true, is_public: true }, { key: 'growth', name: 'Growth', stripe_price_id: 'price_growth', is_public: true }, { key: 'hidden', is_public: false, stripe_price_id: 'p' }],
     billing_subscription: [],
     ghost_nodes: [],
@@ -69,6 +75,13 @@ async function run() {
         check('the palette is the engine\'s own registry', types.includes('wait') && types.includes('message') && types.length === Object.values(engine.STEP_TYPES).filter((s) => !s.adminOnly).length);
         check('platform-only steps are left out', !types.includes('script') && !types.includes('http.request'));
         check('triggers and events come with it', meta.body.triggers.length > 0 && meta.body.events.some((e) => e.name === 'booking.completed'));
+        const appEvent = meta.body.events.find((e) => e.name === 'song-requests.requests.submitted');
+        check('the events of this business\'s installed apps are listed, namespaced by app key (DECISIONS #47)', !!appEvent && appEvent.app === 'song-requests' && /Song Requests/.test(appEvent.description), JSON.stringify(meta.body.events));
+        check('a disabled install\'s events are not, nor another business\'s', !meta.body.events.some((e) => e.name === 'gone-app.things.happened' || e.name === 'theirs.stuff.done'));
+        const onApp = await call('POST', '/api/business/automations/drafts', { name: 'Thank the requester', trigger: { type: 'event', event: 'song-requests.requests.submitted' }, steps: [] });
+        check('a draft may listen for an installed app\'s event', onApp.status === 201 && onApp.body.problems.length === 0, JSON.stringify(onApp.body));
+        const onNothing = await call('POST', '/api/business/automations/drafts', { name: 'Listen to the void', trigger: { type: 'event', event: 'nobody.installed.this' }, steps: [] });
+        check('an event no installed app declares is a problem', onNothing.body.problems.some((p) => /event/i.test(p)), JSON.stringify(onNothing.body));
         const saved = await call('POST', '/api/business/automations/drafts', {
             name: 'Thank-you note', trigger: { type: 'event', event: 'booking.completed' },
             steps: [{ id: 'w', type: 'wait', config: { minutes: 60 } }, { id: 'm', type: 'message', config: { channel: 'email', to: '{{ trigger.payload.booking.customer_email }}', body: 'Thanks!' } }],
@@ -79,7 +92,7 @@ async function run() {
         const upd = await call('POST', '/api/business/automations/drafts', { id: saved.body.draft.id, name: 'Thank-you note v2', steps: [] });
         check('a draft can be updated by id', upd.status === 200 && upd.body.draft.name === 'Thank-you note v2');
         const list = await call('GET', '/api/business/automations/drafts');
-        check('drafts list', list.body.drafts.length === 2);
+        check('drafts list', list.body.drafts.length === 4, String(list.body.drafts.length));
         session = { ...session, entitySlug: 'other' };
         const foreign = await call('POST', '/api/business/automations/drafts', { id: saved.body.draft.id, name: 'mine now' });
         check('another business cannot change it', foreign.status === 404);

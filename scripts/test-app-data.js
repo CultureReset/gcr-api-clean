@@ -52,6 +52,15 @@ const { T, db } = createMemDb({ tables: {
     ],
 } });
 inject(path.join(ROOT, 'db.js'), db);
+// The automation engine, recording what the app routes emit (DECISIONS #47).
+const events = [];
+inject(path.join(ROOT, 'lib/automationEngine.js'), {
+    emitEvent: async (event, slug, payload) => { events.push({ event, slug, payload }); return { ran: 0 }; },
+    newHookToken: () => 'b'.repeat(48),
+    tick: async () => ({}),
+    catalogue: () => ({ steps: [], events: [] }),
+    EVENTS: [],
+});
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
@@ -73,6 +82,8 @@ function manifest(over = {}) {
         runtime: { type: 'engine', engine: '1' },
         surfaces: [{ id: 'owner', kind: 'dashboard', path: '/owner' }, { id: 'public', kind: 'public', path: '/public' }],
         permissions: [{ id: 'menu:read', reason: 'Shows the menu.' }],
+        // <table>.<verb>: an insert into `notes` emits notes.submitted, as <appKey>.notes.submitted.
+        events: { emits: ['notes.submitted', 'internal.noted'] },
         data: {
             namespace: 'notes',
             tables: {
@@ -178,8 +189,10 @@ async function run() {
         check('no token is refused', (await call('GET', '/api/app-install')).status === 401);
 
         console.log('\n── /api/app-data ──');
+        events.length = 0;
         const made = await own('POST', '/api/app-data/notes', { title: 'First', count: '3', sneaky: 'x', entity_slug: 'other' });
         check('a record is created with declared columns only', made.status === 201 && made.body.row.title === 'First' && made.body.row.count === 3 && !('sneaky' in made.body.row) && made.body.row.shown === true, JSON.stringify(made.body));
+        check('an owner insert emits the declared event, namespaced by the app key, for the install\'s business', events.length === 1 && events[0].event === 'notes-app.notes.submitted' && events[0].slug === 'shop' && events[0].payload.table === 'notes' && events[0].payload.record.title === 'First' && events[0].payload.source === 'owner' && events[0].payload.installId === 'app-1', JSON.stringify(events));
         const rec = T.app_records.find((r) => r.id === made.body.row.id);
         check('scoped to the install and the business from the token', rec.install_id === 'app-1' && rec.entity_slug === 'shop' && rec.app_table === 'notes');
         check('a missing required column is refused', (await own('POST', '/api/app-data/notes', { count: 1 })).status === 422);
@@ -220,8 +233,14 @@ async function run() {
         check('a public contract source: the registry\'s table and filter, this business only', contractPub.status === 200 && contractPub.body.data.products?.length === 1 && contractPub.body.data.products[0].name === 'Mug', JSON.stringify(contractPub.body.data));
         check('a contract over a table of people is never public, whatever the permission', !('records' in contractPub.body.data));
 
+        events.length = 0;
         const sub = await call('POST', '/api/public/apps/app-1/notes', { title: 'From a visitor', flag: 'set-by-visitor' });
         check('a visitor can append to a public append table', sub.status === 201 && sub.body.row.id && !('title' in sub.body.row), JSON.stringify(sub.body));
+        check('a visitor\'s insert emits the same declared event, source visitor', events.length === 1 && events[0].event === 'notes-app.notes.submitted' && events[0].payload.source === 'visitor' && events[0].payload.record.title === 'From a visitor', JSON.stringify(events));
+        events.length = 0;
+        await own('POST', '/api/app-data/internal', { memo: 'quiet' });
+        check('an insert into a table with no declared event emits nothing of its own (internal.noted is declared: it fires)', events.length === 1 && events[0].event === 'notes-app.internal.noted', JSON.stringify(events));
+        events.length = 0;
         const vrec = T.app_records.find((r) => r.id === sub.body.row.id);
         check('owner-only columns take their default, not the visitor\'s value', vrec.data.flag === 'new' && vrec.source === 'visitor' && vrec.entity_slug === 'shop');
         check('a table not open to visitors is refused', (await call('POST', '/api/public/apps/app-1/internal', { memo: 'x' })).status === 404);

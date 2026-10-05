@@ -44,6 +44,7 @@
 const express = require('express');
 const supabase = require('../db');
 const googlePush = require('../lib/googlePush');
+const businessEvents = require('../lib/businessEvents');
 const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 
 // The schema discovery, the table allow-list and the column filter live in
@@ -339,8 +340,14 @@ router.post('/:table', businessCaller, async (req, res) => {
 
     // A fact Google shows (hours, menus…) is queued for the profile (lib/googlePush.js).
     await googlePush.noteTableWrite(req.entitySlug, table, data);
+    // A booking or a review written here fires the same events the dashboard's
+    // own paths fire (lib/businessEvents.js, DECISIONS #47). Never fails the write.
+    await businessEvents.sectionWritten(req.entitySlug, table, null, data);
     res.status(201).json({ ...named(section), row: sectionRow(section, data) });
 });
+
+// Tables whose change is an event (booking.changed / cancelled need the row as it was).
+const EVENTFUL_ON_CHANGE = new Set(['bookings', 'booking_calendar']);
 
 // PATCH /api/business/:table/:id
 router.patch('/:table/:id', businessCaller, async (req, res) => {
@@ -352,6 +359,14 @@ router.patch('/:table/:id', businessCaller, async (req, res) => {
     for (const column of Object.keys(section.filter || {})) delete values[column]; // a row cannot leave its contract
     if (!Object.keys(values).length) return fail(res, 400, 'Nothing to change.');
 
+    let before = null;
+    if (EVENTFUL_ON_CHANGE.has(table)) {
+        const { data: was } = await applySection(
+            supabase.from(table).select('*').eq(section.idColumn, req.params.id), section, req.entitySlug,
+        ).maybeSingle();
+        before = was ? { ...was } : null; // a snapshot, not a reference the update could move
+    }
+
     const { data, error } = await applySection(
         supabase.from(table).update(values).eq(section.idColumn, req.params.id),
         section, req.entitySlug, // never reachable outside this business, or outside the contract
@@ -360,6 +375,7 @@ router.patch('/:table/:id', businessCaller, async (req, res) => {
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
     await googlePush.noteTableWrite(req.entitySlug, table, data[0]);
+    if (EVENTFUL_ON_CHANGE.has(table)) await businessEvents.sectionWritten(req.entitySlug, table, before, data[0]);
     res.json({ ...named(section), row: sectionRow(section, data[0]) });
 });
 

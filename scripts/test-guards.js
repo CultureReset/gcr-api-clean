@@ -50,6 +50,7 @@ const { T, db } = createMemDb({
         automation_waits: [],
         scheduler_state: [],
         bookings: [{ id: 'bk-1', entity_slug: 'shop', payment_status: 'unpaid', status: 'pending' }],
+        entity_reviews: [],
         stripe_webhook_events: [],
         payments_detected: [],
         entity_external_calendars: [],
@@ -67,15 +68,31 @@ inject(path.join(ROOT, 'lib/automationEngine.js'), {
     catalogue: () => ({ steps: [], events: [] }),
 });
 
+// The live schema read (lib/businessTables.js), for the business data routes.
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, init) => {
+    if (String(url).startsWith('https://db.example.test/rest/v1/')) {
+        const def = (cols) => ({ properties: Object.fromEntries(cols.map((c) => [c, { type: 'string' }])) });
+        return { ok: true, status: 200, json: async () => ({ definitions: {
+            bookings: def(['id', 'entity_slug', 'customer_name', 'phone', 'email', 'date', 'start_time', 'party_size', 'status', 'source', 'details']),
+            booking_calendar: def(['id', 'entity_slug', 'date', 'kind', 'status', 'title', 'details']),
+            entity_reviews: def(['id', 'entity_slug', 'reviewer_name', 'rating', 'body', 'verified_purchase', 'approved']),
+        } }) };
+    }
+    return realFetch(url, init);
+};
+
 const { check, done } = checker();
 const app = express();
 app.use(express.json({ verify: (req, _r, buf) => { req.rawBody = buf; } }));
+app.use('/api/business/availability', require(path.join(ROOT, 'routes/owner-availability.js')));
 app.use('/api/rentals', require(path.join(ROOT, 'routes/rentals.js')));
 app.use('/api/services', require(path.join(ROOT, 'routes/services.js')));
-app.use('/api/business/availability', require(path.join(ROOT, 'routes/owner-availability.js')));
 const automations = require(path.join(ROOT, 'routes/automations.js'));
 app.use('/api/business/automations', automations.ownerRouter);
 app.use('/api/automations', automations.publicRouter);
+// Mounted last of the /api/business routers: it ends in /:table.
+app.use('/api/business', require(path.join(ROOT, 'routes/business-data.js')));
 app.use('/api/email-parser', require(path.join(ROOT, 'routes/email-parser.js')));
 app.use('/api/stripe', require(path.join(ROOT, 'routes/stripe.js')));
 app.use('/api/webhooks', require(path.join(ROOT, 'routes/webhooks.js')));
@@ -122,6 +139,26 @@ async function run() {
         events.length = 0;
         r = await call('DELETE', '/api/business/availability/block/bc-3', { token: 'owner-token' });
         check('a block is cancelled with no booking event', r.status === 200 && T.booking_calendar.find((b) => b.id === 'bc-3').status === 'cancelled' && !events.length);
+
+        console.log('\n── writes through /api/business emit what the dashboard emits (DECISIONS #47) ──');
+        events.length = 0;
+        r = await call('POST', '/api/business/booking.records', { token: 'owner-token', body: { customer_name: 'Cy', phone: '+12515550199', date: '2026-12-01', status: 'pending' } });
+        check('a booking written through its contract fires booking.created', r.status === 201 && events.length === 1 && events[0].event === 'booking.created' && events[0].slug === 'shop', `${r.status} ${JSON.stringify(events)}`);
+        check('with the booking as every other path shapes it', events[0]?.payload.booking.customer_name === 'Cy' && events[0].payload.booking.customer_phone === '+12515550199' && events[0].payload.booking.booking_id === r.body.row.id && events[0].payload.booking.date === '2026-12-01', JSON.stringify(events[0]?.payload));
+        events.length = 0;
+        r = await call('PATCH', `/api/business/booking.records/${r.body.row.id}`, { token: 'owner-token', body: { status: 'cancelled' } });
+        check('cancelling it fires booking.cancelled', r.status === 200 && events.length === 1 && events[0].event === 'booking.cancelled', `${r.status} ${JSON.stringify(events)}`);
+        events.length = 0;
+        r = await call('POST', '/api/business/bookings', { token: 'owner-token', body: { customer_name: 'Di', date: '2026-12-02' } });
+        check('the raw table name is the same door: booking.created', events.length === 1 && events[0].event === 'booking.created' && events[0].payload.booking.customer_name === 'Di', JSON.stringify(events));
+        events.length = 0;
+        r = await call('POST', '/api/business/reviews.items', { token: 'owner-token', body: { reviewer_name: 'Em', rating: 5, body: 'Great' } });
+        check('a review written through its contract fires review.received', r.status === 201 && events.length === 1 && events[0].event === 'review.received' && events[0].payload.review.reviewer_name === 'Em' && events[0].payload.review.rating === 5 && events[0].payload.review.text === 'Great', `${r.status} ${JSON.stringify(events)}`);
+        events.length = 0;
+        r = await call('PATCH', `/api/business/reviews.items/${r.body.row.id}`, { token: 'owner-token', body: { body: 'Great!' } });
+        check('editing a review fires nothing (only a new one is received)', r.status === 200 && events.length === 0, JSON.stringify(events));
+        r = await call('POST', '/api/business/availability.claims', { token: 'owner-token', body: { date: '2026-12-03', kind: 'block', title: 'Closed' } });
+        check('a block on the calendar is not a booking event', r.status === 201 && events.length === 0, JSON.stringify(events));
 
         console.log('\n── cron endpoints ──');
         delete process.env.CRON_SECRET;

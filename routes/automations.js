@@ -451,9 +451,9 @@ function hookUrl(req, token) {
     return `${proto}://${host}/api/automations/hook/${token}`;
 }
 
-/** The builder's palette for an owner: the engine's own registry, less platform-only steps. */
-ownerRouter.get('/meta', ownerRequired, (_req, res) => {
-    res.json(engine.catalogue({ forOwner: true }));
+/** The builder's palette for an owner: the engine's own registry, less platform-only steps, plus the events this business's installed apps declare. */
+ownerRouter.get('/meta', ownerRequired, async (req, res) => {
+    res.json(engine.catalogue({ forOwner: true, events: await engine.knownEvents(req.entitySlug) }));
 });
 
 /** The owner's own automation drafts. */
@@ -477,7 +477,7 @@ ownerRouter.post('/drafts', ownerRequired, async (req, res) => {
         steps: Array.isArray(b.steps) ? b.steps : [],
         config_schema: Array.isArray(b.config_schema) ? b.config_schema : [],
     };
-    const problems = engine.validateDefinition(def, { forOwner: true });
+    const problems = engine.validateDefinition(def, { forOwner: true, events: await engine.knownEvents(req.entitySlug) });
     if (!def.name) return fail(res, 400, 'A name is required.', { problems });
     const row = { ...def, entity_slug: req.entitySlug, problems, updated_at: new Date().toISOString(), updated_by: req.paperclip?.userId || req.ownerUserId || null };
     let result;

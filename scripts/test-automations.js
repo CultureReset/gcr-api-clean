@@ -78,6 +78,13 @@ function result(rec) {
         return { data: null, error: null };
     }
     if (rec.table === 'automations') return { data: [{ id: 'auto-1', name: 'Nightly special', icon: '⚡', version: 2, status: 'published', trigger: DEFINITION.trigger }], error: null };
+    if (rec.table === 'entity_modules') {
+        return { data: rec.eq.entity_slug === 'flora-bama' ? [
+            { entity_slug: 'flora-bama', module_key: 'song-requests', managed_by: 'paperclip', enabled: true, settings: { manifest: { name: 'Song Requests', events: { emits: ['requests.submitted', 'requests.played'] } } } },
+            { entity_slug: 'flora-bama', module_key: 'legacy', managed_by: null, enabled: true, settings: { manifest: { name: 'Legacy', events: { emits: ['x.y'] } } } },
+            { entity_slug: 'flora-bama', module_key: 'no-events', managed_by: 'paperclip', enabled: true, settings: { manifest: { name: 'Quiet' } } },
+        ] : [], error: null };
+    }
     return { data: [], error: null, count: 0 };
 }
 
@@ -187,6 +194,18 @@ function check(label, ok, detail) {
     check('a duplicate step id is caught', engine.validateDefinition({ ...DEFINITION, steps: [DEFINITION.steps[0], DEFINITION.steps[0]] }).some((p) => /used twice/.test(p)));
     check('a required step field is caught', engine.validateDefinition({ ...DEFINITION, steps: [{ id: 'q', type: 'data.query', config: {} }] }).some((p) => /Table is required/.test(p)));
     check('a bad key is caught', engine.validateDefinition({ ...DEFINITION, key: 'Not Valid' }).some((p) => /Key must/.test(p)));
+
+    console.log('\nEvents an installed app declares (DECISIONS #47)');
+    const appEvents = await engine.appEventsFor('flora-bama');
+    check('the events of the business\'s installed apps, namespaced by app key', appEvents.map((e) => e.name).join(',') === 'song-requests.requests.submitted,song-requests.requests.played', JSON.stringify(appEvents));
+    check('a legacy dashboard row (not managed by Paperclip) declares nothing', !appEvents.some((e) => e.name.startsWith('legacy.')));
+    const known = await engine.knownEvents('flora-bama');
+    check('knownEvents is the platform list plus those', known.some((e) => e.name === 'booking.created') && known.some((e) => e.name === 'song-requests.requests.submitted') && known.length === engine.EVENTS.length + 2);
+    check('another business knows only the platform list', (await engine.knownEvents('somebody-else')).length === engine.EVENTS.length);
+    const listen = (event) => ({ ...DEFINITION, trigger: { type: 'event', event } });
+    check('with a known-events list, an app event validates', engine.validateDefinition(listen('song-requests.requests.submitted'), { events: known }).length === 0);
+    check('and an undeclared one is a problem', engine.validateDefinition(listen('nope.nothing'), { events: known }).some((p) => /event/i.test(p)));
+    check('without a list, validation is as before (the admin builds for every business)', engine.validateDefinition(listen('nope.nothing')).length === 0);
 
     console.log('\nRunner — a real run is scoped to the business and records itself');
     calls.length = 0; smsCalls.length = 0;
