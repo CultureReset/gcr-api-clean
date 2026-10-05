@@ -32,6 +32,8 @@ function builder(table, verb) {
         update: (v) => { rec.update = v; return self; },
         eq: (k, v) => { rec.eq[k] = v; return self; },
         in: (k, v) => { rec.in = [k, v]; return self; },
+        is: (k, v) => { rec.is = [k, v]; return self; },
+        not: (...a) => { rec.not = a; return self; },
         order: (...a) => { rec.order = a; return self; },
         limit: (n) => { rec.limit = n; return self; },
         maybeSingle: () => Promise.resolve(result(rec)),
@@ -175,6 +177,19 @@ async function call(server, method, url, { token, body } = {}) {
 
         r = await call(server, 'POST', '/api/nodes/heartbeat', { token: NODE_TOKEN, body: { version: '0.2.0', health: { core: 'ok' } } });
         check('heartbeat accepted', r.status === 200);
+
+        // Late receipts pushed by the box (DECISIONS #80)
+        r = await call(server, 'POST', '/api/nodes/receipts', { body: { receipts: [] } });
+        check('a receipt push needs a node token', r.status === 401);
+        calls.length = 0;
+        r = await call(server, 'POST', '/api/nodes/receipts', { token: NODE_TOKEN, body: { receipts: [{ action_id: 'act-1', capability: 'sms.send', result: 'VERIFIED', task_id: 'task-1', entity_slug: 'someone-else' }] } });
+        check('a pushed receipt is accepted', r.status === 200 && r.json.accepted === 1, JSON.stringify(r.json));
+        const stored = calls.find((c) => c.table === 'ghost_node_requests' && c.insert);
+        check('it is stored as a done receipt request of the token\'s business, never the body\'s',
+            stored?.insert.entity_slug === 'flora-bama' && stored.insert.node_id === 'node-1' && stored.insert.path === '/actions/act-1/receipt'
+            && stored.insert.method === 'GET' && stored.insert.status === 'done' && stored.insert.paperclip_task_id === 'task-1', JSON.stringify(stored?.insert));
+        const dedupe = calls.find((c) => c.table === 'ghost_node_requests' && !c.insert && !c.update);
+        check('duplicates are looked for among this node\'s requests only', dedupe?.eq.node_id === 'node-1');
     } finally {
         server.close();
     }

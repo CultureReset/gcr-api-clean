@@ -84,6 +84,33 @@ async function run() {
         const req3 = T.ghost_node_requests[2];
         await call('POST', `/api/nodes/requests/${req3.id}/response`, { status: 200, body: { receipt: { action: 'x', verified: false } } }, NODE_TOKEN);
         check('an unlinked business: not posted, the reason kept', posted.length === 1 && T.ghost_node_requests[2].receipt_error === 'not_linked');
+        T.company_links.push({ company_id: 'co-1', entity_slug: 'shop' });
+
+        console.log('\n── receipts produced later are pushed by the computer (DECISIONS #80, #79) ──');
+        // The box's late push: core's receipt shape in relay form, no target.
+        const late = { action_id: 'act-9', capability: 'maps.update_hours', environment: 'android', map_id: 'gmb.hours', map_version: '3', requested_state: { hours: 'closes 22:00' }, observed_state: { hours: 'closes 22:00' }, result: 'VERIFIED', evidence: ['after.png'], created_at: '2026-10-04T13:00:00Z', task_id: 'task-77', action: 'maps.update_hours', verified: true, at: '2026-10-04T13:00:00Z', new_value: { hours: 'closes 22:00' } };
+        const noToken = await realFetch(`http://127.0.0.1:${server.address().port}/api/nodes/receipts`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ receipts: [late] }) });
+        check('a push needs a node token', noToken.status === 401);
+        const rows = T.ghost_node_requests.length;
+        const pushed = await call('POST', '/api/nodes/receipts', { receipts: [late, { capability: 'no.action.id', result: 'VERIFIED' }] }, NODE_TOKEN);
+        check('the push is accepted (2xx; 404/405/501 would pause the box)', pushed.status === 200 && pushed.body.accepted === 1 && pushed.body.posted === 1 && pushed.body.skipped === 1, JSON.stringify(pushed.body));
+        const synthetic = T.ghost_node_requests[rows];
+        check('each receipt becomes a done GET /actions/<id>/receipt row of the node\'s business, with its task id',
+            T.ghost_node_requests.length === rows + 1 && synthetic?.method === 'GET' && synthetic.path === '/actions/act-9/receipt' && synthetic.status === 'done'
+            && synthetic.response_status === 200 && synthetic.response_body === late || JSON.stringify(synthetic?.response_body) === JSON.stringify(late),
+            JSON.stringify(synthetic));
+        check('scoped by the node token, never the body', synthetic?.entity_slug === 'shop' && synthetic.node_id === 'node-1' && synthetic.paperclip_task_id === 'task-77');
+        const lateBody = JSON.parse(posted[1]?.body || '{}');
+        check('posted to Paperclip against its task', posted.length === 2 && lateBody.companyId === 'co-1' && lateBody.taskId === 'task-77' && lateBody.verified === true && lateBody.action === 'maps.update_hours', JSON.stringify(lateBody));
+        check('a receipt with no target falls back to its capability (DECISIONS #79)', lateBody.target === 'maps.update_hours' && !!synthetic.receipt_posted_at);
+        const again = await call('POST', '/api/nodes/receipts', { receipts: [late] }, NODE_TOKEN);
+        check('the same action pushed again is a duplicate: no new row, nothing posted', again.status === 200 && again.body.duplicates === 1 && T.ghost_node_requests.length === rows + 1 && posted.length === 2, JSON.stringify(again.body));
+        const carried = await call('POST', '/api/nodes/receipts', { receipts: [{ action_id: 'act-7', action: 'sms.send', verified: true }] }, NODE_TOKEN);
+        check('a receipt already carried in an answer is not posted twice', carried.body.duplicates === 1 && posted.length === 2, JSON.stringify(carried.body));
+        const bare = await call('POST', '/api/nodes/receipts', { receipts: [{ action_id: 'act-10', result: 'FAILED' }] }, NODE_TOKEN);
+        const bareBody = JSON.parse(posted[2]?.body || '{}');
+        check('with neither target nor capability the action id stands in', bare.body.posted === 1 && bareBody.target === 'act-10' && bareBody.verified === false, JSON.stringify(bareBody));
+        check('not a list: refused', (await call('POST', '/api/nodes/receipts', { receipts: 'x' }, NODE_TOKEN)).status === 400);
     } catch (e) {
         check('no exception', false, e.stack);
     }

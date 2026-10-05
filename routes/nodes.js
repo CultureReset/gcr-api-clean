@@ -421,6 +421,63 @@ router.get('/pull', nodeRequired, async (req, res) => {
     res.json({ requests });
 });
 
+// POST /api/nodes/receipts — {receipts: [...]}: receipts produced after the
+// answer went up (the owner's SMS YES came later), pushed by the computer
+// (DECISIONS #80). Each one becomes a done GET /actions/<id>/receipt row of this
+// node — the row an agent asking for the receipt would have produced — and goes
+// to Paperclip through lib/ghostReceipts the same way, against receipt.task_id.
+// An action whose receipt this node already carried (in an answer, or in an
+// earlier push) is a duplicate and is not posted again. The answer is 2xx
+// whatever happened to each receipt: 404/405/501 would tell the box there is
+// no push here.
+const ACTION_RECEIPT_PATH = /^\/actions\/([^/]+)\/receipt$/;
+router.post('/receipts', nodeRequired, async (req, res) => {
+    const receipts = req.body?.receipts;
+    if (!Array.isArray(receipts)) return res.status(400).json({ error: 'receipts must be a list.' });
+    const ghostReceipts = require('../lib/ghostReceipts');
+
+    // The action ids whose receipts this node already carried.
+    const { data: recent, error } = await supabase.from('ghost_node_requests')
+        .select('path, response_body')
+        .eq('node_id', req.node.id).not('response_body', 'is', null)
+        .order('created_at', { ascending: false }).limit(200);
+    if (error) return tableError(res, error);
+    const carried = new Set();
+    for (const r of Array.isArray(recent) ? recent : []) {
+        const m = String(r.path || '').match(ACTION_RECEIPT_PATH);
+        if (m) carried.add(decodeURIComponent(m[1]));
+        const inAnswer = r.response_body?.receipt && typeof r.response_body.receipt === 'object' ? ghostReceipts.actionIdOf(r.response_body.receipt) : null;
+        if (inAnswer) carried.add(String(inAnswer));
+    }
+
+    const out = { accepted: 0, posted: 0, duplicates: 0, skipped: 0 };
+    for (const receipt of receipts) {
+        const actionId = receipt && typeof receipt === 'object' ? ghostReceipts.actionIdOf(receipt) : null;
+        if (!actionId) { out.skipped += 1; continue; }
+        if (carried.has(String(actionId))) { out.duplicates += 1; continue; }
+        carried.add(String(actionId));
+        const row = {
+            node_id: req.node.id,
+            entity_slug: req.node.entity_slug,
+            method: 'GET',
+            path: `/actions/${encodeURIComponent(String(actionId))}/receipt`,
+            body: null,
+            status: 'done',
+            response_status: 200,
+            response_body: receipt,
+            paperclip_task_id: typeof receipt.task_id === 'string' && receipt.task_id ? receipt.task_id : null,
+            dispatched_at: nowIso(),
+            completed_at: nowIso(),
+        };
+        const { data: inserted, error: insertError } = await supabase.from('ghost_node_requests').insert(row).select('*').single();
+        if (insertError) return tableError(res, insertError);
+        out.accepted += 1;
+        const posted = await ghostReceipts.postReceipt({ ...inserted, ...row }).catch((e) => ({ posted: false, reason: e.message }));
+        if (posted.posted) out.posted += 1;
+    }
+    res.json(out);
+});
+
 // POST /api/nodes/requests/:rid/response — {status, body}
 router.post('/requests/:rid/response', nodeRequired, async (req, res) => {
     const status = Number(req.body?.status);
