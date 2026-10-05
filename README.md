@@ -256,7 +256,10 @@ Who answers is the number called: `CONCIERGE_NUMBER` is the concierge (public
 MCP tools, NEXT GENT's instructions and LiteLLM key); a Phone Agent number is
 that business (its install's permissions over the business MCP tools, the
 agent's stored instructions, the company's LiteLLM key). Each conversation is
-recorded to Paperclip (`POST /api/nextgent/conversations`, signed).
+kept here, in `live_conversations`; when it ends only a reference to it (ids,
+channel, mode, times, turn count, outcome — no transcript, no customer number)
+is posted to Paperclip (`POST /api/nextgent/conversations`, signed). A business
+reads its own at `GET /api/owner/conversations` and `/api/owner/conversations/:id`.
 
 Set `ALWAYS_ON=true` there: `lib/scheduler.js` then runs the scheduled work
 in-process every minute (automations, waits and completed bookings, Google

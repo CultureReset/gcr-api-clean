@@ -32,6 +32,12 @@
 //   PATCH /apps/:installId                  { renderMode?, publicLabel?, position?, publicEnabled? } -> the row
 //                                           (enabled is Paperclip's, not written here)
 //   PUT   /apps/order                       [installId, …] -> the rows in that order
+//   GET   /conversations?limit&offset       { conversations: [{ id, channel, mode, started_at, ended_at,
+//                                             outcome, turns }], total, limit, offset } (newest first,
+//                                             no transcripts: the calls and texts a live agent answered
+//                                             for this business, live_conversations; DECISIONS #36)
+//   GET   /conversations/:id                { conversation } with its transcript and tool_calls (404 unless
+//                                             it is this business's)
 
 const express = require('express');
 const supabase = require('../db');
@@ -286,6 +292,51 @@ router.post('/export', async (req, res) => {
         const out = await require('../lib/exportBusiness').exportBusiness(req.entitySlug);
         res.json({ url: out.url, expiresAt: out.expiresAt });
     } catch (err) { fail(res, err); }
+});
+
+/* ── live conversations ───────────────────────────────────────────────── */
+
+// The calls and texts the business's Phone Agent answered (lib/liveAgent.js
+// keeps each as a live_conversations row with entity_slug = the business).
+// Paperclip holds only a reference to each (DECISIONS #34); the content is
+// read here, by the business it belongs to, and nowhere else.
+const conversationsFail = (res, error) => res.status(503).json({ error: `Live conversations are not set up on this database yet: ${error.message}` });
+const conversationOut = (c) => ({
+    id: c.id, channel: c.channel, mode: c.mode, started_at: c.started_at, ended_at: c.ended_at || null,
+    outcome: c.outcome || null, turns: Array.isArray(c.transcript) ? c.transcript.length : 0,
+});
+const pageInt = (v, fallback, max) => {
+    const n = Number.parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : fallback;
+};
+
+router.get('/conversations', async (req, res) => {
+    const limit = pageInt(req.query.limit, Math.min(50, listLimit()), listLimit()) || 1;
+    const offset = pageInt(req.query.offset, 0, Number.MAX_SAFE_INTEGER);
+    const { data, error, count } = await supabase.from('live_conversations')
+        .select('id, channel, mode, started_at, ended_at, outcome, transcript', { count: 'exact' })
+        .eq('entity_slug', req.entitySlug)
+        .order('started_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+    if (error) return conversationsFail(res, error);
+    res.json({ conversations: (data || []).map(conversationOut), total: count ?? (data || []).length, limit, offset });
+});
+
+router.get('/conversations/:id', async (req, res) => {
+    const { data, error } = await supabase.from('live_conversations').select('*')
+        .eq('entity_slug', req.entitySlug).eq('id', String(req.params.id)).maybeSingle();
+    if (error && !/invalid input syntax/i.test(error.message || '')) return conversationsFail(res, error);
+    if (!data) return res.status(404).json({ error: 'No such conversation.' });
+    res.json({
+        conversation: {
+            ...conversationOut(data),
+            from: data.from_number || null,
+            to: data.to_number || null,
+            status: data.status,
+            transcript: Array.isArray(data.transcript) ? data.transcript : [],
+            tool_calls: Array.isArray(data.tool_calls) ? data.tool_calls : [],
+        },
+    });
 });
 
 /* ── installed apps ───────────────────────────────────────────────────── */

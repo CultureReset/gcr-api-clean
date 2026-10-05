@@ -104,9 +104,14 @@ notify pgrst, 'reload schema';
 
 -- live_conversations   one call or text conversation answered live by the
 --                      concierge or a Phone Agent (routes/telephony-live.js):
---                      who called whom, the transcript, the voice loop's
---                      state, and whether it was recorded to Paperclip
---                      (POST /api/nextgent/conversations).
+--                      who called whom, the transcript, the tool calls, the
+--                      voice loop's state. This is the only copy: Paperclip is
+--                      posted a reference to the row when it ends (its id,
+--                      channel, mode, times, turn count and outcome — POST
+--                      /api/nextgent/conversations), never the transcript or
+--                      a customer number. recorded_at / record_error say
+--                      whether that reference was taken. A business reads its
+--                      own rows at GET /api/owner/conversations (routes/owner.js).
 create table if not exists public.live_conversations (
     id                uuid primary key default gen_random_uuid(),
     channel           text not null,

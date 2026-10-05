@@ -52,6 +52,12 @@ const { T, db } = createMemDb({ tables: {
 } });
 inject(path.join(ROOT, 'db.js'), db);
 inject(path.join(ROOT, 'lib/staff-commands.js'), { handleStaffCommand: async (phone, body) => (/^SOLD OUT/i.test(body) ? 'Marked sold out.' : null) });
+// The owner routes, signed in as The Shop (ownerAuth resolves the business
+// from the session; here that resolution is stubbed to one business).
+inject(path.join(ROOT, 'middleware/ownerAuth.js'), {
+    ownerRequired: (req, _res, next) => { Object.assign(req, { entitySlug: 'shop', authVia: 'paperclip', paperclip: { userId: 'pc-1', companyId: 'co-1' } }); next(); },
+    resolveSessionSlug: async () => ({ reason: 'no sessions here' }),
+});
 const publicCalls = [];
 inject(path.join(ROOT, 'routes/mcp-public.js'), {
     publicTools: [{ name: 'search_businesses', description: 'Search', inputSchema: { type: 'object', properties: { query: { type: 'string' } } } }],
@@ -95,6 +101,7 @@ const { check, done } = checker();
 const app = express();
 app.use(express.json({ verify: (req, _r, buf) => { req.rawBody = buf; } }));
 app.use('/api/telephony/telnyx', require(path.join(ROOT, 'routes/telephony-live.js')));
+app.use('/api/owner', require(path.join(ROOT, 'routes/owner.js')));
 const server = app.listen(0, run);
 const settle = () => new Promise((r) => setTimeout(r, 80));
 async function hook(kind, data, { sign = true } = {}) {
@@ -177,8 +184,15 @@ async function run() {
         check('and it listens again without restarting transcription', telnyxCalls.filter((c) => c.url.endsWith('/actions/transcription_start')).length === 1);
         await hook('voice', { event_type: 'call.hangup', payload: { call_control_id: 'cc-1', hangup_cause: 'normal_clearing' } });
         const conv = paperclip.find((p) => p.body.channel === 'voice');
-        check('at hang-up the conversation is recorded to Paperclip', conv?.url === 'https://paperclip.test/api/nextgent/conversations' && conv.body.companyId === 'nextgent'
-            && conv.body.from === '+12515550144' && conv.body.transcript.map((t) => t.role).join(',') === 'agent,caller,agent' && conv.body.outcome === 'normal_clearing', JSON.stringify(conv?.body));
+        const voiceRow = T.live_conversations.find((c) => c.channel === 'voice');
+        // DECISIONS #34: Paperclip gets a reference to the conversation, never
+        // the conversation. The transcript stays in live_conversations.
+        check('at hang-up a reference to the conversation is posted to Paperclip', conv?.url === 'https://paperclip.test/api/nextgent/conversations'
+            && conv.body.companyId === 'nextgent' && conv.body.conversationId === voiceRow.id && conv.body.mode === 'concierge'
+            && conv.body.startedAt === voiceRow.started_at && conv.body.endedAt === voiceRow.ended_at && conv.body.turns === 3 && conv.body.outcome === 'normal_clearing', JSON.stringify(conv?.body));
+        check('the reference and nothing else: no transcript, no numbers',
+            JSON.stringify(Object.keys(conv.body).sort()) === JSON.stringify(['channel', 'companyId', 'conversationId', 'endedAt', 'mode', 'outcome', 'startedAt', 'turns']), JSON.stringify(conv.body));
+        check('the transcript stays here', voiceRow.transcript.map((t) => t.role).join(',') === 'agent,caller,agent' && voiceRow.from_number === '+12515550144');
         check('signed per CONTRACT §3', /^[0-9a-f]{64}$/.test(conv.headers['x-nextgent-signature']));
 
         console.log('\n── texts are recorded when they go quiet ──');
@@ -186,6 +200,27 @@ async function run() {
         const closed = await live.closeIdleConversations({ now: new Date(Date.now() + 31 * 60e3) });
         const smsConv = paperclip.filter((p) => p.body.channel === 'sms');
         check('idle text conversations are closed and recorded', closed.closed === 2 && smsConv.some((p) => p.body.companyId === 'nextgent') && smsConv.some((p) => p.body.companyId === 'co-1'));
+        const bizRow = T.live_conversations.find((c) => c.entity_slug === 'shop');
+        const bizRef = smsConv.find((p) => p.body.companyId === 'co-1')?.body;
+        const thread = T.message_threads.find((t) => t.entity_slug === 'shop' && t.channel === 'sms' && t.customer_address === '+12515550122');
+        check('a business text conversation\'s reference names its inbox thread', bizRef?.mode === 'business' && bizRef.conversationId === bizRow.id && !!thread && bizRef.threadId === thread.id, JSON.stringify(bizRef));
+        check('a concierge one has no thread, and no reference carries a number', !('threadId' in smsConv.find((p) => p.body.companyId === 'nextgent').body)
+            && !JSON.stringify(paperclip.map((p) => p.body)).includes('+1251'));
+
+        console.log('\n── owners read their own conversations (DECISIONS #36) ──');
+        const owner = async (p) => { const r = await realFetch(`http://127.0.0.1:${server.address().port}/api/owner${p}`); return { status: r.status, body: await r.json() }; };
+        const list = await owner('/conversations');
+        const item = list.body?.conversations?.[0];
+        check('the list is this business\'s conversations only', list.status === 200 && list.body.conversations.length === 1 && item.id === bizRow.id && T.live_conversations.length === 3, JSON.stringify(list.body));
+        check('each with channel, mode, times, outcome and a turn count, no bodies',
+            item.channel === 'sms' && item.mode === 'business' && item.started_at === bizRow.started_at && item.ended_at === bizRow.ended_at && item.outcome === 'idle'
+            && item.turns === bizRow.transcript.length && bizRow.transcript.length > 0 && !('transcript' in item) && !('tool_calls' in item) && !JSON.stringify(item).includes('+1251'), JSON.stringify(item));
+        const paged = await owner('/conversations?limit=1&offset=1');
+        check('paged: limit and offset, with the total', paged.body.conversations.length === 0 && paged.body.total === 1 && list.body.total === 1, JSON.stringify(paged.body));
+        const one = await owner(`/conversations/${bizRow.id}`);
+        check('one conversation comes with its transcript and tool calls', one.status === 200 && one.body.conversation.id === bizRow.id
+            && JSON.stringify(one.body.conversation.transcript) === JSON.stringify(bizRow.transcript) && Array.isArray(one.body.conversation.tool_calls), JSON.stringify(one.body));
+        check('another business\'s (or the concierge\'s) conversation is 404', (await owner(`/conversations/${voiceRow.id}`)).status === 404 && (await owner('/conversations/no-such')).status === 404);
 
         console.log('\n── numbers nobody answers here ──');
         telnyxCalls.length = 0;
