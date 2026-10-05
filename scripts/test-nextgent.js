@@ -414,7 +414,7 @@ async function run() {
         T.menu_items = T.menu_items.filter((m) => ![4, 5].includes(m.id));
         check('an unknown contract is not a section', (await asUser('GET', '/api/business/nope.items', undefined, prodTok)).status === 400);
         check('a contract whose table this database lacks is not a section either', (await asUser('GET', '/api/business/media.images', undefined, prodTok)).status === 400);
-        check('the business record is read-only through contracts', (await asUser('POST', '/api/business/business.profile', { name: 'X' }, prodTok)).status === 403);
+        check('the business record exists once: a POST through its contract is refused, PATCH is the write (DECISIONS #96)', (await asUser('POST', '/api/business/business.profile', { name: 'X' }, prodTok)).status === 405);
         check('business:read reaches no leads: not by contract (DECISIONS #59)', (await asUser('GET', '/api/business/leads.items', undefined, prodTok)).status === 403);
         check('nor by the raw table name (the registry pins entity_leads to contacts, above the entity_* name rule)', (await asUser('GET', '/api/business/entity_leads', undefined, prodTok)).status === 403);
         const contactsInst = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-ct', itemKey: 'enquiry-app', kind: 'app', version: '1.0.0', permissions: ['contacts:read', 'contacts:write'] });

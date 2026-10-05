@@ -47,7 +47,7 @@ const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth')
 const {
     getSchema, cleanBody, textColumns,
     canAny, mayUse, tablesFor, normalizePermissions, scopeForPermissions, permitsResource,
-    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, appTables,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, sectionPatchValues, appTables,
 } = require('../lib/businessTables');
 const dataContracts = require('../lib/dataContracts');
 const appInstances = require('../lib/appInstances');
@@ -628,6 +628,7 @@ async function runTool(name, args, caller) {
         case 'create_row': {
             const sec = await section(a.section, caller, 'write');
             const { table } = sec;
+            if (sec.single) return toolError(`${sec.contract} is this business's one record: update_row changes it, nothing creates it.`);
             if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
             const values = await cleanBody(table, sectionValues(sec, a.values));
             if (!Object.keys(values).length) {
@@ -652,9 +653,10 @@ async function runTool(name, args, caller) {
             const sec = await section(a.section, caller, 'write');
             const { table } = sec;
             if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
-            if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
-            const values = await cleanBody(table, sectionValues(sec, a.values));
-            for (const column of Object.keys(sec.filter || {})) delete values[column]; // a row cannot leave its contract
+            if (!sec.single && (a.id === undefined || a.id === null || a.id === '')) return toolError('An id is required.');
+            // The business record's columns are the owner's rule (DECISIONS #96): a governed column is refused by name.
+            const { values, refused } = await sectionPatchValues(sec, a.values);
+            if (refused.length) return toolError(`${sec.contract} does not let a business change ${refused.join(', ')}.`);
             if (!Object.keys(values).length) {
                 return toolError('Nothing to change. Call describe_section to see what this section accepts.');
             }
@@ -665,10 +667,11 @@ async function runTool(name, args, caller) {
                 ).maybeSingle();
                 before = was ? { ...was } : null; // a snapshot, not a reference the update could move
             }
+            const byId = (q) => (sec.single && (a.id === undefined || a.id === null || a.id === '') ? q : q.eq(sec.idColumn, a.id));
             const { data, error } = await applySection(
-                supabase.from(table).update(values).eq(sec.idColumn, a.id),
+                byId(supabase.from(table).update(values)),
                 sec, caller.slug, // never reachable outside this business, or outside the contract
-            ).select();
+            ).select(await sectionSelect(sec));
             if (error) return toolError(`Could not update ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
             await googlePush.noteTableWrite(caller.slug, table, data[0]);
@@ -679,6 +682,7 @@ async function runTool(name, args, caller) {
         case 'delete_row': {
             const sec = await section(a.section, caller, 'write');
             const { table } = sec;
+            if (sec.single) return toolError(`${sec.contract} is this business's one record and cannot be deleted.`);
             if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
             const { data, error } = await applySection(

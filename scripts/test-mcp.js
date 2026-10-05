@@ -188,7 +188,7 @@ const schemaStub = {
             const entry = dataContracts.contractFor(name);
             return entry && tables.includes(entry.table) ? { name, ...entry } : null;
         }
-        return tables.includes(name) ? { name, table: name, contract: null, resource: realTables.resourceForTable(name, columns[name]), filter: {}, fieldMap: null, idColumn: 'id', slugColumn: 'entity_slug', columns: null, readOnly: false } : null;
+        return tables.includes(name) ? { name, table: name, contract: null, resource: realTables.resourceForTable(name, columns[name]), filter: {}, fieldMap: null, idColumn: 'id', slugColumn: 'entity_slug', columns: null, readOnly: false, single: false, derived: null } : null;
     },
     sectionPermitted: async (caller, section, action) => {
         if (!section || (section.readOnly && action !== 'read')) return false;
@@ -201,6 +201,11 @@ const schemaStub = {
     sectionRow: realTables.sectionRow,
     sectionRows: async (section, rows) => (rows || []).map((r) => realTables.sectionRow(section, r)),
     sectionValues: realTables.sectionValues,
+    sectionPatchValues: async (section, body) => {
+        const values = await schemaStub.cleanBody(section.table, realTables.sectionValues(section, body));
+        for (const column of Object.keys(section.filter || {})) delete values[column];
+        return { values, refused: [] };
+    },
     // The app data space is the manifest's, not the schema's: the real rules apply as they are.
     appTables: realTables.appTables,
     appTableFor: realTables.appTableFor,

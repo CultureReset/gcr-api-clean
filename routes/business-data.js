@@ -53,7 +53,7 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // a second copy of a security check drifts until one of them has a hole in it.
 const {
     getSchema, cleanBody, tablesFor,
-    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionValues, pivotColumn,
+    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionValues, sectionPatchValues, pivotColumn,
 } = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
@@ -350,7 +350,15 @@ const pivotValue = (section, body) => {
  *
  * Create stamps the slug. Update and delete filter on it as well as the id, so
  * a tampered id matches nothing rather than somebody else's row.
+ *
+ * A single-record contract (business.profile, DECISIONS #96) is the business's
+ * own record: it exists once, so it is PATCHed — with or without an id — and
+ * never POSTed or DELETEd. Its columns are the owner's column rule
+ * (lib/businessTables.js ownerProfilePatch, shared with PATCH /api/owner/profile);
+ * a governed column is refused by name.
  */
+
+const onlyPatch = (res, section) => fail(res, 405, `${section.name} is this business's one record: PATCH it.`);
 
 // POST /api/business/:table
 router.post('/:table', businessCaller, async (req, res) => {
@@ -358,6 +366,7 @@ router.post('/:table', businessCaller, async (req, res) => {
     if (!section) return;
     const { table } = section;
 
+    if (section.single) return onlyPatch(res, section);
     if (section.pivot) {
         const id = req.body && typeof req.body === 'object' ? req.body[section.pivot.key] : undefined;
         const value = pivotValue(section, req.body);
@@ -391,37 +400,52 @@ const EVENTFUL_ON_CHANGE = new Set(['bookings', 'booking_calendar']);
 router.patch('/:table/:id', businessCaller, async (req, res) => {
     const section = await sectionFor(req, res, 'write');
     if (!section) return;
-    const { table } = section;
 
     if (section.pivot) {
         const value = pivotValue(section, req.body);
         if (!value) return fail(res, 400, 'Nothing to change.');
         return writePivot(req, res, section, req.params.id, value);
     }
+    return updateRow(req, res, section, req.params.id);
+});
 
-    const values = await cleanBody(table, sectionValues(section, req.body));
-    for (const column of Object.keys(section.filter || {})) delete values[column]; // a row cannot leave its contract
+// PATCH /api/business/:table — the business's one record (business.profile) needs no id.
+router.patch('/:table', businessCaller, async (req, res) => {
+    const section = await sectionFor(req, res, 'write');
+    if (!section) return;
+    if (!section.single) return fail(res, 400, 'An id is required.');
+    return updateRow(req, res, section, null);
+});
+
+/** Update one row of this business — by id, or the single record when id is null. */
+async function updateRow(req, res, section, id) {
+    const { table } = section;
+    const { values, refused } = await sectionPatchValues(section, req.body);
+    if (refused.length) return fail(res, 400, `${section.name} does not let a business change ${refused.join(', ')}.`, { refused });
     if (!Object.keys(values).length) return fail(res, 400, 'Nothing to change.');
+
+    // The id never widens the match: the slug from the credential always applies.
+    const byId = (q) => (id === null ? q : q.eq(section.idColumn, id));
 
     let before = null;
     if (EVENTFUL_ON_CHANGE.has(table)) {
         const { data: was } = await applySection(
-            supabase.from(table).select('*').eq(section.idColumn, req.params.id), section, req.entitySlug,
+            byId(supabase.from(table).select('*')), section, req.entitySlug,
         ).maybeSingle();
         before = was ? { ...was } : null; // a snapshot, not a reference the update could move
     }
 
     const { data, error } = await applySection(
-        supabase.from(table).update(values).eq(section.idColumn, req.params.id),
+        byId(supabase.from(table).update(values)),
         section, req.entitySlug, // never reachable outside this business, or outside the contract
-    ).select();
+    ).select(await sectionSelect(section));
     if (error) return fail(res, 400, error.message);
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
     await googlePush.noteTableWrite(req.entitySlug, table, data[0]);
     if (EVENTFUL_ON_CHANGE.has(table)) await businessEvents.sectionWritten(req.entitySlug, table, before, data[0]);
     res.json({ ...named(section), row: sectionRow(section, data[0]) });
-});
+}
 
 // DELETE /api/business/:table/:id
 router.delete('/:table/:id', businessCaller, async (req, res) => {
@@ -429,6 +453,7 @@ router.delete('/:table/:id', businessCaller, async (req, res) => {
     if (!section) return;
     const { table } = section;
 
+    if (section.single) return onlyPatch(res, section);
     if (section.pivot) return writePivot(req, res, section, req.params.id, null);
 
     const { data, error } = await applySection(

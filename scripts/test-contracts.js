@@ -71,7 +71,12 @@ check('products.items is offerings kind=product, server-side', contracts.contrac
 check('every offerings kind has a products.<kind> contract', Object.values(contracts.OFFERING_KINDS).every((k) => contracts.contractFor(`products.${k}`)?.filter.kind === k));
 check('every contract names a known resource', contracts.contractNames().every((n) => RESOURCES.includes(contracts.contractFor(n).resource)),
     contracts.contractNames().filter((n) => !RESOURCES.includes(contracts.contractFor(n).resource)).join(','));
-check('the business record is keyed by slug and read-only through contracts', contracts.contractFor('business.profile').slugColumn === 'slug' && contracts.contractFor('business.profile').readOnly);
+check('the business record is keyed by slug: one record per business, PATCH only (DECISIONS #96)', contracts.contractFor('business.profile').slugColumn === 'slug' && contracts.contractFor('business.profile').single && !contracts.contractFor('business.profile').readOnly);
+const profile = contracts.contractFor('business.profile');
+check('address_display is derived from the address columns (DECISIONS #100)', contracts.toContractRow(profile, { slug: 's', address_line_1: '12 Main St', address_line_2: '', city: 'Gulf Shores', state: 'AL', zip: '36542' }).address_display === '12 Main St, Gulf Shores, AL 36542');
+check('each part only when set', contracts.toContractRow(profile, { slug: 's', address_line_1: '1 Elm', address_line_2: 'Suite 4', city: 'Mobile', state: null, zip: null }).address_display === '1 Elm, Suite 4, Mobile'
+    && contracts.toContractRow(profile, { slug: 's' }).address_display === null);
+check('a write drops it: it is not a column', !('address_display' in contracts.toTableRow(profile, { name: 'x', address_display: 'y' })));
 check('business.links is a column rule over entity, not a list of networks', contracts.contractFor('business.links').columns instanceof RegExp && contracts.contractFor('business.links').columns.test('social_anything'));
 const linksEntry = contracts.contractFor('business.links');
 const entityCols = ['id', 'slug', 'name', 'social_instagram', 'social_facebook', 'website_url', 'email'];

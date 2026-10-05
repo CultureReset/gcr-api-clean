@@ -47,7 +47,7 @@ const { ownerRequired } = require('../middleware/ownerAuth');
 const messages = require('../lib/messages');
 const intake = require('../lib/intake');
 const { forwardingAddressFor } = require('../lib/forwardingAddress');
-const { ownerEditableEntityColumns } = require('../lib/businessTables');
+const { ownerProfilePatch } = require('../lib/businessTables');
 const { envInt } = require('../lib/env');
 const appInstances = require('../lib/appInstances');
 
@@ -271,16 +271,13 @@ for (const action of ['approve', 'block']) {
 
 /* ── the business record ──────────────────────────────────────────────── */
 
+// The column rule is lib/businessTables.js ownerProfilePatch, the same one the
+// business.profile contract applies (DECISIONS #96); this route ignores what
+// it may not change where the contract refuses it.
 router.patch('/profile', async (req, res) => {
-    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
     try {
-        const allowed = new Set(await ownerEditableEntityColumns());
-        const patch = {};
-        const ignored = [];
-        for (const [k, v] of Object.entries(body)) {
-            if (allowed.has(k)) patch[k] = v === '' ? null : v;
-            else ignored.push(k);
-        }
+        const { patch, dropped, refused } = await ownerProfilePatch(req.body);
+        const ignored = [...dropped, ...refused];
         if (!Object.keys(patch).length) return res.status(400).json({ error: 'Nothing here can be changed.', ignored });
         const { data, error } = await supabase.from('entity').update(patch).eq('slug', req.entitySlug).select('*');
         if (error) return res.status(400).json({ error: error.message });

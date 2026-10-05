@@ -332,6 +332,7 @@ async function insertBound({ install, bound, body }) {
     const caller = { scope: scopeForPermissions(install.permissions), permissions: Array.isArray(install.permissions) ? install.permissions : [] };
     const section = await sectionFor(caller, bound.binding.contract, 'write');
     if (!section) throw Object.assign(new Error('This form is not open to visitors.'), { status: 403 });
+    if (section.single) throw Object.assign(new Error(`${section.name} is the business's one record; a visitor cannot add to it.`), { status: 405 });
     const input = body && typeof body === 'object' && !Array.isArray(body) ? { ...body } : {};
     for (const f of bound.source.fields || []) if (f?.ownerOnly && typeof f.key === 'string') delete input[f.key];
     const values = sectionValues(section, await cleanBody(section.table, sectionValues(section, input)));
