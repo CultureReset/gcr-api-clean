@@ -11,7 +11,11 @@
 //   /api/app-install       GET → { installId, itemKey, version, settings, granted }
 //                          PUT /settings { settings } → { settings }
 //   /api/public/apps       GET /:installId → { settings, data, manifest }
-//                          POST /:installId/:table — a visitor's form
+//                          POST /:installId/:sourceKey — a visitor's form: an
+//                          app-owned table (public append), or a source bound
+//                          read-write to a business contract (DECISIONS #57),
+//                          written through the contract with the install's
+//                          permissions
 //   /api/public/business   GET /:slug/apps → [{ installId, appKey, version,
 //                          renderMode, publicLabel, position, enabled,
 //                          publicEnabled, config, manifest }] — the business's
@@ -28,8 +32,8 @@ const express = require('express');
 const supabase = require('../db');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 const {
-    appTables, appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
-    sectionSelect, applySection, sectionRow,
+    appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
+    sectionSelect, applySection, sectionRow, sectionFor, sectionValues, cleanBody, scopeForPermissions,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
 const businessEvents = require('../lib/businessEvents');
@@ -110,26 +114,78 @@ async function insertRecord({ install, instance, table, data, source }) {
     return made;
 }
 
+/* ── the install's own records: one copy of each operation ─────────────
+ *
+ * The routes below and the business MCP's app tools (routes/mcp.js, an
+ * installed app's declared actions, DECISIONS #46) run these same three, so
+ * the scoping — the install AND the business, both from the credential — and
+ * the manifest's column rules exist once. Each throws err.status for the
+ * caller to answer with (422 with err.errors, 400, 404, 413, 409, 503).
+ */
+
+const httpError = (status, message, extra) => Object.assign(new Error(message), { status, ...(extra || {}) });
+
+/** This install's rows in one of its tables, newest first: { rows, total, limit, offset }. */
+async function listAppRecords({ install, table, limit, offset }) {
+    const lim = Math.min(Number(limit) || rowLimit(), rowLimit());
+    const off = Math.max(Number(offset) || 0, 0);
+    const { data, error, count } = await supabase.from('app_records').select('*', { count: 'exact' })
+        .eq('install_id', install.install_id).eq('entity_slug', install.entity_slug).eq('app_table', table)
+        .order('created_at', { ascending: false })
+        .range(off, off + lim - 1);
+    if (error) throw (appInstances.missing(error) ? appInstances.notSetUp() : new Error(error.message));
+    return { rows: (data || []).map((r) => appRecordRow(r)), total: count ?? null, limit: lim, offset: off };
+}
+
+/** A new record from a body, checked against the manifest. Resolves the stored row. */
+async function createAppRecord({ install, instance, table, body, source = 'owner' }) {
+    const checked = cleanAppRecord(instance.manifest, table, body);
+    if (!checked.ok) throw httpError(422, 'Some fields need attention.', { errors: checked.errors });
+    return insertRecord({ install, instance, table, data: checked.data, source });
+}
+
+async function scopedRecord({ install, table, id }) {
+    const { data, error } = await supabase.from('app_records').select('*')
+        .eq('id', id).eq('install_id', install.install_id)
+        .eq('entity_slug', install.entity_slug).eq('app_table', table)
+        .maybeSingle();
+    if (error) throw (appInstances.missing(error) ? appInstances.notSetUp() : new Error(error.message));
+    return data;
+}
+
+/** Change the given columns of one of this install's records. Resolves the stored row. */
+async function updateAppRecord({ install, instance, table, id, body }) {
+    const checked = cleanAppRecord(instance.manifest, table, body, { partial: true });
+    if (!checked.ok) throw httpError(422, 'Some fields need attention.', { errors: checked.errors });
+    if (!Object.keys(checked.data).length) throw httpError(400, 'Nothing to change.');
+    const current = await scopedRecord({ install, table, id });
+    if (!current) throw httpError(404, 'That row is not there.');
+    const data = { ...(current.data || {}), ...checked.data };
+    if (Buffer.byteLength(JSON.stringify(data)) > maxRecordBytes()) throw httpError(413, 'That record is too large.');
+    const { data: rows, error } = await supabase.from('app_records')
+        .update({ data, updated_at: nowIso() })
+        .eq('id', current.id).eq('install_id', current.install_id).eq('entity_slug', install.entity_slug)
+        .select();
+    if (error) throw new Error(error.message);
+    if (!rows?.length) throw httpError(404, 'That row is not there.');
+    return rows[0];
+}
+
 /* ── /api/app-data ────────────────────────────────────────────────────── */
 
 const dataRouter = express.Router();
 dataRouter.use(installCaller);
 
+const answer = (res, err) => (err?.errors ? fail(res, err.status, err.message, { errors: err.errors }) : dbFail(res, err));
+
 dataRouter.get('/:table', async (req, res) => {
     const { install, instance } = req.appInstall;
     const table = tableFor(req, res, instance.manifest, { who: 'install' });
     if (!table) return;
-    const limit = Math.min(Number(req.query.limit) || rowLimit(), rowLimit());
-    const offset = Math.max(Number(req.query.offset) || 0, 0);
     try {
-        const { data, error, count } = await supabase.from('app_records').select('*', { count: 'exact' })
-            .eq('install_id', install.install_id).eq('entity_slug', req.entitySlug).eq('app_table', table)
-            .order('created_at', { ascending: false })
-            .range(offset, offset + limit - 1);
-        if (error) throw (appInstances.missing(error) ? appInstances.notSetUp() : new Error(error.message));
-        res.json({ table, rows: (data || []).map((r) => appRecordRow(r)), total: count ?? null, limit, offset });
+        res.json({ table, ...(await listAppRecords({ install, table, limit: req.query.limit, offset: req.query.offset })) });
     } catch (err) {
-        dbFail(res, err);
+        answer(res, err);
     }
 });
 
@@ -137,55 +193,32 @@ dataRouter.post('/:table', async (req, res) => {
     const { install, instance } = req.appInstall;
     const table = tableFor(req, res, instance.manifest, { who: 'install' });
     if (!table) return;
-    const checked = cleanAppRecord(instance.manifest, table, req.body);
-    if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
     try {
-        const made = await insertRecord({ install, instance, table, data: checked.data, source: 'owner' });
+        const made = await createAppRecord({ install, instance, table, body: req.body, source: 'owner' });
         res.status(201).json({ table, row: appRecordRow(made) });
     } catch (err) {
-        dbFail(res, err);
+        answer(res, err);
     }
 });
 
-async function scopedRecord(req, table) {
-    const { data, error } = await supabase.from('app_records').select('*')
-        .eq('id', req.params.id).eq('install_id', req.appInstall.install.install_id)
-        .eq('entity_slug', req.entitySlug).eq('app_table', table)
-        .maybeSingle();
-    if (error) throw (appInstances.missing(error) ? appInstances.notSetUp() : new Error(error.message));
-    return data;
-}
-
 dataRouter.patch('/:table/:id', async (req, res) => {
-    const { instance } = req.appInstall;
+    const { install, instance } = req.appInstall;
     const table = tableFor(req, res, instance.manifest, { who: 'install' });
     if (!table) return;
-    const checked = cleanAppRecord(instance.manifest, table, req.body, { partial: true });
-    if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
-    if (!Object.keys(checked.data).length) return fail(res, 400, 'Nothing to change.');
     try {
-        const current = await scopedRecord(req, table);
-        if (!current) return fail(res, 404, 'That row is not there.');
-        const data = { ...(current.data || {}), ...checked.data };
-        if (Buffer.byteLength(JSON.stringify(data)) > maxRecordBytes()) return fail(res, 413, 'That record is too large.');
-        const { data: rows, error } = await supabase.from('app_records')
-            .update({ data, updated_at: nowIso() })
-            .eq('id', current.id).eq('install_id', current.install_id).eq('entity_slug', req.entitySlug)
-            .select();
-        if (error) throw new Error(error.message);
-        if (!rows?.length) return fail(res, 404, 'That row is not there.');
-        res.json({ table, row: appRecordRow(rows[0]) });
+        const row = await updateAppRecord({ install, instance, table, id: req.params.id, body: req.body });
+        res.json({ table, row: appRecordRow(row) });
     } catch (err) {
-        dbFail(res, err);
+        answer(res, err);
     }
 });
 
 dataRouter.delete('/:table/:id', async (req, res) => {
-    const { instance } = req.appInstall;
+    const { install, instance } = req.appInstall;
     const table = tableFor(req, res, instance.manifest, { who: 'install' });
     if (!table) return;
     try {
-        const current = await scopedRecord(req, table);
+        const current = await scopedRecord({ install, table, id: req.params.id });
         if (!current) return fail(res, 404, 'That row is not there.');
         const { data, error } = await supabase.from('app_records').delete()
             .eq('id', current.id).eq('install_id', current.install_id).eq('entity_slug', req.entitySlug)
@@ -288,13 +321,39 @@ publicRouter.get('/:installId', async (req, res) => {
     }
 });
 
+/**
+ * A visitor's submission into the business through a read-write binding
+ * (DECISIONS #57): the contract's table, filter and business key from the
+ * registry, under the install's permissions (what the owner approved for the
+ * app), never the visitor's. Owner-only fields of the source are dropped.
+ * Resolves the stored row, or throws err.status.
+ */
+async function insertBound({ install, bound, body }) {
+    const caller = { scope: scopeForPermissions(install.permissions), permissions: Array.isArray(install.permissions) ? install.permissions : [] };
+    const section = await sectionFor(caller, bound.binding.contract, 'write');
+    if (!section) throw Object.assign(new Error('This form is not open to visitors.'), { status: 403 });
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? { ...body } : {};
+    for (const f of bound.source.fields || []) if (f?.ownerOnly && typeof f.key === 'string') delete input[f.key];
+    const values = sectionValues(section, await cleanBody(section.table, sectionValues(section, input)));
+    const { data, error } = await supabase.from(section.table)
+        .insert({ ...values, [section.slugColumn]: install.entity_slug }) // the business is the install's
+        .select().single();
+    if (error) throw Object.assign(new Error(error.message), { status: 400 });
+    await businessEvents.sectionWritten(install.entity_slug, section.table, null, data);
+    return { row: sectionRow(section, data), table: section.table };
+}
+
 publicRouter.post('/:installId/:table', async (req, res) => {
     try {
         const live = await publicInstance(req.params.installId);
         if (!live) return fail(res, 404, 'No such app.');
         const { install, instance } = live;
         const manifest = instance.manifest;
-        const table = tableFor(req, res, manifest, { who: 'visitor', action: 'append' });
+        const key = req.params.table;
+        // The path names an app-owned table a visitor may append to, or a
+        // public source bound read-write to a business contract (DECISIONS #57).
+        const bound = appTableFor(manifest, key, { who: 'visitor', action: 'append' }) ? null : appInstances.boundSubmission(manifest, key);
+        const table = bound ? key : tableFor(req, res, manifest, { who: 'visitor', action: 'append' });
         if (!table) return;
         // A form the owner closed ({ openWhen: { setting } } set to false) takes nothing.
         const settings = appInstances.settingsFor(instance);
@@ -302,27 +361,43 @@ publicRouter.post('/:installId/:table', async (req, res) => {
         if (forms.length && forms.every((v) => v.openWhen?.setting && settings[v.openWhen.setting] === false)) {
             return fail(res, 403, 'This form is closed.');
         }
-        const checked = cleanAppRecord(manifest, table, req.body, { visitor: true });
-        if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
-        const made = await insertRecord({ install, instance, table, data: checked.data, source: 'visitor' });
-        // A write-only table (public: append) is a submission to the business:
-        // it lands in the one Messages inbox too (lib/messages.js, DECISIONS
-        // #48). A read-append table is public content, not a message. The inbox
-        // row must never fail the submission, so a refusal is logged, not raised.
-        if (appTables(manifest)[table]?.public === 'append') {
+        let made;
+        let record;
+        if (bound) {
+            try {
+                const out = await insertBound({ install, bound, body: req.body });
+                made = out.row;
+                record = out.row;
+            } catch (err) {
+                return fail(res, err.status || 500, err.message);
+            }
+            await businessEvents.appRecordCreated(install.entity_slug, {
+                appKey: instance.app_key, manifest, table: key, record, source: 'visitor', installId: install.install_id,
+            });
+        } else {
+            const checked = cleanAppRecord(manifest, table, req.body, { visitor: true });
+            if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
+            made = await insertRecord({ install, instance, table, data: checked.data, source: 'visitor' });
+            record = appRecordRow(made, { strip: ownerOnlyColumns(manifest, table) });
+        }
+        // A submission to the business lands in the one Messages inbox too
+        // (lib/messages.js, DECISIONS #48): an app table with inbox true, or
+        // by default one visitors may append to; a binding with inbox true.
+        // The inbox row must never fail the submission: a refusal is logged.
+        if (appInstances.isInboxSubmission(manifest, key)) {
             try {
                 await messages.recordAppSubmission({
                     slug: install.entity_slug,
                     installId: install.install_id,
-                    record: appRecordRow(made, { strip: ownerOnlyColumns(manifest, table) }),
-                    titleField: appInstances.appSourceFor(manifest, table)?.title || null,
+                    record,
+                    titleField: (bound ? bound.source : appInstances.appSourceFor(manifest, table))?.title || null,
                 });
             } catch (err) {
-                console.error(`[app-data] inbox row for ${instance.app_key}/${table} on ${install.entity_slug}:`, err.message);
+                console.error(`[app-data] inbox row for ${instance.app_key}/${key} on ${install.entity_slug}:`, err.message);
             }
         }
         // Write-only: a visitor gets the receipt, not the row back.
-        res.status(201).json({ table, row: { id: made.id, created_at: made.created_at } });
+        res.status(201).json({ table: key, row: { id: made.id, created_at: made.created_at } });
     } catch (err) {
         dbFail(res, err);
     }
@@ -351,4 +426,7 @@ businessRouter.get('/:slug/apps', async (req, res) => {
     }
 });
 
-module.exports = { dataRouter, installRouter, publicRouter, businessRouter, installCaller };
+module.exports = {
+    dataRouter, installRouter, publicRouter, businessRouter, installCaller,
+    listAppRecords, createAppRecord, updateAppRecord,
+};

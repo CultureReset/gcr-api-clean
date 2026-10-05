@@ -198,7 +198,7 @@ globalThis.fetch = async (url, init) => {
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
             entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
             // The business record: keyed by slug, so not a section; its columns back business.* contracts.
-            entity: def(['id', 'slug', 'name', 'phone', 'website_url', 'social_instagram', 'stripe_customer_id']),
+            entity: def(['id', 'slug', 'name', 'phone', 'website_url', 'social_instagram', 'stripe_customer_id', 'currency']),
             business_mcp_tokens: def(['id', 'entity_slug', 'token_hash']),
         } };
         return { ok: true, status: 200, json: async () => spec };
@@ -401,6 +401,13 @@ async function run() {
         check('leads.items is the permissioned door to it: this business\'s leads', leads.status === 200 && leads.body.rows.length === 1 && leads.body.rows[0].name === 'Asker', JSON.stringify(leads.body));
         const lead = await asUser('POST', '/api/business/leads.items', { name: 'New asker', email: 'n@example.test', message: 'Hi', source: 'shop-app' }, prodTok);
         check('an app with business:write records a lead for its business', lead.status === 201 && T.entity_leads.find((l) => l.name === 'New asker')?.entity_slug === 'new-taco-shop', JSON.stringify(lead.body));
+        process.env.DEFAULT_CURRENCY = 'usd';
+        const cur = await asUser('GET', '/api/business/business.currency', undefined, prodTok);
+        check('business.currency is a scalar: { value }, the environment default when the business set none (DECISIONS #56)', cur.status === 200 && cur.body.value === 'usd' && cur.body.contract === 'business.currency' && !('rows' in cur.body), JSON.stringify(cur.body));
+        T.entity.find((e) => e.slug === 'new-taco-shop').currency = 'eur';
+        check('a set currency wins', (await asUser('GET', '/api/business/business.currency', undefined, prodTok)).body.value === 'eur');
+        delete process.env.DEFAULT_CURRENCY;
+        check('the dotted name arrives as one path segment, URL-encoded or not', (await asUser('GET', '/api/business/' + encodeURIComponent('business.currency'), undefined, prodTok)).body.value === 'eur');
         const links = await asUser('GET', '/api/business/business.links', undefined, prodTok);
         check('business.links reads the business record by its slug', links.status === 200 && links.body.table === 'entity' && links.body.rows.length === 1 && links.body.rows[0].slug === 'new-taco-shop', JSON.stringify(links.body));
 

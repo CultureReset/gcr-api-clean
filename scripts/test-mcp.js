@@ -52,6 +52,48 @@ const TOKEN_ROW = {
 let tokenScope = 'write';
 let tokenPermissions = null; // null = a legacy token
 let entityExists = true;
+let appsInstalled = false; // the agent face: installed apps' declared actions (DECISIONS #46)
+
+// Two installed apps (lib/appInstances.js projection rows) with declared actions.
+const APP_ROWS = [
+    {
+        id: 1, entity_slug: 'flora-bama', module_key: 'song-requests', managed_by: 'paperclip', install_id: 'in-song', enabled: true, sort_order: 0,
+        settings: { showOnPublic: true, config: {}, manifest: {
+            name: 'Song Requests',
+            data: { tables: { requests: { public: 'append', columns: { song: { type: 'text', required: true }, from_name: { type: 'text' } } } } },
+            actions: [
+                { id: 'list_requests', summary: 'The songs guests asked for tonight.', table: 'requests', kind: 'read' },
+                { id: 'add_request', summary: 'Put a song on the list.', table: 'requests', kind: 'create' },
+                { id: 'mark_played', summary: 'Mark a request played.', table: 'requests', kind: 'update' },
+                { id: 'ghost', summary: 'Names a table the app never declared.', table: 'nope', kind: 'read' },
+                { id: 'Bad Id', summary: 'Not a usable id.', table: 'requests', kind: 'read' },
+                { id: 'wipe', summary: 'Not a kind that exists.', table: 'requests', kind: 'delete' },
+            ],
+        } },
+    },
+    {
+        id: 2, entity_slug: 'flora-bama', module_key: 'qr-menu', managed_by: 'paperclip', install_id: 'in-menu', enabled: true, sort_order: 1,
+        settings: { showOnPublic: true, config: {}, manifest: {
+            name: 'QR Menu',
+            // The engine's shape: an action names a binding, the binding names the contract.
+            bindings: { menu: { contract: 'menu.items', access: 'read-write' }, faqs: { contract: 'faqs.items', access: 'read' }, nope: { contract: 'nope.items', access: 'read' } },
+            actions: [
+                { id: 'list_menu', summary: 'What is on the menu.', binding: 'menu', kind: 'read' },
+                { id: 'add_item', summary: 'Add a dish.', binding: 'menu', kind: 'create' },
+                { id: 'list_faqs', summary: 'Needs business:read, which this install was not granted.', binding: 'faqs', kind: 'read' },
+                { id: 'edit_faq', summary: 'Writes through a read-only binding.', binding: 'faqs', kind: 'update' },
+                { id: 'unknown', summary: 'Not a contract.', binding: 'nope', kind: 'read' },
+                { id: 'nowhere', summary: 'Names a binding the manifest lacks.', binding: 'missing', kind: 'read' },
+            ],
+        } },
+    },
+    { id: 3, entity_slug: 'flora-bama', module_key: 'off-app', managed_by: 'paperclip', install_id: 'in-off', enabled: false, sort_order: 2, settings: { manifest: { name: 'Off', actions: [{ id: 'x', summary: 'x', table: 't', kind: 'read' }] } } },
+    { id: 4, entity_slug: 'flora-bama', module_key: 'legacy', managed_by: null, enabled: true, sort_order: 3, settings: { manifest: { name: 'Legacy', actions: [{ id: 'y', summary: 'y', table: 't', kind: 'read' }] } } },
+];
+const INSTALL_ROWS = [
+    { install_id: 'in-song', company_id: 'co-1', entity_slug: 'flora-bama', item_key: 'song-requests', kind: 'app', version: '1.0.0', permissions: [], status: 'active' },
+    { install_id: 'in-menu', company_id: 'co-1', entity_slug: 'flora-bama', item_key: 'qr-menu', kind: 'app', version: '1.0.0', permissions: ['menu:read', 'menu:write'], status: 'active' },
+];
 
 function result(rec) {
     if (rec.table === 'business_mcp_tokens') {
@@ -75,6 +117,23 @@ function result(rec) {
         if (rec.insert) return { data: { id: 1, ...rec.insert }, error: null };
         if (rec.update) return { data: [{ id: 8821, ...rec.update }], error: null };
         return { data: [{ id: 8821, name: 'Bushwacker', price: 12 }], error: null, count: 1 };
+    }
+    if (rec.table === 'entity_modules') {
+        if (!appsInstalled) return { data: [], error: null };
+        const rows = APP_ROWS.filter((r) => (!rec.eq.entity_slug || r.entity_slug === rec.eq.entity_slug) && (!rec.eq.managed_by || r.managed_by === rec.eq.managed_by) && (!rec.eq.install_id || r.install_id === rec.eq.install_id));
+        return { data: rec.eq.install_id ? rows[0] || null : rows, error: null };
+    }
+    if (rec.table === 'nextgent_installs') {
+        if (!appsInstalled) return { data: rec.eq.install_id ? null : [], error: null };
+        const rows = INSTALL_ROWS.filter((r) => !rec.eq.install_id || r.install_id === rec.eq.install_id);
+        return { data: rec.eq.install_id ? rows[0] || null : rows, error: null };
+    }
+    if (rec.table === 'app_records') {
+        if (rec.insert) return { data: { id: 'r-2', created_at: '2026-01-01T00:00:00Z', ...rec.insert }, error: null };
+        if (rec.update) return { data: [{ id: 'r-1', install_id: 'in-song', entity_slug: 'flora-bama', app_table: 'requests', data: { song: 'Margaritaville', from_name: 'Al', ...rec.update.data }, created_at: '2026-01-01T00:00:00Z' }], error: null };
+        const row = { id: 'r-1', install_id: 'in-song', entity_slug: 'flora-bama', app_table: 'requests', data: { song: 'Margaritaville', from_name: 'Al' }, created_at: '2026-01-01T00:00:00Z' };
+        if (rec.args.some((a) => a[2]?.head)) return { data: null, error: null, count: 1 };
+        return { data: rec.eq.id ? row : [row], error: null, count: 1 };
     }
     return { data: [], error: null, count: 0 };
 }
@@ -100,16 +159,43 @@ const realTables = require(path.join(ROOT, 'lib/businessTables.js'));
 const STUB_TABLES = ['menu_items', 'faqs'];
 const stubSchema = async () => schemaStub.getSchema();
 
+const dataContracts = require(path.join(ROOT, 'lib/dataContracts.js'));
 const schemaStub = {
     SYSTEM_COLUMNS: new Set(['id', 'entity_slug']),
     RESOURCES: realTables.RESOURCES,
     ACTIONS: realTables.ACTIONS,
     permits: realTables.permits,
+    permitsResource: realTables.permitsResource,
     canAny: realTables.canAny,
     mayUse: realTables.mayUse,
     resourceForTable: realTables.resourceForTable,
     normalizePermissions: realTables.normalizePermissions,
     scopeForPermissions: realTables.scopeForPermissions,
+    // Sections (a table or a data contract), as lib/businessTables.js resolves them, over the stub schema.
+    sectionNamed: async (name) => {
+        const { tables, columns } = await stubSchema();
+        if (dataContracts.isContractName(name)) {
+            const entry = dataContracts.contractFor(name);
+            return entry && tables.includes(entry.table) ? { name, ...entry } : null;
+        }
+        return tables.includes(name) ? { name, table: name, contract: null, resource: realTables.resourceForTable(name, columns[name]), filter: {}, fieldMap: null, idColumn: 'id', slugColumn: 'entity_slug', columns: null, readOnly: false } : null;
+    },
+    sectionPermitted: async (caller, section, action) => {
+        if (!section || (section.readOnly && action !== 'read')) return false;
+        if (section.contract) return realTables.permitsResource(caller, section.resource, action);
+        const { columns } = await stubSchema();
+        return realTables.permits(caller, section.table, columns[section.table], action);
+    },
+    sectionSelect: async () => '*',
+    applySection: realTables.applySection,
+    sectionRow: realTables.sectionRow,
+    sectionValues: realTables.sectionValues,
+    // The app data space is the manifest's, not the schema's: the real rules apply as they are.
+    appTables: realTables.appTables,
+    appTableFor: realTables.appTableFor,
+    cleanAppRecord: realTables.cleanAppRecord,
+    appRecordRow: realTables.appRecordRow,
+    ownerOnlyColumns: realTables.ownerOnlyColumns,
     tablesFor: async (caller, action = 'read') => {
         const { tables, columns } = await stubSchema();
         return tables.filter((t) => realTables.permits(caller, t, columns[t], action));
@@ -363,6 +449,66 @@ async function run() {
     check('describe_section lists columns', desc.body.result.structuredContent.columns.length === 5);
     const secs = await call('list_sections');
     check('list_sections returns sections', Array.isArray(secs.body.result.structuredContent.sections));
+
+    console.log('\n── the agent face: installed apps\' actions as tools (DECISIONS #46) ──');
+    tokenScope = 'write'; tokenPermissions = null; appsInstalled = false;
+    const plain = (await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools.map((t) => t.name);
+    check('no installed apps: the seven generic tools and nothing else', plain.length === 7 && !plain.some((n) => n.startsWith('app_')), plain.join(','));
+    appsInstalled = true;
+    const withApps = (await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools;
+    const appNames = withApps.filter((t) => t.name.startsWith('app_')).map((t) => t.name);
+    check('each declared action of each enabled installed app is a tool, app_<appKey>_<action>',
+        ['app_song-requests_list_requests', 'app_song-requests_add_request', 'app_song-requests_mark_played', 'app_qr-menu_list_menu', 'app_qr-menu_add_item'].every((n) => appNames.includes(n)), appNames.join(','));
+    check('an action on a table the app never declared is not', !appNames.includes('app_song-requests_ghost'));
+    check('nor an unusable id, nor a kind that does not exist', !appNames.some((n) => /bad|wipe/i.test(n)));
+    check('nor an action on a contract the registry lacks, nor on a binding the manifest lacks', !appNames.includes('app_qr-menu_unknown') && !appNames.includes('app_qr-menu_nowhere'));
+    check('nor a write through a read-only binding', !appNames.includes('app_qr-menu_edit_faq'));
+    check('nor a contract action the install was not granted (faqs.items needs business:read)', !appNames.includes('app_qr-menu_list_faqs'));
+    check('a disabled install and a legacy dashboard row offer nothing', !appNames.some((n) => n.startsWith('app_off-app') || n.startsWith('app_legacy')));
+    check('no tool anywhere takes a slug', withApps.every((t) => !('slug' in (t.inputSchema?.properties || {}))));
+    const listTool = withApps.find((t) => t.name === 'app_song-requests_list_requests');
+    check('a read action is marked read-only and says which app it is', listTool.annotations.readOnlyHint === true && /Song Requests/.test(listTool.description), JSON.stringify(listTool));
+    const createTool = withApps.find((t) => t.name === 'app_song-requests_add_request');
+    check('a create action takes values and is not read-only', createTool.inputSchema.required.includes('values') && createTool.annotations.readOnlyHint === false);
+
+    calls.length = 0;
+    const songs = await call('app_song-requests_list_requests', {});
+    const songQuery = calls.find((c) => c.table === 'app_records' && c.verb === 'select');
+    check('a table action reads the app\'s own records, scoped to the install and the token\'s business', !songs.body.result?.isError && songQuery?.eq.install_id === 'in-song' && songQuery.eq.entity_slug === 'flora-bama' && songQuery.eq.app_table === 'requests', JSON.stringify(songQuery?.eq));
+    check('and returns them as the engine reads them', songs.body.result.structuredContent.rows[0]?.song === 'Margaritaville' && songs.body.result.structuredContent.app === 'song-requests', JSON.stringify(songs.body.result.structuredContent));
+    calls.length = 0;
+    const added = await call('app_song-requests_add_request', { values: { song: 'Sweet Caroline', from_name: 'Bo', entity_slug: 'somebody-else', install_id: 'in-other' } });
+    const songInsert = calls.find((c) => c.table === 'app_records' && c.insert);
+    check('a create action stamps the install and the business from the credential, keeps declared columns only',
+        !added.body.result?.isError && songInsert?.insert.install_id === 'in-song' && songInsert.insert.entity_slug === 'flora-bama' && songInsert.insert.data.song === 'Sweet Caroline' && !('entity_slug' in songInsert.insert.data), JSON.stringify(songInsert?.insert));
+    const badAdd = await call('app_song-requests_add_request', { values: { from_name: 'No song' } });
+    check('the manifest\'s column rules apply (a required column missing is refused, naming it)', badAdd.body.result?.isError === true && /song/.test(badAdd.body.result.content[0].text), JSON.stringify(badAdd.body.result));
+    calls.length = 0;
+    const played = await call('app_song-requests_mark_played', { id: 'r-1', values: { from_name: 'Al (played)' } });
+    const songUpdate = calls.find((c) => c.table === 'app_records' && c.update);
+    check('an update action changes one of the install\'s records, scoped the same way', !played.body.result?.isError && songUpdate?.eq.install_id === 'in-song' && songUpdate.eq.entity_slug === 'flora-bama' && songUpdate.update.data.from_name === 'Al (played)', JSON.stringify(songUpdate));
+
+    calls.length = 0;
+    const menu = await call('app_qr-menu_list_menu', {});
+    const menuQuery = calls.find((c) => c.table === 'menu_items');
+    check('a contract action goes through the business door: the registry\'s table, the token\'s slug', !menu.body.result?.isError && menuQuery?.eq.entity_slug === 'flora-bama' && menu.body.result.structuredContent.section === 'menu_items', JSON.stringify(menu.body).slice(0, 200));
+    calls.length = 0;
+    await call('app_qr-menu_add_item', { values: { name: 'Gumbo', price: 9, entity_slug: 'somebody-else' } });
+    const menuInsert = calls.find((c) => c.table === 'menu_items' && c.insert);
+    check('a contract create stamps the token\'s slug, same as create_row', menuInsert?.insert.entity_slug === 'flora-bama' && menuInsert.insert.name === 'Gumbo', JSON.stringify(menuInsert?.insert));
+    const unlisted = await call('app_song-requests_ghost', {});
+    check('an action that is not listed cannot be called', unlisted.body.error?.code === -32601);
+
+    tokenScope = 'read';
+    const readOnlyNames = (await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools.map((t) => t.name);
+    check('a read-only token is shown the read actions only', readOnlyNames.includes('app_song-requests_list_requests') && readOnlyNames.includes('app_qr-menu_list_menu') && !readOnlyNames.includes('app_song-requests_add_request') && !readOnlyNames.includes('app_qr-menu_add_item'), readOnlyNames.join(','));
+    tokenScope = 'write'; tokenPermissions = ['menu:read'];
+    const menuOnly = (await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools.map((t) => t.name);
+    check('a contract action needs the caller\'s permission as well as the install\'s (menu:read sees list_menu, not add_item)', menuOnly.includes('app_qr-menu_list_menu') && !menuOnly.includes('app_qr-menu_add_item'), menuOnly.join(','));
+    tokenPermissions = null;
+    const sectionViaContract = await call('read_section', { section: 'menu.items' });
+    check('the generic tools take a contract name too', !sectionViaContract.body.result?.isError && sectionViaContract.body.result.structuredContent.section === 'menu_items' && sectionViaContract.body.result.structuredContent.contract === 'menu.items', JSON.stringify(sectionViaContract.body).slice(0, 200));
+    appsInstalled = false;
 
     console.log('\n── the public directory server ──');
     const PUB = () => `http://127.0.0.1:${server.address().port}/api/mcp/public`;

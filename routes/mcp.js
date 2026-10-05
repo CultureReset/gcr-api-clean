@@ -30,13 +30,27 @@
 // the request. There is no `slug` argument on any tool below and no way to add
 // one — the same property that makes the dashboard safe. A read-scoped token
 // gets the four read tools and is refused the three writes.
+//
+// ── The agent face of installed apps (DECISIONS #46) ────────────────────
+//
+// An app installed for the business may declare `actions` in its manifest:
+// { id, summary, table | binding, kind: read | create | update } (a binding
+// names a data contract through the manifest's `bindings`). Each one is
+// offered here as a tool, app_<appKey>_<action>, and runs through the same
+// code the app's own screens use — routes/app-data.js for the app's own
+// table, the section tools below for a data contract (lib/dataContracts.js)
+// — under the install's permissions and the caller's. There is no second MCP
+// and, again, no slug argument: the install names the business.
 
 const supabase = require('../db');
 const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth');
 const {
-    getSchema, allowTable, cleanBody, textColumns,
-    permits, canAny, mayUse, tablesFor, resourceForTable, normalizePermissions, scopeForPermissions,
+    getSchema, cleanBody, textColumns,
+    canAny, mayUse, tablesFor, normalizePermissions, scopeForPermissions, permitsResource,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionValues, appTables,
 } = require('../lib/businessTables');
+const dataContracts = require('../lib/dataContracts');
+const appInstances = require('../lib/appInstances');
 const messages = require('../lib/messages');
 const googlePush = require('../lib/googlePush');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
@@ -95,21 +109,157 @@ async function authenticate(req) {
         const found = await lookupToken(raw);
         if (found.reason) return { reason: found.reason };
         // permissions null = a legacy token, governed by scope alone.
-        return {
+        return withApps({
             slug: found.slug,
             scope: found.scope,
             permissions: found.permissions,
             installId: found.installId,
             via: 'token',
             label: found.label,
-        };
+        });
     }
 
     // A dashboard session: a Supabase access token or a Paperclip business
     // token, resolved by the same code the dashboard's guards use.
     const session = await resolveSessionSlug(raw);
     if (session.reason) return { reason: session.reason };
-    return { slug: session.slug, scope: 'write', permissions: null, via: session.via, label: 'dashboard session', session: true };
+    return withApps({ slug: session.slug, scope: 'write', permissions: null, via: session.via, label: 'dashboard session', session: true });
+}
+
+/** The caller, with the actions of its business's installed apps attached (tool listing is synchronous). */
+async function withApps(caller) {
+    return { ...caller, apps: await installedActions(caller.slug) };
+}
+
+/* ── installed apps' declared actions ─────────────────────────────────── */
+
+const ACTION_ID = /^[a-z][a-z0-9_]*$/;
+const ACTION_KINDS = Object.freeze(['read', 'create', 'update']);
+const toolSafe = (v) => String(v).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+/**
+ * The contract an action reaches: through a binding of the manifest
+ * ({ binding }, the engine's shape — a write needs access read-write), or
+ * named outright ({ contract }). Null when it names neither usable thing.
+ */
+function actionContract(manifest, a) {
+    if (typeof a.binding === 'string') {
+        const b = manifest?.bindings?.[a.binding];
+        if (!b || typeof b.contract !== 'string') return null;
+        if (a.kind !== 'read' && b.access !== 'read-write') return null;
+        return b.contract;
+    }
+    return typeof a.contract === 'string' && a.contract ? a.contract : null;
+}
+
+/** Does this manifest entry describe an action this server can offer? */
+function usableAction(manifest, a) {
+    if (!a || typeof a !== 'object' || !ACTION_ID.test(String(a.id || '')) || !ACTION_KINDS.includes(a.kind)) return false;
+    if (typeof a.summary !== 'string' || !a.summary.trim()) return false;
+    const hasTable = typeof a.table === 'string' && !!a.table;
+    const hasBinding = typeof a.binding === 'string' || typeof a.contract === 'string';
+    if (hasTable === hasBinding) return false; // exactly one
+    if (hasTable) return Object.prototype.hasOwnProperty.call(appTables(manifest), a.table);
+    const contract = actionContract(manifest, a);
+    return contract !== null && dataContracts.contractFor(contract) !== null;
+}
+
+/**
+ * Every usable action of every enabled app Paperclip has installed for this
+ * business, with the install it belongs to and that install's permissions.
+ * Read live per call; never throws (no apps table yet = no app tools).
+ */
+async function installedActions(slug) {
+    if (!slug) return [];
+    try {
+        const apps = await appInstances.listForSlug(slug);
+        const live = apps.filter((a) => a.enabled && a.manifest && Array.isArray(a.manifest.actions) && a.manifest.actions.length);
+        if (!live.length) return [];
+        const { data: installs } = await supabase.from('nextgent_installs')
+            .select('install_id, entity_slug, permissions, status')
+            .in('install_id', live.map((a) => a.installId));
+        const byInstall = Object.fromEntries((installs || []).map((i) => [i.install_id, i]));
+        const out = [];
+        for (const app of live) {
+            const install = byInstall[app.installId];
+            if (!install || install.status !== 'active' || install.entity_slug !== slug) continue;
+            const permissions = Array.isArray(install.permissions) ? install.permissions : [];
+            for (const action of app.manifest.actions) {
+                if (!usableAction(app.manifest, action)) continue;
+                out.push({
+                    name: `app_${toolSafe(app.appKey)}_${action.id}`,
+                    installId: app.installId,
+                    appKey: app.appKey,
+                    appName: app.manifest.name || app.appKey,
+                    permissions,
+                    action: { id: action.id, summary: action.summary.trim(), kind: action.kind, table: action.table || null, contract: action.table ? null : actionContract(app.manifest, action) },
+                });
+            }
+        }
+        return out;
+    } catch (e) {
+        console.error(`[mcp] installed actions for ${slug}:`, e.message);
+        return [];
+    }
+}
+
+const ACTION_INPUTS = {
+    read: {
+        type: 'object',
+        properties: {
+            search: { type: 'string', description: 'Match this text in the records\' text columns (a business section only).' },
+            limit: { type: 'integer', description: 'Rows to return, 1-500. Default 50.' },
+            offset: { type: 'integer', description: 'Rows to skip, for paging. Default 0.' },
+        },
+        additionalProperties: false,
+    },
+    create: {
+        type: 'object',
+        properties: { values: { type: 'object', description: 'Field name to value, as the app declares its fields. The business and the install are stamped for you.' } },
+        required: ['values'],
+        additionalProperties: false,
+    },
+    update: {
+        type: 'object',
+        properties: {
+            id: { type: ['string', 'integer'], description: 'The record\'s id, as the read action returned it.' },
+            values: { type: 'object', description: 'Field name to new value. Only the fields you name change.' },
+        },
+        required: ['id', 'values'],
+        additionalProperties: false,
+    },
+};
+
+/** The MCP tool for one installed app's action. */
+function appTool(entry) {
+    const { action } = entry;
+    const target = action.table ? `the app's ${action.table} records` : `the business's ${action.contract}`;
+    return {
+        name: entry.name,
+        title: `${entry.appName}: ${action.id.replace(/_/g, ' ')}`,
+        description: `${action.summary} — an action of the ${entry.appName} app installed for this business, on ${target}.`,
+        inputSchema: ACTION_INPUTS[action.kind],
+        annotations: action.kind === 'read'
+            ? { readOnlyHint: true, openWorldHint: false }
+            : { readOnlyHint: false, destructiveHint: action.kind === 'update', idempotentHint: action.kind === 'update', openWorldHint: false },
+    };
+}
+
+/**
+ * The app tools this caller may see: a write action only when the caller may
+ * write at all; a contract action only when both the install (what the owner
+ * approved for the app) and the caller hold the contract's resource for it.
+ */
+function appToolsFor(caller) {
+    const entries = Array.isArray(caller?.apps) ? caller.apps : [];
+    return entries.filter((e) => {
+        const act = e.action.kind === 'read' ? 'read' : 'write';
+        if (act === 'write' && !canAny(caller, 'write')) return false;
+        if (!e.action.contract) return true;
+        const resource = dataContracts.contractFor(e.action.contract)?.resource;
+        const installCaller = { scope: scopeForPermissions(e.permissions), permissions: e.permissions };
+        return permitsResource(installCaller, resource, act) && permitsResource(caller, resource, act);
+    });
 }
 
 /* ── the tools ────────────────────────────────────────────────────────────
@@ -262,6 +412,7 @@ const WRITE_TOOLS = new Set(['create_row', 'update_row', 'delete_row']);
 const toolsFor = (caller) => {
     const tools = canAny(caller, 'write') ? TOOLS.slice() : TOOLS.filter((t) => !WRITE_TOOLS.has(t.name));
     if (mayUse(caller, 'messages', 'send')) tools.push(SEND_TOOL);
+    for (const entry of appToolsFor(caller)) tools.push(appTool(entry));
     return tools;
 };
 
@@ -282,23 +433,68 @@ async function mapLimit(items, limit, worker) {
 }
 
 /**
- * Resolve a section name and check this caller may `action` it, or explain why
- * not. The check is lib/businessTables.js permits() — one copy.
+ * Resolve a section name — a table, or a data contract such as menu.items —
+ * and check this caller may `action` it, or explain why not. The check is
+ * lib/businessTables.js sectionPermitted() — one copy, the same the dashboard
+ * runs. Returns the section descriptor (table, filter, business key).
  */
 async function section(name, caller, action) {
     if (typeof name !== 'string' || !name.trim()) throw new Error('A section name is required.');
-    const table = await allowTable(name.trim());
-    if (!table) throw new Error(`There is no section called "${name}". Call list_sections to see what this business has.`);
-    const { columns } = await getSchema();
-    const allowed = Array.isArray(action)
-        ? action.some((a) => permits(caller, table, columns[table], a))
-        : permits(caller, table, columns[table], action);
+    const found = await sectionNamed(name.trim());
+    if (!found) throw new Error(`There is no section called "${name}". Call list_sections to see what this business has.`);
+    const actions = Array.isArray(action) ? action : [action];
+    let allowed = false;
+    for (const act of actions) if (await sectionPermitted(caller, found, act)) allowed = true;
     if (!allowed) {
-        const resource = resourceForTable(table, columns[table]) || 'this data';
-        const verb = Array.isArray(action) ? action[0] : action;
-        throw new Error(`This connection is not allowed to ${verb} ${resource}. Ask the business owner to approve it.`);
+        const resource = found.resource || 'this data';
+        throw new Error(`This connection is not allowed to ${actions[0]} ${resource}. Ask the business owner to approve it.`);
     }
-    return table;
+    return found;
+}
+
+/** What a section result names: the table, and the contract when one was asked for. */
+const named = (sec) => ({ section: sec.table, ...(sec.contract ? { contract: sec.contract } : {}) });
+
+/**
+ * Run one installed app's action (appToolsFor decided the caller may see it).
+ * A table action is the app's own records through routes/app-data.js; a
+ * contract action is the section tool of the same kind, on the contract.
+ */
+async function runAppAction(entry, a, caller) {
+    const { action } = entry;
+    if (action.contract) {
+        const inner = action.kind === 'read'
+            ? await runTool('read_section', { section: action.contract, search: a.search, limit: a.limit, offset: a.offset }, caller)
+            : action.kind === 'create'
+                ? await runTool('create_row', { section: action.contract, values: a.values }, caller)
+                : await runTool('update_row', { section: action.contract, id: a.id, values: a.values }, caller);
+        if (!inner || inner.isError) return inner;
+        return content({ app: entry.appKey, action: action.id, ...(inner.structuredContent || {}) });
+    }
+
+    const live = await appInstances.liveInstance(entry.installId);
+    if (!live || live.install.entity_slug !== caller.slug) return toolError(`The ${entry.appName} app is not installed for this business any more.`);
+    const { install, instance } = live;
+    const appData = require('./app-data'); // the same operations the app's own screens use
+    try {
+        if (action.kind === 'read') {
+            const page = await appData.listAppRecords({ install, table: action.table, limit: Number(a.limit) || 50, offset: a.offset });
+            return content({ app: entry.appKey, action: action.id, table: action.table, ...page });
+        }
+        if (action.kind === 'create') {
+            const made = await appData.createAppRecord({ install, instance, table: action.table, body: a.values, source: 'owner' });
+            return content({ app: entry.appKey, action: action.id, table: action.table, created: appInstances.rowShape ? require('../lib/businessTables').appRecordRow(made) : made });
+        }
+        if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
+        const row = await appData.updateAppRecord({ install, instance, table: action.table, id: a.id, body: a.values });
+        return content({ app: entry.appKey, action: action.id, table: action.table, updated: require('../lib/businessTables').appRecordRow(row) });
+    } catch (err) {
+        if (err.errors) {
+            const fields = Object.entries(err.errors).map(([k, v]) => `${k} ${v}`).join('; ');
+            return toolError(`${err.message} ${fields}`);
+        }
+        return toolError(err.message || 'That did not work.');
+    }
 }
 
 async function runTool(name, args, caller) {
@@ -306,6 +502,11 @@ async function runTool(name, args, caller) {
 
     if (WRITE_TOOLS.has(name) && !canAny(caller, 'write')) {
         return toolError('This connection is read-only. Ask the business owner for a token with write access.');
+    }
+
+    if (name.startsWith('app_')) {
+        const entry = appToolsFor(caller).find((e) => e.name === name);
+        return entry ? runAppAction(entry, a, caller) : null;
     }
 
     switch (name) {
@@ -345,10 +546,11 @@ async function runTool(name, args, caller) {
         }
 
         case 'describe_section': {
-            const table = await section(a.section, caller, ['read', 'write']);
+            const sec = await section(a.section, caller, ['read', 'write']);
+            const { table } = sec;
             const { columns } = await getSchema();
             return content({
-                section: table,
+                ...named(sec),
                 columns: (columns[table] || []).map((c) => ({
                     name: c.name,
                     type: c.type,
@@ -361,15 +563,16 @@ async function runTool(name, args, caller) {
         }
 
         case 'read_section': {
-            const table = await section(a.section, caller, 'read');
+            const sec = await section(a.section, caller, 'read');
+            const { table } = sec;
             const limit = Math.min(Math.max(Number(a.limit) || 50, 1), ROW_LIMIT);
             const offset = Math.max(Number(a.offset) || 0, 0);
 
-            const query = supabase
-                .from(table)
-                .select('*', { count: 'exact' })
-                .eq('entity_slug', caller.slug)
-                .range(offset, offset + limit - 1);
+            // The business key is the token's; a contract's filter rides along.
+            const query = applySection(
+                supabase.from(table).select(await sectionSelect(sec), { count: 'exact' }),
+                sec, caller.slug,
+            ).range(offset, offset + limit - 1);
 
             const term = typeof a.search === 'string' ? a.search.trim() : '';
             if (term) {
@@ -389,8 +592,8 @@ async function runTool(name, args, caller) {
             if (error) return toolError(`Could not read ${table}: ${error.message}`);
 
             return content({
-                section: table,
-                rows: data || [],
+                ...named(sec),
+                rows: (data || []).map((r) => sectionRow(sec, r)),
                 returned: (data || []).length,
                 total_matching: count ?? null,
                 limit,
@@ -399,55 +602,56 @@ async function runTool(name, args, caller) {
         }
 
         case 'create_row': {
-            const table = await section(a.section, caller, 'write');
-            const values = await cleanBody(table, a.values);
+            const sec = await section(a.section, caller, 'write');
+            const { table } = sec;
+            const values = await cleanBody(table, sectionValues(sec, a.values));
             if (!Object.keys(values).length) {
                 return toolError('No usable columns in values. Call describe_section to see what this section accepts.');
             }
             const { data, error } = await supabase
                 .from(table)
                 // The slug is ours, not the caller's — cleanBody has already
-                // dropped any the model tried to send.
-                .insert({ ...values, entity_slug: caller.slug })
+                // dropped any the model tried to send. A contract's filter
+                // columns are stamped last, whatever the values said.
+                .insert({ ...values, ...sectionValues(sec, {}), [sec.slugColumn]: caller.slug })
                 .select()
                 .single();
             if (error) return toolError(`Could not add to ${table}: ${error.message}`);
             await googlePush.noteTableWrite(caller.slug, table, data);
-            return content({ section: table, created: data });
+            return content({ ...named(sec), created: sectionRow(sec, data) });
         }
 
         case 'update_row': {
-            const table = await section(a.section, caller, 'write');
+            const sec = await section(a.section, caller, 'write');
+            const { table } = sec;
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
-            const values = await cleanBody(table, a.values);
+            const values = await cleanBody(table, sectionValues(sec, a.values));
+            for (const column of Object.keys(sec.filter || {})) delete values[column]; // a row cannot leave its contract
             if (!Object.keys(values).length) {
                 return toolError('Nothing to change. Call describe_section to see what this section accepts.');
             }
-            const { data, error } = await supabase
-                .from(table)
-                .update(values)
-                .eq('id', a.id)
-                .eq('entity_slug', caller.slug) // never reachable outside this business
-                .select();
+            const { data, error } = await applySection(
+                supabase.from(table).update(values).eq(sec.idColumn, a.id),
+                sec, caller.slug, // never reachable outside this business, or outside the contract
+            ).select();
             if (error) return toolError(`Could not update ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
             await googlePush.noteTableWrite(caller.slug, table, data[0]);
-            return content({ section: table, updated: data[0] });
+            return content({ ...named(sec), updated: sectionRow(sec, data[0]) });
         }
 
         case 'delete_row': {
-            const table = await section(a.section, caller, 'write');
+            const sec = await section(a.section, caller, 'write');
+            const { table } = sec;
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
-            const { data, error } = await supabase
-                .from(table)
-                .delete()
-                .eq('id', a.id)
-                .eq('entity_slug', caller.slug)
-                .select('id');
+            const { data, error } = await applySection(
+                supabase.from(table).delete().eq(sec.idColumn, a.id),
+                sec, caller.slug,
+            ).select(sec.idColumn);
             if (error) return toolError(`Could not delete from ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
             await googlePush.noteTableWrite(caller.slug, table, null);
-            return content({ section: table, deleted: data[0].id });
+            return content({ ...named(sec), deleted: data[0][sec.idColumn] });
         }
 
         case 'send_message': {

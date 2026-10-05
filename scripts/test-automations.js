@@ -80,8 +80,8 @@ function result(rec) {
     if (rec.table === 'automations') return { data: [{ id: 'auto-1', name: 'Nightly special', icon: '⚡', version: 2, status: 'published', trigger: DEFINITION.trigger }], error: null };
     if (rec.table === 'entity_modules') {
         return { data: rec.eq.entity_slug === 'flora-bama' ? [
-            { entity_slug: 'flora-bama', module_key: 'song-requests', managed_by: 'paperclip', enabled: true, settings: { manifest: { name: 'Song Requests', events: { emits: ['requests.submitted', 'requests.played'] } } } },
-            { entity_slug: 'flora-bama', module_key: 'legacy', managed_by: null, enabled: true, settings: { manifest: { name: 'Legacy', events: { emits: ['x.y'] } } } },
+            { entity_slug: 'flora-bama', module_key: 'song-requests', managed_by: 'paperclip', enabled: true, settings: { manifest: { id: 'song-requests', name: 'Song Requests', events: { emits: ['song-requests.requests.submitted', 'song-requests.requests.played'] } } } },
+            { entity_slug: 'flora-bama', module_key: 'legacy', managed_by: null, enabled: true, settings: { manifest: { id: 'legacy', name: 'Legacy', events: { emits: ['legacy.x.y'] } } } },
             { entity_slug: 'flora-bama', module_key: 'no-events', managed_by: 'paperclip', enabled: true, settings: { manifest: { name: 'Quiet' } } },
         ] : [], error: null };
     }
@@ -197,7 +197,7 @@ function check(label, ok, detail) {
 
     console.log('\nEvents an installed app declares (DECISIONS #47)');
     const appEvents = await engine.appEventsFor('flora-bama');
-    check('the events of the business\'s installed apps, namespaced by app key', appEvents.map((e) => e.name).join(',') === 'song-requests.requests.submitted,song-requests.requests.played', JSON.stringify(appEvents));
+    check('the events of the business\'s installed apps, exactly as declared (<manifest id>.<event>)', appEvents.map((e) => e.name).join(',') === 'song-requests.requests.submitted,song-requests.requests.played', JSON.stringify(appEvents));
     check('a legacy dashboard row (not managed by Paperclip) declares nothing', !appEvents.some((e) => e.name.startsWith('legacy.')));
     const known = await engine.knownEvents('flora-bama');
     check('knownEvents is the platform list plus those', known.some((e) => e.name === 'booking.created') && known.some((e) => e.name === 'song-requests.requests.submitted') && known.length === engine.EVENTS.length + 2);

@@ -312,7 +312,10 @@ router.get('/:table', businessCaller, async (req, res) => {
     ).range(offset, offset + limit - 1);
     if (error) return fail(res, 500, error.message);
 
-    res.json({ ...named(section), rows: (data || []).map((r) => sectionRow(section, r)), total: count ?? null, limit, offset });
+    const rows = (data || []).map((r) => sectionRow(section, r));
+    // A scalar contract (business.currency) is one value of the business (DECISIONS #56).
+    if (section.scalar) return res.json({ ...named(section), value: rows[0]?.[section.scalar] ?? null });
+    res.json({ ...named(section), rows, total: count ?? null, limit, offset });
 });
 
 /* ── the three writes ─────────────────────────────────────────────────────

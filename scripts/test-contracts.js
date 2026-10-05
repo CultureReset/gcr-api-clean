@@ -65,6 +65,8 @@ check('business.links is a column rule over entity, not a list of networks', con
 check('a raw table name is not a contract', !contracts.isContractName('menu_items') && contracts.contractFor('menu_items') === null);
 check('an unknown dotted name is not a contract', contracts.contractFor('nope.items') === null);
 check('a prototype name is not a contract', contracts.contractFor('constructor.x') === null);
+check('a dotted name with dashes is a well-formed name (DECISIONS #54)', contracts.isContractName('my-app.items') && contracts.contractFor('my-app.items') === null);
+check('business.currency is a scalar contract read as { value }', contracts.contractFor('business.currency').scalar === 'currency');
 
 console.log('\n── the legacy dashboard keys (routes/platform.js dispatch) ──');
 const expectKey = {

@@ -29,9 +29,9 @@ const { T, db } = createMemDb({ tables: {
     owner_automation_drafts: [],
     // An installed app (lib/appInstances.js projection) declaring the events it emits.
     entity_modules: [
-        { id: 1, entity_slug: 'shop', module_key: 'song-requests', managed_by: 'paperclip', install_id: 'in-1', enabled: true, settings: { manifest: { name: 'Song Requests', events: { emits: ['requests.submitted'] } } } },
-        { id: 2, entity_slug: 'shop', module_key: 'gone-app', managed_by: 'paperclip', install_id: 'in-2', enabled: false, settings: { manifest: { name: 'Gone', events: { emits: ['things.happened'] } } } },
-        { id: 3, entity_slug: 'other', module_key: 'theirs', managed_by: 'paperclip', install_id: 'in-3', enabled: true, settings: { manifest: { name: 'Theirs', events: { emits: ['stuff.done'] } } } },
+        { id: 1, entity_slug: 'shop', module_key: 'song-requests', managed_by: 'paperclip', install_id: 'in-1', enabled: true, settings: { manifest: { id: 'song-requests', name: 'Song Requests', events: { emits: ['song-requests.requests.submitted'] } } } },
+        { id: 2, entity_slug: 'shop', module_key: 'gone-app', managed_by: 'paperclip', install_id: 'in-2', enabled: false, settings: { manifest: { id: 'gone-app', name: 'Gone', events: { emits: ['gone-app.things.happened'] } } } },
+        { id: 3, entity_slug: 'other', module_key: 'theirs', managed_by: 'paperclip', install_id: 'in-3', enabled: true, settings: { manifest: { id: 'theirs', name: 'Theirs', events: { emits: ['theirs.stuff.done'] } } } },
     ],
     billing_plan: [{ key: 'base', is_default: true, is_public: true }, { key: 'growth', name: 'Growth', stripe_price_id: 'price_growth', is_public: true }, { key: 'hidden', is_public: false, stripe_price_id: 'p' }],
     billing_subscription: [],
@@ -76,7 +76,7 @@ async function run() {
         check('platform-only steps are left out', !types.includes('script') && !types.includes('http.request'));
         check('triggers and events come with it', meta.body.triggers.length > 0 && meta.body.events.some((e) => e.name === 'booking.completed'));
         const appEvent = meta.body.events.find((e) => e.name === 'song-requests.requests.submitted');
-        check('the events of this business\'s installed apps are listed, namespaced by app key (DECISIONS #47)', !!appEvent && appEvent.app === 'song-requests' && /Song Requests/.test(appEvent.description), JSON.stringify(meta.body.events));
+        check('the events of this business\'s installed apps are listed, exactly as declared (DECISIONS #47, #55)', !!appEvent && appEvent.app === 'song-requests' && /Song Requests/.test(appEvent.description), JSON.stringify(meta.body.events));
         check('a disabled install\'s events are not, nor another business\'s', !meta.body.events.some((e) => e.name === 'gone-app.things.happened' || e.name === 'theirs.stuff.done'));
         const onApp = await call('POST', '/api/business/automations/drafts', { name: 'Thank the requester', trigger: { type: 'event', event: 'song-requests.requests.submitted' }, steps: [] });
         check('a draft may listen for an installed app\'s event', onApp.status === 201 && onApp.body.problems.length === 0, JSON.stringify(onApp.body));

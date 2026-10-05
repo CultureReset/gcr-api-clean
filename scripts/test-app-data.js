@@ -45,6 +45,7 @@ const { T, db } = createMemDb({ tables: {
         { id: 3, entity_slug: 'other', name: 'Not ours', shown: true },
     ],
     bookings: [{ id: 1, entity_slug: 'shop', customer_name: 'A Person' }],
+    entity_leads: [],
     offerings: [
         { id: 1, entity_slug: 'shop', kind: 'product', name: 'Mug' },
         { id: 2, entity_slug: 'shop', kind: 'service', name: 'Catering' },
@@ -70,6 +71,8 @@ globalThis.fetch = async (url, init) => {
             menu_items: def(['id', 'entity_slug', 'name', 'shown', 'cost_note']),
             bookings: def(['id', 'entity_slug', 'customer_name']),
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
+            entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
+            entity: def(['id', 'slug', 'name']),
             app_records: def(['id', 'entity_slug', 'data']),
         } }) };
     }
@@ -82,12 +85,14 @@ function manifest(over = {}) {
         runtime: { type: 'engine', engine: '1' },
         surfaces: [{ id: 'owner', kind: 'dashboard', path: '/owner' }, { id: 'public', kind: 'public', path: '/public' }],
         permissions: [{ id: 'menu:read', reason: 'Shows the menu.' }],
-        // <table>.<verb>: an insert into `notes` emits notes.submitted, as <appKey>.notes.submitted.
-        events: { emits: ['notes.submitted', 'internal.noted', 'enquiries.submitted'] },
+        // <manifest id>.<event> (DECISIONS #55): one segment after the id fires for every new record;
+        // a table-qualified one (<id>.<table>.<verb>) only for that table.
+        events: { emits: ['notes-app.submitted', 'notes-app.internal.noted'] },
         data: {
             namespace: 'notes',
             tables: {
-                notes: { public: 'read-append', columns: {
+                // Public content, not a message to the owner: inbox false (the default for an append table is true).
+                notes: { public: 'read-append', inbox: false, columns: {
                     title: { type: 'text', required: true, max_length: 20 },
                     count: { type: 'integer' },
                     shown: { type: 'boolean', default: true },
@@ -198,7 +203,7 @@ async function run() {
         events.length = 0;
         const made = await own('POST', '/api/app-data/notes', { title: 'First', count: '3', sneaky: 'x', entity_slug: 'other' });
         check('a record is created with declared columns only', made.status === 201 && made.body.row.title === 'First' && made.body.row.count === 3 && !('sneaky' in made.body.row) && made.body.row.shown === true, JSON.stringify(made.body));
-        check('an owner insert emits the declared event, namespaced by the app key, for the install\'s business', events.length === 1 && events[0].event === 'notes-app.notes.submitted' && events[0].slug === 'shop' && events[0].payload.table === 'notes' && events[0].payload.record.title === 'First' && events[0].payload.source === 'owner' && events[0].payload.installId === 'app-1', JSON.stringify(events));
+        check('an owner insert emits the declared event, exactly as declared, for the install\'s business', events.length === 1 && events[0].event === 'notes-app.submitted' && events[0].slug === 'shop' && events[0].payload.table === 'notes' && events[0].payload.record.title === 'First' && events[0].payload.source === 'owner' && events[0].payload.installId === 'app-1', JSON.stringify(events));
         const rec = T.app_records.find((r) => r.id === made.body.row.id);
         check('scoped to the install and the business from the token', rec.install_id === 'app-1' && rec.entity_slug === 'shop' && rec.app_table === 'notes');
         check('a missing required column is refused', (await own('POST', '/api/app-data/notes', { count: 1 })).status === 422);
@@ -242,11 +247,11 @@ async function run() {
         events.length = 0;
         const sub = await call('POST', '/api/public/apps/app-1/notes', { title: 'From a visitor', flag: 'set-by-visitor' });
         check('a visitor can append to a public append table', sub.status === 201 && sub.body.row.id && !('title' in sub.body.row), JSON.stringify(sub.body));
-        check('a read-append table is public content, not a message to the owner', !T.business_messages?.length, JSON.stringify(T.business_messages));
-        check('a visitor\'s insert emits the same declared event, source visitor', events.length === 1 && events[0].event === 'notes-app.notes.submitted' && events[0].payload.source === 'visitor' && events[0].payload.record.title === 'From a visitor', JSON.stringify(events));
+        check('a read-append table marked inbox false is public content, not a message to the owner', !T.business_messages?.length, JSON.stringify(T.business_messages));
+        check('a visitor\'s insert emits the same declared event, source visitor', events.length === 1 && events[0].event === 'notes-app.submitted' && events[0].payload.source === 'visitor' && events[0].payload.record.title === 'From a visitor', JSON.stringify(events));
         events.length = 0;
         await own('POST', '/api/app-data/internal', { memo: 'quiet' });
-        check('an insert into a table with no declared event emits nothing of its own (internal.noted is declared: it fires)', events.length === 1 && events[0].event === 'notes-app.internal.noted', JSON.stringify(events));
+        check('a table-qualified event fires only for its table; the app-level one fires for every table', events.map((e) => e.event).sort().join(',') === 'notes-app.internal.noted,notes-app.submitted', JSON.stringify(events));
         events.length = 0;
         const vrec = T.app_records.find((r) => r.id === sub.body.row.id);
         check('owner-only columns take their default, not the visitor\'s value', vrec.data.flag === 'new' && vrec.source === 'visitor' && vrec.entity_slug === 'shop');
@@ -262,12 +267,42 @@ async function run() {
         check('the body is the record, led by the manifest\'s title field', /^Do you cater\?/.test(inbound[0]?.body || '') && /name: Pat/.test(inbound[0].body) && /rating: 4/.test(inbound[0].body), inbound[0]?.body);
         const thread = T.message_threads.find((t) => t.id === inbound[0]?.thread_id);
         check('on an app thread of this business', thread?.channel === 'app' && thread.entity_slug === 'shop' && thread.customer_address === 'pat@example.test' && thread.mode === 'agent', JSON.stringify(thread));
-        check('the declared event fired as well', events.some((e) => e.event === 'notes-app.enquiries.submitted'));
+        check('the declared event fired as well', events.some((e) => e.event === 'notes-app.submitted' && e.payload.table === 'enquiries'));
         await call('POST', '/api/public/apps/app-1/enquiries', { name: 'Quinn', phone: '(251) 555-0123', message: 'Hours?' });
         check('no email: the phone is the address', (T.business_messages || []).some((m) => m.channel === 'app' && m.customer_address === '+12515550123'), JSON.stringify((T.business_messages || []).map((m) => m.customer_address)));
         await call('POST', '/api/public/apps/app-1/enquiries', { name: 'Rae', message: 'Just saying hi' });
         check('no email or phone: the first text field', (T.business_messages || []).some((m) => m.channel === 'app' && m.customer_address === 'Rae'), JSON.stringify((T.business_messages || []).map((m) => m.customer_address)));
         T.app_records = T.app_records.filter((r) => r.app_table !== 'enquiries');
+
+        console.log('\n── a visitor submits into the business through a read-write binding (DECISIONS #57) ──');
+        const leadApp = {
+            schema_version: 1, id: 'lead-app', name: 'Enquiry Form', version: '1.0.0', publisher: 'test', runtime: { type: 'engine', engine: '1' },
+            surfaces: [{ id: 'public', kind: 'public', path: '/public' }],
+            permissions: [{ id: 'business:read', reason: 'r' }, { id: 'business:write', reason: 'w' }],
+            bindings: { leads: { contract: 'leads.items', access: 'read-write', inbox: true }, who: { contract: 'business.profile', access: 'read' } },
+            events: { emits: ['lead-app.submitted'] },
+            config: [{ key: 'accepting', type: 'boolean', default: true }],
+            ui: {
+                sources: {
+                    enquiries: { from: 'business', binding: 'leads', fields: [{ key: 'name', type: 'text', required: true }, { key: 'email', type: 'email' }, { key: 'message', type: 'longtext' }, { key: 'status', type: 'select', ownerOnly: true }], title: 'name' },
+                    profile: { from: 'business', binding: 'who', fields: [{ key: 'name', type: 'text' }], title: 'name' },
+                },
+                views: { public: [{ type: 'form', source: 'enquiries', openWhen: { setting: 'accepting' } }] },
+            },
+        };
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['business:read', 'business:write'], app: leadApp });
+        events.length = 0;
+        const boundSub = await call('POST', '/api/public/apps/app-4/enquiries', { name: 'Sam', email: 'sam@example.test', message: 'Call me', status: 'won', entity_slug: 'other' });
+        const lead = (T.entity_leads || []).find((l) => l.name === 'Sam');
+        check('the source key resolves through the manifest to its binding: the lead is in entity_leads, for the install\'s business', boundSub.status === 201 && boundSub.body.table === 'enquiries' && lead?.entity_slug === 'shop' && lead.email === 'sam@example.test', JSON.stringify({ body: boundSub.body, lead }));
+        check('an owner-only field is dropped; the visitor cannot set the status', lead && lead.status !== 'won', JSON.stringify(lead));
+        check('nothing in app_records', !T.app_records.some((r) => r.install_id === 'app-4'));
+        const leadMsg = (T.business_messages || []).find((m) => m.install_id === 'app-4');
+        check('the inbox row follows (binding inbox true)', leadMsg?.channel === 'app' && leadMsg.customer_address === 'sam@example.test' && /^Sam/.test(leadMsg.body), JSON.stringify(leadMsg));
+        check('and the declared event, as declared', events.some((e) => e.event === 'lead-app.submitted' && e.payload.record.name === 'Sam' && e.payload.table === 'enquiries'), JSON.stringify(events));
+        check('a read-only binding takes no submission', (await call('POST', '/api/public/apps/app-4/profile', { name: 'Hack' })).status === 404);
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['business:read'], app: leadApp });
+        check('without the install\'s business:write the submission is refused', (await call('POST', '/api/public/apps/app-4/enquiries', { name: 'Tess' })).status === 403 && !(T.entity_leads || []).some((l) => l.name === 'Tess'));
         check('bad visitor input is refused', (await call('POST', '/api/public/apps/app-1/notes', {})).status === 422);
         const full = await call('POST', '/api/public/apps/app-1/notes', { title: 'Too many' });
         check('a table at APP_DATA_MAX_ROWS_PER_TABLE takes no more', full.status === 409, JSON.stringify(full.body));
