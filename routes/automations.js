@@ -648,6 +648,15 @@ publicRouter.get('/cron/conversations', cronRequired, async (req, res) => {
     }
 });
 
+/** Every five minutes, from vercel.json: business events that did not reach Paperclip first time (lib/eventOutbox.js). */
+publicRouter.get('/cron/outbox', cronRequired, async (req, res) => {
+    try {
+        res.json(await require('../lib/eventOutbox').drain());
+    } catch (err) {
+        fail(res, 500, err.message);
+    }
+});
+
 /** One URL per install. The token is the credential; nothing else is trusted. */
 publicRouter.post('/hook/:token', async (req, res) => {
     const token = String(req.params.token || '');

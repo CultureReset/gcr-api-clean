@@ -62,6 +62,12 @@ database named in `CLAUDE.md`, after checking it is the right project.
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.
 
+## Step 7: moving what is in the wrong database (DECISIONS #87)
+
+| # | File | What it adds |
+| - | ---- | ------------ |
+| 18g | `nextgent_event_outbox.sql` | `business_event_outbox`: every business event on its way to Paperclip (`POST /api/nextgent/events`, ids and a non-PII summary only), with its attempts and last error (needs 7 for `company_links`). Written only while `EVENTS_TO_PAPERCLIP` is true; until it is applied the module logs the missing table and the local fan-out runs as before |
+
 ## One copy of each thing (the duplication audit)
 
 Apply after everything above. Each moves data that two places held into the
