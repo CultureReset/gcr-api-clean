@@ -202,6 +202,7 @@ const schemaStub = {
     sectionRows: async (section, rows) => (rows || []).map((r) => realTables.sectionRow(section, r)),
     sectionValues: realTables.sectionValues,
     settleExclusive: realTables.settleExclusive,
+    sectionInsertValues: async (section, body) => ({ values: realTables.sectionValues(section, await schemaStub.cleanBody(section.table, realTables.sectionValues(section, body))), refused: [] }),
     sectionPatchValues: async (section, body) => {
         const values = await schemaStub.cleanBody(section.table, realTables.sectionValues(section, body));
         for (const column of Object.keys(section.filter || {})) delete values[column];

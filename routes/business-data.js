@@ -52,8 +52,8 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // to an AI assistant that this file applies to the dashboard. One copy only —
 // a second copy of a security check drifts until one of them has a hole in it.
 const {
-    getSchema, cleanBody, tablesFor,
-    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionValues, sectionPatchValues, settleExclusive, pivotColumn,
+    getSchema, tablesFor,
+    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionInsertValues, sectionPatchValues, settleExclusive, pivotColumn,
 } = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
@@ -376,7 +376,8 @@ router.post('/:table', businessCaller, async (req, res) => {
 
     // The contract's filter columns are stamped after the body is cleaned, so a
     // products.items write is a product whatever `kind` the body carried.
-    const values = sectionValues(section, await cleanBody(table, sectionValues(section, req.body)));
+    const { values, refused } = await sectionInsertValues(section, req.body);
+    if (refused.length) return fail(res, 400, `${section.name}: ${refused.join('; ')}.`, { refused });
 
     const { data, error } = await supabase
         .from(table)
@@ -423,7 +424,7 @@ router.patch('/:table', businessCaller, async (req, res) => {
 async function updateRow(req, res, section, id) {
     const { table } = section;
     const { values, refused } = await sectionPatchValues(section, req.body);
-    if (refused.length) return fail(res, 400, `${section.name} does not let a business change ${refused.join(', ')}.`, { refused });
+    if (refused.length) return fail(res, 400, `${section.name}: ${refused.join('; ')}.`, { refused });
     if (!Object.keys(values).length) return fail(res, 400, 'Nothing to change.');
 
     // The id never widens the match: the slug from the credential always applies.

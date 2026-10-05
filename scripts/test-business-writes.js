@@ -155,6 +155,24 @@ async function run() {
         const appSrc = fs.readFileSync(path.join(ROOT, 'routes/app-data.js'), 'utf8');
         const mcpSrc = fs.readFileSync(path.join(ROOT, 'routes/mcp.js'), 'utf8');
         check('every write door settles it: business-data, app-data (a bound submission) and the MCP', [dataSrc, appSrc, mcpSrc].every((src) => /settleExclusive\(/.test(src)) && !/entity_photos/.test(dataSrc));
+
+        console.log('\n── menu.items.tags: a comma-separated string in, the array out (DECISIONS #98) ──');
+        const contracts = require(path.join(ROOT, 'lib/dataContracts.js'));
+        check('the registry declares tags a list column of menu.items', JSON.stringify(contracts.contractFor('menu.items').lists) === '["tags"]');
+        r = await call('POST', '/api/business/menu.items', { body: { name: 'Gumbo', tags: ' spicy, seafood ,, gluten-free ' } });
+        const gumbo = T.menu_items.find((m) => m.name === 'Gumbo');
+        check('a string is split and trimmed into text[], empties dropped', r.status === 201 && JSON.stringify(gumbo.tags) === '["spicy","seafood","gluten-free"]', `${r.status} ${JSON.stringify(gumbo)}`);
+        check('the row comes back with the array', JSON.stringify(r.body.row.tags) === '["spicy","seafood","gluten-free"]');
+        r = await call('GET', '/api/business/menu.items');
+        check('a read returns the array, not a joined string', r.status === 200 && Array.isArray(r.body.rows[0].tags) && r.body.rows[0].tags.length === 3, JSON.stringify(r.body.rows));
+        r = await call('PATCH', `/api/business/menu.items/${gumbo.id}`, { body: { tags: ['mild', ' seafood '] } });
+        check('an array is accepted as it is, each entry trimmed', r.status === 200 && JSON.stringify(gumbo.tags) === '["mild","seafood"]', `${r.status} ${JSON.stringify(gumbo)}`);
+        r = await call('PATCH', `/api/business/menu.items/${gumbo.id}`, { body: { tags: '' } });
+        check('an empty input is no value, as every other column', r.status === 200 && gumbo.tags === null, JSON.stringify(gumbo));
+        r = await call('POST', '/api/business/menu_items', { body: { name: 'Po-boy', tags: 'lunch,sandwich' } });
+        check('the raw table name is the same door: split too', r.status === 201 && JSON.stringify(T.menu_items.find((m) => m.name === 'Po-boy').tags) === '["lunch","sandwich"]', `${r.status} ${JSON.stringify(r.body)}`);
+        r = await call('PATCH', `/api/business/menu.items/${gumbo.id}`, { body: { tags: 7 } });
+        check('a value that is neither is refused, naming the column', r.status === 400 && /tags/.test(r.body.error) && gumbo.tags === null, `${r.status} ${JSON.stringify(r.body)}`);
     } catch (e) {
         check('no exception', false, e.stack);
     }

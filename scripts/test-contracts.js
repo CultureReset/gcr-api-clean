@@ -123,4 +123,13 @@ check('toTableRow renames a contract field to its column', JSON.stringify(contra
 check('toContractRow renames it back', contracts.toContractRow(entry, { from_name: 'A', id: 2 }).from === 'A');
 check('no fieldMap: the row is the row', contracts.toContractRow({ fieldMap: null }, { a: 1 }).a === 1);
 
+console.log('\n── list columns (DECISIONS #98) ──');
+const menu = contracts.contractFor('menu.items');
+check('menu.items declares tags a list', JSON.stringify(menu.lists) === '["tags"]');
+check('a comma-separated string is split and trimmed, empties dropped', JSON.stringify(contracts.toTableRow(menu, { tags: ' a, b ,,c ' }).tags) === '["a","b","c"]');
+check('an array is kept, trimmed', JSON.stringify(contracts.toTableRow(menu, { tags: [' a ', 'b', ''] }).tags) === '["a","b"]');
+check('an empty string is no value', contracts.toTableRow(menu, { tags: '' }).tags === null);
+check('a number is a problem, named', JSON.stringify(contracts.listProblems(menu, { tags: 7 })) === '["tags"]' && contracts.listProblems(menu, { tags: 'a' }).length === 0);
+check('a read returns the array as stored — no joined read', Array.isArray(contracts.toContractRow(menu, { tags: ['a', 'b'] }).tags));
+
 done('contracts');

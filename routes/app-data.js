@@ -33,7 +33,7 @@ const supabase = require('../db');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 const {
     appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
-    sectionSelect, applySection, sectionRow, sectionRows, sectionFor, sectionValues, cleanBody, scopeForPermissions, settleExclusive,
+    sectionSelect, applySection, sectionRow, sectionRows, sectionFor, sectionInsertValues, scopeForPermissions, settleExclusive,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
 const businessEvents = require('../lib/businessEvents');
@@ -335,7 +335,8 @@ async function insertBound({ install, bound, body }) {
     if (section.single) throw Object.assign(new Error(`${section.name} is the business's one record; a visitor cannot add to it.`), { status: 405 });
     const input = body && typeof body === 'object' && !Array.isArray(body) ? { ...body } : {};
     for (const f of bound.source.fields || []) if (f?.ownerOnly && typeof f.key === 'string') delete input[f.key];
-    const values = sectionValues(section, await cleanBody(section.table, sectionValues(section, input)));
+    const { values, refused } = await sectionInsertValues(section, input);
+    if (refused.length) throw Object.assign(new Error(`${section.name}: ${refused.join('; ')}.`), { status: 400 });
     const { data, error } = await supabase.from(section.table)
         .insert({ ...values, [section.slugColumn]: install.entity_slug }) // the business is the install's
         .select().single();

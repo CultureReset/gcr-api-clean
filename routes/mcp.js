@@ -47,7 +47,7 @@ const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth')
 const {
     getSchema, cleanBody, textColumns,
     canAny, mayUse, tablesFor, normalizePermissions, scopeForPermissions, permitsResource,
-    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, sectionPatchValues, settleExclusive, appTables,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, sectionInsertValues, sectionPatchValues, settleExclusive, appTables,
 } = require('../lib/businessTables');
 const dataContracts = require('../lib/dataContracts');
 const appInstances = require('../lib/appInstances');
@@ -630,7 +630,8 @@ async function runTool(name, args, caller) {
             const { table } = sec;
             if (sec.single) return toolError(`${sec.contract} is this business's one record: update_row changes it, nothing creates it.`);
             if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
-            const values = await cleanBody(table, sectionValues(sec, a.values));
+            const { values, refused } = await sectionInsertValues(sec, a.values);
+            if (refused.length) return toolError(`${sec.name}: ${refused.join('; ')}.`);
             if (!Object.keys(values).length) {
                 return toolError('No usable columns in values. Call describe_section to see what this section accepts.');
             }
@@ -657,7 +658,7 @@ async function runTool(name, args, caller) {
             if (!sec.single && (a.id === undefined || a.id === null || a.id === '')) return toolError('An id is required.');
             // The business record's columns are the owner's rule (DECISIONS #96): a governed column is refused by name.
             const { values, refused } = await sectionPatchValues(sec, a.values);
-            if (refused.length) return toolError(`${sec.contract} does not let a business change ${refused.join(', ')}.`);
+            if (refused.length) return toolError(`${sec.name}: ${refused.join('; ')}.`);
             if (!Object.keys(values).length) {
                 return toolError('Nothing to change. Call describe_section to see what this section accepts.');
             }
