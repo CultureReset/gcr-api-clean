@@ -21,6 +21,9 @@
 //                                  and kept, the app's records stay)
 //   POST   /installs/:installId/session  a short-lived token for that install
 //                                  (≤ 300 s, the install's permissions)
+//   POST   /platform-text          a text from the platform number, for
+//                                  Paperclip's notifications
+//                                  (routes/nextgent-platform-text.js, DECISIONS #85)
 //   GET    /entitlement            may this company have this item, and at what price
 //   GET    /business-kinds         linked companies grouped by their business's
 //                                  kind (entity.entity_type), for the store's
@@ -69,6 +72,8 @@ const nodePairing = require('../lib/nodePairing');
 
 const router = express.Router();
 router.use(serviceSigned);
+// Platform texts for Paperclip (DECISIONS #85), its own module behind the same signature.
+router.use(require('./nextgent-platform-text'));
 
 const fail = (res, status, error, extra) => res.status(status).json({ error, ...(extra || {}) });
 const KINDS = new Set(['agent', 'app', 'automation', 'layout']);
