@@ -52,6 +52,8 @@ const {
 const dataContracts = require('../lib/dataContracts');
 const appInstances = require('../lib/appInstances');
 const messages = require('../lib/messages');
+const { resolveRecipient } = require('../lib/recipientRef');
+const businessEvents = require('../lib/businessEvents');
 const googlePush = require('../lib/googlePush');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { TOKEN_PREFIX, mintToken, lookupToken, missingTable } = require('../lib/businessTokens');
@@ -380,28 +382,49 @@ const TOOLS = [
 /**
  * messages.send (CONTRACT §6): one message to one customer, behind the
  * messages:send permission. The rules live in lib/messages.js.
+ *
+ * The recipient is `to` (an address) or `to_ref` (the record the address is
+ * on: { contract: 'booking.records', id } or { customer_id }), resolved inside
+ * gcr by lib/recipientRef.js within this business only, so a caller that
+ * holds ids — Paperclip's routines hold nothing else (DECISIONS #87) — can
+ * message a customer without the address ever passing through it. The result
+ * never carries the address either way.
  */
 const SEND_TOOL = {
     name: 'send_message',
     title: 'messages.send — message a customer',
     description:
-        'Send one email or text to one customer of this business. Texts go only from the business\'s registered number and only to customers who agreed to texts; otherwise the message is recorded as blocked with the reason. Set require_approval to have the owner OK it first.',
+        'Send one email or text to one customer of this business. Name the customer by address (to) or by the record the address is on (to_ref: a booking or a customer id; the address is looked up here and never returned). Texts go only from the business\'s registered number and only to customers who agreed to texts; otherwise the message is recorded as blocked with the reason. Set require_approval to have the owner OK it first.',
     inputSchema: {
         type: 'object',
         properties: {
             channel: { type: 'string', enum: messages.CHANNELS, description: 'email or sms.' },
-            to: { type: 'string', description: 'The customer\'s email address or phone number.' },
+            to: { type: 'string', description: 'The customer\'s email address or phone number. Give this or to_ref, not both.' },
+            to_ref: {
+                type: 'object',
+                description: 'The record the address is on, instead of the address: { contract: "booking.records", id } for a booking, or { customer_id } for a customer record. Resolved within this business; the address is never returned.',
+                properties: {
+                    contract: { type: 'string', description: 'A data contract name, e.g. booking.records.' },
+                    id: { type: ['string', 'number'], description: 'The row id within that contract.' },
+                    customer_id: { type: ['string', 'number'], description: 'Shorthand for { contract: "customers.items", id }.' },
+                },
+                additionalProperties: false,
+            },
             subject: { type: 'string', description: 'Email subject. Ignored for texts.' },
             body: { type: 'string', description: 'The message itself, plain text.' },
             require_approval: { type: 'boolean', description: 'Hold it for the owner to approve. Default false.' },
         },
-        required: ['channel', 'to', 'body'],
+        required: ['channel', 'body'],
         additionalProperties: false,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 };
 
 const WRITE_TOOLS = new Set(['create_row', 'update_row', 'delete_row']);
+
+// Tables whose change is an event (booking.changed / cancelled need the row as
+// it was) — the same set routes/business-data.js reads a `before` for.
+const EVENTFUL_ON_CHANGE = new Set(['bookings', 'booking_calendar']);
 
 /**
  * Tools this caller may actually see. A token that may not write anything is
@@ -620,6 +643,8 @@ async function runTool(name, args, caller) {
                 .single();
             if (error) return toolError(`Could not add to ${table}: ${error.message}`);
             await googlePush.noteTableWrite(caller.slug, table, data);
+            // The same events a write through /api/business fires (lib/businessEvents.js; review 01 M12). Never fails the write.
+            await businessEvents.sectionWritten(caller.slug, table, null, data);
             return content({ ...named(sec), created: sectionRow(sec, data) });
         }
 
@@ -633,6 +658,13 @@ async function runTool(name, args, caller) {
             if (!Object.keys(values).length) {
                 return toolError('Nothing to change. Call describe_section to see what this section accepts.');
             }
+            let before = null;
+            if (EVENTFUL_ON_CHANGE.has(table)) {
+                const { data: was } = await applySection(
+                    supabase.from(table).select('*').eq(sec.idColumn, a.id), sec, caller.slug,
+                ).maybeSingle();
+                before = was ? { ...was } : null; // a snapshot, not a reference the update could move
+            }
             const { data, error } = await applySection(
                 supabase.from(table).update(values).eq(sec.idColumn, a.id),
                 sec, caller.slug, // never reachable outside this business, or outside the contract
@@ -640,6 +672,7 @@ async function runTool(name, args, caller) {
             if (error) return toolError(`Could not update ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
             await googlePush.noteTableWrite(caller.slug, table, data[0]);
+            await businessEvents.sectionWritten(caller.slug, table, before, data[0]);
             return content({ ...named(sec), updated: sectionRow(sec, data[0]) });
         }
 
@@ -662,10 +695,21 @@ async function runTool(name, args, caller) {
             if (!mayUse(caller, 'messages', 'send')) {
                 return toolError('This connection is not allowed to send messages. Ask the business owner to approve messages:send.');
             }
+            const hasTo = typeof a.to === 'string' && a.to.trim() !== '';
+            const hasRef = a.to_ref !== undefined && a.to_ref !== null;
+            if (hasTo === hasRef) return toolError('Name the recipient once: to (an address) or to_ref (the record it is on), not both and not neither.');
+            let to = a.to;
+            if (hasRef) {
+                // Resolved here, within this business; the address is used
+                // for the send and never written into the result.
+                const found = await resolveRecipient(caller.slug, a.channel, a.to_ref);
+                if (!found.address) return toolError(`No ${a.channel === 'sms' ? 'phone number' : 'email address'} for that reference (${found.reason}).`);
+                to = found.address;
+            }
             const sent = await messages.sendMessage({
                 slug: caller.slug,
                 channel: a.channel,
-                to: a.to,
+                to,
                 subject: a.subject,
                 body: a.body,
                 requireApproval: a.require_approval === true,

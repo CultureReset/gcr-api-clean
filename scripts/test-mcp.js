@@ -128,6 +128,16 @@ function result(rec) {
         const rows = INSTALL_ROWS.filter((r) => !rec.eq.install_id || r.install_id === rec.eq.install_id);
         return { data: rec.eq.install_id ? rows[0] || null : rows, error: null };
     }
+    // Rows a recipient reference resolves to (lib/recipientRef.js): the address
+    // stays in here and must never reach the tool result.
+    if (rec.table === 'bookings') {
+        if (rec.eq.id === 'bk-1' && rec.eq.entity_slug === 'flora-bama') return { data: { id: 'bk-1', entity_slug: 'flora-bama', customer_name: 'Ana', email: 'ana@example.test', phone: '+15550001111', details: {} }, error: null };
+        return { data: rec.eq.id ? null : [], error: null };
+    }
+    if (rec.table === 'entity_customers') {
+        if (rec.eq.id === 'cu-1' && rec.eq.entity_slug === 'flora-bama') return { data: { id: 'cu-1', entity_slug: 'flora-bama', name: 'Cus', email: 'cu@example.test', phone: null }, error: null };
+        return { data: rec.eq.id ? null : [], error: null };
+    }
     if (rec.table === 'app_records') {
         if (rec.insert) return { data: { id: 'r-2', created_at: '2026-01-01T00:00:00Z', ...rec.insert }, error: null };
         if (rec.update) return { data: [{ id: 'r-1', install_id: 'in-song', entity_slug: 'flora-bama', app_table: 'requests', data: { song: 'Margaritaville', from_name: 'Al', ...rec.update.data }, created_at: '2026-01-01T00:00:00Z' }], error: null };
@@ -293,6 +303,20 @@ inject(path.join(ROOT, 'db.js'), dbStub);
 inject(path.join(ROOT, 'lib/businessTables.js'), schemaStub);
 inject(path.join(ROOT, 'lib/conciergeTools.js'), conciergeStub);
 
+// messages.send, recording what it was asked to send (the address included,
+// so the test can prove the result never carries it), and the business events
+// an MCP write must fire like /api/business does (review 01 M12).
+const sends = [];
+inject(path.join(ROOT, 'lib/messages.js'), {
+    CHANNELS: ['email', 'sms'],
+    sendMessage: async (m) => { sends.push(m); return { id: 'msg-1', status: 'sent', customer_address: m.to }; },
+});
+const fired = [];
+inject(path.join(ROOT, 'lib/businessEvents.js'), {
+    sectionWritten: async (slug, table, before, after) => { fired.push({ slug, table, before, after }); return null; },
+    appRecordCreated: async (slug, args) => { fired.push({ slug, app: args?.appKey, table: args?.table }); return []; },
+});
+
 const mcp = require(path.join(ROOT, 'routes/mcp.js'));
 const mcpPublic = require(path.join(ROOT, 'routes/mcp-public.js'));
 const app = express();
@@ -404,6 +428,43 @@ async function run() {
     const legacy = await call('read_section', { section: 'faqs' });
     check('a legacy read token still reads every section', !legacy.body.result?.isError);
     tokenScope = 'write';
+
+    console.log('\n── send_message by reference: the address never leaves gcr (DECISIONS #87) ──');
+    tokenScope = 'write'; tokenPermissions = ['messages:send']; appsInstalled = false;
+    const sendTool = (await rpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools.find((t) => t.name === 'send_message');
+    check('send_message takes to_ref and no longer requires to', sendTool && 'to_ref' in sendTool.inputSchema.properties && !sendTool.inputSchema.required.includes('to'), JSON.stringify(sendTool?.inputSchema));
+    sends.length = 0; calls.length = 0;
+    const byBooking = await call('send_message', { channel: 'sms', to_ref: { contract: 'booking.records', id: 'bk-1' }, body: 'How was it?' });
+    check('a booking.records reference resolves to the booking\'s phone inside gcr', sends[0]?.to === '+15550001111' && sends[0].channel === 'sms' && sends[0].slug === 'flora-bama', JSON.stringify(sends[0]));
+    const bookingRead = calls.find((c) => c.table === 'bookings');
+    check('the lookup is filtered on the token\'s slug and the id', bookingRead && bookingRead.eq.entity_slug === 'flora-bama' && bookingRead.eq.id === 'bk-1', JSON.stringify(bookingRead?.eq));
+    const outText = JSON.stringify(byBooking.body);
+    check('the result reports the message, never the address', !byBooking.body.result?.isError && byBooking.body.result.structuredContent.message_id === 'msg-1'
+        && !outText.includes('5550001111') && !outText.includes('ana@') && !('to' in byBooking.body.result.structuredContent), outText.slice(0, 300));
+    sends.length = 0;
+    const byCustomer = await call('send_message', { channel: 'email', to_ref: { customer_id: 'cu-1' }, body: 'Hello' });
+    check('a customer_id reference resolves through customers.items to the email', sends[0]?.to === 'cu@example.test' && !JSON.stringify(byCustomer.body).includes('cu@example.test'), JSON.stringify({ sent: sends[0], body: byCustomer.body }).slice(0, 300));
+    sends.length = 0;
+    const noPhone = await call('send_message', { channel: 'sms', to_ref: { customer_id: 'cu-1' }, body: 'Hello' });
+    check('a reference with no address for that channel is refused with the reason, nothing sent', noPhone.body.result?.isError === true && /no_address/.test(noPhone.body.result.content[0].text) && !sends.length, JSON.stringify(noPhone.body).slice(0, 200));
+    const unknownRow = await call('send_message', { channel: 'sms', to_ref: { contract: 'booking.records', id: 'bk-404' }, body: 'x' });
+    check('an unknown id is refused (not_found), nothing sent', unknownRow.body.result?.isError === true && /not_found/.test(unknownRow.body.result.content[0].text) && !sends.length);
+    const unknownContract = await call('send_message', { channel: 'sms', to_ref: { contract: 'nope.items', id: '1' }, body: 'x' });
+    check('a contract the registry lacks is refused (unknown_contract)', unknownContract.body.result?.isError === true && /unknown_contract/.test(unknownContract.body.result.content[0].text));
+    const both = await call('send_message', { channel: 'sms', to: '+15550002222', to_ref: { customer_id: 'cu-1' }, body: 'x' });
+    const neither = await call('send_message', { channel: 'sms', body: 'x' });
+    check('to and to_ref together, or neither, is refused', both.body.result?.isError === true && neither.body.result?.isError === true && !sends.length);
+    const plainTo = await call('send_message', { channel: 'sms', to: '+15550002222', body: 'x' });
+    check('a plain to still works as before', !plainTo.body.result?.isError && sends[0]?.to === '+15550002222');
+    tokenPermissions = null; appsInstalled = true;
+
+    console.log('\n── MCP writes fire the same events /api/business fires (review 01 M12) ──');
+    tokenScope = 'write'; fired.length = 0;
+    await call('create_row', { section: 'menu_items', values: { name: 'New' } });
+    check('create_row → sectionWritten(slug, table, null, row)', fired.length === 1 && fired[0].slug === 'flora-bama' && fired[0].table === 'menu_items' && fired[0].before === null && fired[0].after?.name === 'New', JSON.stringify(fired));
+    fired.length = 0;
+    await call('update_row', { section: 'menu_items', id: 8821, values: { name: 'Y' } });
+    check('update_row → sectionWritten(slug, table, before, row)', fired.length === 1 && fired[0].table === 'menu_items' && fired[0].after?.id === 8821 && 'before' in fired[0], JSON.stringify(fired));
 
     console.log('\n── the slug is never taken from the request ──');
     calls.length = 0;
