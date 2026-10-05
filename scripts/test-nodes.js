@@ -31,6 +31,7 @@ function builder(table, verb) {
         insert: (v) => { rec.insert = v; return self; },
         update: (v) => { rec.update = v; return self; },
         eq: (k, v) => { rec.eq[k] = v; return self; },
+        lt: (k, v) => { rec.lt = [k, v]; return self; },
         in: (k, v) => { rec.in = [k, v]; return self; },
         is: (k, v) => { rec.is = [k, v]; return self; },
         not: (...a) => { rec.not = a; return self; },
@@ -56,6 +57,7 @@ function result(rec) {
     if (rec.table === 'ghost_node_requests') {
         if (rec.insert) return { data: { id: 'req-1', status: 'queued', created_at: 'now' }, error: null };
         if (rec.update) return { data: rec.eq.node_id === 'node-1' ? [{ id: rec.eq.id || 'req-1' }] : [], error: null };
+        if (rec.eq.id && rec.eq.node_id === 'node-1') return { data: { id: rec.eq.id, path: '/intent' }, error: null };
         if (rec.eq.status === 'queued') return { data: [{ id: 'req-1', method: 'POST', path: '/intent', body: { text: 'hi' } }], error: null };
         return { data: rec.eq.entity_slug === 'flora-bama' ? { id: 'req-1', status: 'done' } : null, error: null };
     }
@@ -169,7 +171,7 @@ async function call(server, method, url, { token, body } = {}) {
         calls.length = 0;
         r = await call(server, 'GET', '/api/nodes/pull', { token: NODE_TOKEN });
         check('box pulls its queued requests', r.status === 200 && r.json.requests.length === 1);
-        const mark = calls.find((c) => c.table === 'ghost_node_requests' && c.update);
+        const mark = calls.find((c) => c.table === 'ghost_node_requests' && c.update?.status === 'dispatched');
         check('pulled requests are marked dispatched for this node only', mark.update.status === 'dispatched' && mark.eq.node_id === 'node-1');
 
         calls.length = 0;

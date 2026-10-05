@@ -28,9 +28,13 @@ inject(path.join(ROOT, 'db.js'), db);
 inject(path.join(ROOT, 'middleware/ownerAuth.js'), { ownerRequired: (q, r) => r.status(401).json({}) });
 
 const posted = [];
+let paperclipOffline = false;
+let pendingBeforeDelivery = false;
 const realFetch = globalThis.fetch;
 globalThis.fetch = async (url, init) => {
     if (String(url).startsWith('https://paperclip.test')) {
+        if (String(url).endsWith('/receipts')) pendingBeforeDelivery ||= T.ghost_node_requests.some(r => r.receipt_error === 'pending');
+        if (paperclipOffline) throw new Error('Paperclip offline');
         posted.push({ url: String(url), headers: init.headers, body: init.body });
         return { ok: true, status: 201, text: async () => '{"ok":true}' };
     }
@@ -113,6 +117,43 @@ async function run() {
         const bareBody = JSON.parse(posted[2]?.body || '{}');
         check('with neither target nor capability the action id stands in', bare.body.posted === 1 && bareBody.target === 'act-10' && bareBody.verified === false, JSON.stringify(bareBody));
         check('not a list: refused', (await call('POST', '/api/nodes/receipts', { receipts: 'x' }, NODE_TOKEN)).status === 400);
+
+        // Match the exact ActionRecord/Receipt shape nextgent-platform emits.
+        await call('POST', '/api/mcp/ghost', { jsonrpc: '2.0', id: 4, method: 'tools/call', params: {
+            name: 'nextgent_ghost_submit_intent', arguments: { text: 'open display settings', idempotency_key: 'key-00003', task_id: 'task-real' }
+        } }, MCP_TOKEN);
+        const origin = T.ghost_node_requests.at(-1);
+        await call('POST', `/api/nodes/requests/${origin.id}/response`, { status: 200,
+            body: { resolved: true, action: { request: { action_id: 'act_real' }, status: 'APPROVAL_REQUIRED' } }
+        }, NODE_TOKEN);
+        paperclipOffline = true;
+        const actual = { action_id: 'act_real', capability: 'android.settings.open_display', environment: 'android.primary',
+            map_id: 'android.settings.open_display', map_version: '0.1.0', requested_state: {},
+            observed_state: { state_id: 'display_settings' }, result: 'VERIFIED', evidence: ['after.png'], created_at: '2026-10-05T04:30:00Z' };
+        const delayed = await call('POST', '/api/nodes/receipts', { receipts: [actual] }, NODE_TOKEN);
+        check('Paperclip outage keeps the delayed receipt in the relay', delayed.body.accepted === 1 && delayed.body.posted === 0);
+        check('receipt is marked pending before its first upstream attempt', pendingBeforeDelivery);
+        paperclipOffline = false;
+        // Ordinary pending answers must not fill the retry window and starve receipts.
+        T.ghost_node_requests.unshift(...Array.from({ length: 25 }, (_, i) => ({
+            id: `ordinary-${i}`, node_id: 'node-1', entity_slug: 'shop',
+            status: 'done', path: '/health', response_body: { ok: true },
+            receipt_posted_at: null, receipt_error: null, created_at: '2026-10-01T00:00:00Z'
+        })));
+        await call('GET', '/api/nodes/pull', null, NODE_TOKEN);
+        const delivered = posted.map(p => JSON.parse(p.body)).find(p => p.taskId === 'task-real');
+        check('poll retries delivery and links the real local action to its originating task', !!delivered);
+        check('real receipt preserves observation, timestamp, device and verification', delivered?.verified === true
+            && delivered.newValue.state_id === 'display_settings' && delivered.at === actual.created_at
+            && delivered.device === 'android.primary' && delivered.evidence[0] === 'after.png');
+        const stale = { id: 'lost-answer', node_id: 'node-1', entity_slug: 'shop', status: 'dispatched',
+            method: 'POST', path: '/intent', body: { text: 'open display settings' },
+            dispatched_at: new Date(Date.now() - 240_000).toISOString(), created_at: '2026-10-01T00:00:00Z' };
+        const fresh = { ...stale, id: 'still-running', dispatched_at: new Date().toISOString() };
+        T.ghost_node_requests.push(stale, fresh);
+        const retry = await call('GET', '/api/nodes/pull', null, NODE_TOKEN);
+        check('expired dispatch lease redelivers the same request ID', retry.body.requests.some(r => r.id === 'lost-answer'));
+        check('live dispatch lease is not redelivered', !retry.body.requests.some(r => r.id === 'still-running'));
     } catch (e) {
         check('no exception', false, e.stack);
     }

@@ -35,6 +35,7 @@ const { ownerRequired } = require('../middleware/ownerAuth');
 const { pageAll, resolveAudience, industries } = require('../lib/audience');
 const ent = require('../lib/entitlements');
 const { prepareVersion, configKeys } = require('../lib/storeManifest');
+const { validateRelease } = require('../lib/ghostRelease');
 
 const router = express.Router();
 const ownerRouter = express.Router();
@@ -152,6 +153,7 @@ router.post('/items/:id/versions', adminRequired, async (req, res) => {
         if (item.status === 'archived') return fail(res, 409, 'This item is archived.');
         const prepared = prepareVersion(item, req.body || {});
         if (!prepared.ok) return fail(res, 400, prepared.error);
+        try { validateRelease(prepared.manifest, item.kind); } catch (err) { return fail(res, 400, err.message); }
         const version = (item.latest_version || 0) + 1;
         const { data, error } = await supabase.from('store_versions').insert({
             item_id: item.id,
@@ -200,6 +202,9 @@ async function planPush(item, target, action, audience) {
         }
         if (action === 'install') {
             if (has) return { slug, do: 'skip', why: 'already_installed' };
+            if (['map', 'box_release'].includes(item.kind) && ent.newPermissions(row?.granted_permissions, target.permissions).length) {
+                return { slug, do: row ? 'offer' : 'offer_new', row, why: 'needs_consent' };
+            }
             return { slug, do: row ? 'install_existing' : 'install_new', row };
         }
         // force

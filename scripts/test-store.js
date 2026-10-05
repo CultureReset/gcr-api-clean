@@ -241,6 +241,20 @@ const seen = (list, key) => list.find((i) => i.key === key);
         r = await call(server, 'POST', `/api/admin/store/items/${songs}/deploy`, ADMIN, { action: 'force', version: 2, audience: { mode: 'slugs', slugs: ['lulus'] } });
         check('rollback: force the older version', inst.version === 2 && r.json.deployment.applied === 1);
 
+        console.log('\nPhysical release consent');
+        r = await call(server, 'POST', '/api/admin/store/items', ADMIN, { key: 'android-launch-map', kind: 'map', name: 'Android launch map', access: 'free' });
+        const androidMap = r.json.item.id;
+        await call(server, 'POST', `/api/admin/store/items/${androidMap}/versions`, ADMIN, { semver: '1.0.0', manifest: { permissions: ['android.settings'] } });
+        r = await call(server, 'POST', `/api/admin/store/items/${androidMap}/deploy/preview`, ADMIN, { action: 'install', version: 1, audience: { mode: 'slugs', slugs: ['flora-bama'] } });
+        check('new physical permissions appear as pending consent in preview', r.status === 200 && r.json.needs_consent === 1);
+        r = await call(server, 'POST', `/api/admin/store/items/${androidMap}/deploy`, ADMIN, { action: 'install', version: 1, audience: { mode: 'slugs', slugs: ['flora-bama'] } });
+        const offeredMap = db.store_installs.find(row => row.entity_slug === 'flora-bama' && row.item_id === androidMap);
+        check('admin install offers physical permissions instead of granting them', offeredMap.status === 'offered' && !(offeredMap.granted_permissions || []).length);
+        r = await call(server, 'POST', `/api/store/${androidMap}/install`, OWNER('u-fb'), {});
+        check('physical installation without permission acceptance is refused', r.status === 409);
+        r = await call(server, 'POST', `/api/store/${androidMap}/install`, OWNER('u-fb'), { accept_permissions: true });
+        check('owner can explicitly accept the physical release', r.status === 200 && offeredMap.status === 'installed');
+
         console.log('\nStaged rollout');
         await call(server, 'POST', `/api/admin/store/items/${reviews}/versions`, ADMIN, { semver: '1.1.0', manifest: { runtime: { kind: 'iframe' } } });
         await call(server, 'POST', `/api/store/${reviews}/install`, OWNER('u-fb'), {});

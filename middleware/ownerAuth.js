@@ -232,7 +232,7 @@ async function ownerRequired(req, res, next) {
         req.actingAsAdmin = true;
         return next();
     }
-    return res.status(403).json({ error: notLinked(caller.via) });
+    return res.status(403).json({ error: notLinked(caller.via), code: 'not_linked' });
 }
 
 /**
@@ -274,7 +274,7 @@ async function businessOrAdminRequired(req, res, next) {
         req.scopeSlug = null;
         return next();
     }
-    if (!caller.slug) return res.status(403).json({ error: notLinked(caller.via) });
+    if (!caller.slug) return res.status(403).json({ error: notLinked(caller.via), code: 'not_linked' });
     req.scopeSlug = caller.slug;
     req.ownerRole = caller.role;
     return next();

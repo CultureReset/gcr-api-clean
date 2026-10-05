@@ -25,6 +25,27 @@ const pairing = require('../lib/nodePairing');
 
 const router = express.Router();
 
+router.get('/releases', nodeRequired, async (req, res) => {
+    try {
+        const releases = await require('../lib/ghostRelease').releasesFor(req.node.entity_slug);
+        res.json({ releases });
+    } catch (err) { res.status(err.status || 503).json({ error: err.message }); }
+});
+
+// Device-reported installer status; this is not a physical action verification receipt.
+router.post('/release-status', nodeRequired, async (req, res) => {
+    const { item_id, version, sha256, state } = req.body || {};
+    if (typeof item_id !== 'string' || !item_id || item_id.length > 128 || !Number.isInteger(version) || version < 1 || !/^[a-f0-9]{64}$/.test(sha256) || !['installed', 'failed', 'blocked'].includes(state)) {
+        return res.status(400).json({ error: 'Invalid release status.' });
+    }
+    const { data, error } = await supabase.from('ghost_nodes').select('health').eq('id', req.node.id).maybeSingle();
+    if (error) return tableError(res, error);
+    const health = { ...(data?.health || {}), release: { item_id, version, sha256, state, observed_at: nowIso() } };
+    const result = await supabase.from('ghost_nodes').update({ health }).eq('id', req.node.id);
+    if (result.error) return tableError(res, result.error);
+    return res.json({ ok: true });
+});
+
 const { TOKEN_PREFIX, hashToken, normalizeUserCode } = pairing;
 const nowIso = () => new Date().toISOString();
 
@@ -32,9 +53,10 @@ const nowIso = () => new Date().toISOString();
 // (nextgent-platform link.py ALLOWED_PREFIXES), which has no /remote/: the
 // box side of remote view is not built (DECISIONS #75). GET /:id/remote below
 // still queues its own /remote/session row, kept for when it is.
-const FORWARDABLE = ['/health', '/capabilities', '/intent', '/approvals', '/actions/'];
+const FORWARDABLE = new Set(['/health', '/capabilities', '/intent', '/approvals']);
 const forwardable = (path) =>
-    typeof path === 'string' && !path.includes('..') && FORWARDABLE.some((p) => path.startsWith(p));
+    typeof path === 'string' && (FORWARDABLE.has(path)
+        || /^\/actions\/[A-Za-z0-9_-]{1,80}(?:\/receipt|\/dispatch)?$/.test(path));
 
 const missingTable = (error) =>
     /ghost_node|ghost_mcp_tokens/.test(error?.message || '') && /(does not exist|schema cache)/i.test(error.message);
@@ -51,7 +73,7 @@ async function nodeRequired(req, res, next) {
 
     const { data, error } = await supabase
         .from('ghost_nodes')
-        .select('id, entity_slug, name, revoked_at')
+        .select('id, entity_slug, name, revoked_at, health')
         .eq('token_hash', hashToken(raw))
         .maybeSingle();
     if (error) return tableError(res, error);
@@ -390,7 +412,9 @@ router.get('/:id/requests', ownerRequired, async (req, res) => {
 // (lib/deviceSync.js, DECISIONS #73); that push never fails the heartbeat.
 router.post('/heartbeat', nodeRequired, async (req, res) => {
     const version = typeof req.body?.version === 'string' ? req.body.version.slice(0, 64) : null;
-    const health = req.body?.health && typeof req.body.health === 'object' ? req.body.health : null;
+    const health = req.body?.health && typeof req.body.health === 'object' && !Array.isArray(req.body.health) ? { ...req.body.health } : {};
+    delete health.release;
+    if (req.node.health?.release) health.release = req.node.health.release;
     const lastSeenAt = nowIso();
     const { error } = await supabase
         .from('ghost_nodes')
@@ -404,6 +428,25 @@ router.post('/heartbeat', nodeRequired, async (req, res) => {
 
 // GET /api/nodes/pull — queued requests for this box, oldest first, marked dispatched
 router.get('/pull', nodeRequired, async (req, res) => {
+    // A lost poll response or local answer must not strand the instruction.
+    // The local link derives its action ID from this unchanged request ID,
+    // so redelivery reconciles the existing action instead of executing twice.
+    const { error: leaseError } = await supabase.from('ghost_node_requests')
+        .update({ status: 'queued', dispatched_at: null })
+        .eq('node_id', req.node.id).eq('status', 'dispatched')
+        .lt('dispatched_at', new Date(Date.now() - 180_000).toISOString());
+    if (leaseError) return tableError(res, leaseError);
+    // The computer's result is durable even if Paperclip was unavailable.
+    // Retry delivery on its next poll, without re-executing any device action.
+    const { data: pendingReceipts } = await supabase.from('ghost_node_requests')
+        .select('*').eq('node_id', req.node.id)
+        .not('response_body', 'is', null).is('receipt_posted_at', null)
+        .not('receipt_error', 'is', null)
+        .order('created_at', { ascending: true }).limit(20);
+    const receiptService = require('../lib/ghostReceipts');
+    for (const row of pendingReceipts || []) {
+        if (receiptService.receiptOf(row)) await receiptService.postReceipt(row).catch(() => {});
+    }
     const { data, error } = await supabase
         .from('ghost_node_requests')
         .select('id, method, path, body')
@@ -468,6 +511,7 @@ router.post('/receipts', nodeRequired, async (req, res) => {
             status: 'done',
             response_status: 200,
             response_body: receipt,
+            receipt_error: 'pending',
             paperclip_task_id: typeof receipt.task_id === 'string' && receipt.task_id ? receipt.task_id : null,
             dispatched_at: nowIso(),
             completed_at: nowIso(),
@@ -487,6 +531,12 @@ router.post('/requests/:rid/response', nodeRequired, async (req, res) => {
     if (!Number.isInteger(status) || status < 100 || status > 599) {
         return res.status(400).json({ error: 'status must be an HTTP status code.' });
     }
+    const receiptService = require('../lib/ghostReceipts');
+    const { data: original, error: lookupError } = await supabase.from('ghost_node_requests')
+        .select('path').eq('id', req.params.rid).eq('node_id', req.node.id).maybeSingle();
+    if (lookupError) return tableError(res, lookupError);
+    if (!original) return res.status(404).json({ error: 'No such request for this box.' });
+    const hasReceipt = receiptService.receiptOf({ path: original.path, response_status: status, response_body: req.body?.body });
     const { data, error } = await supabase
         .from('ghost_node_requests')
         .update({
@@ -494,6 +544,9 @@ router.post('/requests/:rid/response', nodeRequired, async (req, res) => {
             response_status: status,
             response_body: req.body?.body ?? null,
             completed_at: nowIso(),
+            // Mark the outbox before attempting delivery, including a crash
+            // between storing the answer and the first signed Paperclip call.
+            ...(hasReceipt ? { receipt_error: 'pending' } : {}),
         })
         .eq('id', req.params.rid)
         .eq('node_id', req.node.id)

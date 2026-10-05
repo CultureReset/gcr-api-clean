@@ -206,6 +206,7 @@ function run(mw, { token, query = {}, body = {}, params = {} } = {}) {
 
     const unlinked = await run(ownerRequired, { token: sign({ claims: { company_id: 'co-unlinked' } }) });
     check('an unlinked company is refused', !unlinked.next && unlinked.status === 403, JSON.stringify(unlinked.body));
+    check('a missing link has a code distinct from permission denial', unlinked.body.code === 'not_linked');
 
     const admin = await run(ownerRequired, {
         token: sign({ claims: { sub: 'pc-admin', role: 'instance_admin', company_id: 'co-unlinked' } }),
