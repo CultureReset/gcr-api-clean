@@ -32,7 +32,9 @@ const DEF = {
     config_schema: [],
     steps: [
         { id: 'pause', type: 'wait', config: { minutes: 1440 } },
-        { id: 'hand', type: 'agent', config: { item_key: '{{ automation.key }}', instructions: 'Ask {{ trigger.payload.booking.customer_name }} for a review', payload: { booking: '{{ trigger.payload.booking }}' } } },
+        // DECISIONS #87 (#37 interim): the agent gets ids, not the customer — it
+        // reads the booking through the business MCP when it runs.
+        { id: 'hand', type: 'agent', config: { item_key: '{{ automation.key }}', instructions: 'Ask the guest of booking {{ trigger.ref.booking_id }} for a review', payload: { booking: '{{ trigger.ref }}' } } },
         { id: 'mail', type: 'message', config: { channel: 'email', to: '{{ trigger.payload.booking.customer_email }}', subject: 'How was it?', body: 'Thanks for visiting {{ business.name }}!' } },
     ],
 };
@@ -128,7 +130,13 @@ const { check, done } = checker();
         const expected = 'sha256=' + crypto.createHmac('sha256', ROUTINE_SECRET).update(`${ts}.`).update(p.body).digest('hex');
         check('signed hmac_sha256 exactly as Paperclip checks it', p.headers['X-Paperclip-Signature'] === expected && /^\d+$/.test(ts));
         const sent = JSON.parse(p.body);
-        check('with the booking and the instructions', sent.payload.booking.customer_email === 'ana@example.test' && sent.instructions === 'Ask Ana for a review' && sent.business.slug === 'shop');
+        check('with the trigger as { type, event, ref } — ids and a non-PII summary, never the payload',
+            sent.trigger && sent.trigger.type === 'event' && sent.trigger.event === 'booking.completed' && sent.trigger.ref.booking_id === 'b-1' && sent.trigger.ref.status === 'completed'
+            && !('payload' in sent.trigger), JSON.stringify(sent.trigger));
+        const piiKeys = (v, trail = '') => (v && typeof v === 'object' ? Object.entries(v).flatMap(([k, x]) => (/name|email|phone|details|notes/i.test(k) ? [`${trail}.${k}`] : []).concat(piiKeys(x, `${trail}.${k}`))) : []);
+        const leaks = piiKeys({ trigger: sent.trigger, payload: sent.payload });
+        check('nothing posted to Paperclip carries a customer name, email or phone', leaks.length === 0 && !p.body.includes('ana@example.test') && !p.body.includes('Ana'), leaks.join(',') || p.body);
+        check('templates reach the ref as trigger.ref', sent.instructions === 'Ask the guest of booking b-1 for a review' && sent.payload.booking.booking_id === 'b-1' && sent.business.slug === 'shop', JSON.stringify({ i: sent.instructions, p: sent.payload }));
         check('and the review request went out by email', emails[0]?.to === 'ana@example.test' && /The Shop/.test(emails[0].html));
         check('the same run row finished ok, its log in one piece', T.automation_runs.length === 1 && T.automation_runs[0].status === 'ok'
             && T.automation_runs[0].steps_log.map((x) => x.id).join(',') === 'pause,hand,mail', JSON.stringify(T.automation_runs[0]));
