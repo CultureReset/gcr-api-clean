@@ -74,6 +74,8 @@ const T = {
     menu_items: [{ id: 1, entity_slug: 'listed-cafe', name: 'Toast' }, { id: 3, entity_slug: 'new-taco-shop', name: 'Taco' }],
     faqs: [{ id: 2, entity_slug: 'listed-cafe', q: 'Open?' }],
     // The catalogue: one table, the kind is data (products.items = kind product).
+    // People who asked: private as a raw table (a lead is a record of a person), reached by contract.
+    entity_leads: [{ id: 'l-1', entity_slug: 'new-taco-shop', name: 'Asker', email: 'a@example.test', status: 'new' }, { id: 'l-2', entity_slug: 'listed-cafe', name: 'Theirs' }],
     offerings: [
         { id: 10, entity_slug: 'new-taco-shop', kind: 'product', name: 'Salsa jar' },
         { id: 11, entity_slug: 'new-taco-shop', kind: 'service', name: 'Catering' },
@@ -194,6 +196,7 @@ globalThis.fetch = async (url, init) => {
             menu_items: def(['id', 'entity_slug', 'name']),
             faqs: def(['id', 'entity_slug', 'q']),
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
+            entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
             // The business record: keyed by slug, so not a section; its columns back business.* contracts.
             entity: def(['id', 'slug', 'name', 'phone', 'website_url', 'social_instagram', 'stripe_customer_id']),
             business_mcp_tokens: def(['id', 'entity_slug', 'token_hash']),
@@ -394,6 +397,10 @@ async function run() {
         check('an unknown contract is not a section', (await asUser('GET', '/api/business/nope.items', undefined, prodTok)).status === 400);
         check('a contract whose table this database lacks is not a section either', (await asUser('GET', '/api/business/media.images', undefined, prodTok)).status === 400);
         check('the business record is read-only through contracts', (await asUser('POST', '/api/business/business.profile', { name: 'X' }, prodTok)).status === 403);
+        const leads = await asUser('GET', '/api/business/leads.items', undefined, prodTok);
+        check('leads.items is the permissioned door to it: this business\'s leads', leads.status === 200 && leads.body.rows.length === 1 && leads.body.rows[0].name === 'Asker', JSON.stringify(leads.body));
+        const lead = await asUser('POST', '/api/business/leads.items', { name: 'New asker', email: 'n@example.test', message: 'Hi', source: 'shop-app' }, prodTok);
+        check('an app with business:write records a lead for its business', lead.status === 201 && T.entity_leads.find((l) => l.name === 'New asker')?.entity_slug === 'new-taco-shop', JSON.stringify(lead.body));
         const links = await asUser('GET', '/api/business/business.links', undefined, prodTok);
         check('business.links reads the business record by its slug', links.status === 200 && links.body.table === 'entity' && links.body.rows.length === 1 && links.body.rows[0].slug === 'new-taco-shop', JSON.stringify(links.body));
 

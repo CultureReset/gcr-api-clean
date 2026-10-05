@@ -29,6 +29,33 @@ const expectTable = {
 for (const [name, table] of Object.entries(expectTable)) {
     check(`${name} → ${table}`, contracts.contractFor(name)?.table === table, JSON.stringify(contracts.contractFor(name)));
 }
+console.log('\n── business facts the apps used to keep themselves (DECISIONS #44, #49) ──');
+check('leads.items → entity_leads', contracts.contractFor('leads.items')?.table === 'entity_leads');
+check('customers.items → entity_customers', contracts.contractFor('customers.items')?.table === 'entity_customers');
+check('both are on an existing resource (CONTRACT §6 list unchanged)', ['leads.items', 'customers.items'].every((n) => RESOURCES.includes(contracts.contractFor(n).resource)));
+check('business.currency → entity.currency, read-only', contracts.contractFor('business.currency')?.table === 'entity' && contracts.contractFor('business.currency').readOnly && contracts.contractFor('business.currency').columns.test('currency'));
+delete process.env.DEFAULT_CURRENCY;
+check('a business with no currency set answers null when no default is configured', contracts.toContractRow(contracts.contractFor('business.currency'), { slug: 's', currency: null }).currency === null);
+process.env.DEFAULT_CURRENCY = 'usd';
+check('and the environment default otherwise — nothing hard-coded', contracts.toContractRow(contracts.contractFor('business.currency'), { slug: 's', currency: null }).currency === 'usd');
+check('a set currency wins', contracts.toContractRow(contracts.contractFor('business.currency'), { slug: 's', currency: 'eur' }).currency === 'eur');
+delete process.env.DEFAULT_CURRENCY;
+const sqlDir = path.join(ROOT, 'sql');
+const contactsSql = fs.existsSync(path.join(sqlDir, 'nextgent_business_contacts.sql')) ? fs.readFileSync(path.join(sqlDir, 'nextgent_business_contacts.sql'), 'utf8') : '';
+const PROVENANCE = ['source_type', 'source_id', 'external_record_id', 'source_updated_at', 'last_synced_at', 'created_by', 'updated_by', 'owner_override'];
+for (const table of ['entity_leads', 'entity_customers']) {
+    const block = contactsSql.match(new RegExp(`create table if not exists public\\.${table}\\s*\\(([\\s\\S]*?)\\n\\);`));
+    check(`sql creates ${table} with entity_slug and the SPEC §6.6 provenance columns`, !!block && /entity_slug\s+text not null/.test(block[1]) && PROVENANCE.every((c) => new RegExp(`^\\s*${c}\\s`, 'm').test(block[1])));
+    check(`${table} has RLS on and anon/authenticated revoked`, new RegExp(`alter table public\\.${table}\\s+enable row level security`).test(contactsSql) && new RegExp(`revoke all on public\\.${table}\\s+from anon, authenticated`).test(contactsSql));
+}
+check('one customer per phone per business, when a phone is known', /create unique index if not exists \S+ on public\.entity_customers \(entity_slug, phone\) where phone is not null/.test(contactsSql));
+const currencySql = fs.existsSync(path.join(sqlDir, 'nextgent_business_currency.sql')) ? fs.readFileSync(path.join(sqlDir, 'nextgent_business_currency.sql'), 'utf8') : '';
+check('entity.currency is added nullable, with no default baked in', /add column if not exists currency text\s*;/.test(currencySql) && !/currency text\s+(not null\s+)?default/.test(currencySql));
+const order = fs.readFileSync(path.join(sqlDir, 'ORDER.md'), 'utf8');
+check('both files are in sql/ORDER.md', order.includes('nextgent_business_contacts.sql') && order.includes('nextgent_business_currency.sql'));
+check('the registry names faqs canonical and entity_faqs legacy', /faqs[\s\S]{0,120}canonical[\s\S]{0,200}entity_faqs[\s\S]{0,80}legacy/.test(fs.readFileSync(path.join(ROOT, 'lib/dataContracts.js'), 'utf8')));
+check('lib/businessEvents.js says bookings is canonical, booking_calendar the mirror', /`?bookings`? is (the )?canonical/.test(fs.readFileSync(path.join(ROOT, 'lib/businessEvents.js'), 'utf8')) && !/Bookings live in booking_calendar/.test(fs.readFileSync(path.join(ROOT, 'lib/businessEvents.js'), 'utf8')));
+
 check('products.items is offerings kind=product, server-side', contracts.contractFor('products.items').filter.kind === 'product');
 check('every offerings kind has a products.<kind> contract', Object.values(contracts.OFFERING_KINDS).every((k) => contracts.contractFor(`products.${k}`)?.filter.kind === k));
 check('every contract names a known resource', contracts.contractNames().every((n) => RESOURCES.includes(contracts.contractFor(n).resource)),

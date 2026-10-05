@@ -50,6 +50,13 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 18a | `nextgent_apps.sql` | `app_records` (an app's own records) — needs 8. Its `business_app_instances` DDL is superseded by 18b and kept only as a comment |
 | 18b | `nextgent_entity_modules.sql` | `entity_modules.managed_by / install_id / company_id / version / render_mode / public_label / updated_at`: the runtime projection of installed apps is one `entity_modules` row per install (manifest, settings and the public flag in `settings`). Replaces `business_app_instances`. Apply **before** Paperclip sends app installs: an install answers 503 until it is applied |
 
+## Step 5: business facts the apps bind to (DECISIONS #44, #49)
+
+| # | File | What it adds |
+| - | ---- | ------------ |
+| 18c | `nextgent_business_contacts.sql` | `entity_leads` (enquiries, contract `leads.items`) and `entity_customers` (the per-business customer record, contract `customers.items`), both with the SPEC §6.6 provenance columns. Until applied the two contracts answer "not a business section" |
+| 18d | `nextgent_business_currency.sql` | `entity.currency` (nullable; contract `business.currency` reads `DEFAULT_CURRENCY` when null). Until applied the column is absent, so every business reads as `DEFAULT_CURRENCY` and the owner cannot set one |
+
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.
 
