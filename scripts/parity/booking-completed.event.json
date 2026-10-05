@@ -1,0 +1,22 @@
+{
+  "type": "event",
+  "payload": {
+    "event": "booking.completed",
+    "booking": {
+      "booking_id": "b-1",
+      "date": "2026-10-01",
+      "end_date": null,
+      "start_time": "10:00",
+      "end_time": "12:00",
+      "party": 2,
+      "title": null,
+      "source": "booking_page",
+      "status": "completed",
+      "customer_name": "Ana Lopez",
+      "customer_email": "ana@example.test",
+      "customer_phone": "+15550001111",
+      "details": { "end_time": "12:00", "customer_name": "Ana Lopez", "customer_email": "ana@example.test" }
+    },
+    "ended_at": "2026-10-01T17:00:00.000Z"
+  }
+}

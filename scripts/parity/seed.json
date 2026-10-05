@@ -1,0 +1,18 @@
+{
+  "slug": "shop",
+  "config": { "delay_minutes": 60 },
+  "tables": {
+    "entity": [{ "slug": "shop", "name": "The Shop", "email": "owner@shop.test", "phone": "+15550100000", "timezone": "America/Chicago" }],
+    "company_links": [{ "company_id": "co-1", "entity_slug": "shop" }],
+    "menu_items": [
+      { "id": 1, "entity_slug": "shop", "name": "Toast", "is_active": true },
+      { "id": 2, "entity_slug": "shop", "name": "Beans", "is_active": false },
+      { "id": 3, "entity_slug": "shop", "name": "Eggs", "is_active": true },
+      { "id": 4, "entity_slug": "other", "name": "Not ours", "is_active": true }
+    ],
+    "nextgent_installs": [
+      { "install_id": "in-review", "company_id": "co-1", "entity_slug": "shop", "item_key": "review-agent", "kind": "agent", "status": "active",
+        "routine_webhook_url": "https://paperclip.test/api/routine-triggers/public/abc/fire", "routine_webhook_secret_plain": "whsec_parity" }
+    ]
+  }
+}

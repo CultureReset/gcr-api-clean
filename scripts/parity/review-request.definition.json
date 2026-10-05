@@ -1,0 +1,16 @@
+{
+  "name": "Ask for a review",
+  "trigger": { "type": "event", "event": "booking.completed" },
+  "config_schema": [
+    { "key": "delay_minutes", "label": "Wait (minutes)", "type": "number", "default": 1440 }
+  ],
+  "steps": [
+    { "id": "recent", "type": "data.query", "config": { "table": "menu_items", "filter": "{\"is_active\": true}", "order_by": "id", "descending": false, "limit": 2 } },
+    { "id": "gate", "type": "condition", "config": { "left": "{{ steps.recent.count }}", "op": "gt", "right": "0" } },
+    { "id": "shape", "type": "transform", "config": { "assign": "{\"booking\": \"{{ trigger.ref.booking_id }}\", \"first\": \"{{ steps.recent.rows.0.name }}\"}" } },
+    { "id": "pause", "type": "wait", "config": { "minutes": "{{ config.delay_minutes }}" } },
+    { "id": "hand", "type": "agent", "config": { "install_id": "in-review", "instructions": "Ask the guest of booking {{ trigger.ref.booking_id }} for a review", "payload": { "booking": "{{ trigger.ref }}" } } },
+    { "id": "mail", "type": "message", "config": { "channel": "email", "to": "{{ trigger.payload.booking.customer_email }}", "subject": "How was it?", "body": "Thanks for visiting {{ business.name }}!" } },
+    { "id": "note", "type": "log", "config": { "message": "Review asked for {{ trigger.ref.booking_id }} on {{ trigger.ref.date }}" } }
+  ]
+}
