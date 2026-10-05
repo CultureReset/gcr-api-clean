@@ -83,7 +83,7 @@ function manifest(over = {}) {
         surfaces: [{ id: 'owner', kind: 'dashboard', path: '/owner' }, { id: 'public', kind: 'public', path: '/public' }],
         permissions: [{ id: 'menu:read', reason: 'Shows the menu.' }],
         // <table>.<verb>: an insert into `notes` emits notes.submitted, as <appKey>.notes.submitted.
-        events: { emits: ['notes.submitted', 'internal.noted'] },
+        events: { emits: ['notes.submitted', 'internal.noted', 'enquiries.submitted'] },
         data: {
             namespace: 'notes',
             tables: {
@@ -94,6 +94,10 @@ function manifest(over = {}) {
                     flag: { type: 'text', default: 'new' },
                 } },
                 internal: { columns: { memo: { type: 'text' } } },
+                // Write-only for visitors: a submission to the business (DECISIONS #48).
+                enquiries: { public: 'append', columns: {
+                    name: { type: 'text', required: true }, email: { type: 'text' }, phone: { type: 'text' }, message: { type: 'text' }, rating: { type: 'integer' },
+                } },
             },
         },
         config: [
@@ -111,6 +115,7 @@ function manifest(over = {}) {
                 menu: { from: 'business', section: 'menu_items', resource: 'menu', fields: [{ key: 'name', type: 'text' }, { key: 'cost_note', type: 'text', ownerOnly: true }], title: 'name', visibleWhen: 'shown' },
                 people: { from: 'business', section: 'bookings', resource: 'bookings', fields: [{ key: 'customer_name', type: 'text' }], title: 'customer_name' },
                 memos: { from: 'app', table: 'internal', fields: [{ key: 'memo', type: 'text' }], title: 'memo' },
+                enquiries: { from: 'app', table: 'enquiries', fields: [{ key: 'name', type: 'text' }, { key: 'email', type: 'text' }, { key: 'message', type: 'text' }], title: 'message' },
                 // Bound by contract (DECISIONS #45): the registry names the table and the filter.
                 products: { from: 'business', contract: 'products.items', resource: 'business', fields: [{ key: 'name', type: 'text' }], title: 'name' },
                 records: { from: 'business', contract: 'booking.records', resource: 'bookings', fields: [{ key: 'customer_name', type: 'text' }], title: 'customer_name' },
@@ -125,6 +130,7 @@ function manifest(over = {}) {
                     { type: 'list', source: 'products', fields: { title: 'name' } },
                     { type: 'list', source: 'records', fields: { title: 'customer_name' } },
                     { type: 'form', source: 'notes', intro: { setting: 'intro' }, openWhen: { setting: 'open' } },
+                    { type: 'form', source: 'enquiries' },
                 ],
             },
         },
@@ -236,6 +242,7 @@ async function run() {
         events.length = 0;
         const sub = await call('POST', '/api/public/apps/app-1/notes', { title: 'From a visitor', flag: 'set-by-visitor' });
         check('a visitor can append to a public append table', sub.status === 201 && sub.body.row.id && !('title' in sub.body.row), JSON.stringify(sub.body));
+        check('a read-append table is public content, not a message to the owner', !T.business_messages?.length, JSON.stringify(T.business_messages));
         check('a visitor\'s insert emits the same declared event, source visitor', events.length === 1 && events[0].event === 'notes-app.notes.submitted' && events[0].payload.source === 'visitor' && events[0].payload.record.title === 'From a visitor', JSON.stringify(events));
         events.length = 0;
         await own('POST', '/api/app-data/internal', { memo: 'quiet' });
@@ -244,6 +251,23 @@ async function run() {
         const vrec = T.app_records.find((r) => r.id === sub.body.row.id);
         check('owner-only columns take their default, not the visitor\'s value', vrec.data.flag === 'new' && vrec.source === 'visitor' && vrec.entity_slug === 'shop');
         check('a table not open to visitors is refused', (await call('POST', '/api/public/apps/app-1/internal', { memo: 'x' })).status === 404);
+
+        console.log('\n── a submission lands in the one Messages inbox (DECISIONS #48) ──');
+        events.length = 0;
+        const enq = await call('POST', '/api/public/apps/app-1/enquiries', { name: 'Pat', email: 'Pat@Example.test', message: 'Do you cater?', rating: 4 });
+        check('the submission is stored as the app\'s record', enq.status === 201 && T.app_records.some((r) => r.app_table === 'enquiries' && r.data.name === 'Pat'), JSON.stringify(enq.body));
+        const inbound = (T.business_messages || []).filter((m) => m.channel === 'app');
+        check('and as one inbound message: channel app, this install, this business', inbound.length === 1 && inbound[0].direction === 'in' && inbound[0].status === 'received' && inbound[0].install_id === 'app-1' && inbound[0].entity_slug === 'shop' && inbound[0].author === 'customer', JSON.stringify(inbound));
+        check('addressed by the visitor\'s email', inbound[0]?.customer_address === 'pat@example.test');
+        check('the body is the record, led by the manifest\'s title field', /^Do you cater\?/.test(inbound[0]?.body || '') && /name: Pat/.test(inbound[0].body) && /rating: 4/.test(inbound[0].body), inbound[0]?.body);
+        const thread = T.message_threads.find((t) => t.id === inbound[0]?.thread_id);
+        check('on an app thread of this business', thread?.channel === 'app' && thread.entity_slug === 'shop' && thread.customer_address === 'pat@example.test' && thread.mode === 'agent', JSON.stringify(thread));
+        check('the declared event fired as well', events.some((e) => e.event === 'notes-app.enquiries.submitted'));
+        await call('POST', '/api/public/apps/app-1/enquiries', { name: 'Quinn', phone: '(251) 555-0123', message: 'Hours?' });
+        check('no email: the phone is the address', (T.business_messages || []).some((m) => m.channel === 'app' && m.customer_address === '+12515550123'), JSON.stringify((T.business_messages || []).map((m) => m.customer_address)));
+        await call('POST', '/api/public/apps/app-1/enquiries', { name: 'Rae', message: 'Just saying hi' });
+        check('no email or phone: the first text field', (T.business_messages || []).some((m) => m.channel === 'app' && m.customer_address === 'Rae'), JSON.stringify((T.business_messages || []).map((m) => m.customer_address)));
+        T.app_records = T.app_records.filter((r) => r.app_table !== 'enquiries');
         check('bad visitor input is refused', (await call('POST', '/api/public/apps/app-1/notes', {})).status === 422);
         const full = await call('POST', '/api/public/apps/app-1/notes', { title: 'Too many' });
         check('a table at APP_DATA_MAX_ROWS_PER_TABLE takes no more', full.status === 409, JSON.stringify(full.body));

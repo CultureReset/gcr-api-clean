@@ -28,11 +28,12 @@ const express = require('express');
 const supabase = require('../db');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 const {
-    appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
+    appTables, appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
     sectionSelect, applySection, sectionRow,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
 const businessEvents = require('../lib/businessEvents');
+const messages = require('../lib/messages');
 const { envInt } = require('../lib/env');
 
 const fail = (res, status, error, extra) => res.status(status).json({ error, ...(extra || {}) });
@@ -304,6 +305,22 @@ publicRouter.post('/:installId/:table', async (req, res) => {
         const checked = cleanAppRecord(manifest, table, req.body, { visitor: true });
         if (!checked.ok) return fail(res, 422, 'Some fields need attention.', { errors: checked.errors });
         const made = await insertRecord({ install, instance, table, data: checked.data, source: 'visitor' });
+        // A write-only table (public: append) is a submission to the business:
+        // it lands in the one Messages inbox too (lib/messages.js, DECISIONS
+        // #48). A read-append table is public content, not a message. The inbox
+        // row must never fail the submission, so a refusal is logged, not raised.
+        if (appTables(manifest)[table]?.public === 'append') {
+            try {
+                await messages.recordAppSubmission({
+                    slug: install.entity_slug,
+                    installId: install.install_id,
+                    record: appRecordRow(made, { strip: ownerOnlyColumns(manifest, table) }),
+                    titleField: appInstances.appSourceFor(manifest, table)?.title || null,
+                });
+            } catch (err) {
+                console.error(`[app-data] inbox row for ${instance.app_key}/${table} on ${install.entity_slug}:`, err.message);
+            }
+        }
         // Write-only: a visitor gets the receipt, not the row back.
         res.status(201).json({ table, row: { id: made.id, created_at: made.created_at } });
     } catch (err) {

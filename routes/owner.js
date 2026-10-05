@@ -10,8 +10,10 @@
 //   GET   /payments?from&to                 { payments: [...] }
 //   GET   /messages                         { slug, threads, waiting_for_approval, text_log } (the full inbox)
 //   POST  /messages                         { channel, to, subject?, body, hold? } -> { message }
-//   GET   /messages/threads                 { threads: [...] }
-//   GET   /messages/threads/:id             { thread, messages: [...] }
+//   GET   /messages/threads                 { threads: [{ id, channel, contact, last_message, last_at, unread,
+//                                             handled_by, source? }] } — source: { installId, appKey } on a
+//                                             thread a visitor opened through an installed app (channel app)
+//   GET   /messages/threads/:id             { thread (with source? likewise), messages: [...] }
 //   POST  /messages/threads/:id/send        { text } -> { message }
 //   POST  /messages/threads/:id/takeover    { owner: bool } -> { thread }
 //   PATCH /messages/:id                     { body?, subject? } -> { message } (one that has not gone)
@@ -139,6 +141,7 @@ router.get('/messages/threads', async (req, res) => {
                 last_at: t.last_message_at || t.last_message?.created_at || null,
                 unread: unread[t.id] || 0,
                 handled_by: t.mode === 'owner' ? 'owner' : 'agent',
+                ...(t.source ? { source: t.source } : {}),
             })),
             waiting_for_approval: box.waiting_for_approval,
         });
@@ -150,7 +153,7 @@ router.get('/messages/threads/:id', async (req, res) => {
         const { thread, messages: rows } = await messages.threadMessages(req.entitySlug, req.params.id);
         await supabase.from('message_threads').update({ owner_read_at: new Date().toISOString() }).eq('id', thread.id).eq('entity_slug', req.entitySlug);
         res.json({
-            thread: { id: thread.id, channel: thread.channel, contact: thread.customer_address, handled_by: thread.mode === 'owner' ? 'owner' : 'agent' },
+            thread: { id: thread.id, channel: thread.channel, contact: thread.customer_address, handled_by: thread.mode === 'owner' ? 'owner' : 'agent', ...(thread.source ? { source: thread.source } : {}) },
             messages: rows.map(messageOut),
         });
     } catch (err) { fail(res, err); }

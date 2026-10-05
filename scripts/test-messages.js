@@ -37,8 +37,14 @@ const { T, db } = createMemDb({ tables: {
         { id: 't3', entity_slug: 'shop', scope: 'write', token_hash: sha(TOK_LEGACY), permissions: null },
     ],
     business_phone_numbers: [{ entity_slug: 'shop', phone_number: '+15550200000', status: 'active', registration_status: 'pending', provider: 'telnyx' }],
-    message_threads: [],
-    business_messages: [],
+    message_threads: [
+        // A visitor's submission through an installed app (DECISIONS #48), as routes/app-data.js records it.
+        { id: 'th-app', entity_slug: 'shop', channel: 'app', customer_address: 'vis@example.test', mode: 'agent', last_message_at: '2026-01-01T00:00:00Z' },
+    ],
+    business_messages: [
+        { id: 'm-app', entity_slug: 'shop', thread_id: 'th-app', channel: 'app', direction: 'in', customer_address: 'vis@example.test', body: 'Do you cater?\nname: Pat', status: 'received', author: 'customer', install_id: 'in-song', created_at: '2026-01-01T00:00:00Z' },
+    ],
+    entity_modules: [{ id: 1, entity_slug: 'shop', module_key: 'enquiry-form', managed_by: 'paperclip', install_id: 'in-song', enabled: true, settings: { manifest: { name: 'Enquiry Form' } } }],
     // A booking opt-in's yes, as the opt-in route records it (and as
     // sql/nextgent_consent_fold.sql copied the older ones): message_consent is
     // the only place consent is read from.
@@ -126,6 +132,17 @@ async function run() {
         const inbox = await call('GET', '/api/owner/messages');
         const thread = inbox.body.threads.find((t) => t.customer_address === '+12515550188');
         check('the inbox lists threads with their last message', thread?.last_message?.body === 'Thanks for coming!');
+
+        console.log('\n── a submission through an app shows where it came from (DECISIONS #48) ──');
+        const appThread = inbox.body.threads.find((t) => t.id === 'th-app');
+        check('the inbox carries source: { installId, appKey } on an app thread', appThread?.channel === 'app' && appThread.source?.installId === 'in-song' && appThread.source.appKey === 'enquiry-form', JSON.stringify(appThread));
+        check('and no source on a text thread', thread.source === undefined || thread.source === null, JSON.stringify(thread.source));
+        const list = await call('GET', '/api/owner/messages/threads');
+        const listed = list.body.threads.find((t) => t.id === 'th-app');
+        check('the threads list says the same', listed?.source?.installId === 'in-song' && listed.source.appKey === 'enquiry-form' && listed.contact === 'vis@example.test', JSON.stringify(listed));
+        check('no label text is added server-side (the owner confirms the wording)', !Object.values(listed || {}).some((v) => typeof v === 'string' && /via /i.test(v)), JSON.stringify(listed));
+        const one = await call('GET', '/api/owner/messages/threads/th-app');
+        check('and so does the thread itself', one.body.thread?.source?.appKey === 'enquiry-form' && one.body.messages[0].text === 'Do you cater?\nname: Pat', JSON.stringify(one.body.thread));
         await call('POST', `/api/owner/messages/threads/${thread.id}/takeover`, { on: true });
         const t6 = await rpc(TOK_SEND, 'tools/call', { name: 'send_message', arguments: { channel: 'sms', to: '251-555-0188', body: 'Agent here' } });
         check('after the owner takes over, an agent is blocked', t6.body.result.structuredContent.reason === 'owner_has_taken_over');
