@@ -658,6 +658,12 @@ async function run() {
         check('and its Ghost MCP credential with it', !!minted?.revoked_at && (await asUser('POST', '/api/mcp/ghost', { jsonrpc: '2.0', id: 2, method: 'tools/list' }, ghostTok)).status === 401);
         check('a revoked computer is listed as revoked', (await signed('GET', '/api/nextgent/nodes?companyId=co-new')).body.nodes[0].revoked_at);
 
+        // A second, live computer and its assistant credential, for unlink to revoke (DECISIONS #78).
+        const start2 = await plain('POST', '/api/nodes/pair/start', { name: 'Back office' });
+        const paired2 = await signed('POST', '/api/nextgent/nodes/pair', { companyId: 'co-new', code: start2.body.user_code });
+        const liveNode = T.ghost_nodes.find((n) => n.id === paired2.body.node.id);
+        check('a second computer is paired and live', paired2.status === 201 && liveNode && !liveNode.revoked_at);
+
         console.log('\n── unlink ──');
         uploads.length = 0;
         const gone = await signed('POST', '/api/nextgent/unlink', { companyId: 'co-new', export: true });
@@ -666,6 +672,10 @@ async function run() {
         check('every company token is revoked', T.business_mcp_tokens.filter((t) => t.company_id === 'co-new').every((t) => t.revoked_at));
         check('every install is removed', T.nextgent_installs.filter((i) => i.company_id === 'co-new').every((i) => i.status === 'removed'));
         check('the link is gone, the business is not', !T.company_links.some((l) => l.company_id === 'co-new') && T.entity.some((e) => e.slug === 'new-taco-shop'));
+        check('the business\'s computers are revoked (DECISIONS #78)', gone.body.nodesRevoked === 1 && !!liveNode.revoked_at
+            && T.ghost_nodes.filter((n) => n.entity_slug === 'new-taco-shop').every((n) => n.revoked_at), JSON.stringify({ nodesRevoked: gone.body.nodesRevoked, nodes: T.ghost_nodes }));
+        check('and their Ghost MCP credentials with them', T.ghost_mcp_tokens.filter((t) => t.entity_slug === 'new-taco-shop').every((t) => t.revoked_at)
+            && (await asUser('POST', '/api/mcp/ghost', { jsonrpc: '2.0', id: 3, method: 'tools/list' }, paired2.body.ghostMcpToken)).status === 401);
         const stale = await asUser('GET', '/api/business/menu_items', undefined, appTok);
         check('an unlinked install token stops working', stale.status === 401);
         const staleSess = await asUser('GET', '/api/business/menu_items', undefined, keptSession);

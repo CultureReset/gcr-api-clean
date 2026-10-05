@@ -786,6 +786,9 @@ router.post('/unlink', async (req, res) => {
             .update({ status: 'removed', removed_at: new Date().toISOString() })
             .eq('company_id', companyId).eq('status', 'active');
         await billingStripe.cancelAtPeriodEnd(slug).catch((err) => console.error('[unlink] cancel', err.message));
+        // Its computers stop answering to anyone: every relay node of the
+        // business and every agent credential on them (DECISIONS #78).
+        const nodesRevoked = await nodePairing.revokeNodes({ entitySlug: slug });
         await unlinkCompany(companyId);
         // The business's own data stays: a business that leaves is unlinked,
         // not erased, and can be claimed again.
@@ -794,6 +797,7 @@ router.post('/unlink', async (req, res) => {
             entitySlug: slug,
             tokensRevoked,
             installsRemoved: (installs || []).length,
+            nodesRevoked,
             ...(exported ? { exportUrl: exported.url, exportExpiresAt: exported.expiresAt } : {}),
         });
     } catch (err) {
