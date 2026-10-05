@@ -144,12 +144,11 @@ async function loadInstalled(slug) {
 // Adapters keep the app-facing record shape (the manifests' field
 // names) while storing canonical columns for querying + RAG.
 // ============================================================
-const BOOKING_KEYS = ['bookings', 'charter_trips', 'boat_rentals', 'lodging_bookings', 'class_bookings',
-    'photo_sessions', 'salon_bookings', 'reservations', 'tour_tickets', 'ride_requests', 'orders', 'appointments'];
-const OFFERING_KINDS = {
-    services: 'service', fleet_items: 'fleet', properties: 'room', addons: 'addon',
-    inventory: 'item', gift_cards: 'gift_card', memberships: 'membership', products: 'product'
-};
+// The dataKey → table mapping is the data-contract registry
+// (lib/dataContracts.js, DECISIONS #45): one copy, shared with
+// routes/business-data.js and routes/mcp.js. The adapters below keep the
+// dashboard's record shape; which table a key lands in is decided there.
+const { BOOKING_KEYS, OFFERING_KINDS, tableForDataKey } = require('../lib/dataContracts');
 function isBookingKey(k) { return BOOKING_KEYS.indexOf(k) !== -1; }
 
 function toBookingRow(slug, record) {
@@ -250,32 +249,33 @@ async function ragFact(slug, dataKey, record) {
 // insert a record for a dataKey → { id }
 async function insertRecord(slug, dataKey, record) {
     ragFact(slug, dataKey, record).catch(function () {});
-    if (isBookingKey(dataKey)) {
+    const table = tableForDataKey(dataKey);
+    if (table === 'bookings') {
         const { data, error } = await supabase.from('bookings').insert(toBookingRow(slug, record)).select('id').single();
         if (error) throw error;
         return { id: data.id, table: 'bookings' };
     }
-    if (OFFERING_KINDS[dataKey]) {
+    if (table === 'offerings') {
         const { data, error } = await supabase.from('offerings').insert(toOfferingRow(slug, dataKey, record)).select('id').single();
         if (error) throw error;
         return { id: data.id, table: 'offerings' };
     }
-    switch (dataKey) {
-        case 'photos': {
+    switch (table) {
+        case 'entity_photos': {
             const { data, error } = await supabase.from('entity_photos')
                 .insert({ entity_slug: slug, url: record.url || null, caption: record.caption || null, photo_type: 'gallery' })
                 .select('id').single();
             if (error) throw error;
             return { id: data.id, table: 'entity_photos' };
         }
-        case 'specials': {
+        case 'entity_specials': {
             const { data, error } = await supabase.from('entity_specials')
                 .insert({ entity_slug: slug, special_name: record.name || record.title || 'Special', description: record.desc || record.description || null, discount_text: record.price ? ('$' + record.price) : (record.off || null), days: record.days || null, is_active: true })
                 .select('id').single();
             if (error) throw error;
             return { id: data.id, table: 'entity_specials' };
         }
-        case 'events': {
+        case 'entity_events': {
             const { data, error } = await supabase.from('entity_events')
                 .insert({ entity_slug: slug, event_name: record.name || record.title || 'Event', description: record.desc || record.description || null, event_date: calDate(record.date), start_time: slotToTime(record.time), is_active: true })
                 .select('id').single();
@@ -303,14 +303,14 @@ async function insertRecord(slug, dataKey, record) {
             if (error) throw error;
             return { id: data.id, table: 'waivers' };
         }
-        case 'blocks': {
+        case 'booking_calendar': {
             const { data, error } = await supabase.from('booking_calendar')
                 .insert({ entity_slug: slug, date: calDate(record.date) || new Date().toISOString().slice(0, 10), end_date: calDate(record.end_date), kind: 'block', source: 'manual', status: 'active', title: record.note || record.title || 'Blocked', details: record })
                 .select('id').single();
             if (error) throw error;
             return { id: data.id, table: 'booking_calendar' };
         }
-        case 'coupons': {
+        case 'promos': {
             const off = String(record.off || '').trim();
             const pct = off.match(/^(\d+(?:\.\d+)?)\s*%$/);
             const amt = off.match(/^\$?\s*(\d+(?:\.\d+)?)$/);
@@ -320,7 +320,7 @@ async function insertRecord(slug, dataKey, record) {
             if (error) throw error;
             return { id: data.id, table: 'promos' };
         }
-        case 'reviews': {
+        case 'entity_reviews': {
             const { data, error } = await supabase.from('entity_reviews')
                 .insert({ entity_slug: slug, reviewer_name: record.name || 'Guest', rating: parseInt(record.stars, 10) || 0, body: record.text || '', verified_purchase: !!record.booking_id, approved: true })
                 .select('id').single();
@@ -341,31 +341,32 @@ async function insertRecord(slug, dataKey, record) {
 // read one dataKey stream → array of app-shaped records (newest last)
 async function readRecords(slug, dataKey, limit) {
     limit = limit || 500;
-    if (isBookingKey(dataKey)) {
+    const table = tableForDataKey(dataKey);
+    if (table === 'bookings') {
         const { data } = await supabase.from('bookings')
             .select('id, date, status, details').eq('entity_slug', slug)
             .order('created_at', { ascending: true }).limit(limit);
         return (data || []).map(fromBookingRow);
     }
-    if (OFFERING_KINDS[dataKey]) {
+    if (table === 'offerings') {
         const { data } = await supabase.from('offerings')
             .select('id, details').eq('entity_slug', slug).eq('section', dataKey)
             .order('sort_order', { ascending: true }).limit(limit);
         return (data || []).map(fromOfferingRow);
     }
-    switch (dataKey) {
-        case 'photos': {
+    switch (table) {
+        case 'entity_photos': {
             const { data } = await supabase.from('entity_photos')
                 .select('id, url, caption').eq('entity_slug', slug).order('sort_order', { ascending: true }).limit(limit);
             return (data || []).map(function (r) { return { _id: r.id, url: r.url, caption: r.caption || '' }; });
         }
-        case 'specials': {
+        case 'entity_specials': {
             const { data } = await supabase.from('entity_specials')
                 .select('id, special_name, description, discount_text, days, is_active').eq('entity_slug', slug).limit(limit);
             return (data || []).filter(function (r) { return r.is_active !== false; })
                 .map(function (r) { return { _id: r.id, name: r.special_name, desc: r.description || '', price: String(r.discount_text || '').replace(/^\$/, ''), days: r.days || '' }; });
         }
-        case 'events': {
+        case 'entity_events': {
             const { data } = await supabase.from('entity_events')
                 .select('id, event_name, description, event_date, start_time, is_active').eq('entity_slug', slug).limit(limit);
             return (data || []).filter(function (r) { return r.is_active !== false; })
@@ -387,18 +388,18 @@ async function readRecords(slug, dataKey, limit) {
                 .select('id, customer_name, customer_phone, waiver_text, token, signed_at').eq('entity_slug', slug).limit(limit);
             return (data || []).map(function (r) { return { _id: r.id, customer: r.customer_name, phone: r.customer_phone, booking: r.waiver_text || '', booking_ref: r.token || '', date: (r.signed_at || '').slice(0, 10), status: 'signed' }; });
         }
-        case 'blocks': {
+        case 'booking_calendar': {
             const { data } = await supabase.from('booking_calendar')
                 .select('id, date, end_date, title, details').eq('entity_slug', slug).eq('kind', 'block').eq('status', 'active').limit(limit);
             return (data || []).map(function (r) { const rec = Object.assign({ kind: 'blocked' }, r.details || {}); rec._id = r.id; rec.date = rec.date || r.date; rec.note = rec.note || r.title; return rec; });
         }
-        case 'coupons': {
+        case 'promos': {
             const { data } = await supabase.from('promos')
                 .select('id, code, type, amount, ends, active').eq('entity_slug', slug).limit(limit);
             return (data || []).filter(function (r) { return r.active !== false; })
                 .map(function (r) { return { _id: r.id, code: r.code, off: r.type === 'percent' ? (r.amount + '%') : ('$' + r.amount), until: r.ends || '' }; });
         }
-        case 'reviews': {
+        case 'entity_reviews': {
             const { data } = await supabase.from('entity_reviews')
                 .select('id, reviewer_name, rating, body, verified_purchase, created_at').eq('entity_slug', slug)
                 .eq('approved', true).order('created_at', { ascending: false }).limit(limit);
@@ -420,44 +421,43 @@ async function readRecords(slug, dataKey, limit) {
 // update / delete a record by id within its stream
 async function updateRecord(slug, dataKey, id, record) {
     ragFact(slug, dataKey, record).catch(function () {});
-    if (isBookingKey(dataKey)) {
+    const table = tableForDataKey(dataKey);
+    if (table === 'bookings') {
         const row = toBookingRow(slug, record); delete row.entity_slug;
         await supabase.from('bookings').update(row).eq('id', id).eq('entity_slug', slug);
         return 'bookings';
     }
-    if (OFFERING_KINDS[dataKey]) {
+    if (table === 'offerings') {
         const row = toOfferingRow(slug, dataKey, record); delete row.entity_slug;
         row.updated_at = new Date().toISOString();
         await supabase.from('offerings').update(row).eq('id', id).eq('entity_slug', slug);
         return 'offerings';
     }
-    switch (dataKey) {
-        case 'photos':
+    switch (table) {
+        case 'entity_photos':
             await supabase.from('entity_photos').update({ url: record.url, caption: record.caption || null }).eq('id', id).eq('entity_slug', slug); return 'entity_photos';
-        case 'specials':
+        case 'entity_specials':
             await supabase.from('entity_specials').update({ special_name: record.name || 'Special', description: record.desc || null, discount_text: record.price ? ('$' + record.price) : null, days: record.days || null }).eq('id', id).eq('entity_slug', slug); return 'entity_specials';
-        case 'events':
+        case 'entity_events':
             await supabase.from('entity_events').update({ event_name: record.name || record.title || 'Event', description: record.desc || null, event_date: calDate(record.date), start_time: slotToTime(record.time) }).eq('id', id).eq('entity_slug', slug); return 'entity_events';
         case 'menu_items':
             await supabase.from('menu_items').update({ item_name: record.name || 'Item', description: record.desc || null, price: parseFloat(record.price) || null }).eq('id', id).eq('entity_slug', slug); return 'menu_items';
         case 'faqs':
             await supabase.from('faqs').update({ question: record.q || record.question || '', answer: record.a || record.answer || '' }).eq('id', id).eq('entity_slug', slug); return 'faqs';
-        case 'coupons': {
+        case 'promos': {
             const off = String(record.off || '').trim();
             const pct = off.match(/^(\d+(?:\.\d+)?)\s*%$/);
             const amt = off.match(/^\$?\s*(\d+(?:\.\d+)?)$/);
             await supabase.from('promos').update({ code: record.code || null, type: pct ? 'percent' : 'amount', amount: pct ? parseFloat(pct[1]) : (amt ? parseFloat(amt[1]) : 0), ends: calDate(record.until) }).eq('id', id).eq('entity_slug', slug); return 'promos';
         }
-        case 'blocks':
+        case 'booking_calendar':
             await supabase.from('booking_calendar').update({ date: calDate(record.date) || undefined, end_date: calDate(record.end_date), title: record.note || record.title || 'Blocked', details: record, updated_at: new Date().toISOString() }).eq('id', id).eq('entity_slug', slug); return 'booking_calendar';
         default:
             await supabase.from('entity_section_items').update({ metadata: record, item_name: String(record.name || record.title || dataKey).slice(0, 200) }).eq('id', id).eq('entity_slug', slug); return 'entity_section_items';
     }
 }
 async function deleteRecord(slug, dataKey, id) {
-    if (isBookingKey(dataKey)) { await supabase.from('bookings').delete().eq('id', id).eq('entity_slug', slug); return; }
-    if (OFFERING_KINDS[dataKey]) { await supabase.from('offerings').delete().eq('id', id).eq('entity_slug', slug); return; }
-    const t = { photos: 'entity_photos', specials: 'entity_specials', events: 'entity_events', menu_items: 'menu_items', faqs: 'faqs', coupons: 'promos', blocks: 'booking_calendar', waivers: 'waivers', reviews: 'entity_reviews' }[dataKey] || 'entity_section_items';
+    const t = tableForDataKey(dataKey) || 'entity_section_items';
     await supabase.from(t).delete().eq('id', id).eq('entity_slug', slug);
 }
 // fetch a single booking (app-shaped) by id
