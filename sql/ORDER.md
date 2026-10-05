@@ -57,6 +57,7 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 18c | `nextgent_business_contacts.sql` | `entity_leads` (enquiries, contract `leads.items`) and `entity_customers` (the per-business customer record, contract `customers.items`), both with the SPEC §6.6 provenance columns. Until applied the two contracts answer "not a business section" |
 | 18d | `nextgent_business_currency.sql` | `entity.currency` (nullable; contract `business.currency` reads `DEFAULT_CURRENCY` when null). Until applied the column is absent, so every business reads as `DEFAULT_CURRENCY` and the owner cannot set one |
 | 18e | `nextgent_messages_app_channel.sql` | widens the `message_threads` / `business_messages` channel checks with `'app'`, so a visitor's submission to an installed app lands in Messages (needs 14). Until applied, submissions are still stored as records; the inbox row is refused and logged |
+| 18f | `nextgent_menu_items_order.sql` | `menu_items.sort_order` (the owner's order; the `menu.items` contract reads sort_order, then id) and `menu_items.is_available` (default true; routes/platform.js already writes it). Until applied, reads fall back to id order |
 
 After step 11, add your own Paperclip user id to `platform_admins.paperclip_user_id`
 for your admin row, so `role = instance_admin` tokens are honoured.

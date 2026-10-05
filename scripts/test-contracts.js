@@ -15,6 +15,7 @@ const { checker } = require('./lib/memdb');
 
 const ROOT = path.resolve(__dirname, '..');
 const contracts = require(path.join(ROOT, 'lib/dataContracts.js'));
+const sqlDir = path.join(ROOT, 'sql');
 const { RESOURCES, permitsResource, resourceForTable } = require(path.join(ROOT, 'lib/businessTables.js'));
 const { check, done } = checker();
 
@@ -46,7 +47,6 @@ process.env.DEFAULT_CURRENCY = 'usd';
 check('and the environment default otherwise — nothing hard-coded', contracts.toContractRow(contracts.contractFor('business.currency'), { slug: 's', currency: null }).currency === 'usd');
 check('a set currency wins', contracts.toContractRow(contracts.contractFor('business.currency'), { slug: 's', currency: 'eur' }).currency === 'eur');
 delete process.env.DEFAULT_CURRENCY;
-const sqlDir = path.join(ROOT, 'sql');
 const contactsSql = fs.existsSync(path.join(sqlDir, 'nextgent_business_contacts.sql')) ? fs.readFileSync(path.join(sqlDir, 'nextgent_business_contacts.sql'), 'utf8') : '';
 const PROVENANCE = ['source_type', 'source_id', 'external_record_id', 'source_updated_at', 'last_synced_at', 'created_by', 'updated_by', 'owner_override'];
 for (const table of ['entity_leads', 'entity_customers']) {
@@ -63,6 +63,10 @@ check('the registry names faqs canonical and entity_faqs legacy', /faqs[\s\S]{0,
 check('lib/businessEvents.js says bookings is canonical, booking_calendar the mirror', /`?bookings`? is (the )?canonical/.test(fs.readFileSync(path.join(ROOT, 'lib/businessEvents.js'), 'utf8')) && !/Bookings live in booking_calendar/.test(fs.readFileSync(path.join(ROOT, 'lib/businessEvents.js'), 'utf8')));
 
 check('listings.items → offerings with no fixed kind (DECISIONS #62): kind is a column the app filters on', contracts.contractFor('listings.items')?.table === 'offerings' && Object.keys(contracts.contractFor('listings.items').filter).length === 0 && contracts.contractFor('listings.items').resource === 'business');
+check('menu.items lists sort_order as orderable, then id (DECISIONS #65)', JSON.stringify(contracts.contractFor('menu.items').orderBy) === '["sort_order","id"]');
+const menuSql = fs.existsSync(path.join(sqlDir, 'nextgent_menu_items_order.sql')) ? fs.readFileSync(path.join(sqlDir, 'nextgent_menu_items_order.sql'), 'utf8') : '';
+check('sql adds menu_items.sort_order and is_available, if not exists, additively', /alter table public\.menu_items[\s\S]*add column if not exists sort_order\s+integer/.test(menuSql) && /add column if not exists is_available\s+boolean[^,;]*default true/.test(menuSql));
+check('and is in sql/ORDER.md', fs.readFileSync(path.join(sqlDir, 'ORDER.md'), 'utf8').includes('nextgent_menu_items_order.sql'));
 check('products.items is offerings kind=product, server-side', contracts.contractFor('products.items').filter.kind === 'product');
 check('every offerings kind has a products.<kind> contract', Object.values(contracts.OFFERING_KINDS).every((k) => contracts.contractFor(`products.${k}`)?.filter.kind === k));
 check('every contract names a known resource', contracts.contractNames().every((n) => RESOURCES.includes(contracts.contractFor(n).resource)),

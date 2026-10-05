@@ -71,7 +71,7 @@ const T = {
     business_claims: [],
     owner_notify_settings: [],
     owner_notifications: [],
-    menu_items: [{ id: 1, entity_slug: 'listed-cafe', name: 'Toast' }, { id: 3, entity_slug: 'new-taco-shop', name: 'Taco' }],
+    menu_items: [{ id: 1, entity_slug: 'listed-cafe', name: 'Toast' }, { id: 3, entity_slug: 'new-taco-shop', name: 'Taco', sort_order: 2 }],
     faqs: [{ id: 2, entity_slug: 'listed-cafe', q: 'Open?' }],
     // The catalogue: one table, the kind is data (products.items = kind product).
     // People who asked: private as a raw table (a lead is a record of a person), reached by contract.
@@ -90,7 +90,7 @@ let seq = 0;
 const like = (v, pat) => new RegExp(`^${String(pat).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*')}$`).test(String(v));
 
 function table(name) {
-    const st = { name, filters: [], verb: 'select', values: null, onConflict: null, range: null, limitN: null };
+    const st = { name, filters: [], verb: 'select', values: null, onConflict: null, range: null, limitN: null, orders: [] };
     const rows = () => (T[name] ||= []);
     const match = (r) => st.filters.every((f) => f(r));
     function run() {
@@ -119,6 +119,8 @@ function table(name) {
         if (st.verb === 'update') { hits.forEach((r) => Object.assign(r, st.values)); return { data: hits, error: null }; }
         if (st.verb === 'delete') { T[name] = all.filter((r) => !match(r)); return { data: hits, error: null }; }
         let out = hits;
+        const cmp = (a, b) => (a === b ? 0 : (a ?? '') > (b ?? '') ? 1 : -1);
+        for (const [col, asc] of st.orders.slice().reverse()) out.sort((a, b) => (asc ? 1 : -1) * cmp(a[col], b[col]));
         if (st.range) out = out.slice(st.range[0], st.range[1] + 1);
         if (st.limitN) out = out.slice(0, st.limitN);
         return { data: out, error: null, count: hits.length };
@@ -134,7 +136,7 @@ function table(name) {
         gte: (k, v) => { st.filters.push((r) => String(r[k]) >= String(v)); return self; },
         in: (k, vs) => { st.filters.push((r) => vs.includes(r[k])); return self; },
         not: () => self,
-        order: () => self,
+        order: (col, o) => { st.orders.push([col, o?.ascending !== false]); return self; },
         or: (expr) => {
             const parts = expr.split(',').map((p) => p.split('.'));
             st.filters.push((r) => parts.some(([col, op, ...rest]) => {
@@ -193,7 +195,7 @@ globalThis.fetch = async (url, init) => {
     if (String(url).startsWith('https://db.example.test/rest/v1/')) {
         const def = (cols) => ({ properties: Object.fromEntries(cols.map((c) => [c, { type: 'string' }])) });
         const spec = { definitions: {
-            menu_items: def(['id', 'entity_slug', 'name']),
+            menu_items: def(['id', 'entity_slug', 'name', 'sort_order', 'is_available']),
             faqs: def(['id', 'entity_slug', 'q']),
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
             entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
@@ -399,6 +401,10 @@ async function run() {
         const viaMenu = await asUser('GET', '/api/business/menu.items', undefined, appTok);
         check('menu:read reads menu.items', viaMenu.status === 200 && viaMenu.body.rows.length === 1 && viaMenu.body.table === 'menu_items', JSON.stringify(viaMenu.body));
         check('and not products.items', (await asUser('GET', '/api/business/products.items', undefined, appTok)).status === 403);
+        T.menu_items.push({ id: 5, entity_slug: 'new-taco-shop', name: 'Burrito', sort_order: 1 }, { id: 4, entity_slug: 'new-taco-shop', name: 'Salsa', sort_order: 1 });
+        const ordered = await asUser('GET', '/api/business/menu.items', undefined, appTok);
+        check('menu.items comes back in sort_order, then id (DECISIONS #65)', ordered.body.rows.map((r) => r.name).join(',') === 'Salsa,Burrito,Taco', ordered.body.rows.map((r) => r.name).join(','));
+        T.menu_items = T.menu_items.filter((m) => ![4, 5].includes(m.id));
         check('an unknown contract is not a section', (await asUser('GET', '/api/business/nope.items', undefined, prodTok)).status === 400);
         check('a contract whose table this database lacks is not a section either', (await asUser('GET', '/api/business/media.images', undefined, prodTok)).status === 400);
         check('the business record is read-only through contracts', (await asUser('POST', '/api/business/business.profile', { name: 'X' }, prodTok)).status === 403);

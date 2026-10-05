@@ -53,7 +53,7 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // a second copy of a security check drifts until one of them has a hole in it.
 const {
     getSchema, cleanBody, tablesFor,
-    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, pivotColumn,
+    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionValues, pivotColumn,
 } = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
@@ -306,10 +306,10 @@ router.get('/:table', businessCaller, async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 200, ROW_LIMIT);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
-    const { data, error, count } = await applySection(
+    const { data, error, count } = await orderSection(applySection(
         supabase.from(section.table).select(await sectionSelect(section), { count: 'exact' }),
         section, req.entitySlug,
-    ).range(offset, offset + limit - 1);
+    ), section, await sectionColumns(section)).range(offset, offset + limit - 1);
     if (error) return fail(res, 500, error.message);
 
     const rows = await sectionRows(section, data);
