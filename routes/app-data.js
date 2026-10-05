@@ -29,6 +29,7 @@ const supabase = require('../db');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 const {
     appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
+    sectionSelect, applySection, sectionRow,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
 const { envInt } = require('../lib/env');
@@ -256,12 +257,15 @@ publicRouter.get('/:installId', async (req, res) => {
                 if (error) throw (appInstances.missing(error) ? appInstances.notSetUp() : new Error(error.message));
                 data[key] = visibleRows((rows || []).map((r) => appRecordRow(r)), source, strip);
             } else if (source.from === 'business') {
-                const table = await publicSectionFor(caller, source.section);
-                if (!table) continue;
-                const { data: rows, error } = await supabase.from(table).select('*')
-                    .eq('entity_slug', install.entity_slug).limit(limit);
+                // A section by table name, or by data contract (source.contract,
+                // lib/dataContracts.js): the registry's table, filter and resource.
+                const section = await publicSectionFor(caller, source.contract || source.section);
+                if (!section) continue;
+                const { data: rows, error } = await applySection(
+                    supabase.from(section.table).select(await sectionSelect(section)), section, install.entity_slug,
+                ).limit(limit);
                 if (error) throw new Error(error.message);
-                data[key] = visibleRows(rows || [], source, strip);
+                data[key] = visibleRows((rows || []).map((r) => sectionRow(section, r)), source, strip);
             }
         }
         res.set('Cache-Control', `public, max-age=${envInt('APP_PUBLIC_CACHE_SECONDS', 30, { min: 0 })}`);

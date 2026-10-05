@@ -15,7 +15,7 @@ const { checker } = require('./lib/memdb');
 
 const ROOT = path.resolve(__dirname, '..');
 const contracts = require(path.join(ROOT, 'lib/dataContracts.js'));
-const { RESOURCES } = require(path.join(ROOT, 'lib/businessTables.js'));
+const { RESOURCES, permitsResource } = require(path.join(ROOT, 'lib/businessTables.js'));
 const { check, done } = checker();
 
 console.log('\n── the registry (SPEC §12.6, DECISIONS #45) ──');
@@ -57,6 +57,13 @@ check('routes/platform.js takes the registry', /require\('\.\.\/lib\/dataContrac
 check('routes/platform.js holds no BOOKING_KEYS of its own', !/const BOOKING_KEYS\s*=/.test(platform));
 check('routes/platform.js holds no OFFERING_KINDS of its own', !/const OFFERING_KINDS\s*=\s*\{/.test(platform));
 check('deleteRecord has no dataKey → table map of its own', !/photos:\s*'entity_photos'/.test(platform));
+
+console.log('\n── a contract\'s resource decides the permission ──');
+check('resource:read reads', permitsResource({ scope: 'read', permissions: ['business:read'] }, 'business', 'read'));
+check('write does not imply read', !permitsResource({ scope: 'write', permissions: ['business:write'] }, 'business', 'read'));
+check('another resource does not reach it', !permitsResource({ scope: 'read', permissions: ['menu:read'] }, 'business', 'read'));
+check('a legacy token is governed by scope', permitsResource({ scope: 'read', permissions: null }, 'business', 'read') && !permitsResource({ scope: 'read', permissions: null }, 'business', 'write') && permitsResource({ scope: 'write', permissions: null }, 'business', 'write'));
+check('an unknown resource reaches nothing', !permitsResource({ scope: 'write', permissions: ['business:read'] }, 'nope', 'read'));
 
 console.log('\n── field maps ──');
 const entry = { fieldMap: { from: 'from_name' } };

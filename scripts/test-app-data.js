@@ -45,6 +45,11 @@ const { T, db } = createMemDb({ tables: {
         { id: 3, entity_slug: 'other', name: 'Not ours', shown: true },
     ],
     bookings: [{ id: 1, entity_slug: 'shop', customer_name: 'A Person' }],
+    offerings: [
+        { id: 1, entity_slug: 'shop', kind: 'product', name: 'Mug' },
+        { id: 2, entity_slug: 'shop', kind: 'service', name: 'Catering' },
+        { id: 3, entity_slug: 'other', kind: 'product', name: 'Not ours' },
+    ],
 } });
 inject(path.join(ROOT, 'db.js'), db);
 
@@ -55,6 +60,7 @@ globalThis.fetch = async (url, init) => {
         return { ok: true, status: 200, json: async () => ({ definitions: {
             menu_items: def(['id', 'entity_slug', 'name', 'shown', 'cost_note']),
             bookings: def(['id', 'entity_slug', 'customer_name']),
+            offerings: def(['id', 'entity_slug', 'kind', 'name']),
             app_records: def(['id', 'entity_slug', 'data']),
         } }) };
     }
@@ -94,6 +100,9 @@ function manifest(over = {}) {
                 menu: { from: 'business', section: 'menu_items', resource: 'menu', fields: [{ key: 'name', type: 'text' }, { key: 'cost_note', type: 'text', ownerOnly: true }], title: 'name', visibleWhen: 'shown' },
                 people: { from: 'business', section: 'bookings', resource: 'bookings', fields: [{ key: 'customer_name', type: 'text' }], title: 'customer_name' },
                 memos: { from: 'app', table: 'internal', fields: [{ key: 'memo', type: 'text' }], title: 'memo' },
+                // Bound by contract (DECISIONS #45): the registry names the table and the filter.
+                products: { from: 'business', contract: 'products.items', resource: 'business', fields: [{ key: 'name', type: 'text' }], title: 'name' },
+                records: { from: 'business', contract: 'booking.records', resource: 'bookings', fields: [{ key: 'customer_name', type: 'text' }], title: 'customer_name' },
             },
             views: {
                 owner: [{ type: 'collection', source: 'notes' }, { type: 'collection', source: 'memos' }],
@@ -102,6 +111,8 @@ function manifest(over = {}) {
                     { type: 'list', source: 'menu', fields: { title: 'name' } },
                     { type: 'list', source: 'people', fields: { title: 'customer_name' } },
                     { type: 'list', source: 'memos', fields: { title: 'memo' } },
+                    { type: 'list', source: 'products', fields: { title: 'name' } },
+                    { type: 'list', source: 'records', fields: { title: 'customer_name' } },
                     { type: 'form', source: 'notes', intro: { setting: 'intro' }, openWhen: { setting: 'open' } },
                 ],
             },
@@ -202,6 +213,12 @@ async function run() {
         check('an app table not declared public is not read', !('memos' in pub.body.data));
         const theirPub = await call('GET', '/api/public/apps/app-2');
         check('without menu:read the business source is left out', theirPub.status === 200 && !('menu' in theirPub.body.data));
+        check('a contract source needs its resource too', !('products' in pub.body.data));
+        // Its own item key: a second install of the same key would reuse app-1's row (DECISIONS #28).
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-3', itemKey: 'contract-app', kind: 'app', version: '1.0.0', permissions: ['business:read', 'bookings:read'], app: manifest({ id: 'contract-app' }) });
+        const contractPub = await call('GET', '/api/public/apps/app-3');
+        check('a public contract source: the registry\'s table and filter, this business only', contractPub.status === 200 && contractPub.body.data.products?.length === 1 && contractPub.body.data.products[0].name === 'Mug', JSON.stringify(contractPub.body.data));
+        check('a contract over a table of people is never public, whatever the permission', !('records' in contractPub.body.data));
 
         const sub = await call('POST', '/api/public/apps/app-1/notes', { title: 'From a visitor', flag: 'set-by-visitor' });
         check('a visitor can append to a public append table', sub.status === 201 && sub.body.row.id && !('title' in sub.body.row), JSON.stringify(sub.body));

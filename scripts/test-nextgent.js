@@ -73,6 +73,12 @@ const T = {
     owner_notifications: [],
     menu_items: [{ id: 1, entity_slug: 'listed-cafe', name: 'Toast' }, { id: 3, entity_slug: 'new-taco-shop', name: 'Taco' }],
     faqs: [{ id: 2, entity_slug: 'listed-cafe', q: 'Open?' }],
+    // The catalogue: one table, the kind is data (products.items = kind product).
+    offerings: [
+        { id: 10, entity_slug: 'new-taco-shop', kind: 'product', name: 'Salsa jar' },
+        { id: 11, entity_slug: 'new-taco-shop', kind: 'service', name: 'Catering' },
+        { id: 12, entity_slug: 'listed-cafe', kind: 'product', name: 'Beans' },
+    ],
     // An automation built in the admin builder; its key is the store item key.
     automations: [{ id: 'auto-1', key: 'review-request', name: 'Review request', version: 2, status: 'published', trigger: { type: 'manual' }, steps: [] }],
     automation_versions: [{ automation_id: 'auto-1', version: 1 }, { automation_id: 'auto-1', version: 2 }],
@@ -187,6 +193,9 @@ globalThis.fetch = async (url, init) => {
         const spec = { definitions: {
             menu_items: def(['id', 'entity_slug', 'name']),
             faqs: def(['id', 'entity_slug', 'q']),
+            offerings: def(['id', 'entity_slug', 'kind', 'name']),
+            // The business record: keyed by slug, so not a section; its columns back business.* contracts.
+            entity: def(['id', 'slug', 'name', 'phone', 'website_url', 'social_instagram', 'stripe_customer_id']),
             business_mcp_tokens: def(['id', 'entity_slug', 'token_hash']),
         } };
         return { ok: true, status: 200, json: async () => spec };
@@ -366,6 +375,27 @@ async function run() {
         const schema = await asUser('GET', '/api/business/schema', undefined, appTok);
         check('the schema lists only readable sections', JSON.stringify(schema.body.tables) === '["menu_items"]', JSON.stringify(schema.body.tables));
         check('credential tables are never sections', !schema.body.tables.includes('business_mcp_tokens'));
+
+        console.log('\n── contracts at the business data routes (DECISIONS #45) ──');
+        const prodInst = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-c', itemKey: 'shop-app', kind: 'app', version: '1.0.0', permissions: ['business:read', 'business:write'] });
+        const prodTok = prodInst.body.token;
+        const products = await asUser('GET', '/api/business/products.items', undefined, prodTok);
+        check('products.items reads offerings kind=product, this business only', products.status === 200 && products.body.rows.length === 1 && products.body.rows[0].name === 'Salsa jar' && products.body.table === 'offerings' && products.body.contract === 'products.items', JSON.stringify(products.body));
+        const madeProd = await asUser('POST', '/api/business/products.items', { name: 'Hot sauce', kind: 'service', entity_slug: 'listed-cafe' }, prodTok);
+        const prodRow = T.offerings.find((o) => o.name === 'Hot sauce');
+        check('a write through the contract stamps the filter and the slug, whatever the body says', madeProd.status === 201 && prodRow?.kind === 'product' && prodRow.entity_slug === 'new-taco-shop', JSON.stringify(madeProd.body));
+        const notProd = await asUser('PATCH', '/api/business/products.items/11', { name: 'Renamed' }, prodTok);
+        check('a row of another kind is out of reach through the contract', notProd.status === 404 && T.offerings.find((o) => o.id === 11).name === 'Catering', JSON.stringify(notProd.body));
+        check('the raw table still works', (await asUser('GET', '/api/business/offerings', undefined, prodTok)).body.rows?.length === 3);
+        check('menu.items needs menu, not business', (await asUser('GET', '/api/business/menu.items', undefined, prodTok)).status === 403);
+        const viaMenu = await asUser('GET', '/api/business/menu.items', undefined, appTok);
+        check('menu:read reads menu.items', viaMenu.status === 200 && viaMenu.body.rows.length === 1 && viaMenu.body.table === 'menu_items', JSON.stringify(viaMenu.body));
+        check('and not products.items', (await asUser('GET', '/api/business/products.items', undefined, appTok)).status === 403);
+        check('an unknown contract is not a section', (await asUser('GET', '/api/business/nope.items', undefined, prodTok)).status === 400);
+        check('a contract whose table this database lacks is not a section either', (await asUser('GET', '/api/business/media.images', undefined, prodTok)).status === 400);
+        check('the business record is read-only through contracts', (await asUser('POST', '/api/business/business.profile', { name: 'X' }, prodTok)).status === 403);
+        const links = await asUser('GET', '/api/business/business.links', undefined, prodTok);
+        check('business.links reads the business record by its slug', links.status === 200 && links.body.table === 'entity' && links.body.rows.length === 1 && links.body.rows[0].slug === 'new-taco-shop', JSON.stringify(links.body));
 
         console.log('\n── short-lived install tokens ──');
         const unsignedSess = await signed('POST', '/api/nextgent/installs/in-1/session', {}, { sign: false });

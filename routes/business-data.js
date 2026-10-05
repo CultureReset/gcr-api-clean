@@ -28,7 +28,10 @@
 //   The table allow-list   :table arrives from the URL, so it is checked
 //                          against the live list of slug-scoped tables before
 //                          it reaches a query. Without this, a caller could
-//                          name auth.users in the path.
+//                          name auth.users in the path. A dotted name is a
+//                          data contract (lib/dataContracts.js): the registry
+//                          names the table, the filter the rows carry and the
+//                          permission resource — the same door, by contract.
 //
 //   The column filter      identity and bookkeeping columns are stripped from
 //                          every incoming body, so a business cannot reassign
@@ -47,7 +50,10 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // lib/businessTables.js so routes/mcp.js applies exactly the same three guards
 // to an AI assistant that this file applies to the dashboard. One copy only —
 // a second copy of a security check drifts until one of them has a hole in it.
-const { getSchema, allowTable, allowTableFor, cleanBody, tablesFor } = require('../lib/businessTables');
+const {
+    getSchema, cleanBody, tablesFor,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionValues,
+} = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
 const router = express.Router();
@@ -83,18 +89,26 @@ async function businessCaller(req, res, next) {
     });
 }
 
-/** The section named in the URL, if it exists and this caller may `action` it. */
+/**
+ * The section named in the URL, if it exists and this caller may `action` it.
+ *
+ * A raw table name (`menu_items`) or a data contract (`menu.items`,
+ * `products.items` — lib/dataContracts.js, DECISIONS #45). Either way the
+ * answer is a section descriptor from lib/businessTables.js: the table, the
+ * contract's server-side filter, and the business key. For a contract the
+ * permission resource is the registry's, not the table name's.
+ */
 async function sectionFor(req, res, action) {
-    let table;
+    let section;
     let permitted;
     try {
-        table = await allowTable(req.params.table);
-        permitted = table && await allowTableFor(req.businessCaller, table, action);
+        section = await sectionNamed(req.params.table);
+        permitted = section && await sectionPermitted(req.businessCaller, section, action);
     } catch (err) {
         fail(res, 502, err.message);
         return null;
     }
-    if (!table) {
+    if (!section) {
         fail(res, 400, `Not a business section: ${req.params.table}`);
         return null;
     }
@@ -102,8 +116,11 @@ async function sectionFor(req, res, action) {
         fail(res, 403, `This connection is not allowed to ${action} ${req.params.table}.`);
         return null;
     }
-    return table;
+    return section;
 }
+
+/** What every section response carries: the table, and the contract when one was named. */
+const named = (section) => ({ table: section.table, ...(section.contract ? { contract: section.contract } : {}) });
 
 /* ── who am I ─────────────────────────────────────────────────────────────
  *
@@ -280,22 +297,21 @@ router.get('/industries', ownerRequired, async (req, res) => {
 
 /* ── one section, for refreshing after an edit ───────────────────────────── */
 
-// GET /api/business/:table — this business's rows in one table, paged.
+// GET /api/business/:table — this business's rows in one table (or contract), paged.
 router.get('/:table', businessCaller, async (req, res) => {
-    const table = await sectionFor(req, res, 'read');
-    if (!table) return;
+    const section = await sectionFor(req, res, 'read');
+    if (!section) return;
 
     const limit = Math.min(Number(req.query.limit) || 200, ROW_LIMIT);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
-    const { data, error, count } = await supabase
-        .from(table)
-        .select('*', { count: 'exact' })
-        .eq('entity_slug', req.entitySlug)
-        .range(offset, offset + limit - 1);
+    const { data, error, count } = await applySection(
+        supabase.from(section.table).select(await sectionSelect(section), { count: 'exact' }),
+        section, req.entitySlug,
+    ).range(offset, offset + limit - 1);
     if (error) return fail(res, 500, error.message);
 
-    res.json({ table, rows: data || [], total: count ?? null, limit, offset });
+    res.json({ ...named(section), rows: (data || []).map((r) => sectionRow(section, r)), total: count ?? null, limit, offset });
 });
 
 /* ── the three writes ─────────────────────────────────────────────────────
@@ -306,60 +322,62 @@ router.get('/:table', businessCaller, async (req, res) => {
 
 // POST /api/business/:table
 router.post('/:table', businessCaller, async (req, res) => {
-    const table = await sectionFor(req, res, 'write');
-    if (!table) return;
+    const section = await sectionFor(req, res, 'write');
+    if (!section) return;
+    const { table } = section;
 
-    const values = await cleanBody(table, req.body);
+    // The contract's filter columns are stamped after the body is cleaned, so a
+    // products.items write is a product whatever `kind` the body carried.
+    const values = sectionValues(section, await cleanBody(table, sectionValues(section, req.body)));
 
     const { data, error } = await supabase
         .from(table)
-        .insert({ ...values, entity_slug: req.entitySlug }) // the slug is ours, not theirs
+        .insert({ ...values, [section.slugColumn]: req.entitySlug }) // the slug is ours, not theirs
         .select()
         .single();
     if (error) return fail(res, 400, error.message);
 
     // A fact Google shows (hours, menus…) is queued for the profile (lib/googlePush.js).
     await googlePush.noteTableWrite(req.entitySlug, table, data);
-    res.status(201).json({ table, row: data });
+    res.status(201).json({ ...named(section), row: sectionRow(section, data) });
 });
 
 // PATCH /api/business/:table/:id
 router.patch('/:table/:id', businessCaller, async (req, res) => {
-    const table = await sectionFor(req, res, 'write');
-    if (!table) return;
+    const section = await sectionFor(req, res, 'write');
+    if (!section) return;
+    const { table } = section;
 
-    const values = await cleanBody(table, req.body);
+    const values = await cleanBody(table, sectionValues(section, req.body));
+    for (const column of Object.keys(section.filter || {})) delete values[column]; // a row cannot leave its contract
     if (!Object.keys(values).length) return fail(res, 400, 'Nothing to change.');
 
-    const { data, error } = await supabase
-        .from(table)
-        .update(values)
-        .eq('id', req.params.id)
-        .eq('entity_slug', req.entitySlug) // never reachable outside this business
-        .select();
+    const { data, error } = await applySection(
+        supabase.from(table).update(values).eq(section.idColumn, req.params.id),
+        section, req.entitySlug, // never reachable outside this business, or outside the contract
+    ).select();
     if (error) return fail(res, 400, error.message);
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
     await googlePush.noteTableWrite(req.entitySlug, table, data[0]);
-    res.json({ table, row: data[0] });
+    res.json({ ...named(section), row: sectionRow(section, data[0]) });
 });
 
 // DELETE /api/business/:table/:id
 router.delete('/:table/:id', businessCaller, async (req, res) => {
-    const table = await sectionFor(req, res, 'write');
-    if (!table) return;
+    const section = await sectionFor(req, res, 'write');
+    if (!section) return;
+    const { table } = section;
 
-    const { data, error } = await supabase
-        .from(table)
-        .delete()
-        .eq('id', req.params.id)
-        .eq('entity_slug', req.entitySlug)
-        .select('id');
+    const { data, error } = await applySection(
+        supabase.from(table).delete().eq(section.idColumn, req.params.id),
+        section, req.entitySlug,
+    ).select(section.idColumn);
     if (error) return fail(res, 400, error.message);
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
     await googlePush.noteTableWrite(req.entitySlug, table, null);
-    res.json({ table, deleted: data[0].id });
+    res.json({ ...named(section), deleted: data[0][section.idColumn] });
 });
 
 module.exports = router;
