@@ -383,15 +383,20 @@ router.get('/:id/requests', ownerRequired, async (req, res) => {
 // ── box side ───────────────────────────────────────────────────────────────
 
 // POST /api/nodes/heartbeat — {version, health}
+// The registry hears of it when something changed, or now and then
+// (lib/deviceSync.js, DECISIONS #73); that push never fails the heartbeat.
 router.post('/heartbeat', nodeRequired, async (req, res) => {
     const version = typeof req.body?.version === 'string' ? req.body.version.slice(0, 64) : null;
     const health = req.body?.health && typeof req.body.health === 'object' ? req.body.health : null;
+    const lastSeenAt = nowIso();
     const { error } = await supabase
         .from('ghost_nodes')
-        .update({ last_seen_at: nowIso(), version, health })
+        .update({ last_seen_at: lastSeenAt, version, health })
         .eq('id', req.node.id);
     if (error) return tableError(res, error);
-    res.json({ ok: true });
+    const sync = await require('../lib/deviceSync').syncStatus({ node: req.node, version, health, lastSeenAt })
+        .catch((e) => ({ pushed: false, reason: e.message }));
+    res.json({ ok: true, registry_pushed: !!sync.pushed });
 });
 
 // GET /api/nodes/pull — queued requests for this box, oldest first, marked dispatched

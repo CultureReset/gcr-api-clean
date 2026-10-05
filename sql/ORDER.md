@@ -41,6 +41,7 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 15b | `nextgent_stripe_events.sql` | `stripe_webhook_events`: every Stripe event id acted on, so an event delivered twice (either webhook path, or a retry) is processed once |
 | 16 | `nextgent_intake.sql` | forwarding confirmation rules (seeded) and confirmations, `intake_known_senders`, `email_parser_log.intake_state`, `payments_detected` |
 | 17 | `nextgent_nodes.sql` | computer pairing (device flow), remote-view sessions, task id and receipt columns on `ghost_node_requests` (needs `ghost_nodes.sql`) |
+| 17a | `nextgent_nodes_registry.sql` | `ghost_nodes.registry_state` / `registry_synced_at`: what the heartbeat last pushed to Paperclip's device registry, and when (lib/deviceSync.js, DECISIONS #73). Until applied, nothing is pushed; heartbeats are unaffected (needs `ghost_nodes.sql`) |
 | 18 | `nextgent_google_push.sql` | Google push queue and state, fact sources (seeded), attribute map, source ranks (seeded), `fact_observations` |
 
 ## NEXT GENT apps (app engine, CONTRACT §14)
