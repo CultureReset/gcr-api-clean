@@ -46,6 +46,8 @@ const { T, db } = createMemDb({ tables: {
     ],
     bookings: [{ id: 1, entity_slug: 'shop', customer_name: 'A Person' }],
     entity_leads: [],
+    faqs: [{ id: 1, entity_slug: 'shop', question: 'Parking?', answer: 'Out back.' }],
+    entity_photos: [{ id: 1, entity_slug: 'shop', url: 'https://img.example/room.jpg' }],
     offerings: [
         { id: 1, entity_slug: 'shop', kind: 'product', name: 'Mug' },
         { id: 2, entity_slug: 'shop', kind: 'service', name: 'Catering' },
@@ -72,6 +74,8 @@ globalThis.fetch = async (url, init) => {
             bookings: def(['id', 'entity_slug', 'customer_name']),
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
             entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
+            faqs: def(['id', 'entity_slug', 'question', 'answer']),
+            entity_photos: def(['id', 'entity_slug', 'url', 'caption', 'is_cover']),
             entity: def(['id', 'slug', 'name', 'email', 'social_instagram', 'website_url']),
             app_records: def(['id', 'entity_slug', 'data']),
         } }) };
@@ -306,6 +310,55 @@ async function run() {
         check('a read-only binding takes no submission', (await call('POST', '/api/public/apps/app-4/profile', { name: 'Hack' })).status === 404);
         await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['contacts:read', 'business:read'], app: leadApp });
         check('without the install\'s contacts:write the submission is refused', (await call('POST', '/api/public/apps/app-4/enquiries', { name: 'Tess' })).status === 403 && !(T.entity_leads || []).some((l) => l.name === 'Tess'));
+
+        console.log('\n── a read-write binding alone opens nothing to visitors: an inbox flag or a public form does (DECISIONS #57) ──');
+        // The shipped FAQ, Gallery and QR Menu manifests, as bound: read-write
+        // for the owner, no `inbox: true`, no public form view over the source.
+        const shipped = (id, name, permissions, bindings, sources, publicViews) => ({
+            schema_version: 1, id, name, version: '1.0.0', publisher: 'test', runtime: { type: 'engine', engine: '1' },
+            surfaces: [{ id: 'owner', kind: 'dashboard', path: '/owner' }, { id: 'public', kind: 'public', path: '/public' }],
+            permissions: permissions.map((p) => ({ id: p, reason: 'r' })), bindings,
+            ui: { sources, views: { owner: Object.keys(sources).map((k) => ({ type: 'collection', source: k })), public: publicViews } },
+        });
+        const faqApp = shipped('faq', 'FAQ', ['business:read', 'business:write'], { faqs: { contract: 'faqs.items', access: 'read-write' } },
+            { entries: { from: 'business', binding: 'faqs', title: 'question', fields: [{ key: 'question', type: 'text', required: true }, { key: 'answer', type: 'longtext', required: true }] } },
+            [{ type: 'details', source: 'entries' }]);
+        const galleryApp = shipped('gallery', 'Gallery', ['business:read', 'business:write'], { media: { contract: 'media.images', access: 'read-write', fieldMap: { image_url: 'url' } } },
+            { photos: { from: 'business', binding: 'media', title: 'caption', fields: [{ key: 'image_url', type: 'url', required: true }, { key: 'caption', type: 'text' }] } },
+            [{ type: 'images', source: 'photos' }]);
+        const menuApp = shipped('qr-menu', 'QR Menu', ['menu:read', 'menu:write', 'business:read'], { menu_items: { contract: 'menu.items', access: 'read-write' } },
+            { items: { from: 'business', binding: 'menu_items', title: 'item_name', fields: [{ key: 'item_name', type: 'text', required: true }, { key: 'price', type: 'number' }] } },
+            [{ type: 'list', source: 'items' }]);
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-5', itemKey: 'faq', kind: 'app', version: '1.0.0', permissions: ['business:read', 'business:write'], app: faqApp });
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-6', itemKey: 'gallery', kind: 'app', version: '1.0.0', permissions: ['business:read', 'business:write'], app: galleryApp });
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-7', itemKey: 'qr-menu', kind: 'app', version: '1.0.0', permissions: ['menu:read', 'menu:write', 'business:read'], app: menuApp });
+        const before = { faqs: T.faqs.length, photos: T.entity_photos.length, menu: T.menu_items.length };
+        const faqSub = await call('POST', '/api/public/apps/app-5/entries', { question: 'Free beer?', answer: 'Yes' });
+        check('FAQ entries (read-write, owner collection only): a visitor\'s POST is 404, like an undeclared key', faqSub.status === 404, JSON.stringify(faqSub.body));
+        check('and no faqs row', T.faqs.length === before.faqs && !T.faqs.some((r) => r.question === 'Free beer?'), JSON.stringify(T.faqs));
+        const photoSub = await call('POST', '/api/public/apps/app-6/photos', { image_url: 'https://evil.example/x.jpg', url: 'https://evil.example/x.jpg' });
+        check('Gallery photos: 404', photoSub.status === 404, JSON.stringify(photoSub.body));
+        check('and no entity_photos row', T.entity_photos.length === before.photos, JSON.stringify(T.entity_photos));
+        const itemSub = await call('POST', '/api/public/apps/app-7/items', { item_name: 'Free beer', price: 0 });
+        check('QR Menu items: 404', itemSub.status === 404, JSON.stringify(itemSub.body));
+        check('and no menu_items row', T.menu_items.length === before.menu && !T.menu_items.some((r) => r.item_name === 'Free beer' || r.name === 'Free beer'), JSON.stringify(T.menu_items));
+        // The shipped Enquiry Form: binding inbox true, a public form over the source.
+        const enquiryApp = shipped('enquiry-form', 'Enquiry Form', ['contacts:read', 'contacts:write'], { leads: { contract: 'leads.items', access: 'read-write', inbox: true } },
+            { enquiries: { from: 'business', binding: 'leads', title: 'name', fields: [{ key: 'name', type: 'text', required: true }, { key: 'email', type: 'email', required: true }, { key: 'message', type: 'longtext' }, { key: 'status', type: 'select', ownerOnly: true }] } },
+            [{ type: 'form', source: 'enquiries' }]);
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-8', itemKey: 'enquiry-form', kind: 'app', version: '1.0.0', permissions: ['contacts:read', 'contacts:write'], app: enquiryApp });
+        const enqSub = await call('POST', '/api/public/apps/app-8/enquiries', { name: 'Uma', email: 'uma@example.test', message: 'Open Sunday?', status: 'won', entity_slug: 'other', id: 999 });
+        const uma = (T.entity_leads || []).find((l) => l.name === 'Uma');
+        check('Enquiry Form enquiries (binding inbox true): 201 and the lead row, for the install\'s business', enqSub.status === 201 && uma?.entity_slug === 'shop' && uma.id !== 999 && uma.status !== 'won', JSON.stringify({ body: enqSub.body, uma }));
+        check('and its inbox message', (T.business_messages || []).some((m) => m.install_id === 'app-8' && m.customer_address === 'uma@example.test'), JSON.stringify((T.business_messages || []).filter((m) => m.install_id === 'app-8')));
+        // A public form over a read-write source with no inbox flag: open, no inbox row.
+        const quietForm = shipped('quiet-form', 'Quiet Form', ['contacts:read', 'contacts:write'], { leads: { contract: 'leads.items', access: 'read-write' } },
+            { enquiries: { from: 'business', binding: 'leads', title: 'name', fields: [{ key: 'name', type: 'text', required: true }] } },
+            [{ type: 'form', source: 'enquiries' }]);
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-9', itemKey: 'quiet-form', kind: 'app', version: '1.0.0', permissions: ['contacts:read', 'contacts:write'], app: quietForm });
+        const quietSub = await call('POST', '/api/public/apps/app-9/enquiries', { name: 'Vic' });
+        check('a public form view bound to a read-write source, no inbox flag: 201 and the row', quietSub.status === 201 && (T.entity_leads || []).some((l) => l.name === 'Vic' && l.entity_slug === 'shop'), JSON.stringify(quietSub.body));
+        check('with no inbox row', !(T.business_messages || []).some((m) => m.install_id === 'app-9'));
         check('bad visitor input is refused', (await call('POST', '/api/public/apps/app-1/notes', {})).status === 422);
         const full = await call('POST', '/api/public/apps/app-1/notes', { title: 'Too many' });
         check('a table at APP_DATA_MAX_ROWS_PER_TABLE takes no more', full.status === 409, JSON.stringify(full.body));
