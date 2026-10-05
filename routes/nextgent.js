@@ -8,12 +8,14 @@
 // through company_links, the only place that says which.
 //
 //   POST   /link                   link a company to a business (new or claimed)
-//   POST   /installs               an agent, app or automation was installed (an
-//                                  automation goes onto the business through
-//                                  lib/automationInstalls.js, the path admin
-//                                  rollouts use too)
-//   PATCH  /installs/:installId    an app's enabled switch, version or manifest
-//                                  changed (re-projected into entity_modules)
+//   POST   /installs               an agent, app, automation or layout was
+//                                  installed (an automation goes onto the
+//                                  business through lib/automationInstalls.js,
+//                                  the path admin rollouts use too; a layout is
+//                                  only an entity_modules row, DECISIONS #31)
+//   PATCH  /installs/:installId    an app's or layout's enabled switch, version
+//                                  or manifest changed (re-projected into
+//                                  entity_modules)
 //   DELETE /installs/:installId    …and removed (the projection is switched off
 //                                  and kept, the app's records stay)
 //   POST   /installs/:installId/session  a short-lived token for that install
@@ -53,7 +55,12 @@ const router = express.Router();
 router.use(serviceSigned);
 
 const fail = (res, status, error, extra) => res.status(status).json({ error, ...(extra || {}) });
-const KINDS = new Set(['agent', 'app', 'automation']);
+const KINDS = new Set(['agent', 'app', 'automation', 'layout']);
+// The kinds that are projected to an entity_modules row (lib/appInstances.js).
+const PROJECTED_KINDS = new Set(['app', 'layout']);
+// The kinds that act through a token: an agent and an app. An automation runs
+// inside this API; a layout is drawn, it never calls anything.
+const TOKEN_KINDS = new Set(['agent', 'app']);
 const ROUTINE_SECRET_PURPOSE = 'routine-webhook-secret';
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
@@ -264,6 +271,23 @@ function manifestFrom(app) {
     return app;
 }
 
+/**
+ * A layout's manifest (Paperclip's store version payload.layout, DECISIONS
+ * #31): kept whole as settings.manifest; the renderer is Step 8, so nothing
+ * here reads into it beyond its shape and size.
+ */
+function layoutFrom(layout) {
+    if (layout === undefined || layout === null) return undefined;
+    if (typeof layout !== 'object' || Array.isArray(layout)) throw Object.assign(new Error('layout must be the layout manifest object.'), { status: 400 });
+    if (Buffer.byteLength(JSON.stringify(layout)) > envInt('APP_MANIFEST_MAX_BYTES', 262144)) throw Object.assign(new Error('The layout manifest is too large.'), { status: 413 });
+    return layout;
+}
+
+/** The manifest an install of `kind` is projected with: an app's or a layout's. */
+function projectedManifest(kind, appManifest, layoutManifest) {
+    return kind === 'layout' ? layoutManifest : appManifest;
+}
+
 /* ── POST /installs ───────────────────────────────────────────────────── */
 
 router.post('/installs', async (req, res) => {
@@ -273,7 +297,7 @@ router.post('/installs', async (req, res) => {
     const itemKey = str(b.itemKey);
     const kind = str(b.kind);
     if (!companyId || !installId || !itemKey) return fail(res, 400, 'companyId, installId and itemKey are required.');
-    if (!KINDS.has(kind)) return fail(res, 400, 'kind must be agent, app or automation.');
+    if (!KINDS.has(kind)) return fail(res, 400, `kind must be one of ${[...KINDS].join(', ')}.`);
 
     let permissions;
     try {
@@ -284,20 +308,23 @@ router.post('/installs', async (req, res) => {
 
     // What the item's manifest says about itself: capabilities (e.g.
     // telephony, which makes it a Phone Agent) and the agent's instructions,
-    // kept for the live call and text handlers.
-    const capabilities = Array.isArray(b.capabilities) ? b.capabilities.map((c) => str(c)).filter(Boolean).slice(0, 50) : [];
-    if (b.telephony && typeof b.telephony === 'object' && !capabilities.includes('telephony')) capabilities.push('telephony');
-    const instructions = typeof b.instructions === 'string' ? b.instructions.slice(0, 20000) : null;
+    // kept for the live call and text handlers. A layout has neither.
+    const capabilities = kind !== 'layout' && Array.isArray(b.capabilities) ? b.capabilities.map((c) => str(c)).filter(Boolean).slice(0, 50) : [];
+    if (kind !== 'layout' && b.telephony && typeof b.telephony === 'object' && !capabilities.includes('telephony')) capabilities.push('telephony');
+    const instructions = kind !== 'layout' && typeof b.instructions === 'string' ? b.instructions.slice(0, 20000) : null;
     // An app's manifest (Paperclip's store version payload.app): what the app
     // engine draws, its own tables and its settings. Kept whole in the runtime
     // projection, an entity_modules row per install (CONTRACT §14,
     // lib/appInstances.js), the one row public pages and /api/app-data read.
     let appManifest;
+    let layoutManifest;
     try {
         appManifest = manifestFrom(b.app);
+        layoutManifest = layoutFrom(b.layout);
     } catch (err) {
         return fail(res, err.status || 400, err.message);
     }
+    const manifest = projectedManifest(kind, appManifest, layoutManifest);
     const manifestFields = {
         ...(capabilities.length ? { capabilities } : {}),
         ...(instructions ? { instructions } : {}),
@@ -343,11 +370,11 @@ router.post('/installs', async (req, res) => {
         }
         const { error } = await supabase.from('nextgent_installs').update(patch).eq('install_id', installId);
         if (error) return fail(res, 500, error.message);
-        if (kind === 'app') {
+        if (PROJECTED_KINDS.has(kind)) {
             try {
-                await appInstances.project({ installId, companyId, slug, itemKey, version: patch.version, manifest: appManifest, enabled: b.enabled });
+                await appInstances.project({ installId, companyId, slug, itemKey, kind, version: patch.version, manifest, enabled: b.enabled });
             } catch (err) {
-                if (!(err.code === 'not_configured' && !appManifest)) return fail(res, err.status || 500, err.message);
+                if (!(err.code === 'not_configured' && !manifest)) return fail(res, err.status || 500, err.message);
                 console.warn(`[nextgent] ${err.message}`);
             }
         }
@@ -457,14 +484,14 @@ router.post('/installs', async (req, res) => {
         }
     }
 
-    // An app's runtime projection: manifest, settings, public switches.
-    if (kind === 'app') {
+    // An app's (or a layout's) runtime projection: manifest, settings, public switches.
+    if (PROJECTED_KINDS.has(kind)) {
         try {
-            await appInstances.project({ installId, companyId, slug, itemKey, version: b.version != null ? String(b.version) : null, manifest: appManifest, enabled: b.enabled });
+            await appInstances.project({ installId, companyId, slug, itemKey, kind, version: b.version != null ? String(b.version) : null, manifest, enabled: b.enabled });
         } catch (err) {
             // No manifest to keep and the table not there yet: the install
             // still stands, as it did before this projection existed.
-            if (err.code === 'not_configured' && !appManifest) {
+            if (err.code === 'not_configured' && !manifest) {
                 console.warn(`[nextgent] ${err.message}`);
             } else {
                 if (charge.charged) await billingStripe.removeInstallCharge(installId);
@@ -476,7 +503,7 @@ router.post('/installs', async (req, res) => {
 
     // Agents and apps get a token holding only what the owner approved.
     let token;
-    if (kind !== 'automation') {
+    if (TOKEN_KINDS.has(kind)) {
         try {
             const minted = await mintToken({
                 slug,
@@ -517,7 +544,7 @@ router.post('/installs/:installId/session', async (req, res) => {
     const companyId = str(req.body?.companyId);
     if (companyId && companyId !== data.company_id) return fail(res, 404, 'No such install.');
     if (data.status !== 'active') return fail(res, 409, 'That install was removed.');
-    if (data.kind === 'automation') return fail(res, 409, 'Automation installs have no token.');
+    if (!TOKEN_KINDS.has(data.kind)) return fail(res, 409, `${data.kind === 'automation' ? 'Automation' : 'Layout'} installs have no token.`);
     try {
         res.set('Cache-Control', 'no-store');
         res.status(201).json(mintInstallSession({ installId: data.install_id, companyId: data.company_id }));
@@ -529,21 +556,24 @@ router.post('/installs/:installId/session', async (req, res) => {
 /* ── PATCH /installs/:installId ───────────────────────────────────────── */
 
 // Paperclip switched an install on or off, or moved it to a version (with the
-// manifest that version carries). The install row keeps the version; an app's
-// projection is refreshed with whatever was sent (lib/appInstances.project).
+// manifest that version carries: `app` for an app, `layout` for a layout). The
+// install row keeps the version; an app's or layout's projection is refreshed
+// with whatever was sent (lib/appInstances.project).
 router.patch('/installs/:installId', async (req, res) => {
     const installId = str(req.params.installId);
     const b = req.body || {};
     if (b.enabled !== undefined && typeof b.enabled !== 'boolean') return fail(res, 400, 'enabled must be true or false.');
     if (b.version !== undefined && b.version !== null && !str(b.version)) return fail(res, 400, 'version must be a string.');
     let appManifest;
+    let layoutManifest;
     try {
         appManifest = manifestFrom(b.app);
+        layoutManifest = layoutFrom(b.layout);
     } catch (err) {
         return fail(res, err.status || 400, err.message);
     }
     const version = b.version !== undefined && b.version !== null ? str(b.version) : undefined;
-    if (b.enabled === undefined && version === undefined && appManifest === undefined) return fail(res, 400, 'Send enabled, version or app.');
+    if (b.enabled === undefined && version === undefined && appManifest === undefined && layoutManifest === undefined) return fail(res, 400, 'Send enabled, version, app or layout.');
 
     const { data: existing, error: readError } = await supabase
         .from('nextgent_installs').select('install_id, company_id, entity_slug, item_key, kind, version, status')
@@ -558,11 +588,11 @@ router.patch('/installs/:installId', async (req, res) => {
         if (error) return fail(res, 500, error.message);
     }
     let projected = false;
-    if (existing.kind === 'app') {
+    if (PROJECTED_KINDS.has(existing.kind)) {
         try {
             await appInstances.project({
-                installId, companyId: existing.company_id, slug: existing.entity_slug, itemKey: existing.item_key,
-                version, manifest: appManifest, enabled: b.enabled,
+                installId, companyId: existing.company_id, slug: existing.entity_slug, itemKey: existing.item_key, kind: existing.kind,
+                version, manifest: projectedManifest(existing.kind, appManifest, layoutManifest), enabled: b.enabled,
             });
             projected = true;
         } catch (err) {

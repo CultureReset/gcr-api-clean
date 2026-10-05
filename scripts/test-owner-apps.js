@@ -244,6 +244,32 @@ async function run() {
         const tips = T.entity_modules.filter((r) => r.entity_slug === 'shop' && r.module_key === 'tips-app');
         check('one row for (shop, tips-app): the legacy one, now Paperclip\'s', over.status === 201 && tips.length === 1 && tips[0] === legacyApp && legacyApp.managed_by === 'paperclip' && legacyApp.install_id === 'app-t' && legacyApp.version === '1.0.0', JSON.stringify(tips));
         check('the owner\'s config is carried over, the manifest is the new one, public on', JSON.stringify(legacyApp.settings.config) === '{"a":1}' && legacyApp.settings.manifest.id === 'tips-app' && legacyApp.settings.manifest.ui && legacyApp.settings.showOnPublic === true && legacyApp.enabled === true, JSON.stringify(legacyApp.settings));
+
+        console.log('\n── a layout install (DECISIONS #31) ──');
+        const layoutBody = { companyId: 'co-1', installId: 'lay-1', itemKey: 'cafe-layout', kind: 'layout', version: '1.0.0', permissions: [], optionalPermissions: [], enabled: true };
+        const lay = await signed('POST', '/api/nextgent/installs', layoutBody);
+        const lr = rowOf('lay-1');
+        check('kind layout is accepted, no token minted, nothing charged', lay.status === 201 && !lay.body.token && lay.body.charged === false && !T.business_mcp_tokens.some((t) => t.install_id === 'lay-1'), JSON.stringify(lay.body));
+        check('projected: module_key = layout key, managed_by paperclip, install and company ids, version, enabled', lr && lr.module_key === 'cafe-layout' && lr.managed_by === 'paperclip' && lr.install_id === 'lay-1' && lr.company_id === 'co-1' && lr.version === '1.0.0' && lr.enabled === true, JSON.stringify(lr));
+        check('settings.kind = layout, manifest null when none was sent, public on', lr?.settings?.kind === 'layout' && lr.settings.manifest === null && lr.settings.showOnPublic === true, JSON.stringify(lr?.settings));
+        check('the install row records kind layout', T.nextgent_installs.find((i) => i.install_id === 'lay-1')?.kind === 'layout');
+        check('a layout install has no session token', (await signed('POST', '/api/nextgent/installs/lay-1/session', {})).status === 409);
+        const withLayout = await signed('POST', '/api/nextgent/installs', { ...layoutBody, installId: 'lay-2', itemKey: 'bar-layout', layout: { template: 'bar', sections: ['hero'] } });
+        check('a layout object in the body is kept as settings.manifest', withLayout.status === 201 && rowOf('lay-2')?.settings.manifest?.template === 'bar' && rowOf('lay-2').settings.kind === 'layout', JSON.stringify(rowOf('lay-2')));
+        check('layout must be an object', (await signed('POST', '/api/nextgent/installs', { ...layoutBody, installId: 'lay-3', itemKey: 'x-layout', layout: 'bar' })).status === 400 && !rowOf('lay-3'));
+        check('excluded from the public apps list', !(await call('GET', '/api/public/business/shop/apps')).body.some((r) => r.installId === 'lay-1' || r.installId === 'lay-2' || r.appKey === 'cafe-layout'));
+        check('excluded from the owner apps list', !(await call('GET', '/api/owner/apps')).body.some((r) => r.installId === 'lay-1' || r.installId === 'lay-2'));
+        check('liveInstance does not treat a layout as an app', (await appInstances.liveInstance('lay-1')) === null && (await appInstances.liveInstance('lay-2')) === null);
+        check('the layout has no public app page', (await call('GET', '/api/public/apps/lay-2')).status === 404);
+        const layPatch = await signed('PATCH', '/api/nextgent/installs/lay-1', { version: '1.1.0', layout: { template: 'cafe-v2' }, enabled: false });
+        check('PATCH re-projects version, layout and enabled', layPatch.status === 200 && layPatch.body.projected === true && lr.version === '1.1.0' && lr.settings.manifest?.template === 'cafe-v2' && lr.enabled === false && lr.settings.kind === 'layout', JSON.stringify([layPatch.body, lr]));
+        check('the install row moves to the version too', T.nextgent_installs.find((i) => i.install_id === 'lay-1').version === '1.1.0');
+        check('PATCH { layout } alone is enough', (await signed('PATCH', '/api/nextgent/installs/lay-1', { layout: { template: 'cafe-v3' } })).status === 200 && lr.settings.manifest.template === 'cafe-v3' && lr.enabled === false);
+        check('PATCH layout must be an object', (await signed('PATCH', '/api/nextgent/installs/lay-1', { layout: [1] })).status === 400 && lr.settings.manifest.template === 'cafe-v3');
+        const layGone = await signed('DELETE', '/api/nextgent/installs/lay-2');
+        const l2 = rowOf('lay-2');
+        check('DELETE disables the layout row and keeps it', layGone.status === 200 && layGone.body.app?.disabled === true && l2 && l2.enabled === false && l2.settings.showOnPublic === false && l2.settings.kind === 'layout' && l2.settings.manifest?.template === 'bar', JSON.stringify([layGone.body, l2]));
+        check('the legacy and app rows are untouched by layouts', r1.settings.kind === undefined && T.entity_modules.includes(plainRow));
     } catch (e) {
         check('no exception', false, e.stack);
     }
