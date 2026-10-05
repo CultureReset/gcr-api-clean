@@ -85,6 +85,11 @@ const T = {
     automations: [{ id: 'auto-1', key: 'review-request', name: 'Review request', version: 2, status: 'published', trigger: { type: 'manual' }, steps: [] }],
     automation_versions: [{ automation_id: 'auto-1', version: 1 }, { automation_id: 'auto-1', version: 2 }],
     entity_automations: [],
+    // Computers: the relay's node rows, pairings and agent credentials (routes/nodes.js).
+    ghost_nodes: [],
+    ghost_mcp_tokens: [],
+    node_pairings: [],
+    ghost_node_requests: [],
 };
 let seq = 0;
 const like = (v, pat) => new RegExp(`^${String(pat).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*')}$`).test(String(v));
@@ -246,6 +251,7 @@ app.use(express.json({ verify: (req, _r, buf) => { req.rawBody = buf; } }));
 app.use('/api/nextgent', require(path.join(ROOT, 'routes/nextgent.js')));
 app.use('/api/claims', require(path.join(ROOT, 'routes/claims.js')));
 app.use('/api/business', require(path.join(ROOT, 'routes/business-data.js')));
+app.use('/api/nodes', require(path.join(ROOT, 'routes/nodes.js')));
 const server = app.listen(0, run);
 const base = () => `http://127.0.0.1:${server.address().port}`;
 
@@ -596,6 +602,40 @@ async function run() {
         check('the same item is not announced twice', dup.skipped === 'duplicate');
         const badKind = await notifyOwner('listed-cafe', { kind: 'marketing', title: 'x' });
         check('only the four kinds exist', badKind.skipped === 'unknown_kind');
+
+        console.log('\n── computers: Paperclip approves a pairing (DECISIONS #69) ──');
+        const plain = (method, url, body) => signed(method, url, body, { sign: false });
+        const pairStart = await plain('POST', '/api/nodes/pair/start', { name: 'Front TV' });
+        check('the computer shows a code', pairStart.status === 201 && /^[A-Z0-9]{8}$/.test(pairStart.body.user_code), JSON.stringify(pairStart.body));
+        const unsignedPair = await plain('POST', '/api/nextgent/nodes/pair', { companyId: 'co-new', code: pairStart.body.user_code });
+        check('pairing must be asked for with a signature', unsignedPair.status === 401);
+        const unlinkedPair = await signed('POST', '/api/nextgent/nodes/pair', { companyId: 'co-none', code: pairStart.body.user_code });
+        check('an unlinked company cannot pair a computer', unlinkedPair.status === 409, JSON.stringify(unlinkedPair.body));
+        const wrongCode = await signed('POST', '/api/nextgent/nodes/pair', { companyId: 'co-new', code: 'ZZZZZZZZ' });
+        check('a wrong code is refused', wrongCode.status === 404);
+        const paired = await signed('POST', '/api/nextgent/nodes/pair', { companyId: 'co-new', code: pairStart.body.user_code.toLowerCase(), approvedBy: 'paperclip:u-9', deviceToken: 'pcdev_secret_for_the_box' });
+        check('the node is enrolled for the company\'s business, from company_links',
+            paired.status === 201 && T.ghost_nodes[0]?.entity_slug === 'new-taco-shop', JSON.stringify(paired.body));
+        check('the response is the node: id, name, version, health, last_seen_at',
+            paired.body.node?.id === T.ghost_nodes[0]?.id && paired.body.node.name === 'Front TV'
+            && 'version' in paired.body.node && 'health' in paired.body.node && 'last_seen_at' in paired.body.node, JSON.stringify(paired.body));
+        check('who approved is recorded', T.node_pairings[0]?.approved_by === 'paperclip:u-9' && T.node_pairings[0].entity_slug === 'new-taco-shop');
+        check('the device token waits sealed, never in clear', !JSON.stringify(T.node_pairings).includes('pcdev_secret_for_the_box'));
+        const collected = await plain('POST', '/api/nodes/pair/poll', { device_code: pairStart.body.device_code });
+        check('the computer collects its node token and the device token together',
+            collected.status === 200 && /^gcr_node_/.test(collected.body.token || '') && collected.body.device_token === 'pcdev_secret_for_the_box', JSON.stringify(collected.body));
+        check('both are erased once collected', T.node_pairings[0].token_sealed === null && T.node_pairings[0].status === 'collected');
+        const unsignedList = await plain('GET', '/api/nextgent/nodes?companyId=co-new');
+        check('listing must be asked for with a signature', unsignedList.status === 401);
+        const nodeList = await signed('GET', '/api/nextgent/nodes?companyId=co-new');
+        check('the company\'s computers are listed', nodeList.status === 200 && nodeList.body.nodes?.length === 1 && nodeList.body.nodes[0].id === T.ghost_nodes[0].id, JSON.stringify(nodeList.body));
+        const otherList = await signed('GET', '/api/nextgent/nodes?companyId=co-claim');
+        check('another company sees none of them', otherList.status === 200 && otherList.body.nodes.length === 0);
+        const otherRevoke = await signed('POST', `/api/nextgent/nodes/${T.ghost_nodes[0].id}/revoke`, { companyId: 'co-claim' });
+        check('another company cannot revoke it', otherRevoke.status === 404 && !T.ghost_nodes[0].revoked_at);
+        const revoked = await signed('POST', `/api/nextgent/nodes/${T.ghost_nodes[0].id}/revoke`, { companyId: 'co-new' });
+        check('its own company revokes it', revoked.status === 200 && revoked.body.revoked === true && !!T.ghost_nodes[0].revoked_at, JSON.stringify(revoked.body));
+        check('a revoked computer is listed as revoked', (await signed('GET', '/api/nextgent/nodes?companyId=co-new')).body.nodes[0].revoked_at);
 
         console.log('\n── unlink ──');
         uploads.length = 0;

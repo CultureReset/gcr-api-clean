@@ -20,13 +20,12 @@ const express = require('express');
 const crypto = require('crypto');
 const supabase = require('../db');
 const { ownerRequired } = require('../middleware/ownerAuth');
-const secretBox = require('../lib/secretBox');
 const { envInt, envStr } = require('../lib/env');
+const pairing = require('../lib/nodePairing');
 
 const router = express.Router();
 
-const TOKEN_PREFIX = 'gcr_node_';
-const hashToken = (raw) => crypto.createHash('sha256').update(raw).digest('hex');
+const { TOKEN_PREFIX, hashToken, normalizeUserCode } = pairing;
 const nowIso = () => new Date().toISOString();
 
 // Paths the dashboard may ask a box to serve. The box enforces the same list.
@@ -85,19 +84,21 @@ const mine = (query, req) =>
 //
 //   1. The computer asks for a code: POST /pair/start → a short user_code to
 //      show (and put in a QR) and a long device_code it keeps to itself.
-//   2. The owner, signed in to the app, sends the user_code:
-//      POST /pair { code } → the node is enrolled for the session's business.
-//      The computer never chooses its business.
+//   2. The owner approves the user_code. Paperclip does this through the
+//      signed POST /api/nextgent/nodes/pair (DECISIONS #69: the business is
+//      the company's, through company_links); POST /pair { code } here, with
+//      the owner's session, is kept until Play-user has switched. Both run
+//      lib/nodePairing.approvePairing. The computer never chooses its business.
 //   3. The computer polls POST /pair/poll { device_code } and, once, receives
-//      its own node token. Codes expire (NODE_PAIR_TTL_MINUTES).
+//      its own node token (and the device token Paperclip minted for it, when
+//      there is one). Codes expire (NODE_PAIR_TTL_MINUTES).
 //
-// Only hashes of both codes are stored; the node token waits sealed
-// (lib/secretBox.js) until the computer collects it, then is erased.
+// Only hashes of both codes are stored; the tokens wait sealed
+// (lib/secretBox.js) until the computer collects them, then are erased.
 
 const PAIR_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const pairTtlMinutes = () => envInt('NODE_PAIR_TTL_MINUTES', 10);
 const pairPollSeconds = () => envInt('NODE_PAIR_POLL_SECONDS', 5);
-const PAIR_PURPOSE = 'node-pair-token';
 
 function newUserCode() {
     const len = Math.min(Math.max(envInt('NODE_PAIR_CODE_LENGTH', 8), 6), 12);
@@ -105,8 +106,6 @@ function newUserCode() {
     for (let i = 0; i < len; i += 1) out += PAIR_CHARSET[crypto.randomInt(PAIR_CHARSET.length)];
     return out;
 }
-const normalizeUserCode = (c) => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-
 router.post('/pair/start', async (req, res) => {
     const deviceCode = crypto.randomBytes(32).toString('base64url');
     const userCode = newUserCode();
@@ -140,7 +139,7 @@ router.post('/pair/poll', async (req, res) => {
     if (new Date(row.expires_at) < new Date() && row.status !== 'approved') return res.status(410).json({ status: 'expired' });
     if (row.status !== 'approved') return res.status(202).json({ status: 'pending', interval: pairPollSeconds() });
 
-    // Hand the token over once, then forget it.
+    // Hand the tokens over once, then forget them.
     const sealed = row.token_sealed;
     const nodeId = row.node_id;
     const { data: claimed } = await supabase.from('node_pairings')
@@ -148,37 +147,28 @@ router.post('/pair/poll', async (req, res) => {
         .eq('id', row.id).eq('status', 'approved').select('id');
     if (!claimed?.length) return res.status(410).json({ status: 'collected' });
     const { data: node } = await supabase.from('ghost_nodes').select('id, name, entity_slug').eq('id', nodeId).maybeSingle();
-    res.json({ status: 'approved', token: secretBox.open(sealed, PAIR_PURPOSE), node: node ? { id: node.id, name: node.name } : null });
+    const { token, deviceToken } = pairing.openSealed(sealed);
+    res.json({ status: 'approved', token, ...(deviceToken ? { device_token: deviceToken } : {}), node: node ? { id: node.id, name: node.name } : null });
 });
 
+/** The answer to a lib/nodePairing error: a database error as tableError, the rest by status. */
+const pairingError = (res, err) => (err.dbError ? tableError(res, err.dbError) : res.status(err.status || 500).json({ error: err.message }));
+
+// Transitional (DECISIONS #69): the owner's session approves the code. The
+// business is the session's; the same helper Paperclip's signed route uses.
 router.post('/pair', ownerRequired, async (req, res) => {
-    const code = normalizeUserCode(req.body?.code);
-    if (code.length < 6) return res.status(400).json({ error: 'Enter the code the computer shows.' });
-    const { data: row, error } = await supabase.from('node_pairings').select('*')
-        .eq('user_code_hash', hashToken(code)).eq('status', 'pending').maybeSingle();
-    if (error) return tableError(res, error);
-    if (!row || new Date(row.expires_at) < new Date()) return res.status(404).json({ error: 'That code is not valid or has expired. Ask the computer for a new one.' });
-
-    const token = TOKEN_PREFIX + crypto.randomBytes(24).toString('hex');
-    const { data: node, error: nodeError } = await supabase.from('ghost_nodes').insert({
-        entity_slug: req.entitySlug,
-        name: row.name || String(req.body?.name || '').trim().slice(0, 80) || envStr('NODE_DEFAULT_NAME', 'Computer'),
-        token_hash: hashToken(token),
-        token_hint: token.slice(-6),
-        created_by: req.ownerUserId || null,
-    }).select('id, name, token_hint, created_at').single();
-    if (nodeError) return tableError(res, nodeError);
-
-    const { data: approved } = await supabase.from('node_pairings').update({
-        status: 'approved', node_id: node.id, entity_slug: req.entitySlug,
-        token_sealed: secretBox.seal(token, PAIR_PURPOSE), approved_at: nowIso(),
-        approved_by: req.paperclip?.userId ? `paperclip:${req.paperclip.userId}` : req.ownerUserId || null,
-    }).eq('id', row.id).eq('status', 'pending').select('id');
-    if (!approved?.length) {
-        await supabase.from('ghost_nodes').update({ revoked_at: nowIso() }).eq('id', node.id);
-        return res.status(409).json({ error: 'That code was just used.' });
+    try {
+        const { node } = await pairing.approvePairing({
+            entitySlug: req.entitySlug,
+            code: req.body?.code,
+            name: req.body?.name,
+            createdBy: req.ownerUserId || null,
+            approvedBy: req.paperclip?.userId ? `paperclip:${req.paperclip.userId}` : req.ownerUserId || null,
+        });
+        res.status(201).json({ node });
+    } catch (err) {
+        pairingError(res, err);
     }
-    res.status(201).json({ node });
 });
 
 // ── remote view of a computer's screen ─────────────────────────────────────
@@ -323,16 +313,21 @@ router.get('/:id/remote', ownerRequired, async (req, res) => {
     res.json({ url, expiresAt });
 });
 
-// DELETE /api/nodes/:id — revoke a box's token
+// DELETE /api/nodes/:id — revoke a box's token (and its agent credentials).
+// Transitional (DECISIONS #69): Paperclip revokes through the signed
+// POST /api/nextgent/nodes/:nodeId/revoke; both run lib/nodePairing.revokeNodes.
 router.delete('/:id', ownerRequired, async (req, res) => {
-    const { data, error } = await mine(supabase
-        .from('ghost_nodes')
-        .update({ revoked_at: nowIso() })
-        .eq('id', req.params.id), req)
-        .select('id');
-    if (error) return tableError(res, error);
-    if (!data?.length) return res.status(404).json({ error: 'No such box.' });
-    res.json({ revoked: true });
+    try {
+        const count = await pairing.revokeNodes({
+            entitySlug: req.entitySlug,
+            nodeId: req.params.id,
+            createdBy: req.actingAsAdmin || req.authVia === 'paperclip' ? null : req.ownerUserId,
+        });
+        if (!count) return res.status(404).json({ error: 'No such box.' });
+        res.json({ revoked: true });
+    } catch (err) {
+        pairingError(res, err);
+    }
 });
 
 // POST /api/nodes/:id/requests — queue something for the box to do

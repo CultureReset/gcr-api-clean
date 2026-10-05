@@ -25,7 +25,15 @@
 //                                  kind (entity.entity_type), for the store's
 //                                  "by kind" audience (DECISIONS #32): the kind
 //                                  lives here, Paperclip keeps no copy
-//   POST   /unlink                 the business leaves (export first if asked)
+//   POST   /nodes/pair             approve the code a computer shows: it is
+//                                  enrolled as a relay node of the company's
+//                                  business (DECISIONS #69); a deviceToken,
+//                                  when sent, is handed to the computer with
+//                                  its node token (DECISIONS #71)
+//   GET    /nodes?companyId=       the company's computers (relay rows)
+//   POST   /nodes/:nodeId/revoke   revoke one computer and its agent credentials
+//   POST   /unlink                 the business leaves (export first if asked);
+//                                  its computers are revoked (DECISIONS #78)
 //   POST   /usage                  AI spend from LiteLLM, per company and period
 //                                  (refused while LITELLM_USAGE_PULL is on, the
 //                                  default: the pull already bills it)
@@ -54,6 +62,7 @@ const secretBox = require('../lib/secretBox');
 const { exportBusiness } = require('../lib/exportBusiness');
 const phoneAgent = require('../lib/phoneAgent');
 const automationInstalls = require('../lib/automationInstalls');
+const nodePairing = require('../lib/nodePairing');
 
 const router = express.Router();
 router.use(serviceSigned);
@@ -655,6 +664,70 @@ router.delete('/installs/:installId', async (req, res) => {
             ? await automationInstalls.uninstallFromStore({ itemKey: row.item_key, slug: row.entity_slug })
             : 0;
         res.json({ removed: true, tokensRevoked: revoked, chargesRemoved: charges.removed, numbersReleased, automationsDisabled, ...(appRemoved ? { app: appRemoved } : {}) });
+    } catch (err) {
+        fail(res, err.status || 500, err.message);
+    }
+});
+
+/* ── computers: /nodes/pair, /nodes, /nodes/:nodeId/revoke ────────────── */
+
+// The relay node rows (ghost_nodes) a company's computers are. The business
+// is resolved from company_links; the node rows are then filtered on that
+// slug, so a company only ever sees and touches its own.
+const NODE_COLUMNS = 'id, name, token_hint, version, health, created_at, last_seen_at, revoked_at';
+
+async function linkedSlug(res, companyId) {
+    if (!companyId) { fail(res, 400, 'companyId is required.'); return null; }
+    let slug;
+    try {
+        slug = await slugForCompany(companyId);
+    } catch (err) {
+        fail(res, 500, err.message);
+        return null;
+    }
+    if (!slug) { fail(res, 409, 'This company is not linked to a business.'); return null; }
+    return slug;
+}
+
+// Paperclip approved the code the computer shows (its owner typed it there):
+// the node is enrolled for the company's business. `deviceToken`, when sent,
+// is sealed into the pairing and collected by the computer with its node token.
+router.post('/nodes/pair', async (req, res) => {
+    const b = req.body || {};
+    const slug = await linkedSlug(res, str(b.companyId));
+    if (!slug) return;
+    try {
+        const { node } = await nodePairing.approvePairing({
+            entitySlug: slug,
+            code: b.code,
+            name: str(b.name),
+            approvedBy: str(b.approvedBy) || null,
+            deviceToken: str(b.deviceToken) || null,
+        });
+        res.set('Cache-Control', 'no-store');
+        res.status(201).json({ node: { id: node.id, name: node.name, version: node.version, health: node.health, last_seen_at: node.last_seen_at } });
+    } catch (err) {
+        fail(res, err.status || 500, err.message);
+    }
+});
+
+router.get('/nodes', async (req, res) => {
+    const slug = await linkedSlug(res, str(req.query?.companyId));
+    if (!slug) return;
+    const { data, error } = await supabase.from('ghost_nodes').select(NODE_COLUMNS)
+        .eq('entity_slug', slug).order('created_at', { ascending: true });
+    if (error) return fail(res, 503, `Ghost nodes are not set up on this database yet: ${error.message}`);
+    res.set('Cache-Control', 'no-store');
+    res.json({ nodes: data || [] });
+});
+
+router.post('/nodes/:nodeId/revoke', async (req, res) => {
+    const slug = await linkedSlug(res, str(req.body?.companyId));
+    if (!slug) return;
+    try {
+        const count = await nodePairing.revokeNodes({ entitySlug: slug, nodeId: str(req.params.nodeId) });
+        if (!count) return fail(res, 404, 'No such computer.');
+        res.json({ revoked: true });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
