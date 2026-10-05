@@ -15,7 +15,7 @@ const { checker } = require('./lib/memdb');
 
 const ROOT = path.resolve(__dirname, '..');
 const contracts = require(path.join(ROOT, 'lib/dataContracts.js'));
-const { RESOURCES, permitsResource } = require(path.join(ROOT, 'lib/businessTables.js'));
+const { RESOURCES, permitsResource, resourceForTable } = require(path.join(ROOT, 'lib/businessTables.js'));
 const { check, done } = checker();
 
 console.log('\n── the registry (SPEC §12.6, DECISIONS #45) ──');
@@ -32,7 +32,13 @@ for (const [name, table] of Object.entries(expectTable)) {
 console.log('\n── business facts the apps used to keep themselves (DECISIONS #44, #49) ──');
 check('leads.items → entity_leads', contracts.contractFor('leads.items')?.table === 'entity_leads');
 check('customers.items → entity_customers', contracts.contractFor('customers.items')?.table === 'entity_customers');
-check('both are on an existing resource (CONTRACT §6 list unchanged)', ['leads.items', 'customers.items'].every((n) => RESOURCES.includes(contracts.contractFor(n).resource)));
+check('both are on the contacts resource (DECISIONS #59)', RESOURCES.includes('contacts') && ['leads.items', 'customers.items'].every((n) => contracts.contractFor(n).resource === 'contacts'));
+const cols = (...names) => names.map((name) => ({ name }));
+check('the registry pins a raw table name to its contract\'s resource before the name rules: entity_leads → contacts, not business', resourceForTable('entity_leads', cols('id', 'entity_slug', 'email')) === 'contacts' && resourceForTable('entity_customers', cols('id', 'entity_slug', 'phone')) === 'contacts');
+check('a table the registry does not name is decided by the name rules as before', resourceForTable('menu_items', cols('id', 'entity_slug', 'item_name')) === 'menu' && resourceForTable('entity_hours', cols('id', 'entity_slug', 'day')) === 'business');
+check('and a table of people the registry does not name reaches no permissioned token', resourceForTable('customer_notes', cols('id', 'entity_slug', 'customer_email')) === null);
+check('the pin changes two raw tables: booking_calendar is availability (its contract\'s), waivers is bookings (was unreachable by name)', resourceForTable('booking_calendar', cols('id', 'entity_slug', 'date')) === 'availability' && resourceForTable('waivers', cols('id', 'entity_slug', 'customer_name')) === 'bookings');
+check('BUSINESS_RESOURCE_TABLES still pins above everything', (() => { process.env.BUSINESS_RESOURCE_TABLES = '{"entity_leads":"menu"}'; const r = resourceForTable('entity_leads', cols('id')); delete process.env.BUSINESS_RESOURCE_TABLES; return r === 'menu'; })());
 check('business.currency → entity.currency, read-only', contracts.contractFor('business.currency')?.table === 'entity' && contracts.contractFor('business.currency').readOnly && contracts.contractFor('business.currency').columns.test('currency'));
 delete process.env.DEFAULT_CURRENCY;
 check('a business with no currency set answers null when no default is configured', contracts.toContractRow(contracts.contractFor('business.currency'), { slug: 's', currency: null }).currency === null);

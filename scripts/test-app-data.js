@@ -278,7 +278,7 @@ async function run() {
         const leadApp = {
             schema_version: 1, id: 'lead-app', name: 'Enquiry Form', version: '1.0.0', publisher: 'test', runtime: { type: 'engine', engine: '1' },
             surfaces: [{ id: 'public', kind: 'public', path: '/public' }],
-            permissions: [{ id: 'business:read', reason: 'r' }, { id: 'business:write', reason: 'w' }],
+            permissions: [{ id: 'contacts:read', reason: 'r' }, { id: 'contacts:write', reason: 'w' }, { id: 'business:read', reason: 'p' }],
             bindings: { leads: { contract: 'leads.items', access: 'read-write', inbox: true }, who: { contract: 'business.profile', access: 'read' } },
             events: { emits: ['lead-app.submitted'] },
             config: [{ key: 'accepting', type: 'boolean', default: true }],
@@ -290,7 +290,7 @@ async function run() {
                 views: { public: [{ type: 'form', source: 'enquiries', openWhen: { setting: 'accepting' } }] },
             },
         };
-        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['business:read', 'business:write'], app: leadApp });
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['contacts:read', 'contacts:write', 'business:read'], app: leadApp });
         events.length = 0;
         const boundSub = await call('POST', '/api/public/apps/app-4/enquiries', { name: 'Sam', email: 'sam@example.test', message: 'Call me', status: 'won', entity_slug: 'other' });
         const lead = (T.entity_leads || []).find((l) => l.name === 'Sam');
@@ -301,8 +301,8 @@ async function run() {
         check('the inbox row follows (binding inbox true)', leadMsg?.channel === 'app' && leadMsg.customer_address === 'sam@example.test' && /^Sam/.test(leadMsg.body), JSON.stringify(leadMsg));
         check('and the declared event, as declared', events.some((e) => e.event === 'lead-app.submitted' && e.payload.record.name === 'Sam' && e.payload.table === 'enquiries'), JSON.stringify(events));
         check('a read-only binding takes no submission', (await call('POST', '/api/public/apps/app-4/profile', { name: 'Hack' })).status === 404);
-        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['business:read'], app: leadApp });
-        check('without the install\'s business:write the submission is refused', (await call('POST', '/api/public/apps/app-4/enquiries', { name: 'Tess' })).status === 403 && !(T.entity_leads || []).some((l) => l.name === 'Tess'));
+        await signed('POST', '/api/nextgent/installs', { companyId: 'co-1', installId: 'app-4', itemKey: 'lead-app', kind: 'app', version: '1.0.0', permissions: ['contacts:read', 'business:read'], app: leadApp });
+        check('without the install\'s contacts:write the submission is refused', (await call('POST', '/api/public/apps/app-4/enquiries', { name: 'Tess' })).status === 403 && !(T.entity_leads || []).some((l) => l.name === 'Tess'));
         check('bad visitor input is refused', (await call('POST', '/api/public/apps/app-1/notes', {})).status === 422);
         const full = await call('POST', '/api/public/apps/app-1/notes', { title: 'Too many' });
         check('a table at APP_DATA_MAX_ROWS_PER_TABLE takes no more', full.status === 409, JSON.stringify(full.body));
