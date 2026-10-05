@@ -131,6 +131,9 @@ async function call(server, method, url, { token, body } = {}) {
 
         r = await call(server, 'POST', '/api/nodes/node-1/requests', { token: 'owner-token', body: { method: 'POST', path: '/sms/out' } });
         check('a path off the allow-list is refused', r.status === 400);
+        r = await call(server, 'POST', '/api/nodes/node-1/requests', { token: 'owner-token', body: { method: 'POST', path: '/remote/session' } });
+        check('the computer serves no /remote/ path, so the queue refuses it (DECISIONS #75)', r.status === 400);
+        check('the allow-list is what the computer enforces: no /remote/', !router.forwardable('/remote/session') && router.forwardable('/actions/x/receipt'));
 
         // Remote view: the viewer gets the token; the queue and the session row hold only its hash.
         process.env.NODE_REMOTE_URL_TEMPLATE = 'https://view.example.test/{node}?t={token}';

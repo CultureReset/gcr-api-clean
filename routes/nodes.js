@@ -28,8 +28,11 @@ const router = express.Router();
 const { TOKEN_PREFIX, hashToken, normalizeUserCode } = pairing;
 const nowIso = () => new Date().toISOString();
 
-// Paths the dashboard may ask a box to serve. The box enforces the same list.
-const FORWARDABLE = ['/health', '/capabilities', '/intent', '/approvals', '/actions/', '/remote/'];
+// Paths the dashboard may ask a box to serve. The box enforces the same list
+// (nextgent-platform link.py ALLOWED_PREFIXES), which has no /remote/: the
+// box side of remote view is not built (DECISIONS #75). GET /:id/remote below
+// still queues its own /remote/session row, kept for when it is.
+const FORWARDABLE = ['/health', '/capabilities', '/intent', '/approvals', '/actions/'];
 const forwardable = (path) =>
     typeof path === 'string' && !path.includes('..') && FORWARDABLE.some((p) => path.startsWith(p));
 
