@@ -33,7 +33,7 @@ const supabase = require('../db');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 const {
     appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
-    sectionSelect, applySection, sectionRow, sectionRows, sectionFor, sectionValues, cleanBody, scopeForPermissions,
+    sectionSelect, applySection, sectionRow, sectionRows, sectionFor, sectionValues, cleanBody, scopeForPermissions, settleExclusive,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
 const businessEvents = require('../lib/businessEvents');
@@ -340,6 +340,7 @@ async function insertBound({ install, bound, body }) {
         .insert({ ...values, [section.slugColumn]: install.entity_slug }) // the business is the install's
         .select().single();
     if (error) throw Object.assign(new Error(error.message), { status: 400 });
+    await settleExclusive(supabase, section, install.entity_slug, data); // one cover per business (DECISIONS #97)
     await businessEvents.sectionWritten(install.entity_slug, section.table, null, data);
     return { row: sectionRow(section, data), table: section.table };
 }

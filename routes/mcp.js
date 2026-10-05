@@ -47,7 +47,7 @@ const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth')
 const {
     getSchema, cleanBody, textColumns,
     canAny, mayUse, tablesFor, normalizePermissions, scopeForPermissions, permitsResource,
-    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, sectionPatchValues, appTables,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, sectionPatchValues, settleExclusive, appTables,
 } = require('../lib/businessTables');
 const dataContracts = require('../lib/dataContracts');
 const appInstances = require('../lib/appInstances');
@@ -643,6 +643,7 @@ async function runTool(name, args, caller) {
                 .select()
                 .single();
             if (error) return toolError(`Could not add to ${table}: ${error.message}`);
+            await settleExclusive(supabase, sec, caller.slug, data); // one cover per business (DECISIONS #97)
             await googlePush.noteTableWrite(caller.slug, table, data);
             // The same events a write through /api/business fires (lib/businessEvents.js; review 01 M12). Never fails the write.
             await businessEvents.sectionWritten(caller.slug, table, null, data);
@@ -674,6 +675,7 @@ async function runTool(name, args, caller) {
             ).select(await sectionSelect(sec));
             if (error) return toolError(`Could not update ${table}: ${error.message}`);
             if (!data?.length) return toolError(`No row ${a.id} in ${table} for this business.`);
+            await settleExclusive(supabase, sec, caller.slug, data[0]);
             await googlePush.noteTableWrite(caller.slug, table, data[0]);
             await businessEvents.sectionWritten(caller.slug, table, before, data[0]);
             return content({ ...named(sec), updated: sectionRow(sec, data[0]) });

@@ -53,7 +53,7 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // a second copy of a security check drifts until one of them has a hole in it.
 const {
     getSchema, cleanBody, tablesFor,
-    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionValues, sectionPatchValues, pivotColumn,
+    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionValues, sectionPatchValues, settleExclusive, pivotColumn,
 } = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
@@ -385,6 +385,8 @@ router.post('/:table', businessCaller, async (req, res) => {
         .single();
     if (error) return fail(res, 400, error.message);
 
+    // One cover photo per business (DECISIONS #97): the registry's exclusive columns.
+    await settleExclusive(supabase, section, req.entitySlug, data);
     // A fact Google shows (hours, menus…) is queued for the profile (lib/googlePush.js).
     await googlePush.noteTableWrite(req.entitySlug, table, data);
     // A booking or a review written here fires the same events the dashboard's
@@ -442,6 +444,7 @@ async function updateRow(req, res, section, id) {
     if (error) return fail(res, 400, error.message);
     if (!data?.length) return fail(res, 404, 'That row is not there.');
 
+    await settleExclusive(supabase, section, req.entitySlug, data[0]);
     await googlePush.noteTableWrite(req.entitySlug, table, data[0]);
     if (EVENTFUL_ON_CHANGE.has(table)) await businessEvents.sectionWritten(req.entitySlug, table, before, data[0]);
     res.json({ ...named(section), row: sectionRow(section, data[0]) });

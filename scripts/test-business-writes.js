@@ -131,6 +131,30 @@ async function run() {
         const ownerSrc = fs.readFileSync(path.join(ROOT, 'routes/owner.js'), 'utf8');
         const dataSrc = fs.readFileSync(path.join(ROOT, 'routes/business-data.js'), 'utf8');
         check('neither route filters the entity columns itself: both call lib/businessTables.js ownerProfilePatch', /ownerProfilePatch/.test(ownerSrc) && /ownerProfilePatch/.test(dataSrc) && !/ownerEditableEntityColumns/.test(ownerSrc));
+
+        console.log('\n── one cover photo per business (DECISIONS #97) ──');
+        T.entity_photos.push({ id: 90, entity_slug: 'other', url: 'https://img.example/theirs.jpg', is_cover: true });
+        const photo = (id) => T.entity_photos.find((p) => p.id === id);
+        r = await call('POST', '/api/business/media.images', { body: { url: 'https://img.example/a.jpg', is_cover: true } });
+        const a = r.body?.row?.id;
+        check('the first photo may be the cover', r.status === 201 && photo(a).is_cover === true, `${r.status} ${JSON.stringify(r.body)}`);
+        r = await call('POST', '/api/business/media.images', { body: { url: 'https://img.example/b.jpg', is_cover: true } });
+        const b = r.body?.row?.id;
+        check('a second cover, through the contract, clears the first in the same request', r.status === 201 && photo(b).is_cover === true && photo(a).is_cover === false, `${r.status} ${JSON.stringify(T.entity_photos)}`);
+        r = await call('POST', '/api/business/entity_photos', { body: { url: 'https://img.example/c.jpg', is_cover: false } });
+        const c = r.body?.row?.id;
+        check('a photo that is not the cover changes nothing else', r.status === 201 && photo(b).is_cover === true && photo(c).is_cover === false);
+        r = await call('PATCH', `/api/business/entity_photos/${c}`, { body: { is_cover: true } });
+        check('setting the cover on the raw table is the same rule: the other is cleared', r.status === 200 && photo(c).is_cover === true && photo(b).is_cover === false && photo(a).is_cover === false, `${r.status} ${JSON.stringify(T.entity_photos)}`);
+        r = await call('PATCH', `/api/business/media.images/${c}`, { body: { caption: 'Front' } });
+        check('an edit that does not touch is_cover leaves the cover alone', r.status === 200 && photo(c).is_cover === true);
+        r = await call('PATCH', `/api/business/media.images/${b}`, { body: { is_cover: false } });
+        check('clearing a cover clears nothing else', r.status === 200 && photo(c).is_cover === true);
+        check('another business\'s cover was never touched', photo(90).is_cover === true);
+        check('the rule is the registry\'s, not a table name in a route: media.images declares is_cover exclusive', JSON.stringify(require(path.join(ROOT, 'lib/dataContracts.js')).contractFor('media.images').exclusive) === '["is_cover"]');
+        const appSrc = fs.readFileSync(path.join(ROOT, 'routes/app-data.js'), 'utf8');
+        const mcpSrc = fs.readFileSync(path.join(ROOT, 'routes/mcp.js'), 'utf8');
+        check('every write door settles it: business-data, app-data (a bound submission) and the MCP', [dataSrc, appSrc, mcpSrc].every((src) => /settleExclusive\(/.test(src)) && !/entity_photos/.test(dataSrc));
     } catch (e) {
         check('no exception', false, e.stack);
     }
