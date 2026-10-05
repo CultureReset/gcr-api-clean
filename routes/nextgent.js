@@ -21,6 +21,10 @@
 //   POST   /installs/:installId/session  a short-lived token for that install
 //                                  (≤ 300 s, the install's permissions)
 //   GET    /entitlement            may this company have this item, and at what price
+//   GET    /business-kinds         linked companies grouped by their business's
+//                                  kind (entity.entity_type), for the store's
+//                                  "by kind" audience (DECISIONS #32): the kind
+//                                  lives here, Paperclip keeps no copy
 //   POST   /unlink                 the business leaves (export first if asked)
 //   POST   /usage                  AI spend from LiteLLM, per company and period
 //                                  (refused while LITELLM_USAGE_PULL is on, the
@@ -255,6 +259,33 @@ router.get('/entitlement', async (req, res) => {
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }
+});
+
+/* ── GET /business-kinds ──────────────────────────────────────────────── */
+
+// Every linked company, grouped by its business's entity_type as stored:
+// [{ key, count, companyIds }], most companies first. A business with no
+// kind is left out; there is nothing to target it by.
+router.get('/business-kinds', async (req, res) => {
+    const { data: links, error } = await supabase.from('company_links').select('company_id, entity_slug');
+    if (error) return fail(res, 500, error.message);
+    const slugs = [...new Set((links || []).map((l) => l.entity_slug).filter(Boolean))];
+    const { data: entities, error: entityError } = slugs.length
+        ? await supabase.from('entity').select('slug, entity_type').in('slug', slugs)
+        : { data: [], error: null };
+    if (entityError) return fail(res, 500, entityError.message);
+    const kindOf = new Map((entities || []).map((e) => [e.slug, str(e.entity_type)]));
+    const groups = new Map();
+    for (const l of links || []) {
+        const key = kindOf.get(l.entity_slug);
+        if (!key) continue;
+        if (!groups.has(key)) groups.set(key, new Set());
+        groups.get(key).add(String(l.company_id));
+    }
+    const out = [...groups].map(([key, ids]) => ({ key, count: ids.size, companyIds: [...ids].sort() }))
+        .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
 });
 
 /**

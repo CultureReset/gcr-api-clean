@@ -40,7 +40,7 @@ delete process.env.STRIPE_USAGE_METER_EVENT;
 /* ── an in-memory database ────────────────────────────────────────────── */
 const T = {
     entity: [
-        { slug: 'listed-cafe', name: 'Listed Cafe', phone: '+15550102030', email: 'cafe@example.test', is_active: true },
+        { slug: 'listed-cafe', name: 'Listed Cafe', entity_type: 'restaurant', phone: '+15550102030', email: 'cafe@example.test', is_active: true },
         { slug: 'landline-inn', name: 'Landline Inn', phone: '+15550102040', is_active: true },
         { slug: 'owned-bar', name: 'Owned Bar', phone: '+15550102050', is_active: true },
     ],
@@ -492,6 +492,19 @@ async function run() {
         check('a listing that already has an owner goes to review', owned.status === 202 && owned.body.status === 'review');
         const reviewRow = T.business_claims.find((c) => c.entity_slug === 'owned-bar');
         check('filed in business_claims with who asked', reviewRow?.paperclip_company_id === 'co-owned' && reviewRow.status === 'new');
+
+        console.log('\n── business kinds (store audiences, DECISIONS #32) ──');
+        // Linked now: co-new -> new-taco-shop (restaurant), co-claim -> listed-cafe
+        // (restaurant). A link to a business with no kind is left out.
+        const untyped = { company_id: 'co-untyped', entity_slug: 'landline-inn' };
+        T.company_links.push(untyped);
+        const unsignedKinds = await signed('GET', '/api/nextgent/business-kinds', undefined, { sign: false });
+        check('business kinds must be asked for with a signature', unsignedKinds.status === 401);
+        const kinds = await signed('GET', '/api/nextgent/business-kinds');
+        check('linked companies are grouped by their business\'s entity_type, with their ids',
+            kinds.status === 200 && JSON.stringify(kinds.body) === JSON.stringify([{ key: 'restaurant', count: 2, companyIds: ['co-claim', 'co-new'] }]), JSON.stringify(kinds.body));
+        check('a linked business with no kind is left out', !JSON.stringify(kinds.body).includes('co-untyped'));
+        T.company_links.splice(T.company_links.indexOf(untyped), 1);
 
         console.log('\n── owner notifications ──');
         const { notifyOwner } = require(path.join(ROOT, 'lib/notify.js'));
