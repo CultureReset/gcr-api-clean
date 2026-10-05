@@ -390,6 +390,11 @@ async function run() {
         const notProd = await asUser('PATCH', '/api/business/products.items/11', { name: 'Renamed' }, prodTok);
         check('a row of another kind is out of reach through the contract', notProd.status === 404 && T.offerings.find((o) => o.id === 11).name === 'Catering', JSON.stringify(notProd.body));
         check('the raw table still works', (await asUser('GET', '/api/business/offerings', undefined, prodTok)).body.rows?.length === 3);
+        const listings = await asUser('GET', '/api/business/listings.items', undefined, prodTok);
+        check('listings.items reads every offering of the business, kind unfiltered (DECISIONS #62)', listings.status === 200 && listings.body.table === 'offerings' && listings.body.rows.length === 3 && listings.body.rows.some((r) => r.kind === 'service'), JSON.stringify(listings.body));
+        const listed = await asUser('POST', '/api/business/listings.items', { name: 'Condo 4B', kind: 'room' }, prodTok);
+        check('a listing keeps the kind the app sent', listed.status === 201 && T.offerings.find((o) => o.name === 'Condo 4B')?.kind === 'room' && T.offerings.find((o) => o.name === 'Condo 4B').entity_slug === 'new-taco-shop', JSON.stringify(listed.body));
+        T.offerings = T.offerings.filter((o) => o.name !== 'Condo 4B');
         check('menu.items needs menu, not business', (await asUser('GET', '/api/business/menu.items', undefined, prodTok)).status === 403);
         const viaMenu = await asUser('GET', '/api/business/menu.items', undefined, appTok);
         check('menu:read reads menu.items', viaMenu.status === 200 && viaMenu.body.rows.length === 1 && viaMenu.body.table === 'menu_items', JSON.stringify(viaMenu.body));

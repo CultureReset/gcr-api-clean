@@ -62,6 +62,7 @@ check('both files are in sql/ORDER.md', order.includes('nextgent_business_contac
 check('the registry names faqs canonical and entity_faqs legacy', /faqs[\s\S]{0,120}canonical[\s\S]{0,200}entity_faqs[\s\S]{0,80}legacy/.test(fs.readFileSync(path.join(ROOT, 'lib/dataContracts.js'), 'utf8')));
 check('lib/businessEvents.js says bookings is canonical, booking_calendar the mirror', /`?bookings`? is (the )?canonical/.test(fs.readFileSync(path.join(ROOT, 'lib/businessEvents.js'), 'utf8')) && !/Bookings live in booking_calendar/.test(fs.readFileSync(path.join(ROOT, 'lib/businessEvents.js'), 'utf8')));
 
+check('listings.items → offerings with no fixed kind (DECISIONS #62): kind is a column the app filters on', contracts.contractFor('listings.items')?.table === 'offerings' && Object.keys(contracts.contractFor('listings.items').filter).length === 0 && contracts.contractFor('listings.items').resource === 'business');
 check('products.items is offerings kind=product, server-side', contracts.contractFor('products.items').filter.kind === 'product');
 check('every offerings kind has a products.<kind> contract', Object.values(contracts.OFFERING_KINDS).every((k) => contracts.contractFor(`products.${k}`)?.filter.kind === k));
 check('every contract names a known resource', contracts.contractNames().every((n) => RESOURCES.includes(contracts.contractFor(n).resource)),
