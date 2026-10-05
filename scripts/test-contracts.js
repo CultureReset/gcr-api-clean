@@ -69,6 +69,13 @@ check('every contract names a known resource', contracts.contractNames().every((
     contracts.contractNames().filter((n) => !RESOURCES.includes(contracts.contractFor(n).resource)).join(','));
 check('the business record is keyed by slug and read-only through contracts', contracts.contractFor('business.profile').slugColumn === 'slug' && contracts.contractFor('business.profile').readOnly);
 check('business.links is a column rule over entity, not a list of networks', contracts.contractFor('business.links').columns instanceof RegExp && contracts.contractFor('business.links').columns.test('social_anything'));
+const linksEntry = contracts.contractFor('business.links');
+const entityCols = ['id', 'slug', 'name', 'social_instagram', 'social_facebook', 'website_url', 'email'];
+check('business.links pivots the record into rows (DECISIONS #63), writable', !!linksEntry.pivot && !linksEntry.readOnly);
+check('rows: one per set link column, { id, network, url }', JSON.stringify(contracts.pivotRows(linksEntry, { slug: 's', social_instagram: 'ig', social_facebook: null, website_url: 'w', email: 'e' }, entityCols))
+    === JSON.stringify([{ id: 'instagram', network: 'instagram', url: 'ig' }, { id: 'website', network: 'website', url: 'w' }]));
+check('a row id maps back to its column: instagram → social_instagram, website → website_url', contracts.pivotColumnFor(linksEntry, 'instagram', entityCols) === 'social_instagram' && contracts.pivotColumnFor(linksEntry, 'website', entityCols) === 'website_url');
+check('an id with no such column, or a column of something else, maps to nothing', contracts.pivotColumnFor(linksEntry, 'myspace', entityCols) === null && contracts.pivotColumnFor(linksEntry, 'email', entityCols) === null && contracts.pivotColumnFor(linksEntry, 'name', entityCols) === null);
 check('a raw table name is not a contract', !contracts.isContractName('menu_items') && contracts.contractFor('menu_items') === null);
 check('an unknown dotted name is not a contract', contracts.contractFor('nope.items') === null);
 check('a prototype name is not a contract', contracts.contractFor('constructor.x') === null);

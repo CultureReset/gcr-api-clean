@@ -28,7 +28,7 @@ Object.assign(process.env, {
 });
 
 const { T, db } = createMemDb({ tables: {
-    entity: [{ slug: 'shop', name: 'Shop', entity_type: 'cafe' }, { slug: 'other', name: 'Other', entity_type: 'bar' }],
+    entity: [{ slug: 'shop', name: 'Shop', entity_type: 'cafe', social_instagram: 'https://instagram.com/shop', email: 'o@shop.test' }, { slug: 'other', name: 'Other', entity_type: 'bar' }],
     company_links: [{ company_id: 'co-1', entity_slug: 'shop' }, { company_id: 'co-2', entity_slug: 'other' }],
     business_mcp_tokens: [],
     nextgent_installs: [],
@@ -72,7 +72,7 @@ globalThis.fetch = async (url, init) => {
             bookings: def(['id', 'entity_slug', 'customer_name']),
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
             entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
-            entity: def(['id', 'slug', 'name']),
+            entity: def(['id', 'slug', 'name', 'email', 'social_instagram', 'website_url']),
             app_records: def(['id', 'entity_slug', 'data']),
         } }) };
     }
@@ -124,6 +124,7 @@ function manifest(over = {}) {
                 // Bound by contract (DECISIONS #45): the registry names the table and the filter.
                 products: { from: 'business', contract: 'products.items', resource: 'business', fields: [{ key: 'name', type: 'text' }], title: 'name' },
                 records: { from: 'business', contract: 'booking.records', resource: 'bookings', fields: [{ key: 'customer_name', type: 'text' }], title: 'customer_name' },
+                links: { from: 'business', contract: 'business.links', resource: 'business', fields: [{ key: 'network', type: 'text' }, { key: 'url', type: 'url' }], title: 'network' },
             },
             views: {
                 owner: [{ type: 'collection', source: 'notes' }, { type: 'collection', source: 'memos' }],
@@ -134,6 +135,7 @@ function manifest(over = {}) {
                     { type: 'list', source: 'memos', fields: { title: 'memo' } },
                     { type: 'list', source: 'products', fields: { title: 'name' } },
                     { type: 'list', source: 'records', fields: { title: 'customer_name' } },
+                    { type: 'links', source: 'links', fields: { title: 'network', url: 'url' } },
                     { type: 'form', source: 'notes', intro: { setting: 'intro' }, openWhen: { setting: 'open' } },
                     { type: 'form', source: 'enquiries' },
                 ],
@@ -243,6 +245,7 @@ async function run() {
         const contractPub = await call('GET', '/api/public/apps/app-3');
         check('a public contract source: the registry\'s table and filter, this business only', contractPub.status === 200 && contractPub.body.data.products?.length === 1 && contractPub.body.data.products[0].name === 'Mug', JSON.stringify(contractPub.body.data));
         check('a contract over a table of people is never public, whatever the permission', !('records' in contractPub.body.data));
+        check('business.links on a public page: rows { id, network, url } from the record\'s link columns (DECISIONS #63)', contractPub.body.data.links?.length === 1 && contractPub.body.data.links[0].network === 'instagram' && contractPub.body.data.links[0].url === 'https://instagram.com/shop' && !('email' in contractPub.body.data.links[0]), JSON.stringify(contractPub.body.data.links));
 
         events.length = 0;
         const sub = await call('POST', '/api/public/apps/app-1/notes', { title: 'From a visitor', flag: 'set-by-visitor' });

@@ -198,7 +198,7 @@ globalThis.fetch = async (url, init) => {
             offerings: def(['id', 'entity_slug', 'kind', 'name']),
             entity_leads: def(['id', 'entity_slug', 'name', 'email', 'phone', 'message', 'source', 'status']),
             // The business record: keyed by slug, so not a section; its columns back business.* contracts.
-            entity: def(['id', 'slug', 'name', 'phone', 'website_url', 'social_instagram', 'stripe_customer_id', 'currency']),
+            entity: def(['id', 'slug', 'name', 'phone', 'website_url', 'social_instagram', 'social_facebook', 'stripe_customer_id', 'currency']),
             business_mcp_tokens: def(['id', 'entity_slug', 'token_hash']),
         } };
         return { ok: true, status: 200, json: async () => spec };
@@ -419,8 +419,25 @@ async function run() {
         check('a set currency wins', (await asUser('GET', '/api/business/business.currency', undefined, prodTok)).body.value === 'eur');
         delete process.env.DEFAULT_CURRENCY;
         check('the dotted name arrives as one path segment, URL-encoded or not', (await asUser('GET', '/api/business/' + encodeURIComponent('business.currency'), undefined, prodTok)).body.value === 'eur');
+        console.log('\n── business.links: rows from the business record\'s link columns (DECISIONS #63) ──');
+        const taco = T.entity.find((e) => e.slug === 'new-taco-shop');
+        taco.social_instagram = 'https://instagram.com/taco';
+        taco.website_url = 'https://taco.example';
         const links = await asUser('GET', '/api/business/business.links', undefined, prodTok);
-        check('business.links reads the business record by its slug', links.status === 200 && links.body.table === 'entity' && links.body.rows.length === 1 && links.body.rows[0].slug === 'new-taco-shop', JSON.stringify(links.body));
+        check('rows [{ id, network, url }], one per set link column; website_url is network website', links.status === 200 && links.body.table === 'entity' && links.body.rows.length === 2
+            && links.body.rows.some((r) => r.id === 'instagram' && r.network === 'instagram' && r.url === 'https://instagram.com/taco')
+            && links.body.rows.some((r) => r.id === 'website' && r.network === 'website' && r.url === 'https://taco.example'), JSON.stringify(links.body));
+        check('nothing else of the business record leaks into a row', links.body.rows.every((r) => Object.keys(r).sort().join(',') === 'id,network,url'));
+        const addLink = await asUser('POST', '/api/business/business.links', { network: 'facebook', url: 'https://facebook.com/taco', slug: 'listed-cafe' }, prodTok);
+        check('a new row maps back to its column on this business', addLink.status === 201 && addLink.body.row?.id === 'facebook' && taco.social_facebook === 'https://facebook.com/taco' && T.entity.find((e) => e.slug === 'listed-cafe').social_facebook === undefined, JSON.stringify(addLink.body));
+        const editLink = await asUser('PATCH', '/api/business/business.links/website', { url: 'https://tacos.example' }, prodTok);
+        check('a row is changed by its network', editLink.status === 200 && taco.website_url === 'https://tacos.example', JSON.stringify(editLink.body));
+        const dropLink = await asUser('DELETE', '/api/business/business.links/instagram', undefined, prodTok);
+        check('deleting a row clears the column', dropLink.status === 200 && dropLink.body.deleted === 'instagram' && taco.social_instagram === null, JSON.stringify(dropLink.body));
+        check('a network the business record has no column for is refused', (await asUser('POST', '/api/business/business.links', { network: 'myspace', url: 'https://x' }, prodTok)).status === 400);
+        check('and so is a row id that is a column of something else', (await asUser('PATCH', '/api/business/business.links/stripe_customer_id', { url: 'x' }, prodTok)).status === 404);
+        check('menu:read may not read the links, nor write them', (await asUser('GET', '/api/business/business.links', undefined, appTok)).status === 403 && (await asUser('POST', '/api/business/business.links', { network: 'facebook', url: 'x' }, appTok)).status === 403);
+        taco.social_facebook = null; taco.website_url = null;
 
         console.log('\n── short-lived install tokens ──');
         const unsignedSess = await signed('POST', '/api/nextgent/installs/in-1/session', {}, { sign: false });

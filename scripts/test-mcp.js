@@ -189,6 +189,7 @@ const schemaStub = {
     sectionSelect: async () => '*',
     applySection: realTables.applySection,
     sectionRow: realTables.sectionRow,
+    sectionRows: async (section, rows) => (rows || []).map((r) => realTables.sectionRow(section, r)),
     sectionValues: realTables.sectionValues,
     // The app data space is the manifest's, not the schema's: the real rules apply as they are.
     appTables: realTables.appTables,

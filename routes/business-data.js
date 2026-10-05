@@ -53,7 +53,7 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // a second copy of a security check drifts until one of them has a hole in it.
 const {
     getSchema, cleanBody, tablesFor,
-    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionValues,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, pivotColumn,
 } = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 
@@ -312,11 +312,39 @@ router.get('/:table', businessCaller, async (req, res) => {
     ).range(offset, offset + limit - 1);
     if (error) return fail(res, 500, error.message);
 
-    const rows = (data || []).map((r) => sectionRow(section, r));
+    const rows = await sectionRows(section, data);
     // A scalar contract (business.currency) is one value of the business (DECISIONS #56).
     if (section.scalar) return res.json({ ...named(section), value: rows[0]?.[section.scalar] ?? null });
+    // A pivot contract (business.links) has as many rows as set columns (DECISIONS #63).
+    if (section.pivot) return res.json({ ...named(section), rows, total: rows.length, limit, offset });
     res.json({ ...named(section), rows, total: count ?? null, limit, offset });
 });
+
+/* ── a pivot contract's writes (business.links, DECISIONS #63) ─────────────
+ *
+ * A row is one column of the business record: POST { network, url } sets the
+ * column the network names, PATCH /:id { url } changes it, DELETE /:id clears
+ * it. The column must be live and must be one the pivot rule yields — a row
+ * id can never name another column of the record. The slug is the caller's.
+ */
+async function writePivot(req, res, section, id, value, { create = false } = {}) {
+    const column = await pivotColumn(section, id);
+    if (!column) return fail(res, create ? 400 : 404, create ? `The business record has no ${section.pivot.key} called "${id}".` : 'That row is not there.');
+    const { data, error } = await applySection(
+        supabase.from(section.table).update({ [column]: value }), section, req.entitySlug,
+    ).select(`${section.slugColumn}, ${column}`);
+    if (error) return fail(res, 400, error.message);
+    if (!data?.length) return fail(res, 404, 'That row is not there.');
+    await googlePush.noteTableWrite(req.entitySlug, section.table, data[0]);
+    const row = { id, [section.pivot.key]: id, [section.pivot.value]: value };
+    if (value === null) return res.json({ ...named(section), deleted: id });
+    res.status(create ? 201 : 200).json({ ...named(section), row });
+}
+
+const pivotValue = (section, body) => {
+    const v = body && typeof body === 'object' ? body[section.pivot.value] : undefined;
+    return typeof v === 'string' && v.trim() ? v.trim() : null;
+};
 
 /* ── the three writes ─────────────────────────────────────────────────────
  *
@@ -329,6 +357,13 @@ router.post('/:table', businessCaller, async (req, res) => {
     const section = await sectionFor(req, res, 'write');
     if (!section) return;
     const { table } = section;
+
+    if (section.pivot) {
+        const id = req.body && typeof req.body === 'object' ? req.body[section.pivot.key] : undefined;
+        const value = pivotValue(section, req.body);
+        if (!value) return fail(res, 400, `A ${section.pivot.value} is required.`);
+        return writePivot(req, res, section, String(id || ''), value, { create: true });
+    }
 
     // The contract's filter columns are stamped after the body is cleaned, so a
     // products.items write is a product whatever `kind` the body carried.
@@ -357,6 +392,12 @@ router.patch('/:table/:id', businessCaller, async (req, res) => {
     const section = await sectionFor(req, res, 'write');
     if (!section) return;
     const { table } = section;
+
+    if (section.pivot) {
+        const value = pivotValue(section, req.body);
+        if (!value) return fail(res, 400, 'Nothing to change.');
+        return writePivot(req, res, section, req.params.id, value);
+    }
 
     const values = await cleanBody(table, sectionValues(section, req.body));
     for (const column of Object.keys(section.filter || {})) delete values[column]; // a row cannot leave its contract
@@ -387,6 +428,8 @@ router.delete('/:table/:id', businessCaller, async (req, res) => {
     const section = await sectionFor(req, res, 'write');
     if (!section) return;
     const { table } = section;
+
+    if (section.pivot) return writePivot(req, res, section, req.params.id, null);
 
     const { data, error } = await applySection(
         supabase.from(table).delete().eq(section.idColumn, req.params.id),

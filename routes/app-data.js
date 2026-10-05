@@ -33,7 +33,7 @@ const supabase = require('../db');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
 const {
     appTableFor, cleanAppRecord, appRecordRow, ownerOnlyColumns, publicSectionFor, scrubPublic,
-    sectionSelect, applySection, sectionRow, sectionFor, sectionValues, cleanBody, scopeForPermissions,
+    sectionSelect, applySection, sectionRow, sectionRows, sectionFor, sectionValues, cleanBody, scopeForPermissions,
 } = require('../lib/businessTables');
 const appInstances = require('../lib/appInstances');
 const businessEvents = require('../lib/businessEvents');
@@ -311,7 +311,7 @@ publicRouter.get('/:installId', async (req, res) => {
                     supabase.from(section.table).select(await sectionSelect(section)), section, install.entity_slug,
                 ).limit(limit);
                 if (error) throw new Error(error.message);
-                data[key] = visibleRows((rows || []).map((r) => sectionRow(section, r)), source, strip);
+                data[key] = visibleRows(await sectionRows(section, rows), source, strip);
             }
         }
         res.set('Cache-Control', `public, max-age=${envInt('APP_PUBLIC_CACHE_SECONDS', 30, { min: 0 })}`);

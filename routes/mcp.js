@@ -47,7 +47,7 @@ const { ownerRequired, resolveSessionSlug } = require('../middleware/ownerAuth')
 const {
     getSchema, cleanBody, textColumns,
     canAny, mayUse, tablesFor, normalizePermissions, scopeForPermissions, permitsResource,
-    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionValues, appTables,
+    sectionNamed, sectionPermitted, sectionSelect, applySection, sectionRow, sectionRows, sectionValues, appTables,
 } = require('../lib/businessTables');
 const dataContracts = require('../lib/dataContracts');
 const appInstances = require('../lib/appInstances');
@@ -591,10 +591,11 @@ async function runTool(name, args, caller) {
             const { data, error, count } = await query;
             if (error) return toolError(`Could not read ${table}: ${error.message}`);
 
+            const rows = await sectionRows(sec, data);
             return content({
                 ...named(sec),
-                rows: (data || []).map((r) => sectionRow(sec, r)),
-                returned: (data || []).length,
+                rows,
+                returned: rows.length,
                 total_matching: count ?? null,
                 limit,
                 offset,
@@ -604,6 +605,7 @@ async function runTool(name, args, caller) {
         case 'create_row': {
             const sec = await section(a.section, caller, 'write');
             const { table } = sec;
+            if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
             const values = await cleanBody(table, sectionValues(sec, a.values));
             if (!Object.keys(values).length) {
                 return toolError('No usable columns in values. Call describe_section to see what this section accepts.');
@@ -624,6 +626,7 @@ async function runTool(name, args, caller) {
         case 'update_row': {
             const sec = await section(a.section, caller, 'write');
             const { table } = sec;
+            if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
             const values = await cleanBody(table, sectionValues(sec, a.values));
             for (const column of Object.keys(sec.filter || {})) delete values[column]; // a row cannot leave its contract
@@ -643,6 +646,7 @@ async function runTool(name, args, caller) {
         case 'delete_row': {
             const sec = await section(a.section, caller, 'write');
             const { table } = sec;
+            if (sec.pivot) return toolError(`${sec.contract} is edited one link at a time through the business data routes, not here.`);
             if (a.id === undefined || a.id === null || a.id === '') return toolError('An id is required.');
             const { data, error } = await applySection(
                 supabase.from(table).delete().eq(sec.idColumn, a.id),
