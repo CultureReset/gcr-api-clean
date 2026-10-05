@@ -30,6 +30,14 @@ const { T, db } = createMemDb({ tables: {
     entity_photos: [],
     menu_items: [],
 } });
+// Storage, recorded: the same client the entity_photos uploads use (db.storage).
+const uploads = [];
+db.storage = {
+    from: (bucket) => ({
+        upload: async (p, buffer, opts) => { uploads.push({ bucket, path: p, bytes: buffer.length, contentType: opts?.contentType }); return { data: { path: p }, error: null }; },
+        getPublicUrl: (p) => ({ data: { publicUrl: `https://files.example.test/${bucket}/${p}` } }),
+    }),
+};
 inject(path.join(ROOT, 'db.js'), db);
 
 // The owner's session: req.entitySlug from the credential, never the request.
@@ -154,7 +162,8 @@ async function run() {
         check('the rule is the registry\'s, not a table name in a route: media.images declares is_cover exclusive', JSON.stringify(require(path.join(ROOT, 'lib/dataContracts.js')).contractFor('media.images').exclusive) === '["is_cover"]');
         const appSrc = fs.readFileSync(path.join(ROOT, 'routes/app-data.js'), 'utf8');
         const mcpSrc = fs.readFileSync(path.join(ROOT, 'routes/mcp.js'), 'utf8');
-        check('every write door settles it: business-data, app-data (a bound submission) and the MCP', [dataSrc, appSrc, mcpSrc].every((src) => /settleExclusive\(/.test(src)) && !/entity_photos/.test(dataSrc));
+        const code = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''); // comments may name tables; code may not
+        check('every write door settles it: business-data, app-data (a bound submission) and the MCP', [dataSrc, appSrc, mcpSrc].every((src) => /settleExclusive\(/.test(src)) && !/entity_photos/.test(code(dataSrc)));
 
         console.log('\n── menu.items.tags: a comma-separated string in, the array out (DECISIONS #98) ──');
         const contracts = require(path.join(ROOT, 'lib/dataContracts.js'));
@@ -173,6 +182,42 @@ async function run() {
         check('the raw table name is the same door: split too', r.status === 201 && JSON.stringify(T.menu_items.find((m) => m.name === 'Po-boy').tags) === '["lunch","sandwich"]', `${r.status} ${JSON.stringify(r.body)}`);
         r = await call('PATCH', `/api/business/menu.items/${gumbo.id}`, { body: { tags: 7 } });
         check('a value that is neither is refused, naming the column', r.status === 400 && /tags/.test(r.body.error) && gumbo.tags === null, `${r.status} ${JSON.stringify(r.body)}`);
+
+        console.log('\n── POST /api/business/media/upload (DECISIONS #99) ──');
+        const photosBefore = T.entity_photos.length;
+        async function send(file, { token, field = 'file' } = {}) {
+            const form = new FormData();
+            if (file) form.append(field, new Blob([file.bytes], { type: file.type }), file.name);
+            const res = await fetch(url('/api/business/media/upload'), { method: 'POST', headers: token ? { authorization: `Bearer ${token}` } : {}, body: form });
+            return { status: res.status, body: await res.json().catch(() => null) };
+        }
+        const png = { bytes: Buffer.from('89504e470d0a1a0a', 'hex'), type: 'image/png', name: 'front.png' };
+        delete process.env.MEDIA_UPLOAD_BUCKET;
+        delete process.env.MEDIA_UPLOAD_MAX_BYTES;
+        r = await send(png);
+        check('without MEDIA_UPLOAD_BUCKET the route answers 503 naming it, and stores nothing', r.status === 503 && /MEDIA_UPLOAD_BUCKET/.test(r.body.error) && uploads.length === 0, `${r.status} ${JSON.stringify(r.body)}`);
+        process.env.MEDIA_UPLOAD_BUCKET = 'photos-bucket';
+        r = await send(png);
+        check('without MEDIA_UPLOAD_MAX_BYTES too', r.status === 503 && /MEDIA_UPLOAD_MAX_BYTES/.test(r.body.error) && uploads.length === 0, `${r.status} ${JSON.stringify(r.body)}`);
+        process.env.MEDIA_UPLOAD_MAX_BYTES = '64';
+        r = await send(png);
+        check('the owner uploads an image: { url, image_path }', r.status === 200 && typeof r.body.url === 'string' && typeof r.body.image_path === 'string' && Object.keys(r.body).sort().join(',') === 'image_path,url', `${r.status} ${JSON.stringify(r.body)}`);
+        check('stored through the storage client, in the configured bucket, under this business\'s slug', uploads.length === 1 && uploads[0].bucket === 'photos-bucket' && uploads[0].path.startsWith('shop/') && uploads[0].path.endsWith('.png') && uploads[0].contentType === 'image/png' && uploads[0].bytes === png.bytes.length, JSON.stringify(uploads));
+        check('the url is the bucket\'s public url of that path', r.body.url === `https://files.example.test/photos-bucket/${r.body.image_path}` && r.body.image_path === uploads[0].path, JSON.stringify(r.body));
+        check('no entity_photos row is created: the app POSTs media.images with the url', T.entity_photos.length === photosBefore);
+        r = await send({ bytes: Buffer.from('%PDF-1.4'), type: 'application/pdf', name: 'menu.pdf' });
+        check('only images: a PDF is 400', r.status === 400 && /image/i.test(r.body.error) && uploads.length === 1, `${r.status} ${JSON.stringify(r.body)}`);
+        r = await send({ bytes: Buffer.alloc(65, 1), type: 'image/jpeg', name: 'big.jpg' });
+        check('over MEDIA_UPLOAD_MAX_BYTES is 413', r.status === 413 && uploads.length === 1, `${r.status} ${JSON.stringify(r.body)}`);
+        r = await send(null);
+        check('no file is 400', r.status === 400 && uploads.length === 1, `${r.status} ${JSON.stringify(r.body)}`);
+        r = await send(png, { field: 'image' });
+        check('the field is `file`', r.status === 400 && uploads.length === 1, `${r.status} ${JSON.stringify(r.body)}`);
+        r = await send(png, { token: 'gcr_mcp_writer' });
+        check('an install token with business:write may upload', r.status === 200 && uploads.length === 2 && uploads[1].path.startsWith('shop/'), `${r.status} ${JSON.stringify(r.body)}`);
+        r = await send(png, { token: 'gcr_mcp_reader' });
+        check('business:read may not', r.status === 403 && uploads.length === 2, `${r.status} ${JSON.stringify(r.body)}`);
+        check('no bucket name or storage host is written into the route', !/entity-photos|supabase\.co|entity-media/.test(code(dataSrc)));
     } catch (e) {
         check('no exception', false, e.stack);
     }

@@ -42,6 +42,8 @@
 // silently returned nothing to the browser — visible again.
 
 const express = require('express');
+const multer = require('multer');
+const crypto = require('crypto');
 const supabase = require('../db');
 const googlePush = require('../lib/googlePush');
 const businessEvents = require('../lib/businessEvents');
@@ -53,9 +55,10 @@ const { ownerRequired, sessionRequired } = require('../middleware/ownerAuth');
 // a second copy of a security check drifts until one of them has a hole in it.
 const {
     getSchema, tablesFor,
-    sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionInsertValues, sectionPatchValues, settleExclusive, pivotColumn,
+    permitsResource, sectionNamed, sectionPermitted, sectionSelect, sectionColumns, applySection, orderSection, sectionRow, sectionRows, sectionInsertValues, sectionPatchValues, settleExclusive, pivotColumn,
 } = require('../lib/businessTables');
 const { isBusinessToken, lookupToken } = require('../lib/businessTokens');
+const { envStr, envInt } = require('../lib/env');
 
 const router = express.Router();
 
@@ -294,6 +297,49 @@ router.get('/industries', ownerRequired, async (req, res) => {
 
     industryCache = { industries, at: Date.now() };
     res.json({ industries });
+});
+
+/* ── an image file, into storage (DECISIONS #99) ──────────────────────────
+ *
+ * POST /api/business/media/upload — multipart, one `file`, an image. The owner's
+ * session or an install token with business:write (the resource media.images
+ * is on). The file goes where the business's photos already go: the same
+ * storage client (db.js) and the bucket named by MEDIA_UPLOAD_BUCKET, under
+ * the credential's slug. Answers { url, image_path } and writes no
+ * entity_photos row — the app then POSTs media.images with the url, so the
+ * photo's record is made through the one door every other record uses.
+ *
+ * The cap is MEDIA_UPLOAD_MAX_BYTES. Neither is defaulted here: unset, the
+ * route answers 503 naming what is missing, as the export does.
+ */
+const mediaUpload = (req, res, next) => {
+    const max = envInt('MEDIA_UPLOAD_MAX_BYTES', null);
+    if (!envStr('MEDIA_UPLOAD_BUCKET')) return fail(res, 503, 'MEDIA_UPLOAD_BUCKET is not set, so there is nowhere to put the file.');
+    if (!max) return fail(res, 503, 'MEDIA_UPLOAD_MAX_BYTES is not set, so no size cap applies; refusing rather than guessing.');
+    const single = multer({
+        storage: multer.memoryStorage(),
+        limits: { fileSize: max, files: 1 },
+        fileFilter: (_req, file, cb) => (/^image\//.test(file.mimetype || '') ? cb(null, true) : cb(Object.assign(new Error('Only an image can be uploaded here.'), { status: 400 }))),
+    }).single('file');
+    single(req, res, (err) => {
+        if (!err) return next();
+        if (err instanceof multer.MulterError) return fail(res, err.code === 'LIMIT_FILE_SIZE' ? 413 : 400, err.code === 'LIMIT_FILE_SIZE' ? `The file is over ${max} bytes.` : err.message);
+        fail(res, err.status || 400, err.message);
+    });
+};
+
+router.post('/media/upload', businessCaller, (req, res, next) => {
+    if (!permitsResource(req.businessCaller, 'business', 'write')) return fail(res, 403, 'This connection is not allowed to upload media.');
+    next();
+}, mediaUpload, async (req, res) => {
+    if (!req.file) return fail(res, 400, 'Send one image as the `file` field.');
+    const bucket = envStr('MEDIA_UPLOAD_BUCKET');
+    const ext = (req.file.mimetype.split('/')[1] || 'bin').replace('jpeg', 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'bin';
+    const imagePath = `${req.entitySlug}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`; // the slug is the credential's
+    const { error } = await supabase.storage.from(bucket).upload(imagePath, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (error) return fail(res, 502, `Storage refused the file: ${error.message}`);
+    const { data } = supabase.storage.from(bucket).getPublicUrl(imagePath);
+    res.json({ url: data.publicUrl, image_path: imagePath });
 });
 
 /* ── one section, for refreshing after an edit ───────────────────────────── */
