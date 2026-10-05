@@ -75,6 +75,7 @@ async function run() {
             && p.headers['x-nextgent-signature'] === crypto.createHmac('sha256', SECRET).update(`${ts}\n${nonce}\nPOST\n/api/nextgent/receipts\n\n${bodyHash}`).digest('hex'));
         check('against the instruction\'s task, with the receipt fields', body.companyId === 'co-1' && body.taskId === 'task-42' && body.action === 'sms.send'
             && body.target === '+15550001111' && body.newValue === 'table ready' && body.verified === true && body.device === 'Front desk' && body.evidence.screenshot === 'sha256:abc', JSON.stringify(body));
+        check('a receipt without a capability posts none', !('capability' in body), JSON.stringify(body));
         check('marked posted, never twice', !!T.ghost_node_requests[1].receipt_posted_at);
         await call('POST', `/api/nodes/requests/${req2.id}/response`, { status: 200, body: { action: 'sms.send', verified: true } }, NODE_TOKEN);
         check('a repeated answer does not post again', posted.length === 1);
@@ -103,6 +104,7 @@ async function run() {
         const lateBody = JSON.parse(posted[1]?.body || '{}');
         check('posted to Paperclip against its task', posted.length === 2 && lateBody.companyId === 'co-1' && lateBody.taskId === 'task-77' && lateBody.verified === true && lateBody.action === 'maps.update_hours', JSON.stringify(lateBody));
         check('a receipt with no target falls back to its capability (DECISIONS #79)', lateBody.target === 'maps.update_hours' && !!synthetic.receipt_posted_at);
+        check('the capability is forwarded as its own field', lateBody.capability === 'maps.update_hours', JSON.stringify(lateBody));
         const again = await call('POST', '/api/nodes/receipts', { receipts: [late] }, NODE_TOKEN);
         check('the same action pushed again is a duplicate: no new row, nothing posted', again.status === 200 && again.body.duplicates === 1 && T.ghost_node_requests.length === rows + 1 && posted.length === 2, JSON.stringify(again.body));
         const carried = await call('POST', '/api/nodes/receipts', { receipts: [{ action_id: 'act-7', action: 'sms.send', verified: true }] }, NODE_TOKEN);
