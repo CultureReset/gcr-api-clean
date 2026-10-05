@@ -29,7 +29,9 @@
 //                                  enrolled as a relay node of the company's
 //                                  business (DECISIONS #69); a deviceToken,
 //                                  when sent, is handed to the computer with
-//                                  its node token (DECISIONS #71)
+//                                  its node token (DECISIONS #71); the
+//                                  assistant's Ghost MCP token is minted and
+//                                  returned once (DECISIONS #74)
 //   GET    /nodes?companyId=       the company's computers (relay rows)
 //   POST   /nodes/:nodeId/revoke   revoke one computer and its agent credentials
 //   POST   /unlink                 the business leaves (export first if asked);
@@ -692,9 +694,12 @@ async function linkedSlug(res, companyId) {
 // Paperclip approved the code the computer shows (its owner typed it there):
 // the node is enrolled for the company's business. `deviceToken`, when sent,
 // is sealed into the pairing and collected by the computer with its node token.
+// The company's assistant gets its Ghost MCP credential for this computer in
+// the same answer, once; Paperclip keeps it as a company secret (DECISIONS #74).
 router.post('/nodes/pair', async (req, res) => {
     const b = req.body || {};
-    const slug = await linkedSlug(res, str(b.companyId));
+    const companyId = str(b.companyId);
+    const slug = await linkedSlug(res, companyId);
     if (!slug) return;
     try {
         const { node } = await nodePairing.approvePairing({
@@ -704,8 +709,12 @@ router.post('/nodes/pair', async (req, res) => {
             approvedBy: str(b.approvedBy) || null,
             deviceToken: str(b.deviceToken) || null,
         });
+        const { token: ghostMcpToken } = await nodePairing.mintMcpToken({ nodeId: node.id, entitySlug: slug, label: `assistant:${companyId}` });
         res.set('Cache-Control', 'no-store');
-        res.status(201).json({ node: { id: node.id, name: node.name, version: node.version, health: node.health, last_seen_at: node.last_seen_at } });
+        res.status(201).json({
+            node: { id: node.id, name: node.name, version: node.version, health: node.health, last_seen_at: node.last_seen_at },
+            ghostMcpToken,
+        });
     } catch (err) {
         fail(res, err.status || 500, err.message);
     }

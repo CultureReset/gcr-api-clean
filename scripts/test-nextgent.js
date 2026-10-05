@@ -252,6 +252,7 @@ app.use('/api/nextgent', require(path.join(ROOT, 'routes/nextgent.js')));
 app.use('/api/claims', require(path.join(ROOT, 'routes/claims.js')));
 app.use('/api/business', require(path.join(ROOT, 'routes/business-data.js')));
 app.use('/api/nodes', require(path.join(ROOT, 'routes/nodes.js')));
+app.use('/api/mcp/ghost', require(path.join(ROOT, 'routes/mcp-ghost.js')));
 const server = app.listen(0, run);
 const base = () => `http://127.0.0.1:${server.address().port}`;
 
@@ -621,6 +622,14 @@ async function run() {
             && 'version' in paired.body.node && 'health' in paired.body.node && 'last_seen_at' in paired.body.node, JSON.stringify(paired.body));
         check('who approved is recorded', T.node_pairings[0]?.approved_by === 'paperclip:u-9' && T.node_pairings[0].entity_slug === 'new-taco-shop');
         check('the device token waits sealed, never in clear', !JSON.stringify(T.node_pairings).includes('pcdev_secret_for_the_box'));
+        // DECISIONS #74: the assistant's Ghost MCP credential is minted with the pairing, returned once.
+        const ghostTok = paired.body.ghostMcpToken;
+        const minted = T.ghost_mcp_tokens.find((t) => t.node_id === T.ghost_nodes[0].id);
+        check('a Ghost MCP token for the company\'s assistant is minted with the pairing and returned once',
+            /^gcr_ghostmcp_/.test(ghostTok || '') && minted?.entity_slug === 'new-taco-shop' && minted.label === 'assistant:co-new', JSON.stringify({ ghostTok, minted }));
+        check('only its hash is stored', minted?.token_hash === sha(ghostTok) && !JSON.stringify(T.ghost_mcp_tokens).includes(ghostTok));
+        const tools = await asUser('POST', '/api/mcp/ghost', { jsonrpc: '2.0', id: 1, method: 'tools/list' }, ghostTok);
+        check('and it reaches this computer through Ghost MCP', tools.status === 200 && Array.isArray(tools.body.result?.tools) && tools.body.result.tools.length > 0, JSON.stringify(tools.body));
         const collected = await plain('POST', '/api/nodes/pair/poll', { device_code: pairStart.body.device_code });
         check('the computer collects its node token and the device token together',
             collected.status === 200 && /^gcr_node_/.test(collected.body.token || '') && collected.body.device_token === 'pcdev_secret_for_the_box', JSON.stringify(collected.body));
@@ -635,6 +644,7 @@ async function run() {
         check('another company cannot revoke it', otherRevoke.status === 404 && !T.ghost_nodes[0].revoked_at);
         const revoked = await signed('POST', `/api/nextgent/nodes/${T.ghost_nodes[0].id}/revoke`, { companyId: 'co-new' });
         check('its own company revokes it', revoked.status === 200 && revoked.body.revoked === true && !!T.ghost_nodes[0].revoked_at, JSON.stringify(revoked.body));
+        check('and its Ghost MCP credential with it', !!minted?.revoked_at && (await asUser('POST', '/api/mcp/ghost', { jsonrpc: '2.0', id: 2, method: 'tools/list' }, ghostTok)).status === 401);
         check('a revoked computer is listed as revoked', (await signed('GET', '/api/nextgent/nodes?companyId=co-new')).body.nodes[0].revoked_at);
 
         console.log('\n── unlink ──');
