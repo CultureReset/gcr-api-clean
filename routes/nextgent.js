@@ -11,8 +11,9 @@
 //   POST   /installs               an agent, app, automation or layout was
 //                                  installed (an automation goes onto the
 //                                  business through lib/automationInstalls.js,
-//                                  the path admin rollouts use too; a layout is
-//                                  only an entity_modules row, DECISIONS #31)
+//                                  the path admin rollouts use too, and gets a
+//                                  token like an agent, DECISIONS #87; a layout
+//                                  is only an entity_modules row, DECISIONS #31)
 //   PATCH  /installs/:installId    an app's or layout's enabled switch, version
 //                                  or manifest changed (re-projected into
 //                                  entity_modules)
@@ -73,9 +74,12 @@ const fail = (res, status, error, extra) => res.status(status).json({ error, ...
 const KINDS = new Set(['agent', 'app', 'automation', 'layout']);
 // The kinds that are projected to an entity_modules row (lib/appInstances.js).
 const PROJECTED_KINDS = new Set(['app', 'layout']);
-// The kinds that act through a token: an agent and an app. An automation runs
-// inside this API; a layout is drawn, it never calls anything.
-const TOKEN_KINDS = new Set(['agent', 'app']);
+// The kinds that act through a token: an agent, an app and an automation
+// (Paperclip's step runner acts on the business through the MCP with the
+// install's token, under exactly the permissions the install declared —
+// messages:send among them when declared; DECISIONS #87). A layout is drawn,
+// it never calls anything.
+const TOKEN_KINDS = new Set(['agent', 'app', 'automation']);
 const ROUTINE_SECRET_PURPOSE = 'routine-webhook-secret';
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
@@ -512,8 +516,9 @@ router.post('/installs', async (req, res) => {
         };
     }
 
-    // Automations run inside this API and need no token: the install is the
-    // entity_automations row, through the same path an admin rollout uses.
+    // An automation install is also the entity_automations row, through the
+    // same path an admin rollout uses (the gcr engine keeps running it until
+    // Paperclip's runner takes over; its token is minted below like an agent's).
     let automation;
     if (kind === 'automation') {
         try {
@@ -543,7 +548,7 @@ router.post('/installs', async (req, res) => {
         }
     }
 
-    // Agents and apps get a token holding only what the owner approved.
+    // Agents, apps and automations get a token holding only what the owner approved.
     let token;
     if (TOKEN_KINDS.has(kind)) {
         try {
@@ -586,7 +591,7 @@ router.post('/installs/:installId/session', async (req, res) => {
     const companyId = str(req.body?.companyId);
     if (companyId && companyId !== data.company_id) return fail(res, 404, 'No such install.');
     if (data.status !== 'active') return fail(res, 409, 'That install was removed.');
-    if (!TOKEN_KINDS.has(data.kind)) return fail(res, 409, `${data.kind === 'automation' ? 'Automation' : 'Layout'} installs have no token.`);
+    if (!TOKEN_KINDS.has(data.kind)) return fail(res, 409, 'Layout installs have no token.');
     try {
         res.set('Cache-Control', 'no-store');
         res.status(201).json(mintInstallSession({ installId: data.install_id, companyId: data.company_id }));

@@ -497,14 +497,20 @@ async function run() {
         const noSuch = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-x', itemKey: 'no-such-automation', kind: 'automation', permissions: [] });
         check('an automation install with no automation behind it is refused, nothing recorded', noSuch.status === 409 && !T.nextgent_installs.some((i) => i.install_id === 'in-x'));
         const auto = await signed('POST', '/api/nextgent/installs', {
-            companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '1', permissions: [],
+            companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '1', permissions: ['bookings:read', 'messages:send'],
             routine: { webhookUrl: 'https://paperclip.test/routines/r1', webhookSecret: 'whsec-plain' },
         });
-        check('an automation install has no token', auto.status === 201 && !auto.body.token, JSON.stringify(auto.body));
+        // DECISIONS #87: Paperclip's runner acts through the business MCP, so an
+        // automation install gets a token scoped to what it declared, like an agent.
+        check('an automation install gets a token', auto.status === 201 && /^gcr_mcp_/.test(auto.body.token || ''), JSON.stringify(auto.body));
+        const autoTok = T.business_mcp_tokens.find((t) => t.install_id === 'in-4');
+        check('scoped to the declared permissions, messages:send included, write scope because of it',
+            autoTok && autoTok.permissions.join(',') === 'bookings:read,messages:send' && autoTok.scope === 'write' && autoTok.company_id === 'co-new' && autoTok.entity_slug === 'new-taco-shop', JSON.stringify(autoTok));
         const ea = T.entity_automations.find((r) => r.automation_id === 'auto-1' && r.entity_slug === 'new-taco-shop');
         check('it puts that automation version on the business, switched on', ea && ea.version === 1 && ea.enabled === true && /^[a-f0-9]{48}$/.test(ea.hook_token), JSON.stringify(ea));
-        const autoUpd = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '2', permissions: [] });
+        const autoUpd = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '2', permissions: ['bookings:read'] });
         check('an update moves it to the new version, keeping its settings', autoUpd.status === 200 && ea.version === 2 && T.entity_automations.length === 1);
+        check('and narrows the token to the permissions now declared', autoTok.permissions.join(',') === 'bookings:read' && autoTok.scope === 'read', JSON.stringify(autoTok));
         const autoRow = T.nextgent_installs.find((i) => i.install_id === 'in-4');
         check('its routine secret is not stored in the clear', autoRow.routine_webhook_secret && !autoRow.routine_webhook_secret.includes('whsec-plain'));
         const routine = await require(path.join(ROOT, 'routes/nextgent.js')).routineFor('in-4');
@@ -518,9 +524,14 @@ async function run() {
             && T.billing_item_charges.find((c) => c.install_id === 'in-2').status === 'removed');
 
         const autoSess = await signed('POST', '/api/nextgent/installs/in-4/session', {});
-        check('an automation install has no session token', autoSess.status === 409);
+        check('an automation install gets a session token too (its permissions as they are now)', autoSess.status === 201 && /^gcr_mcp_ist\./.test(autoSess.body.token || ''), JSON.stringify(autoSess.body));
+        const autoSessLookup = await require(path.join(ROOT, 'lib/businessTokens.js')).lookupToken(autoSess.body.token);
+        check('which resolves to the automation install\'s business and permissions', autoSessLookup.slug === 'new-taco-shop' && autoSessLookup.permissions.join(',') === 'bookings:read' && autoSessLookup.installId === 'in-4', JSON.stringify(autoSessLookup));
         const delAuto = await signed('DELETE', '/api/nextgent/installs/in-4');
         check('removing an automation install switches it off', delAuto.body.automationsDisabled === 1 && ea.enabled === false && T.entity_automations.length === 1);
+        check('and revokes its token', delAuto.body.tokensRevoked === 1 && !!autoTok.revoked_at, JSON.stringify(delAuto.body));
+        const layoutSess = await signed('POST', '/api/nextgent/installs/in-no-layout/session', {});
+        check('a missing install is 404', layoutSess.status === 404);
 
         console.log('\n── usage from LiteLLM ──');
         delete process.env.LITELLM_USAGE_PULL;
