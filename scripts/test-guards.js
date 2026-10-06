@@ -193,12 +193,20 @@ async function run() {
         console.log('\n── one Stripe event, processed once ──');
         const event = { id: 'evt_1', type: 'payment_intent.succeeded', data: { object: { id: 'pi_1', amount: 1000, currency: 'usd', metadata: { booking_id: 'bk-1' } } } };
         r = await call('POST', '/api/stripe/webhook', { body: event });
+        check('missing verification config refuses without mutating or claiming', r.status === 503 && T.bookings[0].payment_status === 'unpaid' && T.stripe_webhook_events.length === 0);
+        process.env.STRIPE_SECRET_KEY = 'sk_test_fixture';
+        process.env.STRIPE_WEBHOOK_SECRET = 'whsec_fixture';
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        const signed = (body) => ({ 'stripe-signature': stripe.webhooks.generateTestHeaderString({ payload: JSON.stringify(body), secret: process.env.STRIPE_WEBHOOK_SECRET }) });
+        r = await call('POST', '/api/stripe/webhook', { body: event, headers: { 'stripe-signature': 'invalid' } });
+        check('invalid signature cannot mutate or claim', r.status === 400 && T.bookings[0].payment_status === 'unpaid' && T.stripe_webhook_events.length === 0);
+        r = await call('POST', '/api/stripe/webhook', { body: event, headers: signed(event) });
         check('the first delivery marks the booking paid', r.status === 200 && T.bookings[0].payment_status === 'paid', `${r.status} ${JSON.stringify(r.body)}`);
         T.bookings[0].payment_status = 'unpaid';
-        r = await call('POST', '/api/webhooks/stripe', { body: event });
+        r = await call('POST', '/api/webhooks/stripe', { body: event, headers: signed(event) });
         check('the same event on the other route is not processed again', r.status === 200 && r.body.duplicate === true && T.bookings[0].payment_status === 'unpaid', `${r.status} ${JSON.stringify(r.body)}`);
         check('the event id was recorded once', T.stripe_webhook_events.length === 1 && T.stripe_webhook_events[0].event_id === 'evt_1');
-        r = await call('POST', '/api/webhooks/stripe', { body: { ...event, id: 'evt_2' } });
+        r = await call('POST', '/api/webhooks/stripe', { body: { ...event, id: 'evt_2' }, headers: signed({ ...event, id: 'evt_2' }) });
         check('a new event id is processed', r.status === 200 && T.bookings[0].payment_status === 'paid');
 
         console.log('\n── the webhook URL is this API\'s own address ──');

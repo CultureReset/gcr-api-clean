@@ -868,6 +868,12 @@ async function handleStripeWebhook(req, res) {
     let event;
     let verified = false;
 
+    // Never accept payment events without verification, including when a
+    // deployment is missing its keys. Do this before claiming the event id.
+    if (!process.env.STRIPE_WEBHOOK_SECRET || !process.env.STRIPE_SECRET_KEY) {
+        return res.status(503).json({ error: 'Stripe webhook verification is not configured' });
+    }
+
     if (process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_SECRET_KEY) {
         const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
         const sig = req.headers['stripe-signature'];
@@ -879,12 +885,6 @@ async function handleStripeWebhook(req, res) {
         } catch (err) {
             console.error('Stripe webhook signature failed:', err.message);
             return res.status(400).json({ error: 'Invalid signature' });
-        }
-    } else {
-        try {
-            event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-        } catch (err) {
-            return res.status(400).json({ error: 'Invalid JSON' });
         }
     }
 
