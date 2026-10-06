@@ -39,6 +39,7 @@ database named in `CLAUDE.md`, after checking it is the right project.
 | 15 | `nextgent_automations.sql` | `automation_waits`, `owner_automation_drafts`; needs `automations.sql` and `booking_ingestion_tables.sql` |
 | 15a | `nextgent_scheduler_state.sql` | `scheduler_state`: the booking completion check's first-run watermark. Until it is applied the check completes nothing |
 | 15b | `nextgent_stripe_events.sql` | `stripe_webhook_events`: every Stripe event id acted on, so an event delivered twice (either webhook path, or a retry) is processed once |
+| 15c | `nextgent_automation_execution_owner.sql` | `nextgent_installs.execution_owner` and mutually exclusive executor guards. Apply after 8 and 15 and before native Paperclip automation registration. Existing legacy settings, history and waits stay; conflicting takeover returns `automation_handoff_required` until reconciled |
 | 16 | `nextgent_intake.sql` | forwarding confirmation rules (seeded) and confirmations, `intake_known_senders`, `email_parser_log.intake_state`, `payments_detected` |
 | 17 | `nextgent_nodes.sql` | computer pairing (device flow), remote-view sessions, task id and receipt columns on `ghost_node_requests` (needs `ghost_nodes.sql`) |
 | 17a | `nextgent_nodes_registry.sql` | `ghost_nodes.registry_state` / `registry_synced_at`: what the heartbeat last pushed to Paperclip's device registry, and when (lib/deviceSync.js, DECISIONS #73). Until applied, nothing is pushed; heartbeats are unaffected (needs `ghost_nodes.sql`) |

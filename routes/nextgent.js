@@ -347,8 +347,12 @@ router.post('/installs', async (req, res) => {
     const installId = str(b.installId);
     const itemKey = str(b.itemKey);
     const kind = str(b.kind);
+    const executionOwner = b.executionOwner === undefined ? 'gcr' : str(b.executionOwner);
     if (!companyId || !installId || !itemKey) return fail(res, 400, 'companyId, installId and itemKey are required.');
     if (!KINDS.has(kind)) return fail(res, 400, `kind must be one of ${[...KINDS].join(', ')}.`);
+    if (!['gcr', 'paperclip'].includes(executionOwner) || (executionOwner === 'paperclip' && kind !== 'automation')) {
+        return fail(res, 400, 'executionOwner must be gcr, or paperclip for an automation.');
+    }
 
     let permissions;
     try {
@@ -384,6 +388,7 @@ router.post('/installs', async (req, res) => {
 
     const routine = b.routine;
     if (kind === 'automation' && routine) {
+        if (executionOwner === 'paperclip') return fail(res, 400, 'A Paperclip automation does not use a legacy handoff webhook.');
         if (!/^https:\/\//i.test(str(routine.webhookUrl)) || !str(routine.webhookSecret)) {
             return fail(res, 400, 'routine needs an https webhookUrl and a webhookSecret.');
         }
@@ -401,18 +406,35 @@ router.post('/installs', async (req, res) => {
         .from('nextgent_installs').select('*').eq('install_id', installId).maybeSingle();
     if (readError) return fail(res, 503, `Installs are not set up on this database yet: ${readError.message}`);
 
+    // The native executor owns the definition; GCR only issues its business
+    // token and records billing. Do not silently abandon a legacy install's
+    // settings, history, or durable waits by running a second copy beside it.
+    if (executionOwner === 'paperclip') {
+        try {
+            const legacy = await automationInstalls.automationByKey(itemKey);
+            if (legacy) {
+                const { data, error } = await supabase.from('entity_automations').select('id')
+                    .eq('automation_id', legacy.id).eq('entity_slug', slug).limit(1);
+                if (error) return fail(res, 503, error.message);
+                if (data?.length) return fail(res, 409, 'Reconcile the existing automation settings and waits before moving its execution to Paperclip.', { code: 'automation_handoff_required' });
+            }
+        } catch (err) { return fail(res, err.status || 500, err.message); }
+    }
+
     // An update of an install we already have: new version, or permissions
     // the owner approved since. The token keeps working with the new list.
     if (existing) {
         if (existing.company_id !== companyId) return fail(res, 409, 'That installId belongs to another company.');
+        if (existing.item_key !== itemKey || existing.kind !== kind) return fail(res, 409, 'An install cannot change its item or kind.');
         if (existing.status !== 'active') return fail(res, 409, 'That install was removed; install again with a new installId.');
-        const patch = { permissions, version: b.version ?? existing.version, updated_at: new Date().toISOString(), ...manifestFields };
+        if (existing.execution_owner === 'paperclip' && executionOwner !== 'paperclip') return fail(res, 409, 'This automation is executed by Paperclip; a legacy client cannot take it over.');
+        const patch = { permissions, version: b.version ?? existing.version, execution_owner: executionOwner, updated_at: new Date().toISOString(), ...manifestFields };
         if (kind === 'automation' && routine) {
             patch.routine_webhook_url = str(routine.webhookUrl);
             patch.routine_webhook_secret = secretBox.seal(str(routine.webhookSecret), ROUTINE_SECRET_PURPOSE);
         }
         // An automation moves to the version the store now has (same install path as a new one).
-        if (kind === 'automation') {
+        if (kind === 'automation' && executionOwner === 'gcr') {
             try {
                 await automationInstalls.installFromStore({ itemKey, slug, version: b.version ?? existing.version });
             } catch (err) {
@@ -437,7 +459,7 @@ router.post('/installs', async (req, res) => {
 
     // An automation install puts that automation on the business: the item key
     // is the automation's key. Checked before anything is charged.
-    if (kind === 'automation') {
+    if (kind === 'automation' && executionOwner === 'gcr') {
         try {
             const found = await automationInstalls.automationByKey(itemKey);
             if (!found) return fail(res, 409, `No automation has the key ${itemKey}.`);
@@ -491,6 +513,7 @@ router.post('/installs', async (req, res) => {
         entity_slug: slug,
         item_key: itemKey,
         kind,
+        execution_owner: executionOwner,
         version: b.version != null ? String(b.version) : null,
         permissions,
         routine_webhook_url: kind === 'automation' && routine ? str(routine.webhookUrl) : null,
@@ -525,7 +548,7 @@ router.post('/installs', async (req, res) => {
     // same path an admin rollout uses (the gcr engine keeps running it until
     // Paperclip's runner takes over; its token is minted below like an agent's).
     let automation;
-    if (kind === 'automation') {
+    if (kind === 'automation' && executionOwner === 'gcr') {
         try {
             const done = await automationInstalls.installFromStore({ itemKey, slug, version: b.version });
             automation = { key: done.automation.key, version: done.version };

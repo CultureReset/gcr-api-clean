@@ -508,6 +508,16 @@ async function run() {
             autoTok && autoTok.permissions.join(',') === 'bookings:read,messages:send' && autoTok.scope === 'write' && autoTok.company_id === 'co-new' && autoTok.entity_slug === 'new-taco-shop', JSON.stringify(autoTok));
         const ea = T.entity_automations.find((r) => r.automation_id === 'auto-1' && r.entity_slug === 'new-taco-shop');
         check('it puts that automation version on the business, switched on', ea && ea.version === 1 && ea.enabled === true && /^[a-f0-9]{48}$/.test(ea.hook_token), JSON.stringify(ea));
+        const refusedHandoff = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '2.0.0', permissions: ['bookings:read'], executionOwner: 'paperclip' });
+        check('a native takeover refuses existing legacy settings and waits without changing them', refusedHandoff.status === 409 && refusedHandoff.body.code === 'automation_handoff_required' && ea.enabled === true && ea.version === 1);
+        const nativeBody = { companyId: 'co-new', installId: 'native-automation', itemKey: 'native-review', kind: 'automation', version: '1.0.0', permissions: ['bookings:read'], executionOwner: 'paperclip' };
+        const native = await signed('POST', '/api/nextgent/installs', nativeBody);
+        check('a Paperclip definition needs no duplicate GCR catalog or executor', native.status === 201 && /^gcr_mcp_/.test(native.body.token || '') && T.entity_automations.length === 1, JSON.stringify(native.body));
+        check('the business-token projection records Paperclip execution ownership', T.nextgent_installs.find((i) => i.install_id === 'native-automation')?.execution_owner === 'paperclip');
+        const nativeUpdate = await signed('POST', '/api/nextgent/installs', { ...nativeBody, version: '2.0.0' });
+        check('native semver updates preserve single ownership', nativeUpdate.status === 200 && T.entity_automations.length === 1);
+        const nativeDowngrade = await signed('POST', '/api/nextgent/installs', { ...nativeBody, executionOwner: 'gcr' });
+        check('a legacy client cannot take over a native install', nativeDowngrade.status === 409 && T.nextgent_installs.find((i) => i.install_id === 'native-automation')?.version === '2.0.0');
         const autoUpd = await signed('POST', '/api/nextgent/installs', { companyId: 'co-new', installId: 'in-4', itemKey: 'review-request', kind: 'automation', version: '2', permissions: ['bookings:read'] });
         check('an update moves it to the new version, keeping its settings', autoUpd.status === 200 && ea.version === 2 && T.entity_automations.length === 1);
         check('and narrows the token to the permissions now declared', autoTok.permissions.join(',') === 'bookings:read' && autoTok.scope === 'read', JSON.stringify(autoTok));
