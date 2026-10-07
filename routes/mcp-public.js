@@ -31,6 +31,7 @@ const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
 const { CONCIERGE_TOOLS, runConciergeTool } = require('../lib/conciergeTools');
 const { publicTables, allowPublicTable, scrubRow, getSchema, textColumns, publicReason, HIDE_PERSONAL } = require('../lib/businessTables');
 const { MEMORY_TOOLS, MEMORY_TOOL_NAMES, briefing, runMemoryTool } = require('../lib/touristMemory');
+const { readPublicEntity } = require('../lib/entity-query-gateway');
 
 const SERVER_INFO = { name: 'gulf-coast-radar', title: 'Gulf Coast Radar', version: '1.0.0' };
 
@@ -246,8 +247,7 @@ async function readBusiness(slug, a) {
     // function GCR Unified's profile page renders from. Calling it means the
     // agent sees exactly what the website shows, assembled the same way, with
     // one copy of the assembly rather than a second that drifts.
-    const { buildFullEntity } = require('./gcr');
-    const profile = await buildFullEntity(slug).catch(() => null);
+    const profile = await readPublicEntity(slug).catch(() => null);
 
     // ── and the flat sweep, for anything the profile does not reach ──────
     //
