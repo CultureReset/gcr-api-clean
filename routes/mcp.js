@@ -36,6 +36,7 @@ const supabase = require('../db');
 const { ownerRequired } = require('../middleware/ownerAuth');
 const { getSchema, allowTable, cleanBody, textColumns } = require('../lib/businessTables');
 const { createMcpRouter, content, toolError } = require('../lib/mcpServer');
+const { readPublicEntity } = require('../lib/entity-query-gateway');
 
 const SERVER_INFO = { name: 'gcr-api-clean', title: 'Gulf Coast Radar — business', version: '1.0.0' };
 
@@ -140,6 +141,14 @@ const TOOLS = [
         title: 'Which business am I connected to',
         description:
             'The business this connection acts as, and whether it may write. Call this first if you are unsure who you are working for.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    {
+        name: 'read_profile',
+        title: 'Read the business exactly as its public site sees it',
+        description:
+            'Returns the canonical assembled business profile used by the public website and public discovery MCP: hours, photos, modules, sections, offerings, menus, policies, availability, relationships and other published structured data. Use this when you need the whole business rather than one raw section.',
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -294,6 +303,12 @@ async function runTool(name, args, caller) {
                 connection: caller.label || caller.via,
                 sections_available: tables.length,
             });
+        }
+
+        case 'read_profile': {
+            const profile = await readPublicEntity(caller.slug).catch(() => null);
+            if (!profile) return toolError('This business does not have a public profile available.');
+            return content({ business: caller.slug, profile });
         }
 
         case 'list_sections': {
