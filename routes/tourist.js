@@ -2035,6 +2035,45 @@ router.get('/suggested', touristAuthOptional, async (req, res) => {
   }
 });
 
+
+// ── Assistant conversations (voice + text) ────────────────────────────────
+router.get('/conversations', touristAuth, async (req, res) => {
+  const { data, error } = await mainDb.from('assistant_conversations')
+    .select('id, title, updated_at').eq('user_id', req.touristId).order('updated_at', { ascending: false }).limit(20);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ conversations: data || [] });
+});
+
+router.get('/conversations/:id', touristAuth, async (req, res) => {
+  const { data, error } = await mainDb.from('assistant_messages')
+    .select('role, content, created_at').eq('conversation_id', req.params.id).order('created_at');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ messages: data || [] });
+});
+
+router.post('/conversations', touristAuth, async (req, res) => {
+  const { messages } = req.body || {};
+  if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'messages required' });
+  const title = (messages.find(m => m.role === 'user')?.content || 'Conversation').slice(0, 60);
+  const { data: conv, error: cErr } = await mainDb.from('assistant_conversations')
+    .insert({ user_id: req.touristId, title }).select('id').single();
+  if (cErr) return res.status(500).json({ error: cErr.message });
+  const rows = messages.map(m => ({ conversation_id: conv.id, role: m.role, content: m.content }));
+  const { error: mErr } = await mainDb.from('assistant_messages').insert(rows);
+  if (mErr) return res.status(500).json({ error: mErr.message });
+  res.json({ id: conv.id });
+});
+
+router.post('/conversations/:id/messages', touristAuth, async (req, res) => {
+  const { role, content } = req.body || {};
+  if (!role || !content) return res.status(400).json({ error: 'role and content required' });
+  const { error } = await mainDb.from('assistant_messages')
+    .insert({ conversation_id: req.params.id, role, content });
+  if (error) return res.status(500).json({ error: error.message });
+  await mainDb.from('assistant_conversations').update({ updated_at: new Date().toISOString() }).eq('id', req.params.id);
+  res.json({ ok: true });
+});
+
 module.exports = router;
 module.exports.touristAuth = touristAuth;
 module.exports._recomputeAllPreferences = recomputeAllPreferences;
