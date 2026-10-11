@@ -2264,7 +2264,6 @@ router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
     if (status) updates.status = status;
     if (notes !== undefined) updates.notes = notes;
 
-    // Load the claim first so we can link the owner on approval
     const { data: claim, error: claimErr } = await db
       .from('business_claims')
       .select('*')
@@ -2276,7 +2275,6 @@ router.patch('/gcr/claims/:id', authRequired, async (req, res) => {
     if (error) throw error;
 
     let linked = null;
-    // When approving, optionally link the claimant as owner if they already have an auth account
     if (status === 'approved' && (link_owner !== false)) {
       const email = claim.email || claim.contact_email || claim.user_email;
       const slug = claim.entity_slug || claim.slug;
