@@ -391,7 +391,13 @@ async function buildFullEntity(slug) {
       ...sec, items: (itemList || []).filter(i => i.section_id === sec.id),
     }));
 
-  const normalizedPhotos = (photos.data || []).map(p => ({ ...p, url: normalizeImageUrl(p.url), image_url: normalizeImageUrl(p.url), alt_text: p.caption || null }));
+  const normalizedPhotos = (photos.data || [])
+    .map(p => {
+      const url = normalizeImageUrl(p.url || p.image_path);
+      return url ? { ...p, url, image_url: url, alt_text: p.caption || null } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.is_cover ? 1 : 0) - (a.is_cover ? 1 : 0) || (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   return {
     ...entity,
@@ -408,11 +414,19 @@ async function buildFullEntity(slug) {
     // entity_tags is canonical; entity_amenities rows (import strays) merge in
     // so amenity data displays no matter which table it landed in
     tags: (() => {
-      const base = tags.data || [];
+      const SKIP_CATS = new Set(['google_type', 'google_types', 'google_primary_type', 'google_secondary_type', 'location']);
+      const isMachine = s => (/_/.test(s) && s === s.toLowerCase()) || (/^[a-z]+[A-Z]/.test(s) && !/\s/.test(s));
+      const base = (tags.data || []).filter(t => {
+        const name = (t.tag_name || '').trim();
+        if (!name || SKIP_CATS.has(t.tag_category) || isMachine(name)) return false;
+        return true;
+      });
       const seen = new Set(base.map(t => `${(t.tag_category || '')}|${(t.tag_name || '').toLowerCase()}`));
       for (const a of (amenityRowsRes?.data || [])) {
-        const key = `amenity|${(a.amenity || '').toLowerCase()}`;
-        if (a.amenity && !seen.has(key)) { seen.add(key); base.push({ id: `am-${a.id}`, entity_slug: slug, tag_name: a.amenity, tag_category: 'amenity' }); }
+        const name = (a.amenity || '').trim();
+        if (!name || isMachine(name)) continue;
+        const key = `amenity|${name.toLowerCase()}`;
+        if (!seen.has(key)) { seen.add(key); base.push({ id: `am-${a.id}`, entity_slug: slug, tag_name: name, tag_category: 'amenity' }); }
       }
       return base;
     })(),
