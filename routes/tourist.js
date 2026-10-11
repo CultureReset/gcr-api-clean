@@ -1993,6 +1993,48 @@ router.post('/sms-campaign', adminRequired, async (req, res) => {
     res.json({ sent: sentTo.length, total: profiles.length, numbers: sentTo });
 });
 
+
+// GET /api/tourist/suggested — personalized entities based on saves + preference scores
+router.get('/suggested', touristAuthOptional, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 12, 30);
+    const lat = req.query.lat ? parseFloat(req.query.lat) : null;
+    const lng = req.query.lng ? parseFloat(req.query.lng) : null;
+
+    // Pull preference scores and saves for this user
+    const [{ data: scores }, { data: saves }] = await Promise.all([
+      mainDb.from('user_preference_scores').select('tag, score').eq('user_id', req.touristId).order('score', { ascending: false }).limit(20),
+      mainDb.from('tourist_saves').select('entity_slug, category').eq('user_id', req.touristId).limit(50),
+    ]);
+
+    const topTags = (scores || []).map(s => s.tag).filter(Boolean);
+    const savedSlugs = new Set((saves || []).map(s => s.entity_slug));
+    const preferredCats = [...new Set((saves || []).map(s => s.category).filter(Boolean))];
+
+    // Base candidates: active entities, prefer ones matching preferred categories
+    let q = mainDb.from('entity').select('id, slug, name, subtitle, entity_type, entity_subtype, city, hero_image_url, rating, price_range, latitude, longitude, is_active').eq('is_active', true).limit(80);
+    if (preferredCats.length) q = q.in('entity_type', preferredCats);
+    const { data: candidates } = await q;
+
+    // Score them
+    const scored = (candidates || []).map(e => {
+      let score = 0;
+      if (preferredCats.includes(e.entity_type)) score += 3;
+      if (savedSlugs.has(e.slug)) score -= 5; // already saved — deprioritize
+      if (lat && lng && e.latitude && e.longitude) {
+        const d = Math.hypot(e.latitude - lat, e.longitude - lng);
+        score += Math.max(0, 2 - d * 10); // closer is better
+      }
+      if (e.rating) score += Number(e.rating) / 2;
+      return { ...e, _score: score };
+    }).sort((a, b) => b._score - a._score).slice(0, limit);
+
+    res.json({ suggested: scored, based_on: { tags: topTags.slice(0, 5), categories: preferredCats } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
 module.exports.touristAuth = touristAuth;
 module.exports._recomputeAllPreferences = recomputeAllPreferences;
