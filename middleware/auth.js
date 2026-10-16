@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const supabase = require('../db');
+const { isPlatformAdmin } = require('./supabaseSession');
 
 // Verify JWT and attach site_id to request
 // Accepts both Express JWTs (JWT_SECRET) and Supabase JWTs (old + GCR)
@@ -24,6 +25,13 @@ function authRequired(req, res, next) {
 
     // Try old Supabase JWT (Circle Boats)
     supabase.auth.getUser(token).then(async ({ data, error }) => {
+        // A platform admin signed in through Supabase Auth (OAuth: Google/GitHub).
+        if (!error && data.user && await isPlatformAdmin(data.user)) {
+            req.userId = data.user.id;
+            req.role = 'admin';
+            req.admin = { id: data.user.id, email: data.user.email, role: 'admin' };
+            return next();
+        }
         if (!error && data.user) {
             // Look up site_id — first by auth_id (fast path)
             let { data: user } = await supabase

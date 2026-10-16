@@ -95,6 +95,7 @@ const authLimiter = rateLimit({
 
 app.use('/api/business-auth', authLimiter);
 app.use('/api/tourist-auth', authLimiter);
+app.use('/api/oauth', authLimiter);
 
 /* ── and on the one door that is open to everybody ────────────────────────
  *
@@ -166,6 +167,8 @@ app.get('/', (req, res) => res.json({
 
 // Auth
 mount('/api/auth', () => require('./routes/auth'));
+// OAuth (Supabase Auth: Google/GitHub) for the admin and business dashboards
+mount('/api/oauth', () => require('./routes/oauth'));
 
 // GCR & Admin
 mount('/api/gcr', () => require('./routes/gcr'));

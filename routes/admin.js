@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
+const { supabaseAdminFromToken } = require('../middleware/supabaseSession');
 const bcrypt = require('bcrypt');
 const { findExistingEntity, possibleFuzzyDuplicate } = require('../lib/find-existing-entity');
 const { analyzePhoto } = require('../lib/analyze-photo');
@@ -50,16 +51,27 @@ function authRequired(req, res, next) {
   }
 
   // Check if it's a JWT token
+  let decoded;
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch (e) {
+    decoded = null;
+  }
+  if (decoded) {
     if (decoded.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
     req.admin = decoded;
-    next();
-  } catch (e) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return next();
   }
+
+  // A Supabase Auth session (OAuth: Google/GitHub) for a platform admin.
+  supabaseAdminFromToken(token).then(({ user, admin }) => {
+    if (!user) return res.status(401).json({ error: 'Invalid token' });
+    if (!admin) return res.status(403).json({ error: 'Admin access required' });
+    req.admin = admin;
+    next();
+  }).catch(() => res.status(401).json({ error: 'Invalid token' }));
 }
 
 // ─── CACHE INVALIDATION ───────────────────────────────────────────────────────
