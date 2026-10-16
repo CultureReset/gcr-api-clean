@@ -98,6 +98,17 @@ async function backfillAnonymousActivity(userId, visitorId) {
             mainDb.from('tourist_seen')
                 .update({ tourist_id: userId })
                 .eq('tourist_id', visitorId),
+            // Concierge chats a guest had (tourist.js /ai-chat guest path) are
+            // keyed by guest_id with user_id null — hand them to the account.
+            // Messages hang off the conversation id, so they follow.
+            mainDb.from('tourist_ai_conversations')
+                .update({ user_id: userId, guest_id: null })
+                .eq('guest_id', visitorId),
+            // Close the guest trial clock so this guest id can't keep chatting
+            // signed-out after the browser has become a real account.
+            mainDb.from('tourist_guest_usage')
+                .update({ merged_into: userId })
+                .eq('guest_id', visitorId),
         ]);
 
         // tourist_saves has a (user_id, entity_slug) unique constraint, so a

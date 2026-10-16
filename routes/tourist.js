@@ -1001,9 +1001,83 @@ async function touristOrAdminAuth(req, res, next) {
     }
 }
 
-router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
-    const { message = '', history = [], image, url, conversation_id: clientConvId, lat: userLat, lng: userLng } = req.body || {};
+// ── Guest trial on the concierge ─────────────────────────────────────────
+// A signed-out visitor may chat with no Bearer token by sending the
+// gcr_guest_id UUID as X-Guest-Id. Guests get the read-only public directory
+// tools only (no memory writes, no URL fetch, no images), are rate-limited per
+// guest id and per IP, and are cut off once lib/guestUsage.js says their
+// trial time is used up — the client then asks them to sign in by phone.
+// A real token (tourist or admin) still goes through touristOrAdminAuth
+// unchanged.
+const guestUsage = require('../lib/guestUsage');
+const rateLimit = require('express-rate-limit');
+const guestChatLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: Number(process.env.GUEST_CHAT_RATE_LIMIT || 30),
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => !req.isGuest,
+    keyGenerator: (req) => `guest:${req.touristId}`,
+    message: { error: 'You are sending messages quickly — sign in with your phone to keep going.', signin_required: true },
+});
+// Minting a fresh guest id per request is free, so also cap guests per IP.
+// Generous, since a whole hotel's wifi can share one address.
+const guestIpLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: Number(process.env.GUEST_CHAT_IP_RATE_LIMIT || 120),
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => !req.isGuest,
+    message: { error: 'Too many guest messages from this network — sign in with your phone to keep going.', signin_required: true },
+});
+
+function readGuestId(req) {
+    const g = String(req.headers['x-guest-id'] || '').trim();
+    return UUID_RE.test(g) ? g : null;
+}
+
+async function touristAdminOrGuestAuth(req, res, next) {
+    const header = req.headers.authorization;
+    if (header && header.startsWith('Bearer ')) return touristOrAdminAuth(req, res, next);
+    const guestId = readGuestId(req);
+    if (!guestId) return res.status(401).json({ error: 'No token or guest id provided' });
+    try {
+        const status = guestUsage.statusFrom(await guestUsage.getUsage(guestId));
+        if (status.signin_required) {
+            return res.status(403).json({ error: 'Sign in with your phone to keep chatting.', signin_required: true, guest_status: status });
+        }
+    } catch (e) {
+        console.warn('[guest] usage lookup failed (allowing):', e.message);
+    }
+    req.touristId = guestId;
+    req.isGuest = true;
+    return next();
+}
+
+// GET /guest/status — the guest's trial clock (X-Guest-Id header).
+router.get('/guest/status', async (req, res) => {
+    const guestId = readGuestId(req);
+    if (!guestId) return res.status(400).json({ error: 'X-Guest-Id required' });
+    res.json(guestUsage.statusFrom(await guestUsage.getUsage(guestId)));
+});
+
+// POST /guest/heartbeat { active_ms } — add foreground time since the last
+// beat (capped server-side at 60s per beat). Creates the row on first call.
+router.post('/guest/heartbeat', guestIpLimiter, async (req, res) => {
+    const guestId = readGuestId(req);
+    if (!guestId) return res.status(400).json({ error: 'X-Guest-Id required' });
+    res.json(await guestUsage.recordUsage(guestId, { deltaMs: req.body?.active_ms }));
+});
+
+router.post('/ai-chat', touristAdminOrGuestAuth, guestIpLimiter, guestChatLimiter, async (req, res) => {
+    const isGuest = !!req.isGuest;
+    const body = req.body || {};
+    const { message = '', history = [], conversation_id: clientConvId, lat: userLat, lng: userLng } = body;
+    // Guests: text only — no images (cost) and no server-side URL fetches.
+    const image = isGuest ? undefined : body.image;
+    const url   = isGuest ? undefined : body.url;
     if (!message && !image) return res.status(400).json({ error: 'Message required' });
+    if (isGuest && String(message).length > 2000) return res.status(400).json({ error: 'Message too long' });
 
     if (!process.env.ANTHROPIC_API_KEY) {
         return res.json({ reply: "AI concierge is being set up — check back soon!" });
@@ -1027,7 +1101,10 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     }
 
     // Pull tourist context: profile, saves, memories
-    const [profileRes, savesRes, memoriesRes] = await Promise.all([
+    // Guests have no profile or memories; their saves live in localStorage
+    // until sign-in, so there is nothing server-side to read for them.
+    const none = Promise.resolve({ data: null });
+    const [profileRes, savesRes, memoriesRes] = isGuest ? await Promise.all([none, none, none]) : await Promise.all([
         mainDb.from('tourist_profiles').select('name, destination, arrival, departure, trip_days, group_type, budget, interests, stay_status, hotel_name').eq('user_id', touristId).maybeSingle(),
         mainDb.from('tourist_saves').select('business_name, entity_slug, category, subtitle, rating, price_range').eq('user_id', touristId).order('saved_at', { ascending: false }).limit(50),
         mainDb.from('tourist_memories').select('category, key, value, tags').eq('user_id', touristId).order('updated_at', { ascending: false })
@@ -1341,12 +1418,15 @@ HARD RULES:
 - No phone numbers — they're chatting with you, not calling the place`;
 
     // ── Tools ──
-    const tools = [
+    let tools = [
         // The five public directory tools live in lib/conciergeTools.js so the
         // MCP server at /api/mcp/public can hand the same five to an outside
         // agent — a voice agent on a phone number, a web chat — and every one
         // of them answers from the same rows as this chat does.
         ...asInputSchemaTools(),
+    ];
+    // Memory tools write to the traveller's account — signed-in only.
+    if (!isGuest) tools.push(
         {
             name: 'save_memory',
             description: 'Remember a durable fact, preference, or pattern about this traveler. Auto-upserts on (category, key).',
@@ -1387,7 +1467,7 @@ HARD RULES:
                 required: ['category','key']
             }
         }
-    ];
+    );
 
     async function executeTool(name, input) {
         // The five public directory tools are implemented in
@@ -1402,6 +1482,7 @@ HARD RULES:
         // save_memory / update_memory / delete_memory keep their names here for
         // the chat's own tool schema, and run through lib/touristMemory.js so
         // there is one writer of tourist_memories rather than two.
+        if (isGuest) return { error: 'Not available until the traveller signs in' };
         if (name === 'save_memory') return runMemoryTool('remember', input, touristId);
         if (name === 'update_memory') return runMemoryTool('remember', { ...input, value: input.new_value }, touristId);
         if (name === 'delete_memory') return runMemoryTool('forget', input, touristId);
@@ -1462,14 +1543,23 @@ HARD RULES:
         }
 
         // Persist conversation + messages
-        let conversationId = clientConvId || null;
+        let conversationId = null;
         try {
+            const ownerCol = isGuest ? 'guest_id' : 'user_id';
+            if (clientConvId) {
+                // Only continue a conversation this caller owns.
+                const { data: own } = await mainDb.from('tourist_ai_conversations')
+                    .update({ updated_at: new Date().toISOString() })
+                    .eq('id', clientConvId).eq(ownerCol, touristId)
+                    .select('id');
+                if (own?.length) conversationId = clientConvId;
+            }
             if (!conversationId) {
+                // Guest conversations are keyed by guest_id (user_id null) and
+                // moved onto the account at sign-in by backfillAnonymousActivity.
                 const title = (message || 'Image conversation').slice(0, 60).replace(/\s+/g, ' ').trim();
-                const { data: conv } = await mainDb.from('tourist_ai_conversations').insert({ user_id: touristId, title }).select('id').single();
+                const { data: conv } = await mainDb.from('tourist_ai_conversations').insert({ [ownerCol]: touristId, title }).select('id').single();
                 conversationId = conv?.id || null;
-            } else {
-                await mainDb.from('tourist_ai_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId).eq('user_id', touristId);
             }
             if (conversationId) {
                 await mainDb.from('tourist_ai_messages').insert([
@@ -1481,7 +1571,9 @@ HARD RULES:
             console.warn('Tourist AI chat persist failed (non-fatal):', persistErr.message);
         }
 
-        res.json({ reply: finalReply || 'Try rephrasing!', tool_results: toolResults, conversation_id: conversationId });
+        let guest_status;
+        if (isGuest) guest_status = await guestUsage.recordUsage(touristId, { chat: true }).catch(() => undefined);
+        res.json({ reply: finalReply || 'Try rephrasing!', tool_results: toolResults, conversation_id: conversationId, ...(guest_status ? { guest_status } : {}) });
     } catch (err) {
         console.error('Tourist AI chat error:', err.message);
         res.json({ reply: 'Something went wrong — try again!' });
