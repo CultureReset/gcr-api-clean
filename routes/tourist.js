@@ -1001,8 +1001,52 @@ async function touristOrAdminAuth(req, res, next) {
     }
 }
 
-router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
-    const { message = '', history = [], image, url, conversation_id: clientConvId, lat: userLat, lng: userLng } = req.body || {};
+// ── Guest (signed-out) access to the concierge ──
+// No token → the request runs as a read-only guest: public directory tools
+// only, no profile/saves/memories, nothing persisted. A token that is present
+// but invalid still gets the normal 401 so a stale session is noticed.
+const GUEST_RATE_LIMIT = 20;                    // requests…
+const GUEST_RATE_WINDOW_MS = 10 * 60 * 1000;    // …per 10 minutes per IP
+const GUEST_MAX_MESSAGE_CHARS = 1000;
+const GUEST_MAX_HISTORY = 6;
+const GUEST_MAX_HISTORY_CHARS = 1000;
+const guestHits = new Map();                    // ip -> [timestamps]
+
+function guestRateLimited(ip) {
+    const now = Date.now();
+    const hits = (guestHits.get(ip) || []).filter(t => now - t < GUEST_RATE_WINDOW_MS);
+    if (hits.length >= GUEST_RATE_LIMIT) { guestHits.set(ip, hits); return true; }
+    hits.push(now);
+    guestHits.set(ip, hits);
+    if (guestHits.size > 10000) {
+        for (const [k, v] of guestHits) if (!v.length || now - v[v.length - 1] >= GUEST_RATE_WINDOW_MS) guestHits.delete(k);
+    }
+    return false;
+}
+
+function touristOrGuestAuth(req, res, next) {
+    const header = req.headers.authorization;
+    const token = header && header.startsWith('Bearer ') ? header.split(' ')[1] : '';
+    if (token && token !== 'null' && token !== 'undefined') return touristOrAdminAuth(req, res, next);
+    const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'unknown';
+    if (guestRateLimited(ip)) return res.status(429).json({ error: 'Too many requests — sign in or try again in a few minutes.' });
+    req.isGuest = true;
+    req.touristId = null;
+    return next();
+}
+
+router.post('/ai-chat', touristOrGuestAuth, async (req, res) => {
+    const isGuest = !!req.isGuest;
+    let { message = '', history = [], image, url, conversation_id: clientConvId, lat: userLat, lng: userLng } = req.body || {};
+    if (isGuest) {
+        // Guests: text only, capped input, no URL fetch / images / conversation ids
+        message = String(message || '').slice(0, GUEST_MAX_MESSAGE_CHARS);
+        history = (Array.isArray(history) ? history : [])
+            .filter(h => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string')
+            .slice(-GUEST_MAX_HISTORY)
+            .map(h => ({ role: h.role, content: h.content.slice(0, GUEST_MAX_HISTORY_CHARS) }));
+        image = undefined; url = undefined; clientConvId = null;
+    }
     if (!message && !image) return res.status(400).json({ error: 'Message required' });
 
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -1027,7 +1071,8 @@ router.post('/ai-chat', touristOrAdminAuth, async (req, res) => {
     }
 
     // Pull tourist context: profile, saves, memories
-    const [profileRes, savesRes, memoriesRes] = await Promise.all([
+    const noRows = Promise.resolve({ data: null });
+    const [profileRes, savesRes, memoriesRes] = isGuest ? await Promise.all([noRows, noRows, noRows]) : await Promise.all([
         mainDb.from('tourist_profiles').select('name, destination, arrival, departure, trip_days, group_type, budget, interests, stay_status, hotel_name').eq('user_id', touristId).maybeSingle(),
         mainDb.from('tourist_saves').select('business_name, entity_slug, category, subtitle, rating, price_range').eq('user_id', touristId).order('saved_at', { ascending: false }).limit(50),
         mainDb.from('tourist_memories').select('category, key, value, tags').eq('user_id', touristId).order('updated_at', { ascending: false })
@@ -1313,6 +1358,7 @@ LIVE GULF COAST DATA (only recommend places from this list — never invent):
 ${gcrContext}
 ${urlContent ? `\nWEBPAGE CONTENT (URL they shared):\n${urlContent}\n` : ''}
 ${hasUserLoc ? `\nThe traveler's current location is known — each place above shows its distance from them. Prefer closer options when relevant, but don't force it if a farther spot is clearly the better fit.\n` : ''}
+${isGuest ? `\nGUEST MODE: this traveler is not signed in. You have no memory tools and nothing is saved — ignore the MEMORY section below. If they want you to remember things or save places, tell them to sign in.\n` : ''}
 HOW TO CHAT:
 - Warm, casual, fun — like texting a friend who's a local. Short sentences.
 - Drop in local flavor: "trust me on this one", "locals don't even tell tourists about this spot"
@@ -1389,7 +1435,10 @@ HARD RULES:
         }
     ];
 
+    const chatTools = isGuest ? asInputSchemaTools() : tools;
+
     async function executeTool(name, input) {
+        if (isGuest && !CONCIERGE_TOOL_NAMES.has(name)) return { error: 'Sign in to use this feature' };
         // The five public directory tools are implemented in
         // lib/conciergeTools.js and shared with /api/mcp/public. One copy, so a
         // better search here is a better search on the phone and in the search
@@ -1433,7 +1482,7 @@ HARD RULES:
                 model: 'claude-sonnet-4-6',
                 max_tokens: 2048,
                 system: systemPrompt,
-                tools,
+                tools: chatTools,
                 messages: loopMessages
             });
 
@@ -1463,7 +1512,7 @@ HARD RULES:
 
         // Persist conversation + messages
         let conversationId = clientConvId || null;
-        try {
+        if (!isGuest) try {
             if (!conversationId) {
                 const title = (message || 'Image conversation').slice(0, 60).replace(/\s+/g, ' ').trim();
                 const { data: conv } = await mainDb.from('tourist_ai_conversations').insert({ user_id: touristId, title }).select('id').single();
