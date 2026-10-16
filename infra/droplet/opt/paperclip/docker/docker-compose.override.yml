@@ -1,0 +1,6 @@
+services:
+  db:
+    ports: !reset []
+  server:
+    env_file: [paperclip.env]
+    restart: unless-stopped

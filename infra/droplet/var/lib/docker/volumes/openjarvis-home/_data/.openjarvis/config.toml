@@ -1,0 +1,5 @@
+[engine]
+default = "litellm"
+
+[intelligence]
+default_model = "xai/grok-4"

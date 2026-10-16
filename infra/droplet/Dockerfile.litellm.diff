@@ -1,0 +1,11 @@
+--- /opt/openjarvis/deploy/docker/Dockerfile.bak	2026-10-16 20:31:07.852692800 +0000
++++ /opt/openjarvis/deploy/docker/Dockerfile	2026-10-16 20:31:07.860692937 +0000
+@@ -37,7 +37,7 @@
+ # only application code changes.
+ COPY pyproject.toml uv.lock README.md ./
+ RUN pip install --no-cache-dir uv && \
+-    uv export --frozen --no-dev --extra server --no-emit-project > requirements.txt && \
++    uv export --frozen --no-dev --extra server --extra inference-litellm --no-emit-project > requirements.txt && \
+     uv pip install --system --no-deps -r requirements.txt && \
+     uv pip install --system --no-deps "maturin>=1.12.6,<2"
+ 

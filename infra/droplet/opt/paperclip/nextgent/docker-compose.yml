@@ -1,0 +1,36 @@
+# NEXT GENT — production stack.
+#
+# One always-on container: the Paperclip server, which serves the dashboard,
+# the API and runs the agents. The database is Supabase project "Saas"
+# (ref mtjxlyncokedaduvzgmp), not a container here.
+#
+#   cp .env.example .env    # fill in the blanks
+#   docker compose up -d --build
+#
+# Works on any machine with Docker: a VPS, Railway, Render, Fly, a Ghost box.
+# Put HTTPS (Caddy, a load balancer, or the host's own) in front of port 3100.
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # tini is PID 1 inside the image; see docker/docker-compose.yml.
+    pids_limit: 2048
+    ports:
+      - "${NEXTGENT_PORT:-3100}:3100"
+    env_file: .env
+    environment:
+      # Fixed for this product. Everything that varies lives in .env.
+      PAPERCLIP_DEPLOYMENT_MODE: "authenticated"
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: "public"
+      PAPERCLIP_SELF_SERVE_COMPANIES: "true"
+      PAPERCLIP_MIGRATION_AUTO_APPLY: "true"
+      SERVE_UI: "true"
+    volumes:
+      # Run logs, agent workspaces, local backups. Must survive redeploys.
+      - nextgent-data:/paperclip
+
+volumes:
+  nextgent-data:
