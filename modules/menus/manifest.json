@@ -1,0 +1,56 @@
+{
+  "id": "menus",
+  "name": "Menus",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "food",
+  "icon": "🍽️",
+  "description": "Food, drinks and happy-hour menus. One edit shows up on the website, QR menu, listing, link page and connected services.",
+  "tables": [
+    {"name": "ng.menu", "owner": true},
+    {"name": "ng.menu_section", "owner": true},
+    {"name": "ng.menu_item", "owner": true},
+    {"name": "ng.menu_item_price", "owner": true},
+    {"name": "ng.menu_option_group", "owner": true},
+    {"name": "ng.menu_option", "owner": true},
+    {"name": "ng.business", "owner": false},
+    {"name": "ng.media", "owner": false}
+  ],
+  "routes": {
+    "admin": ["GET /api/admin/m/menus/:businessId"],
+    "owner": [
+      "GET /api/m/menus",
+      "GET /api/m/menus/summary",
+      "POST /api/m/menus/items",
+      "PATCH /api/m/menus/items/:id",
+      "DELETE /api/m/menus/items/:id"
+    ],
+    "public": ["GET /api/p/menus/:slug"]
+  },
+  "permissions": ["menus:read", "menus:write"],
+  "admin": {"nav": {"group": "apps", "label": "Menus", "icon": "🍽️", "path": "/apps/menus"}, "screens": ["MenuBuilder", "MenuEditorsHub"]},
+  "user": {
+    "tile": {"label": "Menu", "icon": "🍽️", "summaryEndpoint": "/api/m/menus/summary"},
+    "nav": {"group": "sell", "label": "Menu", "order": 10},
+    "screens": ["MenuEditor", "AiExtract"]
+  },
+  "public": {"pages": [{"path": "/:slug/menu", "component": "PublicMenu"}], "blocks": ["MenuBlock", "SpecialsStrip"]},
+  "settings": {
+    "type": "object",
+    "properties": {
+      "showPrices": {"type": "boolean", "default": true},
+      "staffPin": {"type": "string", "pattern": "^[0-9]{4,6}$"},
+      "syncGoogleBusiness": {"type": "boolean", "default": false},
+      "syncSquare": {"type": "boolean", "default": false}
+    }
+  },
+  "events": {
+    "emits": ["menus.item.created", "menus.item.updated", "menus.item.deleted", "menus.section.updated", "menus.published"],
+    "consumes": ["media.photo.deleted"]
+  },
+  "theme": {"slots": ["menu.header", "menu.sectionTitle", "menu.itemCard"], "variants": {"PublicMenu": ["list", "cards", "dark-board"], "MenuEditor": ["table", "cards"]}},
+  "entitlements": {"access": "plan", "plans": ["starter", "pro"], "trial_days": 7, "limits": {"items": 500}},
+  "presets": ["restaurant", "venue", "food-truck"],
+  "dependsOn": [],
+  "mcp": {"sections": ["ng.menu_section", "ng.menu_item"]}
+}

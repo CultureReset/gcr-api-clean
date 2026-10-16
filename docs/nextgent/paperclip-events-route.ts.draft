@@ -1,0 +1,20 @@
+// DRAFT for paperclip-ng (NOT in this repo's runtime). Add to server/src/routes/nextgent.ts next to the
+// other signed endpoints (receipts/conversations/devices, routes/nextgent.ts:338-347).
+//
+// router.post("/api/nextgent/events", signed, validate(nextgentEventSchema), async (req, res) => {
+//   const evt = req.body as NextgentEvent;            // { eventId, type, moduleId, businessId, entity, payload, actor, at }
+//   const companyId = await businessLink.companyForBusiness(evt.businessId);   // nextgent-business-link.ts
+//   if (!companyId) { res.status(202).json({ ignored: "unlinked business" }); return; }
+//   if (await events.seen(evt.eventId)) { res.status(200).json({ duplicate: true }); return; }   // idempotent
+//   await events.record(companyId, evt);               // shows in Activity
+//   if (evt.actor?.paperclipTaskId) await issues.addComment(evt.actor.paperclipTaskId, summarize(evt));  // "menu item updated"
+//   await routines.fireEventTriggers(companyId, evt.type, evt);   // routines with trigger kind "event"
+//   res.status(202).json({ ok: true });
+// });
+//
+// const nextgentEventSchema = z.object({
+//   eventId: z.string().uuid(), type: z.string().regex(/^[a-z-]+\.[a-z_.]+$/), moduleId: z.string(),
+//   businessId: z.string().uuid().nullable(), entity: z.object({ table: z.string().nullable(), id: z.string().nullable() }),
+//   payload: z.record(z.unknown()), actor: z.record(z.unknown()), at: z.string() });
+//
+// gcr-api-clean side: lib/events/worker.js deliverPaperclip() signs with lib/nextgent/sign.js (contract §3 v2).

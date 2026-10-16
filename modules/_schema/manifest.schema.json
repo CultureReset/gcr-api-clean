@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nextgent.dev/schema/module-manifest.json",
+  "title": "NEXT GENT module manifest",
+  "type": "object",
+  "required": ["id", "name", "version", "kind", "tables", "routes", "events", "entitlements"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,40}$"},
+    "name": {"type": "string"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "kind": {"enum": ["core", "app", "automation", "connector", "agent", "layout", "pack"]},
+    "description": {"type": "string"},
+    "icon": {"type": "string"},
+    "category": {"type": "string"},
+    "tables": {"type": "array", "items": {
+      "type": "object", "required": ["name", "owner"], "additionalProperties": false,
+      "properties": {"name": {"type": "string", "pattern": "^ng\\.[a-z_]+$"}, "owner": {"type": "boolean"}}}},
+    "routes": {"type": "object", "additionalProperties": false,
+      "properties": {
+        "admin":  {"$ref": "#/$defs/routeList"},
+        "owner":  {"$ref": "#/$defs/routeList"},
+        "public": {"$ref": "#/$defs/routeList"}}},
+    "permissions": {"type": "array", "items": {"type": "string", "pattern": "^[a-z-]+:(read|write|admin)$"}},
+    "admin": {"type": "object", "properties": {
+      "nav": {"$ref": "#/$defs/nav"}, "screens": {"type": "array", "items": {"type": "string"}}}},
+    "user": {"type": "object", "properties": {
+      "tile": {"type": "object", "required": ["label"], "properties": {
+        "label": {"type": "string"}, "icon": {"type": "string"}, "summaryEndpoint": {"type": "string"}}},
+      "nav": {"$ref": "#/$defs/nav"},
+      "screens": {"type": "array", "items": {"type": "string"}}}},
+    "public": {"type": "object", "properties": {
+      "pages": {"type": "array", "items": {"type": "object", "required": ["path", "component"],
+        "properties": {"path": {"type": "string"}, "component": {"type": "string"}}}},
+      "blocks": {"type": "array", "items": {"type": "string"}}}},
+    "settings": {"type": "object", "description": "JSON Schema for the module's per-business config"},
+    "events": {"type": "object", "required": ["emits", "consumes"], "additionalProperties": false,
+      "properties": {
+        "emits":    {"type": "array", "items": {"type": "string", "pattern": "^[a-z-]+\\.[a-z_.]+$"}},
+        "consumes": {"type": "array", "items": {"type": "string", "pattern": "^[a-z-]+\\.[a-z_.*]+$"}}}},
+    "theme": {"type": "object", "properties": {
+      "slots": {"type": "array", "items": {"type": "string"}},
+      "variants": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "string"}}}}},
+    "entitlements": {"type": "object", "required": ["access"], "properties": {
+      "access": {"enum": ["free", "plan", "grant"]},
+      "plans": {"type": "array", "items": {"type": "string"}},
+      "trial_days": {"type": "integer", "minimum": 0},
+      "limits": {"type": "object", "additionalProperties": {"type": "integer"}}}},
+    "presets": {"type": "array", "items": {"type": "string"}},
+    "dependsOn": {"type": "array", "items": {"type": "string"}},
+    "mcp": {"type": "object", "properties": {"sections": {"type": "array", "items": {"type": "string"}}}}
+  },
+  "$defs": {
+    "routeList": {"type": "array", "items": {"type": "string", "pattern": "^(GET|POST|PUT|PATCH|DELETE) /"}},
+    "nav": {"type": "object", "properties": {
+      "group": {"type": "string"}, "label": {"type": "string"}, "icon": {"type": "string"},
+      "path": {"type": "string"}, "order": {"type": "integer"}}}
+  }
+}

@@ -410,6 +410,12 @@ mount('/api/verify-dns', () => require('./routes/verify-dns'));
 mount('/api/gcr/deep-crawl', () => require('./routes/gcr/deep-crawl'));
 mount('/api/gcr/admin', () => require('./routes/rehost-photos'));
 
+// NEXT GENT phase 1 (DRAFT, opt-in): canonical ng.* modules + event link. Off unless NEXTGENT_MODULES=1.
+if (process.env.NEXTGENT_MODULES === '1') {
+  require('./lib/moduleLoader').mountModules(app, mount);
+  mount('/api/nextgent/events', () => require('./routes/nextgent-events'));
+}
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: err.message });
