@@ -1,0 +1,98 @@
+# MODULE BUILD SPEC: gcr-api-clean is the canonical module list
+Read-only. gcr-api-clean@e3495a1. All route mounts are in `server.js` (line in col 2). Tables come from each route file's `.from('…')` calls.
+Status values: **mounted**; **unmounted** (commented out in server.js); **helper** (not mounted, but required by another route).
+A live DB table list was not available. "SQL" means the table has a `create table` in repo `sql/` (66 tables total); most tables have no create script in the repo.
+Example sources: ADM = Admin-dashboard-main/src, PA = Plat-admin/src, USR = Dashboards-users-/src, PU = Play-user/src (same code as USR), CCL = cybercheck-login, GA = gcr-admin (copy of CCL), BX = Boxes. These are examples to rebuild from, not code to stack on.
+Correction to TWO-DASHBOARDS.md: `/api/dashboard/*` **is mounted** (server.js:175, routes/dashboard.js, 206 routes, including ai-chat). The CCL calls to it are live, not dead.
+
+## 1. Modules
+| # | module | routes + tables (file:line) | status | admin screen examples | user screen examples | core/add-on | missing backend |
+|---|---|---|---|---|---|---|---|
+| 1 | Auth: admin + user | server.js:168 `/api/auth` routes/auth.js (users, entity_owners, business_invites, site_apps); admin login in admin.js `/login` (admin_users) | mounted | ADM auth/LoginPage.jsx; CCL login.html | USR pages/AcceptInvite.jsx; CCL claim-business.html | core | one identity model (3 user stores: users, admin_users, tourist_profiles) |
+| 2 | Business auth (phone OTP) | :249 business-auth.js (entity_owners, business_signups, platform_config) | mounted | — | USR pages/Login.jsx, SignUp.jsx | core | merge with #1 |
+| 3 | Tourist auth + profile | :256 tourist-auth.js; :257 tourist.js (41 routes); :258 tourist-groups.js (tourist_profiles, tourist_otps, tourist_saves, tourist_groups*) | mounted | ADM tripswipe/Tourists.jsx | front-end apps (not dashboards) | core (consumer) | merge identity with #1 |
+| 4 | Directory / entity (listings, taxonomy, search) | :171 gcr.js (36 routes; entity, access_info, amenities, activity_*…); admin.js `/gcr/*` (130 routes); :410 gcr/deep-crawl.js | mounted | ADM directory/Businesses.jsx, EntityEditor.jsx; PA same; CCL gcr-entity-manager.html | USR Dashboard.jsx (profile) | core | split admin.js /gcr into its own module; entity CRUD lives in admin.js, user.js, site.js and dashboard.js |
+| 5 | Business data (schema-driven slug tables) | :201 business-data.js (entity, entity_owners, platform_admins): /schema, /sections, /:table | mounted | ADM home/Sections.jsx | USR lib/schemaDiscovery.js:67, sections/* | core | install gating (which tables a business has) |
+| 6 | Business profile (rows/singletons/schema) | :302 business-profile.js (entity_modules); :311 ingest.js | mounted | ADM directory/BusinessProfile.jsx | — | core | overlaps #5; pick one |
+| 7 | Claims + sign-ups + invites | gcr.js `/claim`; admin.js `/gcr/claims`, `/invite-business`, `/link-user`; :253 admin-signups.js (business_claims, business_signups, business_invites) | mounted | ADM directory/Claims.jsx, platform/Signups.jsx, Businesses.jsx | USR pages/Claim.jsx | core | — |
+| 8 | Users / people / admins | admin.js `/users`, `/businesses`; :261 admin-tourists.js | mounted | ADM platform/Users.jsx, People.jsx | — | core | one people/accounts endpoint (People.jsx makes 5 calls) |
+| 9 | Menu (food, drinks, happy hour, sides, daily features) | :187 menu-editor.js (39 routes); :188 menu-edit.js; :189 simple-menu-edit.js; user.js `/menu`, `/happy-hours`; dashboard.js `/menu-*`; admin.js `/gcr/menu-*` (menu_sections, menu_items, drink_*, happy_hour_*, entity_sides, entity_daily_features) | mounted ×6 | ADM menu/MenuBuilder.jsx, MenuEditorsHub.jsx; CCL menu-editor.html; BX apps/menu/app/editor/page.tsx | USR sections/MenuSection.jsx, HappyHourSection.jsx; CCL menu-editor-popup.html | add-on | **6 overlapping menu APIs → one** |
+| 10 | Daily update links / rotation | :355,356 update-link.js (50 routes; daily_rotation_*) | mounted | ADM menu/DailyUpdateLinks.jsx | CCL restaurant-editor.html, menu-update.html | add-on (automation) | — |
+| 11 | QR codes + referral | :350 qr.js (26 routes; qr_codes, qr_scans, qr_locations, qr_events, referral_partners, referral_events) | mounted | ADM menu/QrTracker.jsx, QrMenus.jsx, ReferralPartners.jsx; BX apps/menu/app/admin/qr-menus | CCL q.html | add-on | QR menu render (BX app has its own backend) |
+| 12 | Specials | admin.js `/gcr/specials`; gcr.js `/specials`; dashboard.js `/specials`; user.js; site.js (entity_specials, specials) | mounted ×5 | ADM content/Specials.jsx | USR sections/SpecialsSection.jsx | add-on | dedupe; `specials` vs `entity_specials` |
+| 13 | Events | admin.js `/gcr/events`; gcr.js `/events`; dashboard.js; user.js; site.js (entity_events, events) | mounted ×5 | ADM content/Events.jsx, BulkEvents.jsx | USR sections/EventsSection.jsx | add-on | dedupe; `events` vs `entity_events` |
+| 14 | Hours | dashboard.js `/hours`; user.js `/hours`; admin.js entities/:slug/hours (entity_hours, entity_secondary_hours) | mounted ×3 | ADM directory/tabs/HoursTab.jsx | USR sections/HoursSection.jsx | core | dedupe |
+| 15 | Photos / gallery / media | :381 gallery.js; :411 rehost-photos.js; :373 live-photo.js; dashboard.js `/media`, `/gallery`; admin.js photos (entity_photos, entity_gallery, customer_live_photos) | mounted | ADM directory/tabs/PhotosTab.jsx, ai/AiSettings.jsx (repair); CCL photo-repair.html | USR sections/PhotosSection.jsx | core | one media module + storage |
+| 16 | Reviews | :379 reviews.js (entity_reviews); :344 google-business.js (reviews, oauth_tokens); dashboard.js `/reviews`, `/review-questions`; public.js `/review*` | mounted | ADM engagement/GcrReviews.jsx, menu/Reviews.jsx | USR sections/ReviewsSection.jsx; CCL reviews.html | add-on | `reviews` vs `entity_reviews` |
+| 17 | FAQs / team / blog / policies | :382 faqs.js; :380 team.js; :383 blog.js; dashboard.js `/faqs`, `/team`, `/policies` (entity_faqs, faqs, entity_team_members, entity_blog_posts) | mounted | ADM directory/tabs/ContentTab.jsx | USR sections/FaqsSection.jsx, PoliciesSection.jsx | core (profile) | dedupe faqs vs entity_faqs |
+| 18 | Artists + song requests + tips | :388 artists.js (artist_profiles, song_requests); :389 artist-bookings.js; :390 cooperatives.js (song_cooperatives, cooperative_contributions); :391 goals.js (artist_goals, goal_contributions); email-webhook.js | mounted | ADM content/Artists.jsx, ArtistProfiles.jsx | USR lib/artistModule.js:18-71; CCL song-request.html; PU same | add-on | payments for tips are not wired to #29 |
+| 19 | Bookings (unified) | :384 bookings.js (entity_bookings, entity_availability); :364 availability.js (availability_slots, bookable_resources, integration_items); :399 rentals.js, :400 services.js (bookable_resources, booking_events, availability_blocks); admin-platform.js :269 (offerings, offering_prices, promos, booking_calendar, 58 routes); helpers availability-engine.js, capabilities.js | mounted (+2 helpers) | ADM booking/*.jsx (17); platform/Bookings.jsx; CCL booking.html, bookpro.html | USR sections/OfferingsSection.jsx, PriceListSection.jsx; CCL book.html | add-on | **3 booking data models** (entity_bookings / bookable_resources+booking_events / bookings+booking_calendar) → one |
+| 20 | Booking verticals (legacy) | boat-rental.js, charter.js, rides.js, photographer.js | **unmounted** (server.js:365-369) | CCL dashboard-charter.html, beachside-circle-boats-dashboard.html | — | — | drop; covered by #19 |
+| 21 | Transportation | :368 transportation.js (transportation_providers, requests, dispatches) | mounted | — | — | add-on | no screens anywhere |
+| 22 | Deals / openings | :407 deals.js (gcr_deals); admin-platform.js openings | mounted | ADM booking/Openings.jsx | — | add-on | — |
+| 23 | Email parser / booking ingestion | :405,406 email-parser.js (**mounted twice**; email_parser_log, booking_opt_ins, entity_external_calendars); :392 email-webhook.js | mounted | ADM booking/Sources.jsx | — | add-on (parser) | remove the duplicate mount |
+| 24 | Intake + webhooks out | :316,317 intake.js (intake_requests, webhook_endpoints, webhook_deliveries) | mounted | ADM platform/Intake.jsx | — | core | — |
+| 25 | iCal / calendar feeds | admin-platform.js entity_external_calendars; dashboard.js `/ical`; public.js `/ical` | mounted | ADM booking/CalendarFeeds.jsx | — | add-on | dedupe |
+| 26 | Embed widgets | :329 embed.js (availability.js script) | mounted | ADM booking/WebsiteCalendar.jsx | CCL widget.html | add-on | — |
+| 27 | Integrations: FareHarbor, Square, Google Business | :370 fareharbor.js; :360 square.js; :344 google-business.js | mounted | ADM platform/Integrations.jsx | CCL modular-dashboard.html (square) | add-on (connector) | should become connectors under #28 |
+| 28 | Connections (Composio) | :285 admin, :291 owner composio.js (platform_connections, entity_connections, platform_connection_categories) | mounted | ADM appstore/Connections.jsx, booking/Connections.jsx | USR pages/AppStore.jsx | core (connector host) | — |
+| 29 | Payments: Stripe | :359 stripe.js (16 routes; connections, bookings, waivers) | mounted | CCL admin-pricing.html | CCL enter-stripe-key.html, book.html | add-on | no ledger/payouts table; tips (#18) not linked |
+| 30 | Billing / plans | :202 billing.js (billing_plan, billing_plan_limit, billing_subscription, billing_usage) | mounted | ADM store/Store.jsx (plans) | — | core | plans are duplicated in store_plan_items (#31) |
+| 31 | **Store (catalog, versions, deploy, plans, grants, installs)** | :272 admin, :205 owner store.js (store_items, store_versions, store_installs, store_grants, store_plan_items, store_deployments); lib/storeManifest.js; kinds store.js:42; SQL sql/store.sql | mounted | ADM store/Store.jsx, StoreItem.jsx; PA modules/nextgent (PC store) | USR pages/Store.jsx | **core (the add-on mechanism)** | no seeded items; no Paperclip sync; installs don't gate #5 sections |
+| 32 | Automations | :277 admin, :199 owner, :282 public (cron/hook) automations.js (automations, automation_versions, automation_deployments, entity_automations, automation_runs); lib/automationEngine.js; SQL sql/automations.sql | mounted | ADM automations/*.jsx; CCL automation-builder.html (static) | USR pages/Automations.jsx | add-on type | separate install path from #31; should be store kind `automation` only |
+| 33 | Apps (legacy) | apps.js (apps, site_apps); admin.js `/apps`, `/site-apps`; dashboard.js `/apps`; site.js `/apps`; auth.js site_apps | `/api/apps` **unmounted** (:332); admin/dashboard copies mounted | ADM appstore/AppManager.jsx, BusinessApps.jsx; CCL app-store.html | CCL installed-apps.html | — | drop; covered by #31 |
+| 34 | Modules (legacy) | modules.js (module_manifest, user_modules); user.js `/modules` (installed_modules); dashboard.js `/modules`; public.js `/modules`; business-profile entity_modules | `/api/modules` **unmounted** (:333); others mounted | CCL modular-dashboard.html, onboarding-links.html | — | — | drop; covered by #31 |
+| 35 | Ghost boxes / nodes | :244 nodes.js; :270 admin-ghost.js (ghost_nodes, ghost_node_requests); SQL sql/ghost_nodes.sql | mounted | ADM platform/GhostBoxes.jsx | USR pages/Ghost.jsx | add-on (box_release) | — |
+| 36 | MCP (agent access) | :239 mcp.js (business_mcp_tokens); :218,228 mcp-public.js | mounted | — | — | core (agent API) | no admin/user screen to issue tokens |
+| 37 | AI (chat, organize, RAG, config, OCR, providers) | admin.js `/ai-config`, `/ai-organize`, `/gcr/ask`, `/rag-status` (ai_provider_config); :376 ai-provider.js; :408 ocr.js; dashboard.js `/ai-chat`, `/ai-profile`, `/qa-pairs` (ai_conversations, ai_messages, business_memories); public.js `/chat`, `/gcr-chat` | mounted | ADM ai/*.jsx; CCL admin.html AI tabs, ai-chat.html | CCL ai-chat.html | core (admin) + add-on (concierge) | one AI module; ties to Paperclip agents not defined |
+| 38 | Analytics | :385 analytics.js (page_views, conversions); :307 admin-analytics.js; admin.js `*-analytics` | mounted | ADM engagement/Analytics.jsx, Behaviour.jsx, tripswipe/Analytics.jsx | — | core | per-business user view missing |
+| 39 | SMS (blasts, QR sign-up, OTP) | :347 sms.js (sms_qr_codes, sms_qr_scans, tourist_otps); admin.js `/sms-blast*`; webhooks.js sms_log, sms_opt_outs | mounted | ADM tripswipe/SmsBlasts.jsx, SmsQr.jsx, SmsSettings.jsx | — | add-on | — |
+| 40 | Text-the-dashboard | :323 dashboard-sms.js (dashboard_sms_allowlist, dashboard_sms_log) | mounted | ADM platform/TextTheDashboard.jsx | — | add-on | — |
+| 41 | Messaging / WhatsApp | messaging.js (conversations, messages); whatsapp.js (whatsapp_connections); meta-webhook.js :393 (social_posts) | messaging + whatsapp **unmounted** (:396,:403); meta-webhook mounted | ADM engagement/Messaging.jsx (calls an `unverified` endpoint) | — | add-on | inbox module needed (tables don't exist) |
+| 42 | Social posts | admin.js `/social-posts`; gcr.js `/social-posts`; meta-webhook.js | mounted | ADM engagement/Social.jsx | — | add-on | — |
+| 43 | Ads / page rails / coupons / category cards | admin.js `/gcr/ads`, `/gcr/page-rails`, `/gcr/coupons`; admin-settings.js category_cards; dashboard.js `/coupons`, `/promotions` | mounted | ADM content/Ads.jsx, Rails.jsx, Coupons.jsx; directory/SiteEditor.jsx | — | core (platform) / add-on (coupons) | — |
+| 44 | Loyalty / points / rewards | dashboard.js `/loyalty`; public.js `/loyalty`; platform.js `/rewards`, `/redeem` (points_config, tourist_points, loyalty_programs) | mounted | ADM tripswipe/Points.jsx | CCL js/loyalty-rewards.js | add-on | consumer and business loyalty are split |
+| 45 | Trip Swipe settings / sponsored / setup questions | admin.js `/tripswipe/*`, `/trip-swipe-button`; :264 setup-questions.js | mounted | ADM tripswipe/*.jsx | — | core (platform) | — |
+| 46 | AR hunts | :351 ar-hunts.js | mounted | ADM platform/ArHunts.jsx | — | add-on | — |
+| 47 | Waivers | dashboard.js `/waivers`; public.js `/waiver*`; platform.js `/waiver-*`; site.js; stripe/square (waivers) | mounted ×5 | — | CCL waiver.html | add-on | 5 copies → one module |
+| 48 | Site / website builder / pages / domains / theme / SEO | :184 site.js (41 routes; site_content, site_apps…); dashboard.js `/pages`, `/website-content`, `/theme`, `/domains`, `/seo`, `/publish`; :409 verify-dns.js; :334 platform.js `/page`, `/manage` | mounted | ADM directory/SiteEditor.jsx, content/Seo.jsx | CCL manage.html, biz.html, page.html | add-on | site_content vs entity_sections; 3 page systems |
+| 49 | Link hub | :352 links.js (reads all profile tables) | mounted | — | CCL card.html, card-builder.html | add-on | link/card config table |
+| 50 | Platform records / registry / my | :334 platform.js (34 routes; entity_sections, entity_section_items, ai_facts, tourist_points) | mounted | — | CCL onboarding-links.html | core? | overlaps #5, #44, #47, #48 |
+| 51 | Customers / CRM | admin.js `/gcr/customers`; dashboard.js `/customers`, `/contacts`; site.js; qr.js customers | mounted | ADM engagement/Customers.jsx | CCL customer-dashboard.html | core | dedupe |
+| 52 | Orders / ordering | site.js `/orders`; dashboard.js `/orders`; public.js `/order`; webhooks.js orders | mounted | — | — | add-on | no screen, no payment link |
+| 53 | Fleet / units / addons / time slots (rental site) | dashboard.js `/fleet*`, `/units`, `/addons`, `/time-slots`, `/group-rates`; site.js same (fleet_types, rental_*) | mounted | — | CCL beachside-circle-boats-dashboard.html | add-on | overlaps #19 |
+| 54 | Settings (platform kv, provider status) | :296 admin-settings.js (platform_settings, business_leads, community_photos) | mounted | ADM platform/Settings.jsx, ApiKeys.jsx | — | core | — |
+| 55 | Leads (business + sales) | admin-settings.js business_leads; admin.js `/sales-leads`; public.js `/business-lead`; gcr.js `/nfc-card-lead` | mounted | ADM platform/Leads.jsx, tripswipe/BusinessLeads.jsx | — | core | — |
+| 56 | Voice notes | :404 voice-notes.js (voice_notes) | mounted | — | — | add-on | no screens |
+| 57 | Notifications / webhooks in | :361 webhooks.js (notifications, sms_log, sms_opt_outs) | mounted | — | — | core | notification preferences UI |
+| 58 | Business dashboard monolith | :175 dashboard.js (5640 lines, 206 routes), :178 public.js (3301 lines, 52 routes), :181 user.js (34 routes) | mounted | — | CCL js/*.js (the old business dashboard) | — | **break up into modules #9-#53** |
+
+## 2. Dashboard features with no gcr-api-clean module (a module is needed)
+| feature | example source | needs |
+|---|---|---|
+| Entitlement UI / per-company plan, synced with Paperclip | Paperclip routes/entitlement.ts:42-104; PA modules/nextgent | Paperclip↔gcr store sync module |
+| Agents / skills / routines per business | Paperclip agents, store-pc | agent bridge (only MCP #36 exists) |
+| Messaging inbox / WhatsApp | ADM engagement/Messaging.jsx; CCL js/messaging.js | inbox module (tables missing; routes unmounted) |
+| Ledger / paper trail / audit | DASHBOARD-MODULES "Ledger" (5 entries); CCL audit.html | audit-log module (only activity_log in dashboard.js) |
+| Tip/payment ledger for artists | CCL apps/tipjar.json | payments ledger joined to #18 and #29 |
+| Gift cards, memberships, crowdfund, client galleries, guest videos, forms, checklist | CCL apps/gift-cards.json, memberships.json, crowdfund.json, client-galleries.json, guest-videos.json, forms.json, checklist.json | one module each, or a generic "form/collection" module |
+| Waitlist, reminders, reserve-table | CCL apps/waitlist.json, reminders.json, reserve-table.json; js/waitlist.js | booking sub-features on #19 |
+| Tasks, voice calls, marketing campaigns | CCL js/tasks.js, voice-calls.js, marketing.js | modules |
+| BX menu app (own Next.js API: ai/generate-theme, upload) | BX apps/menu/app/api/* | fold into #9 / #11 |
+| Paperclip fleet / agents admin screens | DASHBOARD-MODULES "Fleet / Paperclip / Agents" (31) | backend lives in Paperclip; gcr needs only the bridge |
+| Install-token / app session for standalone apps | Paperclip nextgent.ts:187 | gcr-side install session (store-content gcr.install target) |
+
+## 3. Duplicates to drop (keep → drop)
+| keep | drop |
+|---|---|
+| #31 store | apps.js, modules.js, admin.js `/apps` `/site-apps`, dashboard.js `/apps` `/modules`, user.js `/modules`, public.js `/modules`, site.js `/apps`, tables apps/site_apps/module_manifest/user_modules/installed_modules/entity_modules |
+| #31 store kind automation | separate automations deploy/install path (keep the engine + runs) |
+| #31 store_plan_items | billing.js billing_plan duplicates (keep billing_subscription/usage only) |
+| #9 one menu API | menu-edit.js, simple-menu-edit.js, user.js `/menu`, dashboard.js `/menu-*`, site.js `/menu-items` |
+| #19 one booking model | boat-rental, charter, rides, photographer (unmounted); site.js/dashboard.js fleet, time-slots, addons; parallel tables bookings / entity_bookings / booking_events |
+| #5 business-data (schema-driven) | business-profile.js profile-rows (or vice versa), platform.js `/records`, user.js entity CRUD, dashboard.js profile CRUD |
+| one each: specials, events, hours, faqs, reviews, waivers, customers | 3-5 copies each across admin.js, dashboard.js, user.js, site.js, public.js, platform.js |
+| email-parser single mount | duplicate mount server.js:405/406 |
+| `/api/webhooks` (webhooks.js) | collision with email-webhook.js at the same path (server.js:361,392); rename one |
+| one auth | admin_users / users / tourist_profiles / entity_owners as separate logins |
+| Dashboards (examples only) | Plat-admin vs ADM (190/191 shared), Play-user vs USR (same), gcr-admin vs CCL (copy), admin-dashboard- (copy of USR) |
